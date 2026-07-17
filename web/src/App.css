@@ -1,0 +1,150 @@
+:root {
+  color: #1c1917;
+  background: #f5f2eb;
+  font-family: "IBM Plex Sans", "Segoe UI", sans-serif;
+  line-height: 1.45;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background:
+    radial-gradient(circle at top left, #e7efe4 0, transparent 40%),
+    linear-gradient(180deg, #f7f4ee 0%, #efe8dc 100%);
+}
+
+.page {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 2.5rem 1.25rem 4rem;
+}
+
+.eyebrow {
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 0.75rem;
+  color: #57534e;
+  margin: 0 0 0.35rem;
+}
+
+h1 {
+  font-family: "IBM Plex Serif", Georgia, serif;
+  font-weight: 600;
+  font-size: 2rem;
+  margin: 0 0 1.5rem;
+}
+
+h2 {
+  font-size: 1.1rem;
+  margin: 2rem 0 0.75rem;
+}
+
+.create {
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: 1fr auto;
+  align-items: end;
+  margin-bottom: 1.25rem;
+}
+
+.create label {
+  display: grid;
+  gap: 0.35rem;
+  font-size: 0.9rem;
+}
+
+input,
+select,
+button {
+  font: inherit;
+}
+
+input,
+select {
+  padding: 0.6rem 0.7rem;
+  border: 1px solid #d6d3d1;
+  background: #fffdf8;
+  border-radius: 4px;
+}
+
+button {
+  padding: 0.65rem 1rem;
+  border: 0;
+  border-radius: 4px;
+  background: #1f4d3a;
+  color: #f8faf8;
+  cursor: pointer;
+}
+
+button:hover {
+  background: #16382a;
+}
+
+.back {
+  background: transparent;
+  color: #1f4d3a;
+  padding: 0;
+  margin-bottom: 1rem;
+}
+
+.list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 0.5rem;
+}
+
+.list li {
+  background: rgba(255, 253, 248, 0.9);
+  border: 1px solid #e7e5e4;
+  border-radius: 4px;
+}
+
+.linkish {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: 0.75rem;
+  align-items: center;
+  text-align: left;
+  background: transparent;
+  color: inherit;
+  padding: 0.85rem 1rem;
+}
+
+.member {
+  display: grid;
+  grid-template-columns: 1.2fr 1.4fr 0.7fr 0.7fr;
+  gap: 0.75rem;
+  padding: 0.85rem 1rem;
+}
+
+.status {
+  color: #57534e;
+  font-size: 0.85rem;
+}
+
+.error {
+  color: #9f1239;
+}
+
+.empty {
+  padding: 1rem;
+  color: #57534e;
+}
+
+@media (max-width: 640px) {
+  .create {
+    grid-template-columns: 1fr;
+  }
+
+  .member,
+  .linkish {
+    grid-template-columns: 1fr;
+  }
+}

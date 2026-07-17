@@ -40,32 +40,40 @@ Auth providers and payment processors are integrations. This repo is the source 
 
 ## Status
 
-**Phase 1 complete:** Go API skeleton, Postgres migrations (schema + seeded permissions/trial plan), health/readiness endpoints, and tests.
+**Phase 2 complete:** organisations, users, memberships, `/v1/signup`, sqlc queries, ops UI scaffold, and tests.
 
-Next: Phase 2 — organisations, users, memberships APIs + ops frontend.
+Next: Phase 3 — authz check APIs + role editor.
 
 ## Run locally
 
 ```bash
-# Start Postgres
+# Postgres
 docker compose up -d
 
-# Run API (applies migrations on startup)
+# API (applies migrations on startup)
 export DATABASE_URL='postgres://kyc:kyc@localhost:5432/kyc?sslmode=disable'
 go run ./cmd/api
+
+# Ops UI (separate terminal)
+cd web && npm run dev
 ```
 
-- `GET /healthz` — process alive
-- `GET /readyz` — database reachable
+- API: `http://localhost:8080` (`/healthz`, `/readyz`, `/v1/...`)
+- UI: `http://localhost:5173` (proxies `/v1` to the API)
 
 ## Test
 
 ```bash
-make test
-# or: go test ./...
+make test-go    # Go unit + integration (Docker for Testcontainers)
+make test-web   # Vitest for ops UI
+make test       # both
 ```
 
-Store migration tests use Testcontainers (Docker required).
+Regenerate sqlc after query changes:
+
+```bash
+make sqlc
+```
 
 ## Non-goals (v1)
 
@@ -77,11 +85,12 @@ Store migration tests use Testcontainers (Docker required).
 ## Layout
 
 ```
-cmd/api/              # HTTP server entrypoint
-core/                 # domain packages (organisation, user, membership, authz, billing)
-internal/config/      # env config
-internal/http/        # HTTP handlers
-internal/store/       # Postgres + embedded migrations
-docs/                 # data model, API, flows, testing
-web/                  # ops console (Phase 2+)
+cmd/api/                 # HTTP server entrypoint
+core/                    # domain helpers
+internal/config/         # env config
+internal/http/           # HTTP handlers
+internal/service/        # application services
+internal/store/          # Postgres, migrations, sqlc queries
+web/                     # Vite + React ops console
+docs/                    # data model, API, flows, testing
 ```

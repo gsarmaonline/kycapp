@@ -11,6 +11,7 @@ import (
 
 	"github.com/gsarmaonline/kyc/internal/config"
 	httpserver "github.com/gsarmaonline/kyc/internal/http"
+	"github.com/gsarmaonline/kyc/internal/service"
 	"github.com/gsarmaonline/kyc/internal/store"
 )
 
@@ -31,7 +32,16 @@ func main() {
 		log.Fatalf("migrate: %v", err)
 	}
 
-	srv := httpserver.New(db)
+	svc := service.New(db)
+	corsOrigin := os.Getenv("CORS_ORIGIN")
+	if corsOrigin == "" {
+		corsOrigin = "http://localhost:5173"
+	}
+
+	srv := httpserver.New(db, httpserver.Options{
+		Service:    svc,
+		CORSOrigin: corsOrigin,
+	})
 	httpServer := &http.Server{
 		Addr:              cfg.HTTPAddr,
 		Handler:           srv.Handler(),

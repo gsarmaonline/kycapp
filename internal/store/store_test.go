@@ -22,6 +22,8 @@ func TestMigrationFilesEmbedded(t *testing.T) {
 		"000001_init.down.sql",
 		"000002_seed.up.sql",
 		"000002_seed.down.sql",
+		"000003_idempotency.up.sql",
+		"000003_idempotency.down.sql",
 	} {
 		if !slices.Contains(files, want) {
 			t.Fatalf("missing migration file %q in %v", want, files)

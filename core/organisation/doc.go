@@ -1,3 +1,4 @@
 package organisation
 
-// Package organisation will own organisation domain logic (Phase 2+).
+// Package organisation owns organisation domain helpers (slugify, etc.).
+// Persistence and HTTP live in internal/store and internal/http.

@@ -1,0 +1,145 @@
+package service
+
+import (
+	"context"
+	"errors"
+	"strings"
+
+	"github.com/gsarmaonline/kyc/internal/apperr"
+	"github.com/gsarmaonline/kyc/internal/ids"
+	"github.com/gsarmaonline/kyc/internal/store"
+	"github.com/gsarmaonline/kyc/internal/store/sqlc"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgtype"
+)
+
+type CreateMembershipInput struct {
+	UserID string
+	Email  string
+	RoleID string
+	Status string // optional; default invited
+}
+
+func (s *Service) CreateMembership(ctx context.Context, orgID string, in CreateMembershipInput) (sqlc.Membership, error) {
+	if _, err := s.GetOrganisation(ctx, orgID); err != nil {
+		return sqlc.Membership{}, err
+	}
+	if strings.TrimSpace(in.RoleID) == "" {
+		return sqlc.Membership{}, apperr.Validation("role_id is required")
+	}
+	role, err := s.db.Q().GetRole(ctx, in.RoleID)
+	if err != nil {
+		return sqlc.Membership{}, mapNotFound(err, "role not found")
+	}
+	if role.OrganisationID != orgID {
+		return sqlc.Membership{}, apperr.Validation("role does not belong to organisation")
+	}
+
+	status := strings.TrimSpace(in.Status)
+	if status == "" {
+		status = "invited"
+	}
+	switch status {
+	case "invited", "active":
+	default:
+		return sqlc.Membership{}, apperr.Validation("invalid membership status")
+	}
+
+	var userID string
+	switch {
+	case strings.TrimSpace(in.UserID) != "":
+		user, err := s.GetUser(ctx, in.UserID)
+		if err != nil {
+			return sqlc.Membership{}, err
+		}
+		userID = user.ID
+	case strings.TrimSpace(in.Email) != "":
+		email := strings.ToLower(strings.TrimSpace(in.Email))
+		user, err := s.db.Q().GetUserByEmail(ctx, email)
+		if errors.Is(err, pgx.ErrNoRows) {
+			user, err = s.db.Q().CreateUser(ctx, sqlc.CreateUserParams{
+				ID:     ids.New(),
+				Email:  email,
+				Name:   email,
+				Status: "active",
+			})
+			if err != nil {
+				if store.IsUniqueViolation(err) {
+					return sqlc.Membership{}, apperr.Conflict("email already exists")
+				}
+				return sqlc.Membership{}, err
+			}
+		} else if err != nil {
+			return sqlc.Membership{}, err
+		}
+		userID = user.ID
+	default:
+		return sqlc.Membership{}, apperr.Validation("user_id or email is required")
+	}
+
+	m, err := s.db.Q().CreateMembership(ctx, sqlc.CreateMembershipParams{
+		ID:             ids.New(),
+		OrganisationID: orgID,
+		UserID:         userID,
+		RoleID:         in.RoleID,
+		Status:         status,
+	})
+	if err != nil {
+		if store.IsUniqueViolation(err) {
+			return sqlc.Membership{}, apperr.Conflict("user already a member of organisation")
+		}
+		return sqlc.Membership{}, err
+	}
+	return m, nil
+}
+
+func (s *Service) ListOrganisationMemberships(ctx context.Context, orgID string) ([]sqlc.ListMembershipsByOrganisationRow, error) {
+	if _, err := s.GetOrganisation(ctx, orgID); err != nil {
+		return nil, err
+	}
+	return s.db.Q().ListMembershipsByOrganisation(ctx, orgID)
+}
+
+type UpdateMembershipInput struct {
+	RoleID *string
+	Status *string
+}
+
+func (s *Service) UpdateMembership(ctx context.Context, id string, in UpdateMembershipInput) (sqlc.Membership, error) {
+	m, err := s.db.Q().GetMembership(ctx, id)
+	if err != nil {
+		return sqlc.Membership{}, mapNotFound(err, "membership not found")
+	}
+	params := sqlc.UpdateMembershipParams{ID: id}
+	if in.RoleID != nil {
+		role, err := s.db.Q().GetRole(ctx, *in.RoleID)
+		if err != nil {
+			return sqlc.Membership{}, mapNotFound(err, "role not found")
+		}
+		if role.OrganisationID != m.OrganisationID {
+			return sqlc.Membership{}, apperr.Validation("role does not belong to organisation")
+		}
+		params.RoleID = pgtype.Text{String: *in.RoleID, Valid: true}
+	}
+	if in.Status != nil {
+		st := strings.TrimSpace(*in.Status)
+		switch st {
+		case "invited", "active", "revoked":
+			params.Status = pgtype.Text{String: st, Valid: true}
+		default:
+			return sqlc.Membership{}, apperr.Validation("invalid status")
+		}
+	}
+	out, err := s.db.Q().UpdateMembership(ctx, params)
+	return out, mapNotFound(err, "membership not found")
+}
+
+func (s *Service) AcceptMembership(ctx context.Context, id string) (sqlc.Membership, error) {
+	m, err := s.db.Q().AcceptMembership(ctx, id)
+	return m, mapNotFound(err, "membership not found or not invited")
+}
+
+func (s *Service) RevokeMembership(ctx context.Context, id string) (sqlc.Membership, error) {
+	m, err := s.db.Q().RevokeMembership(ctx, id)
+	return m, mapNotFound(err, "membership not found")
+}

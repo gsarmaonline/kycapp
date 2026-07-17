@@ -1,11 +1,10 @@
-# ignore local env and binaries
 .env
 .env.*
 bin/
 dist/
 *.exe
 .DS_Store
-
-# testcontainers / IDE
 .idea/
 .vscode/
+web/node_modules/
+web/dist/

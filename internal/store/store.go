@@ -10,6 +10,8 @@ import (
 	"github.com/golang-migrate/migrate/v4"
 	_ "github.com/golang-migrate/migrate/v4/database/pgx/v5"
 	"github.com/golang-migrate/migrate/v4/source/iofs"
+	"github.com/gsarmaonline/kyc/internal/store/sqlc"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -20,6 +22,7 @@ var migrationsFS embed.FS
 type Store struct {
 	pool        *pgxpool.Pool
 	databaseURL string
+	q           *sqlc.Queries
 }
 
 // Open connects to Postgres using databaseURL.
@@ -32,7 +35,11 @@ func Open(ctx context.Context, databaseURL string) (*Store, error) {
 		pool.Close()
 		return nil, fmt.Errorf("ping postgres: %w", err)
 	}
-	return &Store{pool: pool, databaseURL: databaseURL}, nil
+	return &Store{
+		pool:        pool,
+		databaseURL: databaseURL,
+		q:           sqlc.New(pool),
+	}, nil
 }
 
 // Close releases the connection pool.
@@ -48,6 +55,28 @@ func (s *Store) Ping(ctx context.Context) error {
 	return s.pool.Ping(ctx)
 }
 
+// Q returns the sqlc queries bound to the pool.
+func (s *Store) Q() *sqlc.Queries {
+	return s.q
+}
+
+// WithTx runs fn inside a database transaction.
+func (s *Store) WithTx(ctx context.Context, fn func(q *sqlc.Queries) error) error {
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("begin tx: %w", err)
+	}
+	defer tx.Rollback(ctx) //nolint:errcheck
+
+	if err := fn(sqlc.New(tx)); err != nil {
+		return err
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("commit tx: %w", err)
+	}
+	return nil
+}
+
 // Migrate applies all embedded up migrations.
 func (s *Store) Migrate() error {
 	return migrateUp(s.databaseURL)
@@ -59,7 +88,6 @@ func migrateUp(databaseURL string) error {
 		return fmt.Errorf("migration source: %w", err)
 	}
 
-	// migrate's pgx driver expects a pgx5:// scheme.
 	m, err := migrate.NewWithSourceInstance("iofs", source, toMigrateURL(databaseURL))
 	if err != nil {
 		return fmt.Errorf("migrate init: %w", err)
@@ -73,7 +101,6 @@ func migrateUp(databaseURL string) error {
 }
 
 func toMigrateURL(databaseURL string) string {
-	// Accept postgres:// and postgresql://; rewrite to pgx5:// for the driver.
 	switch {
 	case len(databaseURL) >= 11 && databaseURL[:11] == "postgres://":
 		return "pgx5://" + databaseURL[11:]
@@ -98,6 +125,15 @@ func (s *Store) PlanExists(ctx context.Context, key string) (bool, error) {
 	var exists bool
 	err := s.pool.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM plans WHERE key = $1)`, key).Scan(&exists)
 	return exists, err
+}
+
+// IsUniqueViolation reports whether err is a Postgres unique_violation.
+func IsUniqueViolation(err error) bool {
+	var pgErr *pgconn.PgError
+	if errors.As(err, &pgErr) {
+		return pgErr.Code == "23505"
+	}
+	return false
 }
 
 // MigrationFiles returns embedded migration filenames (for tests).

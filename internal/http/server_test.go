@@ -17,7 +17,7 @@ type stubDB struct {
 func (s stubDB) Ping(context.Context) error { return s.err }
 
 func TestHealthz(t *testing.T) {
-	srv := New(nil)
+	srv := New(nil, Options{})
 	srv.now = func() time.Time { return time.Date(2026, 7, 17, 12, 0, 0, 0, time.UTC) }
 
 	req := httptest.NewRequest(http.MethodGet, "/healthz", nil)
@@ -40,7 +40,7 @@ func TestHealthz(t *testing.T) {
 }
 
 func TestReadyzOK(t *testing.T) {
-	srv := New(stubDB{})
+	srv := New(stubDB{}, Options{})
 	req := httptest.NewRequest(http.MethodGet, "/readyz", nil)
 	rec := httptest.NewRecorder()
 	srv.Handler().ServeHTTP(rec, req)
@@ -51,7 +51,7 @@ func TestReadyzOK(t *testing.T) {
 }
 
 func TestReadyzDBDown(t *testing.T) {
-	srv := New(stubDB{err: errors.New("boom")})
+	srv := New(stubDB{err: errors.New("boom")}, Options{})
 	req := httptest.NewRequest(http.MethodGet, "/readyz", nil)
 	rec := httptest.NewRecorder()
 	srv.Handler().ServeHTTP(rec, req)
@@ -62,7 +62,7 @@ func TestReadyzDBDown(t *testing.T) {
 }
 
 func TestReadyzNoDB(t *testing.T) {
-	srv := New(nil)
+	srv := New(nil, Options{})
 	req := httptest.NewRequest(http.MethodGet, "/readyz", nil)
 	rec := httptest.NewRecorder()
 	srv.Handler().ServeHTTP(rec, req)
