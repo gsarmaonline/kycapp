@@ -10,7 +10,10 @@ vi.mock('./api', () => ({
   getOrganisation: vi.fn(),
   listMemberships: vi.fn(),
   listRoles: vi.fn(),
+  listPermissions: vi.fn(),
   inviteMember: vi.fn(),
+  updateRole: vi.fn(),
+  createRole: vi.fn(),
 }))
 
 describe('App', () => {

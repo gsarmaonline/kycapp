@@ -22,6 +22,18 @@ export type Role = {
   id: string
   key: string
   name: string
+  description?: string
+  is_system?: boolean
+  permission_keys?: string[]
+}
+
+export type Permission = {
+  id: string
+  key: string
+  resource: string
+  action: string
+  category: string
+  description: string
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
@@ -67,5 +79,26 @@ export function inviteMember(orgId: string, email: string, roleId: string) {
   return request<Membership>(`/v1/organisations/${orgId}/memberships`, {
     method: 'POST',
     body: JSON.stringify({ email, role_id: roleId }),
+  })
+}
+
+export function listPermissions() {
+  return request<{ items: Permission[] }>('/v1/permissions')
+}
+
+export function updateRole(roleId: string, permissionKeys: string[]) {
+  return request<Role>(`/v1/roles/${roleId}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ permission_keys: permissionKeys }),
+  })
+}
+
+export function createRole(
+  orgId: string,
+  input: { key: string; name: string; description?: string; permission_keys: string[] },
+) {
+  return request<Role>(`/v1/organisations/${orgId}/roles`, {
+    method: 'POST',
+    body: JSON.stringify(input),
   })
 }

@@ -1,4 +1,4 @@
-.PHONY: test test-unit test-store test-web build run sqlc compose-up compose-down
+.PHONY: test test-unit test-store test-web build run sqlc compose-up compose-down compose-logs
 
 test:
 	go test ./... -count=1 -timeout 5m
@@ -23,10 +23,13 @@ build:
 	go build -o bin/api ./cmd/api
 
 run: compose-up
-	DATABASE_URL='postgres://kyc:kyc@localhost:5432/kyc?sslmode=disable' go run ./cmd/api
+	@echo "Open http://localhost:8080"
 
 compose-up:
-	docker compose up -d
+	docker compose up --build -d
 
 compose-down:
 	docker compose down
+
+compose-logs:
+	docker compose logs -f

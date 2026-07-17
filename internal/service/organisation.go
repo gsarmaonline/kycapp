@@ -92,10 +92,3 @@ func (s *Service) ArchiveOrganisation(ctx context.Context, id string) (sqlc.Orga
 	org, err := s.db.Q().ArchiveOrganisation(ctx, id)
 	return org, mapNotFound(err, "organisation not found")
 }
-
-func (s *Service) ListRoles(ctx context.Context, orgID string) ([]sqlc.Role, error) {
-	if _, err := s.GetOrganisation(ctx, orgID); err != nil {
-		return nil, err
-	}
-	return s.db.Q().ListRolesByOrganisation(ctx, orgID)
-}

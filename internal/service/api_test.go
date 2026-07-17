@@ -156,6 +156,117 @@ func TestInviteAcceptRevoke(t *testing.T) {
 	}
 }
 
+func TestAuthzCheckKeyAndResourceAction(t *testing.T) {
+	ctx := context.Background()
+	db := openTestDB(t, ctx)
+	svc := service.New(db)
+	h := httpserver.New(db, httpserver.Options{Service: svc}).Handler()
+
+	signup := doJSON(t, h, http.MethodPost, "/v1/signup", map[string]any{
+		"user":         map[string]string{"email": "owner@acme.com", "name": "Owner"},
+		"organisation": map[string]string{"name": "Acme", "slug": "acme-authz"},
+	}, map[string]string{"Idempotency-Key": "authz-flow"})
+	if signup.Code != http.StatusCreated {
+		t.Fatalf("signup: %s", signup.Body.String())
+	}
+	var signed map[string]any
+	decodeBody(t, signup, &signed)
+	orgID := signed["organisation"].(map[string]any)["id"].(string)
+	ownerID := signed["user"].(map[string]any)["id"].(string)
+
+	// Owner allowed via permission key
+	res := doJSON(t, h, http.MethodPost, "/v1/authz/check", map[string]any{
+		"organisation_id": orgID,
+		"user_id":         ownerID,
+		"permission":      "members:invite",
+	}, nil)
+	if res.Code != http.StatusOK {
+		t.Fatalf("check: %s", res.Body.String())
+	}
+	var check map[string]any
+	decodeBody(t, res, &check)
+	if check["allowed"] != true {
+		t.Fatalf("owner should be allowed, got %#v", check)
+	}
+
+	// Same via resource+action
+	res2 := doJSON(t, h, http.MethodPost, "/v1/authz/check", map[string]any{
+		"organisation_id": orgID,
+		"user_id":         ownerID,
+		"resource":        "members",
+		"action":          "invite",
+	}, nil)
+	decodeBody(t, res2, &check)
+	if check["allowed"] != true {
+		t.Fatalf("resource+action should allow, got %#v", check)
+	}
+
+	// Invite member (read-only role), accept, then check invite denied
+	rolesRes := doJSON(t, h, http.MethodGet, "/v1/organisations/"+orgID+"/roles", nil, nil)
+	var roles struct {
+		Items []map[string]any `json:"items"`
+	}
+	decodeBody(t, rolesRes, &roles)
+	var memberRoleID string
+	for _, r := range roles.Items {
+		if r["key"] == "member" {
+			memberRoleID = r["id"].(string)
+		}
+	}
+	inv := doJSON(t, h, http.MethodPost, "/v1/organisations/"+orgID+"/memberships", map[string]any{
+		"email":   "member@acme.com",
+		"role_id": memberRoleID,
+		"status":  "active",
+	}, nil)
+	if inv.Code != http.StatusCreated {
+		t.Fatalf("invite: %s", inv.Body.String())
+	}
+	var membership map[string]any
+	decodeBody(t, inv, &membership)
+	memberUserID := membership["user_id"].(string)
+
+	denied := doJSON(t, h, http.MethodPost, "/v1/authz/check", map[string]any{
+		"organisation_id": orgID,
+		"user_id":         memberUserID,
+		"permission":      "members:invite",
+	}, nil)
+	decodeBody(t, denied, &check)
+	if check["allowed"] != false {
+		t.Fatalf("member should be denied invite, got %#v", check)
+	}
+
+	// Suspend org → owner denied
+	patch := doJSON(t, h, http.MethodPatch, "/v1/organisations/"+orgID, map[string]any{
+		"status": "suspended",
+	}, nil)
+	if patch.Code != http.StatusOK {
+		t.Fatalf("suspend: %s", patch.Body.String())
+	}
+	suspended := doJSON(t, h, http.MethodPost, "/v1/authz/check", map[string]any{
+		"organisation_id": orgID,
+		"user_id":         ownerID,
+		"permission":      "members:invite",
+	}, nil)
+	decodeBody(t, suspended, &check)
+	if check["allowed"] != false {
+		t.Fatalf("suspended org should deny, got %#v", check)
+	}
+
+	// Owner permissions locked
+	var ownerRoleID string
+	for _, r := range roles.Items {
+		if r["key"] == "owner" {
+			ownerRoleID = r["id"].(string)
+		}
+	}
+	lock := doJSON(t, h, http.MethodPatch, "/v1/roles/"+ownerRoleID, map[string]any{
+		"permission_keys": []string{"members:read"},
+	}, nil)
+	if lock.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400 changing owner perms, got %d %s", lock.Code, lock.Body.String())
+	}
+}
+
 func openTestDB(t *testing.T, ctx context.Context) *store.Store {
 	t.Helper()
 	container, err := postgres.Run(ctx,

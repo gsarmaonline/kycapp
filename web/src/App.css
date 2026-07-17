@@ -138,6 +138,56 @@ button:hover {
   color: #57534e;
 }
 
+.roles {
+  margin-top: 2.5rem;
+}
+
+.role-toolbar {
+  display: flex;
+  gap: 1rem;
+  align-items: end;
+  margin-bottom: 1rem;
+}
+
+.role-toolbar label {
+  display: grid;
+  gap: 0.35rem;
+  font-size: 0.9rem;
+}
+
+.perm-group {
+  border: 1px solid #e7e5e4;
+  background: rgba(255, 253, 248, 0.9);
+  border-radius: 4px;
+  margin: 0 0 0.75rem;
+  padding: 0.75rem 1rem 1rem;
+}
+
+.perm-group legend {
+  padding: 0 0.35rem;
+  font-weight: 600;
+}
+
+.perm {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.65rem;
+  align-items: start;
+  margin: 0.45rem 0;
+  font-size: 0.92rem;
+}
+
+.perm em {
+  display: block;
+  font-style: normal;
+  color: #57534e;
+  font-size: 0.85rem;
+}
+
+.role-create {
+  margin-top: 1.25rem;
+}
+
 @media (max-width: 640px) {
   .create {
     grid-template-columns: 1fr;
@@ -146,5 +196,10 @@ button:hover {
   .member,
   .linkish {
     grid-template-columns: 1fr;
+  }
+
+  .role-toolbar {
+    flex-direction: column;
+    align-items: stretch;
   }
 }

@@ -1,3 +1,4 @@
 package authz
 
-// Package authz will own roles, permissions, and authz checks (Phase 3+).
+// Package authz will hold pure authz helpers as the domain grows.
+// Runtime checks currently live in internal/service.

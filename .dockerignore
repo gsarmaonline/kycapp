@@ -1,0 +1,13 @@
+.git
+.gitignore
+bin/
+dist/
+web/node_modules/
+web/dist/
+**/*_test.go
+**/testdata/
+.cursor/
+*.md
+.env
+.env.*
+.DS_Store

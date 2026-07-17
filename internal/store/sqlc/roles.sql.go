@@ -7,6 +7,8 @@ package sqlc
 
 import (
 	"context"
+
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 const addRolePermission = `-- name: AddRolePermission :exec
@@ -23,6 +25,34 @@ type AddRolePermissionParams struct {
 func (q *Queries) AddRolePermission(ctx context.Context, arg AddRolePermissionParams) error {
 	_, err := q.db.Exec(ctx, addRolePermission, arg.RoleID, arg.PermissionID)
 	return err
+}
+
+const checkUserPermission = `-- name: CheckUserPermission :one
+SELECT EXISTS (
+    SELECT 1
+    FROM memberships m
+    JOIN organisations o ON o.id = m.organisation_id
+    JOIN role_permissions rp ON rp.role_id = m.role_id
+    JOIN permissions p ON p.id = rp.permission_id
+    WHERE m.organisation_id = $1
+      AND m.user_id = $2
+      AND m.status = 'active'
+      AND o.status = 'active'
+      AND p.key = $3
+) AS allowed
+`
+
+type CheckUserPermissionParams struct {
+	OrganisationID string `json:"organisation_id"`
+	UserID         string `json:"user_id"`
+	PermissionKey  string `json:"permission_key"`
+}
+
+func (q *Queries) CheckUserPermission(ctx context.Context, arg CheckUserPermissionParams) (bool, error) {
+	row := q.db.QueryRow(ctx, checkUserPermission, arg.OrganisationID, arg.UserID, arg.PermissionKey)
+	var allowed bool
+	err := row.Scan(&allowed)
+	return allowed, err
 }
 
 const createRole = `-- name: CreateRole :one
@@ -55,6 +85,61 @@ func (q *Queries) CreateRole(ctx context.Context, arg CreateRoleParams) (Role, e
 		&i.OrganisationID,
 		&i.Key,
 		&i.Name,
+		&i.Description,
+		&i.IsSystem,
+	)
+	return i, err
+}
+
+const deleteRolePermissions = `-- name: DeleteRolePermissions :exec
+DELETE FROM role_permissions
+WHERE role_id = $1
+`
+
+func (q *Queries) DeleteRolePermissions(ctx context.Context, roleID string) error {
+	_, err := q.db.Exec(ctx, deleteRolePermissions, roleID)
+	return err
+}
+
+const getPermissionByKey = `-- name: GetPermissionByKey :one
+SELECT id, key, resource, action, category, description, is_system FROM permissions
+WHERE key = $1
+`
+
+func (q *Queries) GetPermissionByKey(ctx context.Context, key string) (Permission, error) {
+	row := q.db.QueryRow(ctx, getPermissionByKey, key)
+	var i Permission
+	err := row.Scan(
+		&i.ID,
+		&i.Key,
+		&i.Resource,
+		&i.Action,
+		&i.Category,
+		&i.Description,
+		&i.IsSystem,
+	)
+	return i, err
+}
+
+const getPermissionByResourceAction = `-- name: GetPermissionByResourceAction :one
+SELECT id, key, resource, action, category, description, is_system FROM permissions
+WHERE resource = $1 AND action = $2
+`
+
+type GetPermissionByResourceActionParams struct {
+	Resource string `json:"resource"`
+	Action   string `json:"action"`
+}
+
+func (q *Queries) GetPermissionByResourceAction(ctx context.Context, arg GetPermissionByResourceActionParams) (Permission, error) {
+	row := q.db.QueryRow(ctx, getPermissionByResourceAction, arg.Resource, arg.Action)
+	var i Permission
+	err := row.Scan(
+		&i.ID,
+		&i.Key,
+		&i.Resource,
+		&i.Action,
+		&i.Category,
 		&i.Description,
 		&i.IsSystem,
 	)
@@ -129,6 +214,65 @@ func (q *Queries) ListPermissionIDs(ctx context.Context) ([]string, error) {
 	return items, nil
 }
 
+const listPermissionIDsByKeys = `-- name: ListPermissionIDsByKeys :many
+SELECT id, key FROM permissions
+WHERE key = ANY($1::text[])
+ORDER BY key
+`
+
+type ListPermissionIDsByKeysRow struct {
+	ID  string `json:"id"`
+	Key string `json:"key"`
+}
+
+func (q *Queries) ListPermissionIDsByKeys(ctx context.Context, keys []string) ([]ListPermissionIDsByKeysRow, error) {
+	rows, err := q.db.Query(ctx, listPermissionIDsByKeys, keys)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListPermissionIDsByKeysRow{}
+	for rows.Next() {
+		var i ListPermissionIDsByKeysRow
+		if err := rows.Scan(&i.ID, &i.Key); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listPermissionKeysByRole = `-- name: ListPermissionKeysByRole :many
+SELECT p.key
+FROM role_permissions rp
+JOIN permissions p ON p.id = rp.permission_id
+WHERE rp.role_id = $1
+ORDER BY p.key
+`
+
+func (q *Queries) ListPermissionKeysByRole(ctx context.Context, roleID string) ([]string, error) {
+	rows, err := q.db.Query(ctx, listPermissionKeysByRole, roleID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []string{}
+	for rows.Next() {
+		var key string
+		if err := rows.Scan(&key); err != nil {
+			return nil, err
+		}
+		items = append(items, key)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listPermissions = `-- name: ListPermissions :many
 SELECT id, key, resource, action, category, description, is_system FROM permissions
 ORDER BY category, key
@@ -136,6 +280,46 @@ ORDER BY category, key
 
 func (q *Queries) ListPermissions(ctx context.Context) ([]Permission, error) {
 	rows, err := q.db.Query(ctx, listPermissions)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []Permission{}
+	for rows.Next() {
+		var i Permission
+		if err := rows.Scan(
+			&i.ID,
+			&i.Key,
+			&i.Resource,
+			&i.Action,
+			&i.Category,
+			&i.Description,
+			&i.IsSystem,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listPermissionsFiltered = `-- name: ListPermissionsFiltered :many
+SELECT id, key, resource, action, category, description, is_system FROM permissions
+WHERE ($1::text IS NULL OR category = $1)
+  AND ($2::text IS NULL OR resource = $2)
+ORDER BY category, key
+`
+
+type ListPermissionsFilteredParams struct {
+	Category pgtype.Text `json:"category"`
+	Resource pgtype.Text `json:"resource"`
+}
+
+func (q *Queries) ListPermissionsFiltered(ctx context.Context, arg ListPermissionsFilteredParams) ([]Permission, error) {
+	rows, err := q.db.Query(ctx, listPermissionsFiltered, arg.Category, arg.Resource)
 	if err != nil {
 		return nil, err
 	}
@@ -193,4 +377,33 @@ func (q *Queries) ListRolesByOrganisation(ctx context.Context, organisationID st
 		return nil, err
 	}
 	return items, nil
+}
+
+const updateRole = `-- name: UpdateRole :one
+UPDATE roles
+SET
+  name = COALESCE($1, name),
+  description = COALESCE($2, description)
+WHERE id = $3
+RETURNING id, organisation_id, key, name, description, is_system
+`
+
+type UpdateRoleParams struct {
+	Name        pgtype.Text `json:"name"`
+	Description pgtype.Text `json:"description"`
+	ID          string      `json:"id"`
+}
+
+func (q *Queries) UpdateRole(ctx context.Context, arg UpdateRoleParams) (Role, error) {
+	row := q.db.QueryRow(ctx, updateRole, arg.Name, arg.Description, arg.ID)
+	var i Role
+	err := row.Scan(
+		&i.ID,
+		&i.OrganisationID,
+		&i.Key,
+		&i.Name,
+		&i.Description,
+		&i.IsSystem,
+	)
+	return i, err
 }

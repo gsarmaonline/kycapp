@@ -62,6 +62,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("PATCH /v1/organisations/{id}", s.handlePatchOrganisation)
 	s.mux.HandleFunc("POST /v1/organisations/{id}/archive", s.handleArchiveOrganisation)
 	s.mux.HandleFunc("GET /v1/organisations/{id}/roles", s.handleListRoles)
+	s.mux.HandleFunc("POST /v1/organisations/{id}/roles", s.handleCreateRole)
 	s.mux.HandleFunc("POST /v1/organisations/{id}/memberships", s.handleCreateMembership)
 	s.mux.HandleFunc("GET /v1/organisations/{id}/memberships", s.handleListMemberships)
 
@@ -74,6 +75,11 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("POST /v1/memberships/{id}/accept", s.handleAcceptMembership)
 	s.mux.HandleFunc("PATCH /v1/memberships/{id}", s.handlePatchMembership)
 	s.mux.HandleFunc("DELETE /v1/memberships/{id}", s.handleRevokeMembership)
+
+	s.mux.HandleFunc("GET /v1/permissions", s.handleListPermissions)
+	s.mux.HandleFunc("GET /v1/permissions/{key}", s.handleGetPermission)
+	s.mux.HandleFunc("PATCH /v1/roles/{id}", s.handlePatchRole)
+	s.mux.HandleFunc("POST /v1/authz/check", s.handleAuthzCheck)
 }
 
 // Handler returns the root handler (with optional CORS).
@@ -225,4 +231,28 @@ func subscriptionJSON(sub sqlc.Subscription) map[string]any {
 		out["current_period_end"] = nil
 	}
 	return out
+}
+
+func permissionJSON(p sqlc.Permission) map[string]any {
+	return map[string]any{
+		"id":          p.ID,
+		"key":         p.Key,
+		"resource":    p.Resource,
+		"action":      p.Action,
+		"category":    p.Category,
+		"description": p.Description,
+		"is_system":   p.IsSystem,
+	}
+}
+
+func roleJSON(role service.RoleView) map[string]any {
+	return map[string]any{
+		"id":              role.Role.ID,
+		"organisation_id": role.Role.OrganisationID,
+		"key":             role.Role.Key,
+		"name":            role.Role.Name,
+		"description":     role.Role.Description,
+		"is_system":       role.Role.IsSystem,
+		"permission_keys": role.PermissionKeys,
+	}
 }

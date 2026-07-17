@@ -40,26 +40,38 @@ Auth providers and payment processors are integrations. This repo is the source 
 
 ## Status
 
-**Phase 2 complete:** organisations, users, memberships, `/v1/signup`, sqlc queries, ops UI scaffold, and tests.
+**Phase 3 complete:** permission catalog, role CRUD with permission keys, `POST /v1/authz/check`, and ops role editor.
 
-Next: Phase 3 — authz check APIs + role editor.
+Next: Phase 4 — billing entitlements.
 
 ## Run locally
 
-```bash
-# Postgres
-docker compose up -d
+### Docker (recommended)
 
-# API (applies migrations on startup)
+```bash
+# Stop any local process already using :8080, then:
+docker compose up --build -d
+```
+
+- **Ops UI + API:** http://localhost:8080  
+  (nginx serves the UI and proxies `/v1`, `/healthz`, `/readyz` to the API)
+- Postgres: `localhost:5432`
+
+```bash
+docker compose down
+```
+
+### Local (without Docker for the app)
+
+```bash
+docker compose up -d postgres
+
 export DATABASE_URL='postgres://kyc:kyc@localhost:5432/kyc?sslmode=disable'
 go run ./cmd/api
 
-# Ops UI (separate terminal)
+# Ops UI (separate terminal) — http://localhost:5173
 cd web && npm run dev
 ```
-
-- API: `http://localhost:8080` (`/healthz`, `/readyz`, `/v1/...`)
-- UI: `http://localhost:5173` (proxies `/v1` to the API)
 
 ## Test
 
