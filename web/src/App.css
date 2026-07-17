@@ -27,9 +27,148 @@ body {
   max-width: 420px;
 }
 
+.shell {
+  display: grid;
+  grid-template-columns: 260px 1fr;
+  min-height: 100vh;
+}
+
+.sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  padding: 1.25rem 1rem;
+  border-right: 1px solid #e7e5e4;
+  background: rgba(255, 253, 248, 0.92);
+}
+
+.sidebar-brand .eyebrow {
+  margin-bottom: 0.15rem;
+}
+
+.sidebar-brand strong {
+  font-family: "IBM Plex Serif", Georgia, serif;
+  font-size: 1.15rem;
+}
+
+.org-switcher {
+  display: grid;
+  gap: 0.35rem;
+  font-size: 0.8rem;
+  color: #57534e;
+}
+
+.org-switcher select {
+  width: 100%;
+}
+
+.sidebar-nav {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.nav-item {
+  text-align: left;
+  background: transparent;
+  color: #1c1917;
+  padding: 0.55rem 0.7rem;
+  border-radius: 4px;
+  text-decoration: none;
+  display: block;
+}
+
+.nav-item:hover {
+  background: rgba(31, 77, 58, 0.08);
+}
+
+.nav-item.active {
+  background: #1f4d3a;
+  color: #f8faf8;
+}
+
+.nav-item.active:hover {
+  background: #16382a;
+}
+
+.sidebar-actions,
+.sidebar-footer {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.sidebar-footer {
+  margin-top: auto;
+}
+
+.sidebar-user {
+  margin: 0;
+  font-size: 0.85rem;
+  color: #57534e;
+  word-break: break-all;
+}
+
+.create-org {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.full {
+  width: 100%;
+}
+
+.main {
+  padding: 1.75rem 1.75rem 3rem;
+  max-width: 880px;
+}
+
+.workspace-header {
+  margin-bottom: 1.25rem;
+}
+
+.workspace-header h1 {
+  margin-bottom: 0.35rem;
+}
+
+.section-title {
+  margin: 1.25rem 0 0.75rem;
+  font-size: 1.15rem;
+  font-weight: 600;
+}
+
+.empty-state h1 {
+  margin-bottom: 0.5rem;
+}
+
+.overview-stats {
+  list-style: none;
+  padding: 0;
+  margin: 1.25rem 0 0;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.overview-stats li {
+  padding: 1rem;
+  background: rgba(255, 253, 248, 0.9);
+  border: 1px solid #e7e5e4;
+  border-radius: 4px;
+  display: grid;
+  gap: 0.25rem;
+}
+
+.overview-stats strong {
+  font-size: 1.25rem;
+}
+
+.overview-stats span {
+  color: #57534e;
+  font-size: 0.85rem;
+}
+
 .lede {
   color: #57534e;
-  margin: -0.75rem 0 1.5rem;
+  margin: 0 0 1rem;
 }
 
 .auth-form {
@@ -46,27 +185,6 @@ body {
 
 .auth-form button {
   margin-top: 0.35rem;
-}
-
-.auth-switch {
-  display: grid;
-  gap: 0.5rem;
-}
-
-.auth-switch .linkish {
-  display: block;
-  padding: 0.35rem 0;
-  background: transparent;
-  color: #1f4d3a;
-  text-align: left;
-}
-
-.topbar {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: 1rem;
-  margin-bottom: 0.5rem;
 }
 
 .ghost {
@@ -106,19 +224,19 @@ body {
 h1 {
   font-family: "IBM Plex Serif", Georgia, serif;
   font-weight: 600;
-  font-size: 2rem;
+  font-size: 1.85rem;
   margin: 0 0 1.5rem;
 }
 
 h2 {
   font-size: 1.1rem;
-  margin: 2rem 0 0.75rem;
+  margin: 0 0 0.75rem;
 }
 
 .create {
   display: grid;
   gap: 0.75rem;
-  grid-template-columns: 1fr auto;
+  grid-template-columns: 1fr 1fr auto;
   align-items: end;
   margin-bottom: 1.25rem;
 }
@@ -156,11 +274,9 @@ button:hover {
   background: #16382a;
 }
 
-.back {
-  background: transparent;
-  color: #1f4d3a;
-  padding: 0;
-  margin-bottom: 1rem;
+button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
 }
 
 .list {
@@ -177,18 +293,6 @@ button:hover {
   border-radius: 4px;
 }
 
-.linkish {
-  width: 100%;
-  display: grid;
-  grid-template-columns: 1fr auto auto;
-  gap: 0.75rem;
-  align-items: center;
-  text-align: left;
-  background: transparent;
-  color: inherit;
-  padding: 0.85rem 1rem;
-}
-
 .member {
   display: grid;
   grid-template-columns: 1.2fr 1.4fr 0.7fr 0.7fr;
@@ -199,6 +303,7 @@ button:hover {
 .status {
   color: #57534e;
   font-size: 0.85rem;
+  margin: 0;
 }
 
 .error {
@@ -208,10 +313,6 @@ button:hover {
 .empty {
   padding: 1rem;
   color: #57534e;
-}
-
-.roles {
-  margin-top: 2.5rem;
 }
 
 .role-toolbar {
@@ -260,17 +361,37 @@ button:hover {
   margin-top: 1.25rem;
 }
 
-.billing {
-  margin-top: 2.5rem;
+.billing .lede {
+  margin-top: 0.75rem;
 }
 
-@media (max-width: 640px) {
+@media (max-width: 840px) {
+  .shell {
+    grid-template-columns: 1fr;
+  }
+
+  .sidebar {
+    border-right: 0;
+    border-bottom: 1px solid #e7e5e4;
+  }
+
+  .sidebar-nav {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .sidebar-footer {
+    margin-top: 0;
+  }
+
   .create {
     grid-template-columns: 1fr;
   }
 
-  .member,
-  .linkish {
+  .member {
+    grid-template-columns: 1fr;
+  }
+
+  .overview-stats {
     grid-template-columns: 1fr;
   }
 

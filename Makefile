@@ -1,4 +1,4 @@
-.PHONY: test test-unit test-store test-web build run sqlc compose-up compose-down compose-logs
+.PHONY: test test-unit test-store test-web build run sqlc compose-up compose-down compose-logs web
 
 test:
 	go test ./... -count=1 -timeout 5m
@@ -33,3 +33,7 @@ compose-down:
 
 compose-logs:
 	docker compose logs -f
+
+web:
+	docker compose up --build -d web
+	@echo "Open http://localhost:8080"

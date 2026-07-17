@@ -1,6 +1,14 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { FormEvent } from 'react'
 import {
+  Navigate,
+  NavLink,
+  Route,
+  Routes,
+  useNavigate,
+  useParams,
+} from 'react-router-dom'
+import {
   authProviders,
   captureOAuthTokenFromHash,
   createOrganisation,
@@ -34,12 +42,36 @@ import {
 import './App.css'
 
 type Gate = 'loading' | 'auth' | 'app'
-type View = { name: 'list' } | { name: 'detail'; orgId: string }
+type OrgSection = 'overview' | 'members' | 'roles' | 'billing'
+
+const ORG_SECTIONS: { id: OrgSection; label: string; path: string }[] = [
+  { id: 'overview', label: 'Overview', path: '' },
+  { id: 'members', label: 'Members', path: 'members' },
+  { id: 'roles', label: 'Roles', path: 'roles' },
+  { id: 'billing', label: 'Billing', path: 'billing' },
+]
+
+function sectionFromParam(section?: string): OrgSection {
+  switch (section) {
+    case 'members':
+    case 'roles':
+    case 'billing':
+      return section
+    default:
+      return 'overview'
+  }
+}
+
+function orgPath(orgId: string, section: OrgSection = 'overview') {
+  const base = `/orgs/${orgId}`
+  if (section === 'overview') return base
+  return `${base}/${section}`
+}
 
 export default function App() {
   const [gate, setGate] = useState<Gate>('loading')
   const [user, setUser] = useState<User | null>(null)
-  const [view, setView] = useState<View>({ name: 'list' })
+  const navigate = useNavigate()
 
   async function refreshSession() {
     captureOAuthTokenFromHash()
@@ -67,13 +99,14 @@ export default function App() {
   async function onAuthed(token: string) {
     setToken(token)
     await refreshSession()
+    navigate('/orgs', { replace: true })
   }
 
   async function onLogout() {
     await logout()
     setUser(null)
-    setView({ name: 'list' })
     setGate('auth')
+    navigate('/', { replace: true })
   }
 
   if (gate === 'loading') {
@@ -88,23 +121,14 @@ export default function App() {
     return <AuthScreen onAuthed={onAuthed} />
   }
 
-  if (view.name === 'detail') {
-    return (
-      <OrganisationDetail
-        orgId={view.orgId}
-        user={user}
-        onBack={() => setView({ name: 'list' })}
-        onLogout={onLogout}
-      />
-    )
-  }
-
   return (
-    <OrganisationList
-      user={user}
-      onOpen={(id) => setView({ name: 'detail', orgId: id })}
-      onLogout={onLogout}
-    />
+    <Routes>
+      <Route path="/" element={<Navigate to="/orgs" replace />} />
+      <Route path="/orgs" element={<AppShell user={user} onLogout={onLogout} />} />
+      <Route path="/orgs/:orgId" element={<AppShell user={user} onLogout={onLogout} />} />
+      <Route path="/orgs/:orgId/:section" element={<AppShell user={user} onLogout={onLogout} />} />
+      <Route path="*" element={<Navigate to="/orgs" replace />} />
+    </Routes>
   )
 }
 
@@ -185,122 +209,175 @@ function AuthScreen({ onAuthed }: { onAuthed: (token: string) => Promise<void> }
   )
 }
 
-function OrganisationList({
-  user,
-  onOpen,
-  onLogout,
-}: {
-  user: User | null
-  onOpen: (id: string) => void
-  onLogout: () => Promise<void>
-}) {
-  const [items, setItems] = useState<Organisation[]>([])
-  const [name, setName] = useState('')
-  const [error, setError] = useState<string | null>(null)
-  const [loading, setLoading] = useState(true)
+function AppShell({ user, onLogout }: { user: User | null; onLogout: () => Promise<void> }) {
+  const { orgId: routeOrgId, section: routeSection } = useParams()
+  const navigate = useNavigate()
+  const section = sectionFromParam(routeSection)
 
-  async function refresh() {
-    setLoading(true)
-    setError(null)
+  const [orgs, setOrgs] = useState<Organisation[]>([])
+  const [orgsError, setOrgsError] = useState<string | null>(null)
+  const [orgsLoading, setOrgsLoading] = useState(true)
+  const [creating, setCreating] = useState(false)
+  const [newOrgName, setNewOrgName] = useState('')
+
+  const selected = orgs.find((o) => o.id === routeOrgId) ?? null
+
+  async function refreshOrgs() {
+    setOrgsLoading(true)
+    setOrgsError(null)
     try {
       const res = await listOrganisations()
-      setItems(res.items)
+      setOrgs(res.items)
+      return res.items
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to load')
+      setOrgsError(e instanceof Error ? e.message : 'Failed to load organisations')
+      return [] as Organisation[]
     } finally {
-      setLoading(false)
+      setOrgsLoading(false)
     }
   }
 
   useEffect(() => {
-    void refresh()
-  }, [])
+    void (async () => {
+      const items = await refreshOrgs()
+      if (!routeOrgId && items[0]) {
+        navigate(orgPath(items[0].id, 'overview'), { replace: true })
+        return
+      }
+      if (routeOrgId && items.length > 0 && !items.some((o) => o.id === routeOrgId)) {
+        navigate(items[0] ? orgPath(items[0].id) : '/orgs', { replace: true })
+      }
+    })()
+  }, [routeOrgId])
 
-  async function onCreate(e: FormEvent) {
+  function switchOrg(id: string) {
+    navigate(orgPath(id, section === 'overview' ? 'overview' : section))
+  }
+
+  async function onCreateOrg(e: FormEvent) {
     e.preventDefault()
-    setError(null)
+    setOrgsError(null)
     try {
-      const org = await createOrganisation(name)
-      setName('')
-      await refresh()
-      onOpen(org.id)
+      const org = await createOrganisation(newOrgName)
+      setNewOrgName('')
+      setCreating(false)
+      await refreshOrgs()
+      navigate(orgPath(org.id, 'overview'))
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Create failed')
+      setOrgsError(err instanceof Error ? err.message : 'Create failed')
     }
   }
 
   return (
-    <main className="page">
-      <header className="topbar">
-        <div>
+    <div className="shell">
+      <aside className="sidebar" aria-label="Organisation navigation">
+        <div className="sidebar-brand">
           <p className="eyebrow">KYC</p>
-          <h1>Your organisations</h1>
-          {user && <p className="lede">{user.email}</p>}
+          <strong>Organisations</strong>
         </div>
-        <button type="button" className="ghost" onClick={() => void onLogout()}>
-          Sign out
-        </button>
-      </header>
 
-      <form className="create" onSubmit={onCreate}>
-        <label>
-          Name
-          <input
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder="Acme Pty Ltd"
-            required
-          />
+        <label className="org-switcher">
+          <span>Current organisation</span>
+          <select
+            value={routeOrgId ?? ''}
+            disabled={orgsLoading || orgs.length === 0}
+            onChange={(e) => switchOrg(e.target.value)}
+            aria-label="Switch organisation"
+          >
+            {orgs.length === 0 && <option value="">No organisations</option>}
+            {orgs.map((o) => (
+              <option key={o.id} value={o.id}>
+                {o.name}
+              </option>
+            ))}
+          </select>
         </label>
-        <button type="submit">Create</button>
-      </form>
 
-      {error && (
-        <p className="error" role="alert">
-          {error}
-        </p>
-      )}
-      {loading ? (
-        <p>Loading…</p>
-      ) : (
-        <ul className="list">
-          {items.map((org) => (
-            <li key={org.id}>
-              <button type="button" className="linkish" onClick={() => onOpen(org.id)}>
-                <strong>{org.name}</strong>
-                <span>{org.slug}</span>
-                <span className="status">{org.status}</span>
-              </button>
-            </li>
-          ))}
-          {items.length === 0 && <li className="empty">No organisations yet — create one above.</li>}
-        </ul>
-      )}
-    </main>
+        {routeOrgId && (
+          <nav className="sidebar-nav" aria-label="Organisation sections">
+            {ORG_SECTIONS.map((item) => (
+              <NavLink
+                key={item.id}
+                to={orgPath(routeOrgId, item.id)}
+                className={({ isActive }) => (isActive ? 'nav-item active' : 'nav-item')}
+                end={item.id === 'overview'}
+              >
+                {item.label}
+              </NavLink>
+            ))}
+          </nav>
+        )}
+
+        <div className="sidebar-actions">
+          <button type="button" className="ghost full" onClick={() => setCreating((v) => !v)}>
+            {creating ? 'Cancel' : 'New organisation'}
+          </button>
+          {creating && (
+            <form className="create-org" onSubmit={onCreateOrg}>
+              <input
+                value={newOrgName}
+                onChange={(e) => setNewOrgName(e.target.value)}
+                placeholder="Organisation name"
+                required
+              />
+              <button type="submit">Create</button>
+            </form>
+          )}
+        </div>
+
+        <div className="sidebar-footer">
+          {user && <p className="sidebar-user">{user.email}</p>}
+          <button type="button" className="ghost full" onClick={() => void onLogout()}>
+            Sign out
+          </button>
+        </div>
+      </aside>
+
+      <main className="main">
+        {orgsError && (
+          <p className="error" role="alert">
+            {orgsError}
+          </p>
+        )}
+        {orgsLoading && <p>Loading organisations…</p>}
+        {!orgsLoading && !selected && (
+          <div className="empty-state">
+            <h1>Your organisations</h1>
+            <p className="lede">Create an organisation to invite teammates and manage access.</p>
+          </div>
+        )}
+        {selected && (
+          <OrgWorkspace
+            key={selected.id}
+            orgId={selected.id}
+            section={section}
+            user={user}
+          />
+        )}
+      </main>
+    </div>
   )
 }
 
-function OrganisationDetail({
+function OrgWorkspace({
   orgId,
+  section,
   user,
-  onBack,
-  onLogout,
 }: {
   orgId: string
+  section: OrgSection
   user: User | null
-  onBack: () => void
-  onLogout: () => Promise<void>
 }) {
   const [org, setOrg] = useState<Organisation | null>(null)
   const [members, setMembers] = useState<Membership[]>([])
   const [roles, setRoles] = useState<Role[]>([])
   const [permissions, setPermissions] = useState<Permission[]>([])
-  const [email, setEmail] = useState('')
-  const [roleId, setRoleId] = useState('')
   const [error, setError] = useState<string | null>(null)
+  const [loading, setLoading] = useState(true)
 
   async function refresh() {
     setError(null)
+    setLoading(true)
     try {
       const [o, m, r, p] = await Promise.all([
         getOrganisation(orgId),
@@ -312,10 +389,10 @@ function OrganisationDetail({
       setMembers(m.items)
       setRoles(r.items)
       setPermissions(p.items)
-      const memberRole = r.items.find((x) => x.key === 'member')
-      setRoleId((prev) => prev || memberRole?.id || r.items[0]?.id || '')
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to load')
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -323,90 +400,158 @@ function OrganisationDetail({
     void refresh()
   }, [orgId])
 
+  const title = ORG_SECTIONS.find((s) => s.id === section)?.label ?? 'Overview'
+
+  return (
+    <div className="workspace">
+      <header className="workspace-header">
+        <div>
+          <p className="eyebrow">{org?.slug ?? '…'}</p>
+          <h1>{org?.name ?? 'Organisation'}</h1>
+          <p className="status">
+            {org?.status ?? '…'}
+            {user ? ` · ${user.email}` : ''}
+          </p>
+        </div>
+        <h2 className="section-title">{title}</h2>
+      </header>
+
+      {error && (
+        <p className="error" role="alert">
+          {error}
+        </p>
+      )}
+      {loading && <p>Loading…</p>}
+
+      {!loading && section === 'overview' && org && (
+        <OverviewPanel org={org} memberCount={members.length} roleCount={roles.length} />
+      )}
+      {!loading && section === 'members' && (
+        <MembersPanel
+          orgId={orgId}
+          members={members}
+          roles={roles}
+          onChanged={refresh}
+          onError={setError}
+        />
+      )}
+      {!loading && section === 'roles' && (
+        <RoleEditor
+          orgId={orgId}
+          roles={roles}
+          permissions={permissions}
+          onChanged={refresh}
+          onError={setError}
+        />
+      )}
+      {!loading && section === 'billing' && <BillingPanel orgId={orgId} onError={setError} />}
+    </div>
+  )
+}
+
+function OverviewPanel({
+  org,
+  memberCount,
+  roleCount,
+}: {
+  org: Organisation
+  memberCount: number
+  roleCount: number
+}) {
+  return (
+    <section className="overview">
+      <p className="lede">
+        Use the sidebar to open Members, Roles, or Billing. Switch organisations with the
+        dropdown above.
+      </p>
+      <ul className="overview-stats">
+        <li>
+          <strong>{memberCount}</strong>
+          <span>Members</span>
+        </li>
+        <li>
+          <strong>{roleCount}</strong>
+          <span>Roles</span>
+        </li>
+        <li>
+          <strong>{org.status}</strong>
+          <span>Status</span>
+        </li>
+      </ul>
+    </section>
+  )
+}
+
+function MembersPanel({
+  orgId,
+  members,
+  roles,
+  onChanged,
+  onError,
+}: {
+  orgId: string
+  members: Membership[]
+  roles: Role[]
+  onChanged: () => Promise<void>
+  onError: (msg: string | null) => void
+}) {
+  const [email, setEmail] = useState('')
+  const [roleId, setRoleId] = useState('')
+
+  useEffect(() => {
+    const memberRole = roles.find((x) => x.key === 'member')
+    setRoleId((prev) => prev || memberRole?.id || roles[0]?.id || '')
+  }, [roles])
+
   async function onInvite(e: FormEvent) {
     e.preventDefault()
-    setError(null)
+    onError(null)
     try {
       await inviteMember(orgId, email, roleId)
       setEmail('')
-      await refresh()
+      await onChanged()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Invite failed')
+      onError(err instanceof Error ? err.message : 'Invite failed')
     }
   }
 
   return (
-    <main className="page">
-      <header className="topbar">
-        <button type="button" className="back" onClick={onBack}>
-          ← Organisations
-        </button>
-        <button type="button" className="ghost" onClick={() => void onLogout()}>
-          Sign out
-        </button>
-      </header>
-      {org && (
-        <header>
-          <p className="eyebrow">{org.slug}</p>
-          <h1>{org.name}</h1>
-          <p className="status">{org.status}</p>
-          {user && <p className="lede">Signed in as {user.email}</p>}
-        </header>
-      )}
+    <section>
+      <form className="create" onSubmit={onInvite}>
+        <label>
+          Email
+          <input
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            required
+          />
+        </label>
+        <label>
+          Role
+          <select value={roleId} onChange={(e) => setRoleId(e.target.value)} required>
+            {roles.map((r) => (
+              <option key={r.id} value={r.id}>
+                {r.name}
+              </option>
+            ))}
+          </select>
+        </label>
+        <button type="submit">Invite</button>
+      </form>
 
-      <section>
-        <h2>Members</h2>
-        <form className="create" onSubmit={onInvite}>
-          <label>
-            Email
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-            />
-          </label>
-          <label>
-            Role
-            <select value={roleId} onChange={(e) => setRoleId(e.target.value)} required>
-              {roles.map((r) => (
-                <option key={r.id} value={r.id}>
-                  {r.name}
-                </option>
-              ))}
-            </select>
-          </label>
-          <button type="submit">Invite</button>
-        </form>
-
-        {error && (
-          <p className="error" role="alert">
-            {error}
-          </p>
-        )}
-
-        <ul className="list">
-          {members.map((m) => (
-            <li key={m.id} className="member">
-              <strong>{m.user_name || m.user_email}</strong>
-              <span>{m.user_email}</span>
-              <span>{m.role_key}</span>
-              <span className="status">{m.status}</span>
-            </li>
-          ))}
-        </ul>
-      </section>
-
-      <RoleEditor
-        orgId={orgId}
-        roles={roles}
-        permissions={permissions}
-        onChanged={refresh}
-        onError={setError}
-      />
-
-      <BillingPanel orgId={orgId} onError={setError} />
-    </main>
+      <ul className="list">
+        {members.map((m) => (
+          <li key={m.id} className="member">
+            <strong>{m.user_name || m.user_email}</strong>
+            <span>{m.user_email}</span>
+            <span>{m.role_key}</span>
+            <span className="status">{m.status}</span>
+          </li>
+        ))}
+        {members.length === 0 && <li className="empty">No members yet.</li>}
+      </ul>
+    </section>
   )
 }
 
@@ -492,7 +637,18 @@ function RoleEditor({
 
   return (
     <section className="roles">
-      <h2>Roles</h2>
+      <form className="create" onSubmit={onCreate}>
+        <label>
+          New role key
+          <input value={newKey} onChange={(e) => setNewKey(e.target.value)} required />
+        </label>
+        <label>
+          Name
+          <input value={newName} onChange={(e) => setNewName(e.target.value)} required />
+        </label>
+        <button type="submit">Create role</button>
+      </form>
+
       <div className="role-toolbar">
         <label>
           Edit role
@@ -530,18 +686,6 @@ function RoleEditor({
         <button type="submit" disabled={locked || !selected}>
           Save permissions
         </button>
-      </form>
-
-      <form className="create role-create" onSubmit={onCreate}>
-        <label>
-          New role key
-          <input value={newKey} onChange={(e) => setNewKey(e.target.value)} required />
-        </label>
-        <label>
-          Name
-          <input value={newName} onChange={(e) => setNewName(e.target.value)} required />
-        </label>
-        <button type="submit">Create role</button>
       </form>
     </section>
   )
@@ -584,7 +728,6 @@ function BillingPanel({
 
   return (
     <section className="billing">
-      <h2>Billing</h2>
       <p className="status">
         Subscription: {subscription ? `${subscription.status}` : 'none'}
         {currentPlan ? ` · ${currentPlan.name} (${currentPlan.key})` : ''}
