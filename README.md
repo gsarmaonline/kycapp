@@ -40,9 +40,9 @@ Auth providers and payment processors are integrations. This repo is the source 
 
 ## Status
 
-**Phase 3 complete:** permission catalog, role CRUD with permission keys, `POST /v1/authz/check`, and ops role editor.
+**Phase 4 complete:** plans, entitlements, subscriptions, overrides, and `POST /v1/entitlements/check`, plus ops billing panel.
 
-Next: Phase 4 — billing entitlements.
+Next: Phase 5 — service auth, audit log, hardening.
 
 ## Run locally
 

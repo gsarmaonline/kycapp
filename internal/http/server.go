@@ -80,6 +80,18 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /v1/permissions/{key}", s.handleGetPermission)
 	s.mux.HandleFunc("PATCH /v1/roles/{id}", s.handlePatchRole)
 	s.mux.HandleFunc("POST /v1/authz/check", s.handleAuthzCheck)
+
+	s.mux.HandleFunc("POST /v1/plans", s.handleCreatePlan)
+	s.mux.HandleFunc("GET /v1/plans", s.handleListPlans)
+	s.mux.HandleFunc("GET /v1/plans/{id}", s.handleGetPlan)
+	s.mux.HandleFunc("PUT /v1/plans/{id}/entitlements", s.handleSetPlanEntitlements)
+	s.mux.HandleFunc("POST /v1/entitlements", s.handleCreateEntitlement)
+	s.mux.HandleFunc("GET /v1/entitlements", s.handleListEntitlementsCatalog)
+	s.mux.HandleFunc("PUT /v1/organisations/{id}/subscription", s.handleUpsertSubscription)
+	s.mux.HandleFunc("GET /v1/organisations/{id}/subscription", s.handleGetSubscription)
+	s.mux.HandleFunc("PUT /v1/organisations/{id}/entitlements", s.handleSetOrgEntitlements)
+	s.mux.HandleFunc("GET /v1/organisations/{id}/entitlements", s.handleGetOrgEntitlements)
+	s.mux.HandleFunc("POST /v1/entitlements/check", s.handleEntitlementsCheck)
 }
 
 // Handler returns the root handler (with optional CORS).
@@ -254,5 +266,23 @@ func roleJSON(role service.RoleView) map[string]any {
 		"description":     role.Role.Description,
 		"is_system":       role.Role.IsSystem,
 		"permission_keys": role.PermissionKeys,
+	}
+}
+
+func planJSON(p service.PlanView) map[string]any {
+	return map[string]any{
+		"id":               p.Plan.ID,
+		"key":              p.Plan.Key,
+		"name":             p.Plan.Name,
+		"status":           p.Plan.Status,
+		"entitlement_keys": p.EntitlementKeys,
+	}
+}
+
+func entitlementJSON(e sqlc.Entitlement) map[string]any {
+	return map[string]any{
+		"id":          e.ID,
+		"key":         e.Key,
+		"description": e.Description,
 	}
 }

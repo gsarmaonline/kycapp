@@ -102,3 +102,71 @@ export function createRole(
     body: JSON.stringify(input),
   })
 }
+
+export type Plan = {
+  id: string
+  key: string
+  name: string
+  status: string
+  entitlement_keys: string[]
+}
+
+export type Entitlement = {
+  id: string
+  key: string
+  description: string
+}
+
+export type Subscription = {
+  id: string
+  organisation_id: string
+  plan_id: string
+  status: string
+}
+
+export function listPlans() {
+  return request<{ items: Plan[] }>('/v1/plans')
+}
+
+export function listEntitlementsCatalog() {
+  return request<{ items: Entitlement[] }>('/v1/entitlements')
+}
+
+export function getSubscription(orgId: string) {
+  return request<Subscription>(`/v1/organisations/${orgId}/subscription`)
+}
+
+export function upsertSubscription(orgId: string, planId: string, status = 'active') {
+  return request<Subscription>(`/v1/organisations/${orgId}/subscription`, {
+    method: 'PUT',
+    body: JSON.stringify({ plan_id: planId, status }),
+  })
+}
+
+export function getOrgEntitlements(orgId: string) {
+  return request<{ entitlements: string[] }>(`/v1/organisations/${orgId}/entitlements`)
+}
+
+export function setOrgEntitlements(
+  orgId: string,
+  overrides: { key: string; effect: 'grant' | 'deny' }[],
+) {
+  return request<{ entitlements: string[] }>(`/v1/organisations/${orgId}/entitlements`, {
+    method: 'PUT',
+    body: JSON.stringify({ overrides }),
+  })
+}
+
+export function createPlan(key: string, name: string) {
+  return request<Plan>('/v1/plans', {
+    method: 'POST',
+    body: JSON.stringify({ key, name }),
+  })
+}
+
+export function setPlanEntitlements(planId: string, entitlementKeys: string[]) {
+  return request<Plan>(`/v1/plans/${planId}/entitlements`, {
+    method: 'PUT',
+    body: JSON.stringify({ entitlement_keys: entitlementKeys }),
+  })
+}

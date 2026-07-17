@@ -188,6 +188,10 @@ button:hover {
   margin-top: 1.25rem;
 }
 
+.billing {
+  margin-top: 2.5rem;
+}
+
 @media (max-width: 640px) {
   .create {
     grid-template-columns: 1fr;

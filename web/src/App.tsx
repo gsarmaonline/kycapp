@@ -2,18 +2,29 @@ import { useEffect, useMemo, useState } from 'react'
 import type { FormEvent } from 'react'
 import {
   createOrganisation,
+  createPlan,
   createRole,
   getOrganisation,
+  getOrgEntitlements,
+  getSubscription,
   inviteMember,
+  listEntitlementsCatalog,
   listMemberships,
   listOrganisations,
   listPermissions,
+  listPlans,
   listRoles,
+  setOrgEntitlements,
+  setPlanEntitlements,
   updateRole,
+  upsertSubscription,
+  type Entitlement,
   type Membership,
   type Organisation,
   type Permission,
+  type Plan,
   type Role,
+  type Subscription,
 } from './api'
 import './App.css'
 
@@ -223,6 +234,8 @@ function OrganisationDetail({
         onChanged={refresh}
         onError={setError}
       />
+
+      <BillingPanel orgId={orgId} onError={setError} />
     </main>
   )
 }
@@ -363,6 +376,174 @@ function RoleEditor({
         </label>
         <button type="submit">Create role</button>
       </form>
+    </section>
+  )
+}
+
+function BillingPanel({
+  orgId,
+  onError,
+}: {
+  orgId: string
+  onError: (msg: string | null) => void
+}) {
+  const [plans, setPlans] = useState<Plan[]>([])
+  const [catalog, setCatalog] = useState<Entitlement[]>([])
+  const [subscription, setSubscription] = useState<Subscription | null>(null)
+  const [effective, setEffective] = useState<string[]>([])
+  const [planId, setPlanId] = useState('')
+  const [grantKey, setGrantKey] = useState('')
+  const [denyKey, setDenyKey] = useState('')
+  const [newPlanKey, setNewPlanKey] = useState('')
+  const [newPlanName, setNewPlanName] = useState('')
+
+  async function refresh() {
+    onError(null)
+    try {
+      const [p, c, e] = await Promise.all([
+        listPlans(),
+        listEntitlementsCatalog(),
+        getOrgEntitlements(orgId),
+      ])
+      setPlans(p.items)
+      setCatalog(c.items)
+      setEffective(e.entitlements)
+      try {
+        const sub = await getSubscription(orgId)
+        setSubscription(sub)
+        setPlanId(sub.plan_id)
+      } catch {
+        setSubscription(null)
+        setPlanId(p.items[0]?.id ?? '')
+      }
+    } catch (err) {
+      onError(err instanceof Error ? err.message : 'Billing load failed')
+    }
+  }
+
+  useEffect(() => {
+    void refresh()
+  }, [orgId])
+
+  async function onAssign(e: FormEvent) {
+    e.preventDefault()
+    onError(null)
+    try {
+      await upsertSubscription(orgId, planId, 'active')
+      await refresh()
+    } catch (err) {
+      onError(err instanceof Error ? err.message : 'Assign plan failed')
+    }
+  }
+
+  async function onOverride(e: FormEvent) {
+    e.preventDefault()
+    onError(null)
+    const overrides: { key: string; effect: 'grant' | 'deny' }[] = []
+    if (grantKey) overrides.push({ key: grantKey, effect: 'grant' })
+    if (denyKey) overrides.push({ key: denyKey, effect: 'deny' })
+    try {
+      await setOrgEntitlements(orgId, overrides)
+      await refresh()
+    } catch (err) {
+      onError(err instanceof Error ? err.message : 'Override failed')
+    }
+  }
+
+  async function onCreatePlan(e: FormEvent) {
+    e.preventDefault()
+    onError(null)
+    try {
+      const plan = await createPlan(newPlanKey, newPlanName)
+      const keys = catalog.map((c) => c.key)
+      if (keys.length) {
+        await setPlanEntitlements(plan.id, keys)
+      }
+      setNewPlanKey('')
+      setNewPlanName('')
+      await refresh()
+      setPlanId(plan.id)
+    } catch (err) {
+      onError(err instanceof Error ? err.message : 'Create plan failed')
+    }
+  }
+
+  const currentPlan = plans.find((p) => p.id === subscription?.plan_id)
+
+  return (
+    <section className="billing">
+      <h2>Billing</h2>
+      <p className="status">
+        Subscription: {subscription ? `${subscription.status}` : 'none'}
+        {currentPlan ? ` · ${currentPlan.name} (${currentPlan.key})` : ''}
+      </p>
+      <p>
+        Effective entitlements:{' '}
+        {effective.length ? effective.join(', ') : 'none'}
+      </p>
+
+      <form className="create" onSubmit={onAssign}>
+        <label>
+          Plan
+          <select value={planId} onChange={(e) => setPlanId(e.target.value)} required>
+            {plans.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name} ({p.key}) — {p.entitlement_keys.join(', ') || 'no entitlements'}
+              </option>
+            ))}
+          </select>
+        </label>
+        <button type="submit">Assign plan</button>
+      </form>
+
+      <form className="create" onSubmit={onOverride}>
+        <label>
+          Grant
+          <select value={grantKey} onChange={(e) => setGrantKey(e.target.value)}>
+            <option value="">—</option>
+            {catalog.map((c) => (
+              <option key={c.key} value={c.key}>
+                {c.key}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label>
+          Deny
+          <select value={denyKey} onChange={(e) => setDenyKey(e.target.value)}>
+            <option value="">—</option>
+            {catalog.map((c) => (
+              <option key={c.key} value={c.key}>
+                {c.key}
+              </option>
+            ))}
+          </select>
+        </label>
+        <button type="submit">Set overrides</button>
+      </form>
+
+      <form className="create role-create" onSubmit={onCreatePlan}>
+        <label>
+          New plan key
+          <input value={newPlanKey} onChange={(e) => setNewPlanKey(e.target.value)} required />
+        </label>
+        <label>
+          Name
+          <input value={newPlanName} onChange={(e) => setNewPlanName(e.target.value)} required />
+        </label>
+        <button type="submit">Create plan (all entitlements)</button>
+      </form>
+
+      <ul className="list">
+        {plans.map((p) => (
+          <li key={p.id} className="member">
+            <strong>{p.name}</strong>
+            <span>{p.key}</span>
+            <span>{p.entitlement_keys.join(', ') || '—'}</span>
+            <span className="status">{p.status}</span>
+          </li>
+        ))}
+      </ul>
     </section>
   )
 }

@@ -14,6 +14,14 @@ vi.mock('./api', () => ({
   inviteMember: vi.fn(),
   updateRole: vi.fn(),
   createRole: vi.fn(),
+  listPlans: vi.fn(),
+  listEntitlementsCatalog: vi.fn(),
+  getSubscription: vi.fn(),
+  upsertSubscription: vi.fn(),
+  getOrgEntitlements: vi.fn(),
+  setOrgEntitlements: vi.fn(),
+  createPlan: vi.fn(),
+  setPlanEntitlements: vi.fn(),
 }))
 
 describe('App', () => {

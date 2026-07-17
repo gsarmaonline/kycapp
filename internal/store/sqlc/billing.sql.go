@@ -11,6 +11,71 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const addPlanEntitlement = `-- name: AddPlanEntitlement :exec
+INSERT INTO plan_entitlements (plan_id, entitlement_id)
+VALUES ($1, $2)
+ON CONFLICT DO NOTHING
+`
+
+type AddPlanEntitlementParams struct {
+	PlanID        string `json:"plan_id"`
+	EntitlementID string `json:"entitlement_id"`
+}
+
+func (q *Queries) AddPlanEntitlement(ctx context.Context, arg AddPlanEntitlementParams) error {
+	_, err := q.db.Exec(ctx, addPlanEntitlement, arg.PlanID, arg.EntitlementID)
+	return err
+}
+
+const createEntitlement = `-- name: CreateEntitlement :one
+INSERT INTO entitlements (id, key, description)
+VALUES ($1, $2, $3)
+RETURNING id, key, description
+`
+
+type CreateEntitlementParams struct {
+	ID          string `json:"id"`
+	Key         string `json:"key"`
+	Description string `json:"description"`
+}
+
+func (q *Queries) CreateEntitlement(ctx context.Context, arg CreateEntitlementParams) (Entitlement, error) {
+	row := q.db.QueryRow(ctx, createEntitlement, arg.ID, arg.Key, arg.Description)
+	var i Entitlement
+	err := row.Scan(&i.ID, &i.Key, &i.Description)
+	return i, err
+}
+
+const createPlan = `-- name: CreatePlan :one
+INSERT INTO plans (id, key, name, status)
+VALUES ($1, $2, $3, $4)
+RETURNING id, key, name, status
+`
+
+type CreatePlanParams struct {
+	ID     string `json:"id"`
+	Key    string `json:"key"`
+	Name   string `json:"name"`
+	Status string `json:"status"`
+}
+
+func (q *Queries) CreatePlan(ctx context.Context, arg CreatePlanParams) (Plan, error) {
+	row := q.db.QueryRow(ctx, createPlan,
+		arg.ID,
+		arg.Key,
+		arg.Name,
+		arg.Status,
+	)
+	var i Plan
+	err := row.Scan(
+		&i.ID,
+		&i.Key,
+		&i.Name,
+		&i.Status,
+	)
+	return i, err
+}
+
 const createSubscription = `-- name: CreateSubscription :one
 INSERT INTO subscriptions (id, organisation_id, plan_id, status, current_period_end)
 VALUES ($1, $2, $3, $4, $5)
@@ -44,6 +109,55 @@ func (q *Queries) CreateSubscription(ctx context.Context, arg CreateSubscription
 	return i, err
 }
 
+const deleteOrganisationEntitlements = `-- name: DeleteOrganisationEntitlements :exec
+DELETE FROM organisation_entitlements
+WHERE organisation_id = $1
+`
+
+func (q *Queries) DeleteOrganisationEntitlements(ctx context.Context, organisationID string) error {
+	_, err := q.db.Exec(ctx, deleteOrganisationEntitlements, organisationID)
+	return err
+}
+
+const deletePlanEntitlements = `-- name: DeletePlanEntitlements :exec
+DELETE FROM plan_entitlements
+WHERE plan_id = $1
+`
+
+func (q *Queries) DeletePlanEntitlements(ctx context.Context, planID string) error {
+	_, err := q.db.Exec(ctx, deletePlanEntitlements, planID)
+	return err
+}
+
+const getEntitlementByKey = `-- name: GetEntitlementByKey :one
+SELECT id, key, description FROM entitlements
+WHERE key = $1
+`
+
+func (q *Queries) GetEntitlementByKey(ctx context.Context, key string) (Entitlement, error) {
+	row := q.db.QueryRow(ctx, getEntitlementByKey, key)
+	var i Entitlement
+	err := row.Scan(&i.ID, &i.Key, &i.Description)
+	return i, err
+}
+
+const getPlan = `-- name: GetPlan :one
+SELECT id, key, name, status FROM plans
+WHERE id = $1
+`
+
+func (q *Queries) GetPlan(ctx context.Context, id string) (Plan, error) {
+	row := q.db.QueryRow(ctx, getPlan, id)
+	var i Plan
+	err := row.Scan(
+		&i.ID,
+		&i.Key,
+		&i.Name,
+		&i.Status,
+	)
+	return i, err
+}
+
 const getPlanByKey = `-- name: GetPlanByKey :one
 SELECT id, key, name, status FROM plans
 WHERE key = $1
@@ -68,6 +182,208 @@ WHERE organisation_id = $1
 
 func (q *Queries) GetSubscriptionByOrganisation(ctx context.Context, organisationID string) (Subscription, error) {
 	row := q.db.QueryRow(ctx, getSubscriptionByOrganisation, organisationID)
+	var i Subscription
+	err := row.Scan(
+		&i.ID,
+		&i.OrganisationID,
+		&i.PlanID,
+		&i.Status,
+		&i.CurrentPeriodEnd,
+	)
+	return i, err
+}
+
+const listEntitlementIDsByKeys = `-- name: ListEntitlementIDsByKeys :many
+SELECT id, key FROM entitlements
+WHERE key = ANY($1::text[])
+ORDER BY key
+`
+
+type ListEntitlementIDsByKeysRow struct {
+	ID  string `json:"id"`
+	Key string `json:"key"`
+}
+
+func (q *Queries) ListEntitlementIDsByKeys(ctx context.Context, keys []string) ([]ListEntitlementIDsByKeysRow, error) {
+	rows, err := q.db.Query(ctx, listEntitlementIDsByKeys, keys)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListEntitlementIDsByKeysRow{}
+	for rows.Next() {
+		var i ListEntitlementIDsByKeysRow
+		if err := rows.Scan(&i.ID, &i.Key); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listEntitlementKeysByPlan = `-- name: ListEntitlementKeysByPlan :many
+SELECT e.key
+FROM plan_entitlements pe
+JOIN entitlements e ON e.id = pe.entitlement_id
+WHERE pe.plan_id = $1
+ORDER BY e.key
+`
+
+func (q *Queries) ListEntitlementKeysByPlan(ctx context.Context, planID string) ([]string, error) {
+	rows, err := q.db.Query(ctx, listEntitlementKeysByPlan, planID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []string{}
+	for rows.Next() {
+		var key string
+		if err := rows.Scan(&key); err != nil {
+			return nil, err
+		}
+		items = append(items, key)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listEntitlements = `-- name: ListEntitlements :many
+SELECT id, key, description FROM entitlements
+ORDER BY key
+`
+
+func (q *Queries) ListEntitlements(ctx context.Context) ([]Entitlement, error) {
+	rows, err := q.db.Query(ctx, listEntitlements)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []Entitlement{}
+	for rows.Next() {
+		var i Entitlement
+		if err := rows.Scan(&i.ID, &i.Key, &i.Description); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listOrganisationEntitlementOverrides = `-- name: ListOrganisationEntitlementOverrides :many
+SELECT e.key, oe.effect
+FROM organisation_entitlements oe
+JOIN entitlements e ON e.id = oe.entitlement_id
+WHERE oe.organisation_id = $1
+ORDER BY e.key
+`
+
+type ListOrganisationEntitlementOverridesRow struct {
+	Key    string `json:"key"`
+	Effect string `json:"effect"`
+}
+
+func (q *Queries) ListOrganisationEntitlementOverrides(ctx context.Context, organisationID string) ([]ListOrganisationEntitlementOverridesRow, error) {
+	rows, err := q.db.Query(ctx, listOrganisationEntitlementOverrides, organisationID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListOrganisationEntitlementOverridesRow{}
+	for rows.Next() {
+		var i ListOrganisationEntitlementOverridesRow
+		if err := rows.Scan(&i.Key, &i.Effect); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listPlans = `-- name: ListPlans :many
+SELECT id, key, name, status FROM plans
+ORDER BY key
+`
+
+func (q *Queries) ListPlans(ctx context.Context) ([]Plan, error) {
+	rows, err := q.db.Query(ctx, listPlans)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []Plan{}
+	for rows.Next() {
+		var i Plan
+		if err := rows.Scan(
+			&i.ID,
+			&i.Key,
+			&i.Name,
+			&i.Status,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const upsertOrganisationEntitlement = `-- name: UpsertOrganisationEntitlement :exec
+INSERT INTO organisation_entitlements (organisation_id, entitlement_id, effect)
+VALUES ($1, $2, $3)
+ON CONFLICT (organisation_id, entitlement_id) DO UPDATE
+SET effect = EXCLUDED.effect
+`
+
+type UpsertOrganisationEntitlementParams struct {
+	OrganisationID string `json:"organisation_id"`
+	EntitlementID  string `json:"entitlement_id"`
+	Effect         string `json:"effect"`
+}
+
+func (q *Queries) UpsertOrganisationEntitlement(ctx context.Context, arg UpsertOrganisationEntitlementParams) error {
+	_, err := q.db.Exec(ctx, upsertOrganisationEntitlement, arg.OrganisationID, arg.EntitlementID, arg.Effect)
+	return err
+}
+
+const upsertSubscription = `-- name: UpsertSubscription :one
+INSERT INTO subscriptions (id, organisation_id, plan_id, status, current_period_end)
+VALUES ($1, $2, $3, $4, $5)
+ON CONFLICT (organisation_id) DO UPDATE
+SET plan_id = EXCLUDED.plan_id,
+    status = EXCLUDED.status,
+    current_period_end = EXCLUDED.current_period_end
+RETURNING id, organisation_id, plan_id, status, current_period_end
+`
+
+type UpsertSubscriptionParams struct {
+	ID               string             `json:"id"`
+	OrganisationID   string             `json:"organisation_id"`
+	PlanID           string             `json:"plan_id"`
+	Status           string             `json:"status"`
+	CurrentPeriodEnd pgtype.Timestamptz `json:"current_period_end"`
+}
+
+func (q *Queries) UpsertSubscription(ctx context.Context, arg UpsertSubscriptionParams) (Subscription, error) {
+	row := q.db.QueryRow(ctx, upsertSubscription,
+		arg.ID,
+		arg.OrganisationID,
+		arg.PlanID,
+		arg.Status,
+		arg.CurrentPeriodEnd,
+	)
 	var i Subscription
 	err := row.Scan(
 		&i.ID,

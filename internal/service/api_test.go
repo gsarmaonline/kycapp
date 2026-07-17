@@ -267,6 +267,125 @@ func TestAuthzCheckKeyAndResourceAction(t *testing.T) {
 	}
 }
 
+func TestEntitlementsEffectiveAndCheck(t *testing.T) {
+	ctx := context.Background()
+	db := openTestDB(t, ctx)
+	svc := service.New(db)
+	h := httpserver.New(db, httpserver.Options{Service: svc}).Handler()
+
+	signup := doJSON(t, h, http.MethodPost, "/v1/signup", map[string]any{
+		"user":         map[string]string{"email": "bill@acme.com", "name": "Bill"},
+		"organisation": map[string]string{"name": "Acme Billing", "slug": "acme-billing"},
+	}, map[string]string{"Idempotency-Key": "billing-flow"})
+	if signup.Code != http.StatusCreated {
+		t.Fatalf("signup: %s", signup.Body.String())
+	}
+	var signed map[string]any
+	decodeBody(t, signup, &signed)
+	orgID := signed["organisation"].(map[string]any)["id"].(string)
+
+	// Trial plan includes api_access only
+	checkAPI := doJSON(t, h, http.MethodPost, "/v1/entitlements/check", map[string]any{
+		"organisation_id": orgID,
+		"entitlement":     "api_access",
+	}, nil)
+	var allowed map[string]any
+	decodeBody(t, checkAPI, &allowed)
+	if allowed["allowed"] != true {
+		t.Fatalf("api_access should be allowed on trial: %#v", allowed)
+	}
+	checkSSO := doJSON(t, h, http.MethodPost, "/v1/entitlements/check", map[string]any{
+		"organisation_id": orgID,
+		"entitlement":     "sso",
+	}, nil)
+	decodeBody(t, checkSSO, &allowed)
+	if allowed["allowed"] != false {
+		t.Fatalf("sso should be denied on trial: %#v", allowed)
+	}
+
+	// Grant SSO override
+	put := doJSON(t, h, http.MethodPut, "/v1/organisations/"+orgID+"/entitlements", map[string]any{
+		"overrides": []map[string]string{{"key": "sso", "effect": "grant"}},
+	}, nil)
+	if put.Code != http.StatusOK {
+		t.Fatalf("overrides: %s", put.Body.String())
+	}
+	var eff struct {
+		Entitlements []string `json:"entitlements"`
+	}
+	decodeBody(t, put, &eff)
+	hasSSO, hasAPI := false, false
+	for _, k := range eff.Entitlements {
+		if k == "sso" {
+			hasSSO = true
+		}
+		if k == "api_access" {
+			hasAPI = true
+		}
+	}
+	if !hasSSO || !hasAPI {
+		t.Fatalf("effective=%v", eff.Entitlements)
+	}
+
+	decodeBody(t, doJSON(t, h, http.MethodPost, "/v1/entitlements/check", map[string]any{
+		"organisation_id": orgID,
+		"entitlement":     "sso",
+	}, nil), &allowed)
+	if allowed["allowed"] != true {
+		t.Fatalf("sso should be granted: %#v", allowed)
+	}
+
+	// Deny api_access
+	doJSON(t, h, http.MethodPut, "/v1/organisations/"+orgID+"/entitlements", map[string]any{
+		"overrides": []map[string]string{
+			{"key": "sso", "effect": "grant"},
+			{"key": "api_access", "effect": "deny"},
+		},
+	}, nil)
+	decodeBody(t, doJSON(t, h, http.MethodPost, "/v1/entitlements/check", map[string]any{
+		"organisation_id": orgID,
+		"entitlement":     "api_access",
+	}, nil), &allowed)
+	if allowed["allowed"] != false {
+		t.Fatalf("api_access denied override failed: %#v", allowed)
+	}
+
+	// Create pro plan with both, assign subscription
+	pro := doJSON(t, h, http.MethodPost, "/v1/plans", map[string]any{
+		"key": "pro", "name": "Pro",
+	}, nil)
+	if pro.Code != http.StatusCreated {
+		t.Fatalf("create plan: %s", pro.Body.String())
+	}
+	var plan map[string]any
+	decodeBody(t, pro, &plan)
+	planID := plan["id"].(string)
+	setEnt := doJSON(t, h, http.MethodPut, "/v1/plans/"+planID+"/entitlements", map[string]any{
+		"entitlement_keys": []string{"api_access", "sso"},
+	}, nil)
+	if setEnt.Code != http.StatusOK {
+		t.Fatalf("set plan ents: %s", setEnt.Body.String())
+	}
+	// Clear overrides then upgrade
+	doJSON(t, h, http.MethodPut, "/v1/organisations/"+orgID+"/entitlements", map[string]any{
+		"overrides": []any{},
+	}, nil)
+	sub := doJSON(t, h, http.MethodPut, "/v1/organisations/"+orgID+"/subscription", map[string]any{
+		"plan_id": planID,
+		"status":  "active",
+	}, nil)
+	if sub.Code != http.StatusOK {
+		t.Fatalf("subscription: %s", sub.Body.String())
+	}
+	decodeBody(t, doJSON(t, h, http.MethodPost, "/v1/entitlements/check", map[string]any{
+		"organisation_id": orgID,
+		"entitlement":     "sso",
+	}, nil), &allowed)
+	if allowed["allowed"] != true {
+		t.Fatalf("pro should include sso: %#v", allowed)
+	}
+}
+
 func openTestDB(t *testing.T, ctx context.Context) *store.Store {
 	t.Helper()
 	container, err := postgres.Run(ctx,

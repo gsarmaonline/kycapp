@@ -1,3 +1,3 @@
 package billing
 
-// Package billing will own plans, subscriptions, and entitlements (Phase 4+).
+// Package billing owns entitlement set math (plan ∪ grant − deny).
