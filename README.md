@@ -94,13 +94,15 @@ cd web && npm run dev
 | `PLATFORM_ADMIN_EMAILS` | Emails granted `platform_admin` on Google/dev login |
 | `CHECK_RATE_LIMIT_PER_MIN` | Max check-endpoint calls per actor/minute (default 120; `0` disables) |
 | `AUTH_RATE_LIMIT_PER_MIN` | Max OAuth/dev-login starts per IP/minute (default 20; `0` disables) |
+| `UPLOAD_DIR` | Local directory for org logo files (default `data/uploads`) |
+| `PUBLIC_BASE_URL` | Absolute origin for public logo URLs (default `APP_ORIGIN`) |
 
 | Principal | Can do |
 | --- | --- |
 | User session (Google or dev-login) | Own profile, orgs they belong to, RBAC-gated mutations |
 | Platform admin / service token | All orgs, plan catalog, API keys, audit, entitlement overrides |
 
-Public (no Bearer): `GET /v1/auth/providers`, `GET /v1/auth/google`, `GET /v1/auth/google/callback`, `POST /v1/auth/dev-login` (if enabled), health endpoints.
+Public (no Bearer): `GET /v1/auth/providers`, `GET /v1/auth/google`, `GET /v1/auth/google/callback`, `POST /v1/auth/dev-login` (if enabled), `GET /v1/public/organisations/{id}/branding/logo`, health endpoints.
 
 **Human login is Google-only.** Create an organisation after sign-in via `POST /v1/organisations`. Invited users sign in with Google using the invited email to claim the account.
 

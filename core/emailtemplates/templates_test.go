@@ -1,6 +1,9 @@
 package emailtemplates
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func TestValidKey(t *testing.T) {
 	if !ValidKey("welcome") || !ValidKey("payment_thank_you") {
@@ -50,5 +53,37 @@ func TestDefaults(t *testing.T) {
 		if !ValidKey(d.Key) || d.Subject == "" || d.BodyText == "" {
 			t.Fatalf("bad default %+v", d)
 		}
+	}
+}
+
+func TestWrapBranding(t *testing.T) {
+	got := Wrap(`<p>Hello</p>`, Branding{
+		OrgName: "Acme <Corp>", LogoURL: "https://example.com/l.png",
+		PrimaryColor: "#1f4d3a", AccentColor: "#16382a", Footer: "Thanks",
+	})
+	for _, want := range []string{
+		"<!DOCTYPE html>", "Hello", "Acme &lt;Corp&gt;", "https://example.com/l.png",
+		"#1f4d3a", "Thanks",
+	} {
+		if !strings.Contains(got, want) {
+			t.Fatalf("missing %q in:\n%s", want, got)
+		}
+	}
+}
+
+func TestWrapSkipsFullDocument(t *testing.T) {
+	in := "<!DOCTYPE html><html><body>x</body></html>"
+	if Wrap(in, Branding{OrgName: "A"}) != in {
+		t.Fatal("full documents should not be wrapped")
+	}
+}
+
+func TestNormalizeColor(t *testing.T) {
+	c, err := NormalizeColor(" #ABC ")
+	if err != nil || c != "#abc" {
+		t.Fatalf("got %q %v", c, err)
+	}
+	if _, err := NormalizeColor("red"); err == nil {
+		t.Fatal("expected error")
 	}
 }

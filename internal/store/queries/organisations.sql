@@ -40,8 +40,17 @@ UPDATE organisations
 SET
   name = COALESCE(sqlc.narg('name'), name),
   status = COALESCE(sqlc.narg('status'), status),
+  primary_color = COALESCE(sqlc.narg('primary_color'), primary_color),
+  accent_color = COALESCE(sqlc.narg('accent_color'), accent_color),
+  email_footer = COALESCE(sqlc.narg('email_footer'), email_footer),
   updated_at = now()
 WHERE id = sqlc.arg('id')
+RETURNING *;
+
+-- name: SetOrganisationLogoURL :one
+UPDATE organisations
+SET logo_url = $2, updated_at = now()
+WHERE id = $1
 RETURNING *;
 
 -- name: ArchiveOrganisation :one

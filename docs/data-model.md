@@ -49,8 +49,14 @@ Tenant hub. Everything else hangs off this record.
 | `name` | string | Display name |
 | `slug` | string | Unique URL-safe identifier |
 | `status` | enum | `active` \| `suspended` \| `archived` |
+| `logo_url` | string | Public URL for email logo (set via upload) |
+| `primary_color` | string | Hex `#RGB` / `#RRGGBB`; default `#1f4d3a` |
+| `accent_color` | string | Optional hex for header title |
+| `email_footer` | string | Footer text for branded email chrome |
 | `created_at` | timestamptz | |
 | `updated_at` | timestamptz | |
+
+Branding is applied at email **render/preview** time (`core/emailtemplates.Wrap`), not baked into each template body. A visual drag-and-drop builder is deferred.
 
 ### User
 
@@ -179,7 +185,7 @@ Org-scoped email copy for messaging app users. Seeded system templates per org; 
 | `description` | string | |
 | `subject` | string | Supports `{{placeholders}}` |
 | `body_text` | string | Plain text body |
-| `body_html` | string | Optional HTML body |
+| `body_html` | string | Inner HTML content (org branding chrome applied at render) |
 | `status` | enum | `active` \| `archived` |
 | `is_system` | bool | Seeded defaults |
 

@@ -1,6 +1,7 @@
 package httpserver
 
 import (
+	"io"
 	"net/http"
 
 	"github.com/gsarmaonline/kyc/internal/apperr"
@@ -94,8 +95,11 @@ func (s *Server) handlePatchOrganisation(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	var body struct {
-		Name   *string `json:"name"`
-		Status *string `json:"status"`
+		Name         *string `json:"name"`
+		Status       *string `json:"status"`
+		PrimaryColor *string `json:"primary_color"`
+		AccentColor  *string `json:"accent_color"`
+		EmailFooter  *string `json:"email_footer"`
 	}
 	if err := decodeJSON(r, &body); err != nil {
 		writeError(w, apperr.Validation("invalid JSON body"))
@@ -103,12 +107,70 @@ func (s *Server) handlePatchOrganisation(w http.ResponseWriter, r *http.Request)
 	}
 	org, err := s.svc.UpdateOrganisation(r.Context(), orgID, service.UpdateOrganisationInput{
 		Name: body.Name, Status: body.Status,
+		PrimaryColor: body.PrimaryColor, AccentColor: body.AccentColor,
+		EmailFooter: body.EmailFooter,
 	})
 	if err != nil {
 		writeError(w, err)
 		return
 	}
 	writeJSON(w, http.StatusOK, orgJSON(org))
+}
+
+func (s *Server) handleUploadOrganisationLogo(w http.ResponseWriter, r *http.Request) {
+	orgID := r.PathValue("id")
+	if _, err := s.svc.RequireOrgPermission(r.Context(), orgID, "organisation:update"); err != nil {
+		writeError(w, err)
+		return
+	}
+	if err := r.ParseMultipartForm(service.MaxLogoBytes + 1<<20); err != nil {
+		writeError(w, apperr.Validation("invalid multipart form"))
+		return
+	}
+	file, header, err := r.FormFile("logo")
+	if err != nil {
+		writeError(w, apperr.Validation("logo file is required"))
+		return
+	}
+	defer file.Close()
+	ct := header.Header.Get("Content-Type")
+	if ct == "" {
+		ct = "application/octet-stream"
+	}
+	org, err := s.svc.SetOrganisationLogo(r.Context(), orgID, file, ct)
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, orgJSON(org))
+}
+
+func (s *Server) handleDeleteOrganisationLogo(w http.ResponseWriter, r *http.Request) {
+	orgID := r.PathValue("id")
+	if _, err := s.svc.RequireOrgPermission(r.Context(), orgID, "organisation:update"); err != nil {
+		writeError(w, err)
+		return
+	}
+	org, err := s.svc.ClearOrganisationLogo(r.Context(), orgID)
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, orgJSON(org))
+}
+
+func (s *Server) handlePublicOrganisationLogo(w http.ResponseWriter, r *http.Request) {
+	orgID := r.PathValue("id")
+	rc, ct, err := s.svc.OpenOrganisationLogo(r.Context(), orgID)
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	defer rc.Close()
+	w.Header().Set("Content-Type", ct)
+	w.Header().Set("Cache-Control", "public, max-age=3600")
+	w.WriteHeader(http.StatusOK)
+	_, _ = io.Copy(w, rc)
 }
 
 func (s *Server) handleArchiveOrganisation(w http.ResponseWriter, r *http.Request) {

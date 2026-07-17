@@ -63,11 +63,23 @@ Get one.
 
 ### `PATCH /v1/organisations/{id}`
 
-Update `{ "name"?, "status"? }`.
+Update `{ "name"?, "status"?, "primary_color"?, "accent_color"?, "email_footer"? }`.  
+Colors must be `#RGB` or `#RRGGBB`. Requires `organisation:update`.
+
+Organisation JSON also includes `logo_url` (read-only; set via logo upload).
 
 ### `POST /v1/organisations/{id}/archive`
 
 Soft-archive (`status=archived`).
+
+### Branding / logo
+
+- `POST /v1/organisations/{id}/branding/logo` — multipart field `logo` (png/jpeg/webp, ≤1MB). Requires `organisation:update`. Sets `logo_url`.
+- `DELETE /v1/organisations/{id}/branding/logo` — clears logo file and `logo_url`. Requires `organisation:update`.
+- `GET /v1/public/organisations/{id}/branding/logo` — **unauthenticated** image bytes for email clients.  
+  Configure `PUBLIC_BASE_URL` (and `UPLOAD_DIR`) so `logo_url` is reachable from outside.
+
+Email template `body_html` is **inner content**. Preview/send wrap it with org chrome (header, logo, colors, footer) via `emailtemplates.Wrap` unless the body is already a full HTML document.
 
 ---
 
@@ -201,11 +213,13 @@ Org-scoped message copy for **app users** (not KYC member invites). Domain helpe
   Seeds system defaults (`welcome`, `payment_thank_you`, `profile_incomplete`) if missing. Query: `status`
 - `POST /v1/organisations/{id}/email-templates` — requires `email_templates:manage`  
   Custom template: `{ "key", "name", "subject", "body_text"?, "body_html"?, "description"? }`  
-  Placeholders: `{{display_name}}`, `{{org_name}}`, etc.
+  Placeholders: `{{display_name}}`, `{{org_name}}`, etc.  
+  Store inner HTML only; branding chrome comes from organisation branding (see above). Visual builder deferred.
 - `GET /v1/email-templates/{id}` — requires `email_templates:read`
 - `PATCH /v1/email-templates/{id}` — requires `email_templates:manage`  
   `{ "name"?, "description"?, "subject"?, "body_text"?, "body_html"?, "status"? }`  
   Key is immutable (including system templates).
+- `DELETE /v1/email-templates/{id}` — archive; requires `email_templates:manage` (system templates cannot be deleted)
 
 ---
 

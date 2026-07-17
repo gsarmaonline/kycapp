@@ -23,6 +23,9 @@ type Config struct {
 	AppOrigin          string
 	OAuthStateSecret   string
 	AuthDevLogin       bool
+
+	UploadDir     string
+	PublicBaseURL string
 }
 
 // Load reads configuration from environment variables.
@@ -41,6 +44,8 @@ func Load() (Config, error) {
 		AppOrigin:            envOr("APP_ORIGIN", "http://localhost:8080"),
 		OAuthStateSecret:     envOr("OAUTH_STATE_SECRET", os.Getenv("API_TOKENS")),
 		AuthDevLogin:         envBool("AUTH_DEV_LOGIN", false),
+		UploadDir:            envOr("UPLOAD_DIR", "data/uploads"),
+		PublicBaseURL:        envOr("PUBLIC_BASE_URL", envOr("APP_ORIGIN", "http://localhost:8080")),
 	}
 	if cfg.DatabaseURL == "" {
 		return Config{}, fmt.Errorf("DATABASE_URL is required")

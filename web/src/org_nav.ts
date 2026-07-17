@@ -5,6 +5,7 @@ export type OrgSection =
   | 'users'
   | 'attributes'
   | 'email-templates'
+  | 'branding'
   | 'billing'
 
 export const ORG_SECTIONS: { id: OrgSection; label: string; path: string }[] = [
@@ -14,6 +15,7 @@ export const ORG_SECTIONS: { id: OrgSection; label: string; path: string }[] = [
   { id: 'users', label: 'Users', path: 'users' },
   { id: 'attributes', label: 'User Attributes', path: 'attributes' },
   { id: 'email-templates', label: 'Email templates', path: 'email-templates' },
+  { id: 'branding', label: 'Branding', path: 'branding' },
   { id: 'billing', label: 'Billing', path: 'billing' },
 ]
 
@@ -28,6 +30,7 @@ export function sectionFromPathname(pathname: string, orgId: string): OrgSection
     case 'users':
     case 'attributes':
     case 'email-templates':
+    case 'branding':
     case 'billing':
       return head
     case 'schema':
@@ -45,7 +48,7 @@ export function orgPath(orgId: string, section: OrgSection = 'overview') {
 
 export function resourcePath(
   orgId: string,
-  section: Exclude<OrgSection, 'overview' | 'billing'>,
+  section: Exclude<OrgSection, 'overview' | 'billing' | 'branding'>,
   ...parts: string[]
 ) {
   const base = orgPath(orgId, section)

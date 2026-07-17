@@ -33,6 +33,7 @@ func main() {
 	}
 
 	svc := service.New(db)
+	svc.ConfigureAssets(cfg.UploadDir, cfg.PublicBaseURL)
 	corsOrigin := cfg.CORSOrigin
 	if corsOrigin == "" {
 		corsOrigin = os.Getenv("CORS_ORIGIN")

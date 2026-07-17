@@ -118,26 +118,15 @@ func (s *Service) ListOrganisationsForUser(ctx context.Context, userID, status, 
 }
 
 type UpdateOrganisationInput struct {
-	Name   *string
-	Status *string
+	Name          *string
+	Status        *string
+	PrimaryColor  *string
+	AccentColor   *string
+	EmailFooter   *string
 }
 
 func (s *Service) UpdateOrganisation(ctx context.Context, id string, in UpdateOrganisationInput) (sqlc.Organisation, error) {
-	params := sqlc.UpdateOrganisationParams{ID: id}
-	if in.Name != nil {
-		params.Name = pgtype.Text{String: strings.TrimSpace(*in.Name), Valid: true}
-	}
-	if in.Status != nil {
-		st := strings.TrimSpace(*in.Status)
-		switch st {
-		case "active", "suspended", "archived":
-			params.Status = pgtype.Text{String: st, Valid: true}
-		default:
-			return sqlc.Organisation{}, apperr.Validation("invalid status")
-		}
-	}
-	org, err := s.db.Q().UpdateOrganisation(ctx, params)
-	return org, mapNotFound(err, "organisation not found")
+	return s.UpdateOrganisationBranding(ctx, id, in)
 }
 
 func (s *Service) ArchiveOrganisation(ctx context.Context, id string) (sqlc.Organisation, error) {

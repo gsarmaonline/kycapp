@@ -6,6 +6,10 @@ export type Organisation = {
   name: string
   slug: string
   status: string
+  logo_url?: string
+  primary_color?: string
+  accent_color?: string
+  email_footer?: string
 }
 
 export type User = {
@@ -152,6 +156,46 @@ export function createOrganisation(name: string, slug?: string) {
 
 export function getOrganisation(id: string) {
   return request<Organisation>(`/v1/organisations/${id}`)
+}
+
+export function updateOrganisation(
+  id: string,
+  input: {
+    name?: string
+    status?: string
+    primary_color?: string
+    accent_color?: string
+    email_footer?: string
+  },
+) {
+  return request<Organisation>(`/v1/organisations/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(input),
+  })
+}
+
+export async function uploadOrganisationLogo(id: string, file: File) {
+  const headers: Record<string, string> = {}
+  const token = getToken()
+  if (token) headers.Authorization = `Bearer ${token}`
+  const body = new FormData()
+  body.append('logo', file)
+  const res = await fetch(`${API_BASE}/v1/organisations/${id}/branding/logo`, {
+    method: 'POST',
+    headers,
+    body,
+  })
+  const data = await res.json().catch(() => ({}))
+  if (!res.ok) {
+    throw new Error(data?.error?.message ?? res.statusText)
+  }
+  return data as Organisation
+}
+
+export function deleteOrganisationLogo(id: string) {
+  return request<Organisation>(`/v1/organisations/${id}/branding/logo`, {
+    method: 'DELETE',
+  })
 }
 
 export function listMemberships(orgId: string) {

@@ -49,6 +49,9 @@ export function EmailTemplatesNew() {
         </label>
         <label>
           Body
+          <span className="field-hint">
+            Inner content only — header, logo, and footer come from Branding.
+          </span>
           <textarea value={bodyText} onChange={(e) => setBodyText(e.target.value)} rows={5} required />
         </label>
         <FormActions cancelTo={resourcePath(orgId, 'email-templates')} submitLabel="Create" />

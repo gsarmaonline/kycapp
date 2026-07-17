@@ -15,6 +15,7 @@ import { AttributesIndex } from './pages/attributes/attributes_index'
 import { AttributesNew } from './pages/attributes/attributes_new'
 import { AttributesShow } from './pages/attributes/attributes_show'
 import { BillingPage } from './pages/billing_page'
+import { BrandingPage } from './pages/branding_page'
 import { EmailTemplatesEdit } from './pages/email_templates/email_templates_edit'
 import { EmailTemplatesIndex } from './pages/email_templates/email_templates_index'
 import { EmailTemplatesNew } from './pages/email_templates/email_templates_new'
@@ -118,6 +119,7 @@ export default function App() {
         <Route path="email-templates/new" element={<EmailTemplatesNew />} />
         <Route path="email-templates/:id" element={<EmailTemplatesShow />} />
         <Route path="email-templates/:id/edit" element={<EmailTemplatesEdit />} />
+        <Route path="branding" element={<BrandingPage />} />
         <Route path="billing" element={<BillingPage />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />

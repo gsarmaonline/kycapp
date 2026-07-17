@@ -98,12 +98,16 @@ type Membership struct {
 }
 
 type Organisation struct {
-	ID        string    `json:"id"`
-	Name      string    `json:"name"`
-	Slug      string    `json:"slug"`
-	Status    string    `json:"status"`
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
+	ID           string    `json:"id"`
+	Name         string    `json:"name"`
+	Slug         string    `json:"slug"`
+	Status       string    `json:"status"`
+	CreatedAt    time.Time `json:"created_at"`
+	UpdatedAt    time.Time `json:"updated_at"`
+	LogoUrl      string    `json:"logo_url"`
+	PrimaryColor string    `json:"primary_color"`
+	AccentColor  string    `json:"accent_color"`
+	EmailFooter  string    `json:"email_footer"`
 }
 
 type OrganisationEntitlement struct {

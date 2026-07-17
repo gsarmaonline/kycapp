@@ -29,6 +29,12 @@ func TestLoadDefaultsHTTPAddr(t *testing.T) {
 	if cfg.AuthRateLimitPerMin != 20 {
 		t.Fatalf("AuthRateLimitPerMin = %d", cfg.AuthRateLimitPerMin)
 	}
+	if cfg.UploadDir != "data/uploads" {
+		t.Fatalf("UploadDir = %q", cfg.UploadDir)
+	}
+	if cfg.PublicBaseURL != "http://localhost:8080" {
+		t.Fatalf("PublicBaseURL = %q", cfg.PublicBaseURL)
+	}
 }
 
 func TestLoadCustomHTTPAddr(t *testing.T) {

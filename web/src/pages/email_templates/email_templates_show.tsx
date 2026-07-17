@@ -1,14 +1,19 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { getEmailTemplate, getOrganisation, type EmailTemplate } from '../../api'
+import {
+  getEmailTemplate,
+  getOrganisation,
+  type EmailTemplate,
+  type Organisation,
+} from '../../api'
 import { DetailList, PageHeader } from '../../crud/ui'
-import { renderEmailTemplate } from '../../email_render'
+import { renderEmailTemplate, wrapEmailHtml } from '../../email_render'
 import { resourcePath } from '../../org_nav'
 
 export function EmailTemplatesShow() {
   const { orgId = '', id = '' } = useParams()
   const [item, setItem] = useState<EmailTemplate | null>(null)
-  const [orgName, setOrgName] = useState('Acme')
+  const [org, setOrg] = useState<Organisation | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
@@ -19,14 +24,25 @@ export function EmailTemplatesShow() {
 
   useEffect(() => {
     void getOrganisation(orgId)
-      .then((o) => setOrgName(o.name))
+      .then(setOrg)
       .catch(() => undefined)
   }, [orgId])
 
   const vars = useMemo(
-    () => ({ display_name: 'Pat', org_name: orgName }),
-    [orgName],
+    () => ({ display_name: 'Pat', org_name: org?.name ?? 'Acme' }),
+    [org?.name],
   )
+
+  const previewHtml = useMemo(() => {
+    if (!item) return ''
+    return wrapEmailHtml(renderEmailTemplate(item.body_html, vars), {
+      org_name: org?.name ?? 'Acme',
+      logo_url: org?.logo_url,
+      primary_color: org?.primary_color,
+      accent_color: org?.accent_color,
+      footer: org?.email_footer,
+    })
+  }, [item, vars, org])
 
   if (error) return <p className="error">{error}</p>
   if (!item) return <p>Loading…</p>
@@ -45,12 +61,13 @@ export function EmailTemplatesShow() {
         ]}
       />
       <fieldset className="perm-group email-preview">
-        <legend>Preview</legend>
+        <legend>Preview (with branding)</legend>
         <p className="preview-subject">
           <span className="preview-label">Subject</span>
           {renderEmailTemplate(item.subject, vars)}
         </p>
         <pre className="preview-text">{renderEmailTemplate(item.body_text, vars)}</pre>
+        <iframe title="HTML preview" className="preview-html" sandbox="" srcDoc={previewHtml} />
       </fieldset>
       <div className="form-actions">
         <Link className="ghost" to={resourcePath(orgId, 'email-templates')}>

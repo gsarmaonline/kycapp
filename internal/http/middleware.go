@@ -31,6 +31,9 @@ func rateLimitedErr() error {
 }
 
 func isPublicAPIPath(path string) bool {
+	if strings.HasPrefix(path, "/v1/public/") {
+		return true
+	}
 	switch path {
 	case "/v1/auth/providers",
 		"/v1/auth/google",

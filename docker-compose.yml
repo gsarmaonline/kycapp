@@ -27,10 +27,14 @@ services:
       AUTH_RATE_LIMIT_PER_MIN: ${AUTH_RATE_LIMIT_PER_MIN:-20}
       AUTH_DEV_LOGIN: ${AUTH_DEV_LOGIN:-true}
       APP_ORIGIN: ${APP_ORIGIN:-http://localhost:8080}
+      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-http://localhost:8080}
+      UPLOAD_DIR: ${UPLOAD_DIR:-/data/uploads}
       OAUTH_REDIRECT_URL: ${OAUTH_REDIRECT_URL:-http://localhost:8080/v1/auth/google/callback}
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
       OAUTH_STATE_SECRET: ${OAUTH_STATE_SECRET:-dev-oauth-state}
+    volumes:
+      - api_uploads:/data/uploads
     depends_on:
       postgres:
         condition: service_healthy
@@ -51,3 +55,6 @@ services:
     depends_on:
       api:
         condition: service_healthy
+
+volumes:
+  api_uploads:

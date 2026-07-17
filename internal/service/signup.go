@@ -15,11 +15,27 @@ import (
 
 // Service implements domain operations.
 type Service struct {
-	db *store.Store
+	db            *store.Store
+	uploadDir     string
+	publicBaseURL string
 }
 
 func New(db *store.Store) *Service {
-	return &Service{db: db}
+	return &Service{
+		db:            db,
+		uploadDir:     "data/uploads",
+		publicBaseURL: "http://localhost:8080",
+	}
+}
+
+// ConfigureAssets sets local upload directory and public base URL for logos.
+func (s *Service) ConfigureAssets(uploadDir, publicBaseURL string) {
+	if strings.TrimSpace(uploadDir) != "" {
+		s.uploadDir = uploadDir
+	}
+	if u := strings.TrimSpace(publicBaseURL); u != "" {
+		s.publicBaseURL = strings.TrimRight(u, "/")
+	}
 }
 
 func seedSystemRoles(ctx context.Context, q *sqlc.Queries, orgID string) (owner, admin, member sqlc.Role, err error) {
