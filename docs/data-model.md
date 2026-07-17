@@ -12,6 +12,9 @@ erDiagram
   Organisation ||--o{ Role : scoped
   Role ||--o{ RolePermission : grants
   Permission ||--o{ RolePermission : used_by
+  Organisation ||--o{ AttributeDefinition : defines
+  Organisation ||--o{ AppUser : has
+  Organisation ||--o{ EmailTemplate : has
   Plan ||--o{ PlanEntitlement : includes
   Entitlement ||--o{ PlanEntitlement : used_by
   Organisation ||--o| Subscription : has
@@ -25,11 +28,12 @@ erDiagram
 | Term people say | Stored as | Notes |
 | --- | --- | --- |
 | Merchant / tenant / business / workspace | **Organisation** | Hub entity |
-| Person / login identity | **User** | Global; many orgs via membership |
-| Seat | **Membership** | User ↔ organisation + role |
+| Person / login identity (KYC operator) | **User** | Global; many orgs via membership |
+| Seat / team member | **Membership** | User ↔ organisation + role |
+| End user / customer of the merchant app | **AppUser** | Org-scoped; schema-backed profile |
+| Profile field definition | **AttributeDefinition** | Org-scoped; `section` for UI grouping |
+| Message copy for app users | **EmailTemplate** | Org-scoped; system + custom keys |
 | Billing account | Organisation + **Subscription** | No separate Account in v1 |
-
-A future CRM “customer” (leads, pipeline) is a later layer — not a rename of Organisation.
 
 ---
 
@@ -120,6 +124,66 @@ Constraints: unique `key`; unique `(resource, action)`.
 | `roles:manage` | roles | manage | Access |
 | `billing:read` | billing | read | Billing |
 | `billing:manage` | billing | manage | Billing |
+| `attributes:read` | attributes | read | Users |
+| `attributes:manage` | attributes | manage | Users |
+| `app_users:read` | app_users | read | Users |
+| `app_users:write` | app_users | write | Users |
+| `email_templates:read` | email_templates | read | Messaging |
+| `email_templates:manage` | email_templates | manage | Messaging |
+
+### AttributeDefinition
+
+Org-scoped schema for end-user profile fields. Used by the merchant UI to group inputs via `section`.
+
+| Field | Type | Notes |
+| --- | --- | --- |
+| `id` | string | PK |
+| `organisation_id` | string | FK → Organisation |
+| `key` | string | Machine key; unique per org |
+| `label` | string | Display label |
+| `description` | string | |
+| `value_type` | enum | `string` \| `number` \| `boolean` \| `date` \| `dropdown` |
+| `section` | string | UI group (default `general`) |
+| `sort_order` | int | Order within section |
+| `required` | bool | |
+| `enum_values` | jsonb | Allowed options when `value_type` is `dropdown` |
+| `is_pii` | bool | |
+| `status` | enum | `active` \| `archived` |
+
+### AppUser
+
+Org-scoped end user (subject of the schema). Not a Membership / login identity for KYC.
+
+| Field | Type | Notes |
+| --- | --- | --- |
+| `id` | string | PK |
+| `organisation_id` | string | FK → Organisation |
+| `external_id` | string? | Merchant-side id |
+| `email` | string? | Unique per org when set |
+| `display_name` | string | |
+| `status` | enum | `active` \| `disabled` \| `archived` |
+| `attributes` | jsonb | Profile values keyed by attribute `key` |
+
+Monitoring / observations are intentionally separate (not this table).
+
+### EmailTemplate
+
+Org-scoped email copy for messaging app users. Seeded system templates per org; custom keys allowed. Domain logic: `core/emailtemplates`.
+
+| Field | Type | Notes |
+| --- | --- | --- |
+| `id` | string | PK |
+| `organisation_id` | string | FK → Organisation |
+| `key` | string | Unique per org; locked when `is_system` |
+| `name` | string | Display label |
+| `description` | string | |
+| `subject` | string | Supports `{{placeholders}}` |
+| `body_text` | string | Plain text body |
+| `body_html` | string | Optional HTML body |
+| `status` | enum | `active` \| `archived` |
+| `is_system` | bool | Seeded defaults |
+
+Default keys: `welcome`, `payment_thank_you`, `profile_incomplete`.
 
 ### RolePermission
 

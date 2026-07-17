@@ -165,6 +165,50 @@ Requires an **active** membership. Suspended orgs / revoked memberships → `all
 
 ---
 
+## App users & attribute schema
+
+End users of a merchant’s product (not KYC team **members**). Profile fields are defined per organisation.
+
+### Attribute definitions
+
+- `POST /v1/organisations/{id}/attribute-definitions` — requires `attributes:manage`  
+  `{ "key", "label", "value_type", "section"?, "sort_order"?, "required"?, "enum_values"?, "description"?, "is_pii"? }`  
+  `value_type`: `string` \| `number` \| `boolean` \| `date` \| `dropdown`  
+  `section`: UI grouping label (default `general`)  
+  For `dropdown`, pass `enum_values` (allowed options).
+- `GET /v1/organisations/{id}/attribute-definitions` — requires `attributes:read`  
+  Query: `status` (`active` \| `archived`)
+- `PATCH /v1/attribute-definitions/{id}` — requires `attributes:manage`  
+  `{ "label"?, "description"?, "value_type"?, "section"?, "sort_order"?, "required"?, "enum_values"?, "is_pii"?, "status"? }`
+
+### App users
+
+- `POST /v1/organisations/{id}/app-users` — requires `app_users:write`  
+  `{ "email"?, "external_id"?, "display_name"?, "status"?, "attributes"? }`  
+  `attributes` keys must match active definitions; types and required fields are validated.
+- `GET /v1/organisations/{id}/app-users` — requires `app_users:read`  
+  Query: `status`
+- `GET /v1/app-users/{id}` — requires `app_users:read`
+- `PATCH /v1/app-users/{id}` — requires `app_users:write`
+
+---
+
+## Email templates
+
+Org-scoped message copy for **app users** (not KYC member invites). Domain helpers live in `core/emailtemplates` for easier extraction later. No send provider in v1.
+
+- `GET /v1/organisations/{id}/email-templates` — requires `email_templates:read`  
+  Seeds system defaults (`welcome`, `payment_thank_you`, `profile_incomplete`) if missing. Query: `status`
+- `POST /v1/organisations/{id}/email-templates` — requires `email_templates:manage`  
+  Custom template: `{ "key", "name", "subject", "body_text"?, "body_html"?, "description"? }`  
+  Placeholders: `{{display_name}}`, `{{org_name}}`, etc.
+- `GET /v1/email-templates/{id}` — requires `email_templates:read`
+- `PATCH /v1/email-templates/{id}` — requires `email_templates:manage`  
+  `{ "name"?, "description"?, "subject"?, "body_text"?, "body_html"?, "status"? }`  
+  Key is immutable (including system templates).
+
+---
+
 ## Billing / entitlements
 
 ### Plans

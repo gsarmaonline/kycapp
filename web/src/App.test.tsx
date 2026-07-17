@@ -33,6 +33,13 @@ vi.mock('./api', () => ({
   listEntitlementsCatalog: vi.fn(async () => ({ items: [] })),
   getSubscription: vi.fn(),
   getOrgEntitlements: vi.fn(async () => ({ entitlements: [] })),
+  listAttributeDefinitions: vi.fn(async () => ({ items: [] })),
+  createAttributeDefinition: vi.fn(),
+  listAppUsers: vi.fn(async () => ({ items: [] })),
+  createAppUser: vi.fn(),
+  listEmailTemplates: vi.fn(async () => ({ items: [] })),
+  createEmailTemplate: vi.fn(),
+  updateEmailTemplate: vi.fn(),
 }))
 
 describe('App', () => {

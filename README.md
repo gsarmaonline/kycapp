@@ -11,7 +11,8 @@ KYC owns the organisation lifecycle:
 | Domain | Responsibility |
 | --- | --- |
 | **Organisations** | Tenants as first-class records — identity, status, relationships |
-| **Users** | People who can belong to many organisations via membership |
+| **Users / Members** | People who log into KYC and belong to orgs via membership + RBAC |
+| **App users** | Org-scoped end users of the merchant product; profile schema with sections |
 | **Authorisation** | Roles and permissions scoped to the organisation |
 | **Billing** | Plans, entitlements, and subscription state tied to the organisation |
 

@@ -5,6 +5,7 @@
 package sqlc
 
 import (
+	"encoding/json"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgtype"
@@ -19,6 +20,35 @@ type ApiKey struct {
 	RevokedAt pgtype.Timestamptz `json:"revoked_at"`
 }
 
+type AppUser struct {
+	ID             string          `json:"id"`
+	OrganisationID string          `json:"organisation_id"`
+	ExternalID     pgtype.Text     `json:"external_id"`
+	Email          pgtype.Text     `json:"email"`
+	DisplayName    string          `json:"display_name"`
+	Status         string          `json:"status"`
+	Attributes     json.RawMessage `json:"attributes"`
+	CreatedAt      time.Time       `json:"created_at"`
+	UpdatedAt      time.Time       `json:"updated_at"`
+}
+
+type AttributeDefinition struct {
+	ID             string          `json:"id"`
+	OrganisationID string          `json:"organisation_id"`
+	Key            string          `json:"key"`
+	Label          string          `json:"label"`
+	Description    string          `json:"description"`
+	ValueType      string          `json:"value_type"`
+	Section        string          `json:"section"`
+	SortOrder      int32           `json:"sort_order"`
+	Required       bool            `json:"required"`
+	EnumValues     json.RawMessage `json:"enum_values"`
+	IsPii          bool            `json:"is_pii"`
+	Status         string          `json:"status"`
+	CreatedAt      time.Time       `json:"created_at"`
+	UpdatedAt      time.Time       `json:"updated_at"`
+}
+
 type AuditEvent struct {
 	ID             string      `json:"id"`
 	Actor          string      `json:"actor"`
@@ -29,6 +59,21 @@ type AuditEvent struct {
 	CreatedAt      time.Time   `json:"created_at"`
 }
 
+type EmailTemplate struct {
+	ID             string    `json:"id"`
+	OrganisationID string    `json:"organisation_id"`
+	Key            string    `json:"key"`
+	Name           string    `json:"name"`
+	Description    string    `json:"description"`
+	Subject        string    `json:"subject"`
+	BodyText       string    `json:"body_text"`
+	BodyHtml       string    `json:"body_html"`
+	Status         string    `json:"status"`
+	IsSystem       bool      `json:"is_system"`
+	CreatedAt      time.Time `json:"created_at"`
+	UpdatedAt      time.Time `json:"updated_at"`
+}
+
 type Entitlement struct {
 	ID          string `json:"id"`
 	Key         string `json:"key"`
@@ -36,11 +81,11 @@ type Entitlement struct {
 }
 
 type IdempotencyKey struct {
-	Key            string    `json:"key"`
-	RequestHash    string    `json:"request_hash"`
-	ResponseStatus int32     `json:"response_status"`
-	ResponseBody   []byte    `json:"response_body"`
-	CreatedAt      time.Time `json:"created_at"`
+	Key            string          `json:"key"`
+	RequestHash    string          `json:"request_hash"`
+	ResponseStatus int32           `json:"response_status"`
+	ResponseBody   json.RawMessage `json:"response_body"`
+	CreatedAt      time.Time       `json:"created_at"`
 }
 
 type Membership struct {

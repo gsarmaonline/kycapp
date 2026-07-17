@@ -11,6 +11,9 @@ import {
 import {
   authProviders,
   captureOAuthTokenFromHash,
+  createAppUser,
+  createAttributeDefinition,
+  createEmailTemplate,
   createOrganisation,
   createRole,
   devLogin,
@@ -20,6 +23,9 @@ import {
   getToken,
   googleAuthURL,
   inviteMember,
+  listAppUsers,
+  listAttributeDefinitions,
+  listEmailTemplates,
   listEntitlementsCatalog,
   listMemberships,
   listOrganisations,
@@ -29,8 +35,12 @@ import {
   logout,
   me,
   setToken,
+  updateEmailTemplate,
   updateRole,
+  type AppUser,
+  type AttributeDefinition,
   type AuthProviders,
+  type EmailTemplate,
   type Membership,
   type Organisation,
   type Permission,
@@ -42,12 +52,22 @@ import {
 import './App.css'
 
 type Gate = 'loading' | 'auth' | 'app'
-type OrgSection = 'overview' | 'members' | 'roles' | 'billing'
+type OrgSection =
+  | 'overview'
+  | 'members'
+  | 'roles'
+  | 'users'
+  | 'attributes'
+  | 'email-templates'
+  | 'billing'
 
 const ORG_SECTIONS: { id: OrgSection; label: string; path: string }[] = [
   { id: 'overview', label: 'Overview', path: '' },
   { id: 'members', label: 'Members', path: 'members' },
   { id: 'roles', label: 'Roles', path: 'roles' },
+  { id: 'users', label: 'Users', path: 'users' },
+  { id: 'attributes', label: 'User Attributes', path: 'attributes' },
+  { id: 'email-templates', label: 'Email templates', path: 'email-templates' },
   { id: 'billing', label: 'Billing', path: 'billing' },
 ]
 
@@ -55,8 +75,13 @@ function sectionFromParam(section?: string): OrgSection {
   switch (section) {
     case 'members':
     case 'roles':
+    case 'users':
+    case 'attributes':
+    case 'email-templates':
     case 'billing':
       return section
+    case 'schema':
+      return 'attributes'
     default:
       return 'overview'
   }
@@ -444,6 +469,15 @@ function OrgWorkspace({
           onError={setError}
         />
       )}
+      {!loading && section === 'users' && (
+        <AppUsersPanel orgId={orgId} onError={setError} />
+      )}
+      {!loading && section === 'attributes' && (
+        <UserAttributesPanel orgId={orgId} onError={setError} />
+      )}
+      {!loading && section === 'email-templates' && (
+        <EmailTemplatesPanel orgId={orgId} onError={setError} />
+      )}
       {!loading && section === 'billing' && <BillingPanel orgId={orgId} onError={setError} />}
     </div>
   )
@@ -461,8 +495,8 @@ function OverviewPanel({
   return (
     <section className="overview">
       <p className="lede">
-        Use the sidebar to open Members, Roles, or Billing. Switch organisations with the
-        dropdown above.
+        Use the sidebar to open Members, Roles, Users, User Attributes, Email templates, or Billing.
+        Switch organisations with the dropdown above.
       </p>
       <ul className="overview-stats">
         <li>
@@ -687,6 +721,462 @@ function RoleEditor({
           Save permissions
         </button>
       </form>
+    </section>
+  )
+}
+
+function groupDefsBySection(defs: AttributeDefinition[]) {
+  const map = new Map<string, AttributeDefinition[]>()
+  for (const d of defs) {
+    const list = map.get(d.section) ?? []
+    list.push(d)
+    map.set(d.section, list)
+  }
+  return [...map.entries()]
+}
+
+function UserAttributesPanel({
+  orgId,
+  onError,
+}: {
+  orgId: string
+  onError: (msg: string | null) => void
+}) {
+  const [defs, setDefs] = useState<AttributeDefinition[]>([])
+  const [key, setKey] = useState('')
+  const [label, setLabel] = useState('')
+  const [section, setSection] = useState('general')
+  const [valueType, setValueType] = useState('string')
+  const [required, setRequired] = useState(false)
+  const [enumValues, setEnumValues] = useState('')
+
+  async function refresh() {
+    onError(null)
+    try {
+      const res = await listAttributeDefinitions(orgId)
+      setDefs(res.items)
+    } catch (err) {
+      onError(err instanceof Error ? err.message : 'User attributes load failed')
+    }
+  }
+
+  useEffect(() => {
+    void refresh()
+  }, [orgId])
+
+  const needsOptions = valueType === 'dropdown'
+
+  async function onCreate(e: FormEvent) {
+    e.preventDefault()
+    onError(null)
+    try {
+      await createAttributeDefinition(orgId, {
+        key,
+        label,
+        section: section || 'general',
+        value_type: valueType,
+        required,
+        enum_values: needsOptions
+          ? enumValues
+              .split(',')
+              .map((v) => v.trim())
+              .filter(Boolean)
+          : undefined,
+      })
+      setKey('')
+      setLabel('')
+      setEnumValues('')
+      await refresh()
+    } catch (err) {
+      onError(err instanceof Error ? err.message : 'Create attribute failed')
+    }
+  }
+
+  const grouped = groupDefsBySection(defs)
+
+  return (
+    <section className="user-attributes">
+      <p className="lede">
+        Define profile fields for end users. Use <em>section</em> to group fields in forms.
+      </p>
+      <form className="create" onSubmit={onCreate}>
+        <label>
+          Key
+          <input
+            value={key}
+            onChange={(e) => setKey(e.target.value)}
+            placeholder="country"
+            required
+          />
+        </label>
+        <label>
+          Label
+          <input value={label} onChange={(e) => setLabel(e.target.value)} required />
+        </label>
+        <label>
+          Section
+          <input value={section} onChange={(e) => setSection(e.target.value)} placeholder="general" />
+        </label>
+        <label>
+          Type
+          <select value={valueType} onChange={(e) => setValueType(e.target.value)}>
+            <option value="string">string</option>
+            <option value="number">number</option>
+            <option value="boolean">boolean</option>
+            <option value="date">date</option>
+            <option value="dropdown">dropdown</option>
+          </select>
+        </label>
+        {needsOptions && (
+          <label>
+            Options
+            <input
+              value={enumValues}
+              onChange={(e) => setEnumValues(e.target.value)}
+              placeholder="au, nz, us"
+              required
+            />
+          </label>
+        )}
+        <label className="perm">
+          <input
+            type="checkbox"
+            checked={required}
+            onChange={(e) => setRequired(e.target.checked)}
+          />
+          <span>Required</span>
+        </label>
+        <button type="submit">Add attribute</button>
+      </form>
+
+      {grouped.length === 0 && <p className="empty">No attributes defined yet.</p>}
+      {grouped.map(([sec, items]) => (
+        <fieldset key={sec} className="perm-group attr-section">
+          <legend>{sec}</legend>
+          <ul className="list">
+            {items.map((d) => (
+              <li key={d.id} className="member">
+                <strong>{d.label}</strong>
+                <span>{d.key}</span>
+                <span>{d.value_type}</span>
+                <span className="status">{d.required ? 'required' : 'optional'}</span>
+              </li>
+            ))}
+          </ul>
+        </fieldset>
+      ))}
+    </section>
+  )
+}
+
+function AppUsersPanel({
+  orgId,
+  onError,
+}: {
+  orgId: string
+  onError: (msg: string | null) => void
+}) {
+  const [users, setUsers] = useState<AppUser[]>([])
+  const [defs, setDefs] = useState<AttributeDefinition[]>([])
+  const [email, setEmail] = useState('')
+  const [displayName, setDisplayName] = useState('')
+  const [attrDraft, setAttrDraft] = useState<Record<string, string>>({})
+
+  async function refresh() {
+    onError(null)
+    try {
+      const [u, d] = await Promise.all([
+        listAppUsers(orgId),
+        listAttributeDefinitions(orgId, 'active'),
+      ])
+      setUsers(u.items)
+      setDefs(d.items)
+    } catch (err) {
+      onError(err instanceof Error ? err.message : 'Users load failed')
+    }
+  }
+
+  useEffect(() => {
+    void refresh()
+  }, [orgId])
+
+  function coerceAttributes(): Record<string, unknown> {
+    const out: Record<string, unknown> = {}
+    for (const d of defs) {
+      const raw = attrDraft[d.key]
+      if (raw === undefined || raw === '') continue
+      switch (d.value_type) {
+        case 'number':
+          out[d.key] = Number(raw)
+          break
+        case 'boolean':
+          out[d.key] = raw === 'true'
+          break
+        default:
+          out[d.key] = raw
+      }
+    }
+    return out
+  }
+
+  async function onCreate(e: FormEvent) {
+    e.preventDefault()
+    onError(null)
+    try {
+      await createAppUser(orgId, {
+        email: email || undefined,
+        display_name: displayName,
+        attributes: coerceAttributes(),
+      })
+      setEmail('')
+      setDisplayName('')
+      setAttrDraft({})
+      await refresh()
+    } catch (err) {
+      onError(err instanceof Error ? err.message : 'Create user failed')
+    }
+  }
+
+  const grouped = groupDefsBySection(defs)
+
+  return (
+    <section className="app-users">
+      <p className="lede">
+        End users of your product (not team members). Profile fields come from User Attributes.
+      </p>
+      <form className="create stacked" onSubmit={onCreate}>
+        <label>
+          Display name
+          <input value={displayName} onChange={(e) => setDisplayName(e.target.value)} />
+        </label>
+        <label>
+          Email
+          <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
+        </label>
+        {grouped.map(([sec, items]) => (
+          <fieldset key={sec} className="perm-group attr-section">
+            <legend>{sec}</legend>
+            {items.map((d) => (
+              <label key={d.id}>
+                {d.label}
+                {d.required ? ' *' : ''}
+                {d.value_type === 'boolean' ? (
+                  <select
+                    value={attrDraft[d.key] ?? ''}
+                    onChange={(e) =>
+                      setAttrDraft((prev) => ({ ...prev, [d.key]: e.target.value }))
+                    }
+                  >
+                    <option value="">—</option>
+                    <option value="true">true</option>
+                    <option value="false">false</option>
+                  </select>
+                ) : d.value_type === 'dropdown' ? (
+                  <select
+                    value={attrDraft[d.key] ?? ''}
+                    onChange={(e) =>
+                      setAttrDraft((prev) => ({ ...prev, [d.key]: e.target.value }))
+                    }
+                  >
+                    <option value="">—</option>
+                    {d.enum_values.map((v) => (
+                      <option key={v} value={v}>
+                        {v}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <input
+                    type={d.value_type === 'number' ? 'number' : d.value_type === 'date' ? 'date' : 'text'}
+                    value={attrDraft[d.key] ?? ''}
+                    onChange={(e) =>
+                      setAttrDraft((prev) => ({ ...prev, [d.key]: e.target.value }))
+                    }
+                    required={d.required}
+                  />
+                )}
+              </label>
+            ))}
+          </fieldset>
+        ))}
+        <button type="submit">Create user</button>
+      </form>
+
+      <ul className="list">
+        {users.map((u) => (
+          <li key={u.id} className="member">
+            <strong>{u.display_name || u.email || u.id}</strong>
+            <span>{u.email || '—'}</span>
+            <span className="status">{u.status}</span>
+            <span className="attr-preview">
+              {Object.keys(u.attributes || {}).length
+                ? Object.entries(u.attributes)
+                    .map(([k, v]) => `${k}=${String(v)}`)
+                    .join(', ')
+                : 'no attributes'}
+            </span>
+          </li>
+        ))}
+        {users.length === 0 && <li className="empty">No users yet.</li>}
+      </ul>
+    </section>
+  )
+}
+
+function EmailTemplatesPanel({
+  orgId,
+  onError,
+}: {
+  orgId: string
+  onError: (msg: string | null) => void
+}) {
+  const [templates, setTemplates] = useState<EmailTemplate[]>([])
+  const [selectedId, setSelectedId] = useState('')
+  const [subject, setSubject] = useState('')
+  const [bodyText, setBodyText] = useState('')
+  const [bodyHtml, setBodyHtml] = useState('')
+  const [name, setName] = useState('')
+  const [newKey, setNewKey] = useState('')
+  const [newName, setNewName] = useState('')
+  const [newSubject, setNewSubject] = useState('')
+  const [newBody, setNewBody] = useState('')
+
+  const selected = templates.find((t) => t.id === selectedId) ?? templates[0]
+
+  async function refresh() {
+    onError(null)
+    try {
+      const res = await listEmailTemplates(orgId)
+      setTemplates(res.items)
+      if (!selectedId && res.items[0]) {
+        setSelectedId(res.items[0].id)
+      }
+    } catch (err) {
+      onError(err instanceof Error ? err.message : 'Email templates load failed')
+    }
+  }
+
+  useEffect(() => {
+    void refresh()
+  }, [orgId])
+
+  useEffect(() => {
+    if (!selected) return
+    setSelectedId(selected.id)
+    setName(selected.name)
+    setSubject(selected.subject)
+    setBodyText(selected.body_text)
+    setBodyHtml(selected.body_html)
+  }, [selected?.id, selected?.name, selected?.subject, selected?.body_text, selected?.body_html])
+
+  async function onSave(e: FormEvent) {
+    e.preventDefault()
+    if (!selected) return
+    onError(null)
+    try {
+      await updateEmailTemplate(selected.id, {
+        name,
+        subject,
+        body_text: bodyText,
+        body_html: bodyHtml,
+      })
+      await refresh()
+    } catch (err) {
+      onError(err instanceof Error ? err.message : 'Save template failed')
+    }
+  }
+
+  async function onCreate(e: FormEvent) {
+    e.preventDefault()
+    onError(null)
+    try {
+      const created = await createEmailTemplate(orgId, {
+        key: newKey,
+        name: newName,
+        subject: newSubject,
+        body_text: newBody,
+      })
+      setNewKey('')
+      setNewName('')
+      setNewSubject('')
+      setNewBody('')
+      await refresh()
+      setSelectedId(created.id)
+    } catch (err) {
+      onError(err instanceof Error ? err.message : 'Create template failed')
+    }
+  }
+
+  return (
+    <section className="email-templates">
+      <p className="lede">
+        Message copy for app users. Use placeholders like{' '}
+        <code>{'{{display_name}}'}</code> and <code>{'{{org_name}}'}</code>. Sending hooks up later
+        via workflows.
+      </p>
+
+      <form className="create stacked" onSubmit={onCreate}>
+        <label>
+          New key
+          <input value={newKey} onChange={(e) => setNewKey(e.target.value)} placeholder="custom_notice" required />
+        </label>
+        <label>
+          Name
+          <input value={newName} onChange={(e) => setNewName(e.target.value)} required />
+        </label>
+        <label>
+          Subject
+          <input value={newSubject} onChange={(e) => setNewSubject(e.target.value)} required />
+        </label>
+        <label>
+          Body
+          <textarea value={newBody} onChange={(e) => setNewBody(e.target.value)} rows={3} required />
+        </label>
+        <button type="submit">Create template</button>
+      </form>
+
+      <div className="role-toolbar">
+        <label>
+          Edit template
+          <select
+            value={selected?.id ?? ''}
+            onChange={(e) => setSelectedId(e.target.value)}
+          >
+            {templates.map((t) => (
+              <option key={t.id} value={t.id}>
+                {t.name} ({t.key}){t.is_system ? ' · system' : ''}
+              </option>
+            ))}
+          </select>
+        </label>
+      </div>
+
+      {selected && (
+        <form className="create stacked" onSubmit={onSave}>
+          <label>
+            Name
+            <input value={name} onChange={(e) => setName(e.target.value)} required />
+          </label>
+          <label>
+            Key
+            <input value={selected.key} disabled />
+          </label>
+          <label>
+            Subject
+            <input value={subject} onChange={(e) => setSubject(e.target.value)} required />
+          </label>
+          <label>
+            Body (text)
+            <textarea value={bodyText} onChange={(e) => setBodyText(e.target.value)} rows={6} />
+          </label>
+          <label>
+            Body (HTML)
+            <textarea value={bodyHtml} onChange={(e) => setBodyHtml(e.target.value)} rows={4} />
+          </label>
+          <button type="submit">Save</button>
+        </form>
+      )}
+      {templates.length === 0 && <p className="empty">No email templates yet.</p>}
     </section>
   )
 }

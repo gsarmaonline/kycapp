@@ -135,6 +135,19 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /v1/api-keys", s.handleListAPIKeys)
 	s.mux.HandleFunc("DELETE /v1/api-keys/{id}", s.handleRevokeAPIKey)
 	s.mux.HandleFunc("GET /v1/audit-events", s.handleListAuditEvents)
+
+	s.mux.HandleFunc("POST /v1/organisations/{id}/attribute-definitions", s.handleCreateAttributeDefinition)
+	s.mux.HandleFunc("GET /v1/organisations/{id}/attribute-definitions", s.handleListAttributeDefinitions)
+	s.mux.HandleFunc("PATCH /v1/attribute-definitions/{id}", s.handlePatchAttributeDefinition)
+	s.mux.HandleFunc("POST /v1/organisations/{id}/app-users", s.handleCreateAppUser)
+	s.mux.HandleFunc("GET /v1/organisations/{id}/app-users", s.handleListAppUsers)
+	s.mux.HandleFunc("GET /v1/app-users/{id}", s.handleGetAppUser)
+	s.mux.HandleFunc("PATCH /v1/app-users/{id}", s.handlePatchAppUser)
+
+	s.mux.HandleFunc("POST /v1/organisations/{id}/email-templates", s.handleCreateEmailTemplate)
+	s.mux.HandleFunc("GET /v1/organisations/{id}/email-templates", s.handleListEmailTemplates)
+	s.mux.HandleFunc("GET /v1/email-templates/{id}", s.handleGetEmailTemplate)
+	s.mux.HandleFunc("PATCH /v1/email-templates/{id}", s.handlePatchEmailTemplate)
 }
 
 // Handler returns the root handler with auth, audit, rate limit, and optional CORS.
@@ -350,5 +363,75 @@ func authResultJSON(a service.AuthResult) map[string]any {
 		"token":      a.Token,
 		"expires_at": a.ExpiresAt.UTC().Format(time.RFC3339Nano),
 		"user":       userJSON(a.User),
+	}
+}
+
+func attributeDefinitionJSON(d sqlc.AttributeDefinition) map[string]any {
+	var enumValues []string
+	if len(d.EnumValues) > 0 {
+		_ = json.Unmarshal(d.EnumValues, &enumValues)
+	}
+	if enumValues == nil {
+		enumValues = []string{}
+	}
+	return map[string]any{
+		"id":              d.ID,
+		"organisation_id": d.OrganisationID,
+		"key":             d.Key,
+		"label":           d.Label,
+		"description":     d.Description,
+		"value_type":      d.ValueType,
+		"section":         d.Section,
+		"sort_order":      d.SortOrder,
+		"required":        d.Required,
+		"enum_values":     enumValues,
+		"is_pii":          d.IsPii,
+		"status":          d.Status,
+		"created_at":      d.CreatedAt.UTC().Format(time.RFC3339Nano),
+		"updated_at":      d.UpdatedAt.UTC().Format(time.RFC3339Nano),
+	}
+}
+
+func appUserJSON(u sqlc.AppUser) map[string]any {
+	attrs := map[string]any{}
+	if len(u.Attributes) > 0 {
+		_ = json.Unmarshal(u.Attributes, &attrs)
+	}
+	out := map[string]any{
+		"id":              u.ID,
+		"organisation_id": u.OrganisationID,
+		"display_name":    u.DisplayName,
+		"status":          u.Status,
+		"attributes":      attrs,
+		"created_at":      u.CreatedAt.UTC().Format(time.RFC3339Nano),
+		"updated_at":      u.UpdatedAt.UTC().Format(time.RFC3339Nano),
+	}
+	if u.ExternalID.Valid {
+		out["external_id"] = u.ExternalID.String
+	} else {
+		out["external_id"] = nil
+	}
+	if u.Email.Valid {
+		out["email"] = u.Email.String
+	} else {
+		out["email"] = nil
+	}
+	return out
+}
+
+func emailTemplateJSON(t sqlc.EmailTemplate) map[string]any {
+	return map[string]any{
+		"id":              t.ID,
+		"organisation_id": t.OrganisationID,
+		"key":             t.Key,
+		"name":            t.Name,
+		"description":     t.Description,
+		"subject":         t.Subject,
+		"body_text":       t.BodyText,
+		"body_html":       t.BodyHtml,
+		"status":          t.Status,
+		"is_system":       t.IsSystem,
+		"created_at":      t.CreatedAt.UTC().Format(time.RFC3339Nano),
+		"updated_at":      t.UpdatedAt.UTC().Format(time.RFC3339Nano),
 	}
 }

@@ -226,3 +226,130 @@ export function getSubscription(orgId: string) {
 export function getOrgEntitlements(orgId: string) {
   return request<{ entitlements: string[] }>(`/v1/organisations/${orgId}/entitlements`)
 }
+
+export type AttributeDefinition = {
+  id: string
+  organisation_id: string
+  key: string
+  label: string
+  description: string
+  value_type: 'string' | 'number' | 'boolean' | 'date' | 'dropdown'
+  section: string
+  sort_order: number
+  required: boolean
+  enum_values: string[]
+  is_pii: boolean
+  status: string
+}
+
+export type AppUser = {
+  id: string
+  organisation_id: string
+  external_id: string | null
+  email: string | null
+  display_name: string
+  status: string
+  attributes: Record<string, unknown>
+}
+
+export function listAttributeDefinitions(orgId: string, status?: string) {
+  const q = status ? `?status=${encodeURIComponent(status)}` : ''
+  return request<{ items: AttributeDefinition[] }>(
+    `/v1/organisations/${orgId}/attribute-definitions${q}`,
+  )
+}
+
+export function createAttributeDefinition(
+  orgId: string,
+  input: {
+    key: string
+    label: string
+    description?: string
+    value_type: string
+    section?: string
+    sort_order?: number
+    required?: boolean
+    enum_values?: string[]
+    is_pii?: boolean
+  },
+) {
+  return request<AttributeDefinition>(`/v1/organisations/${orgId}/attribute-definitions`, {
+    method: 'POST',
+    body: JSON.stringify(input),
+  })
+}
+
+export function listAppUsers(orgId: string, status?: string) {
+  const q = status ? `?status=${encodeURIComponent(status)}` : ''
+  return request<{ items: AppUser[] }>(`/v1/organisations/${orgId}/app-users${q}`)
+}
+
+export function createAppUser(
+  orgId: string,
+  input: {
+    email?: string
+    external_id?: string
+    display_name?: string
+    status?: string
+    attributes?: Record<string, unknown>
+  },
+) {
+  return request<AppUser>(`/v1/organisations/${orgId}/app-users`, {
+    method: 'POST',
+    body: JSON.stringify(input),
+  })
+}
+
+export type EmailTemplate = {
+  id: string
+  organisation_id: string
+  key: string
+  name: string
+  description: string
+  subject: string
+  body_text: string
+  body_html: string
+  status: string
+  is_system: boolean
+}
+
+export function listEmailTemplates(orgId: string, status?: string) {
+  const q = status ? `?status=${encodeURIComponent(status)}` : ''
+  return request<{ items: EmailTemplate[] }>(
+    `/v1/organisations/${orgId}/email-templates${q}`,
+  )
+}
+
+export function createEmailTemplate(
+  orgId: string,
+  input: {
+    key: string
+    name: string
+    description?: string
+    subject: string
+    body_text?: string
+    body_html?: string
+  },
+) {
+  return request<EmailTemplate>(`/v1/organisations/${orgId}/email-templates`, {
+    method: 'POST',
+    body: JSON.stringify(input),
+  })
+}
+
+export function updateEmailTemplate(
+  id: string,
+  input: {
+    name?: string
+    description?: string
+    subject?: string
+    body_text?: string
+    body_html?: string
+    status?: string
+  },
+) {
+  return request<EmailTemplate>(`/v1/email-templates/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(input),
+  })
+}

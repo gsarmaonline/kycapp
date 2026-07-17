@@ -7,6 +7,7 @@ package sqlc
 
 import (
 	"context"
+	"encoding/json"
 )
 
 const getIdempotencyKey = `-- name: GetIdempotencyKey :one
@@ -34,10 +35,10 @@ RETURNING key, request_hash, response_status, response_body, created_at
 `
 
 type InsertIdempotencyKeyParams struct {
-	Key            string `json:"key"`
-	RequestHash    string `json:"request_hash"`
-	ResponseStatus int32  `json:"response_status"`
-	ResponseBody   []byte `json:"response_body"`
+	Key            string          `json:"key"`
+	RequestHash    string          `json:"request_hash"`
+	ResponseStatus int32           `json:"response_status"`
+	ResponseBody   json.RawMessage `json:"response_body"`
 }
 
 func (q *Queries) InsertIdempotencyKey(ctx context.Context, arg InsertIdempotencyKeyParams) (IdempotencyKey, error) {

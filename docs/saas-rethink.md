@@ -79,6 +79,8 @@ flowchart TB
 - Invite emails + clearer accept flow
 - Org switcher UX
 - Team / roles / billing screens refined for merchants (not ops)
+- **App users + attribute schema** (org-scoped end users; definitions with `section` grouping) — **done (v1)**
+- **Email templates** (org-scoped catalog + `core/emailtemplates`; no send yet) — **done (v1)**
 
 ### Phase C — Real billing
 - Stripe Customer per org, Checkout, Portal, webhooks → Subscription / Entitlements

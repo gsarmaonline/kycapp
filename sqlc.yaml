@@ -9,6 +9,10 @@ sql:
       - "internal/store/migrations/000004_hardening.up.sql"
       - "internal/store/migrations/000005_auth.up.sql"
       - "internal/store/migrations/000006_google_oauth.up.sql"
+      - "internal/store/migrations/000007_app_users.up.sql"
+      - "internal/store/migrations/000008_dropdown_type.up.sql"
+      - "internal/store/migrations/000009_drop_enum_type.up.sql"
+      - "internal/store/migrations/000010_email_templates.up.sql"
     gen:
       go:
         package: "sqlc"
@@ -21,3 +25,7 @@ sql:
             go_type: "time.Time"
           - db_type: "pg_catalog.timestamptz"
             go_type: "time.Time"
+          - db_type: "jsonb"
+            go_type: "encoding/json.RawMessage"
+          - db_type: "pg_catalog.jsonb"
+            go_type: "encoding/json.RawMessage"

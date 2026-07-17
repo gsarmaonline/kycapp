@@ -67,10 +67,13 @@ func seedSystemRoles(ctx context.Context, q *sqlc.Queries, orgID string) (owner,
 		return
 	}
 	memberKeys := map[string]bool{
-		"organisation:read": true,
-		"members:read":      true,
-		"roles:read":        true,
-		"billing:read":      true,
+		"organisation:read":     true,
+		"members:read":          true,
+		"roles:read":            true,
+		"billing:read":          true,
+		"attributes:read":       true,
+		"app_users:read":        true,
+		"email_templates:read":  true,
 	}
 	for _, p := range perms {
 		if memberKeys[p.Key] {
