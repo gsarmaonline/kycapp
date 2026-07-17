@@ -10,6 +10,28 @@ import {
 } from './api'
 import { AppShell } from './app_shell'
 import { AuthScreen } from './auth_screen'
+import { AttributesEdit } from './pages/attributes/attributes_edit'
+import { AttributesIndex } from './pages/attributes/attributes_index'
+import { AttributesNew } from './pages/attributes/attributes_new'
+import { AttributesShow } from './pages/attributes/attributes_show'
+import { BillingPage } from './pages/billing_page'
+import { EmailTemplatesEdit } from './pages/email_templates/email_templates_edit'
+import { EmailTemplatesIndex } from './pages/email_templates/email_templates_index'
+import { EmailTemplatesNew } from './pages/email_templates/email_templates_new'
+import { EmailTemplatesShow } from './pages/email_templates/email_templates_show'
+import { MembersEdit } from './pages/members/members_edit'
+import { MembersIndex } from './pages/members/members_index'
+import { MembersNew } from './pages/members/members_new'
+import { MembersShow } from './pages/members/members_show'
+import { OverviewPage } from './pages/overview_page'
+import { RolesEdit } from './pages/roles/roles_edit'
+import { RolesIndex } from './pages/roles/roles_index'
+import { RolesNew } from './pages/roles/roles_new'
+import { RolesShow } from './pages/roles/roles_show'
+import { UsersEdit } from './pages/users/users_edit'
+import { UsersIndex } from './pages/users/users_index'
+import { UsersNew } from './pages/users/users_new'
+import { UsersShow } from './pages/users/users_show'
 import './App.css'
 
 type Gate = 'loading' | 'auth' | 'app'
@@ -74,8 +96,30 @@ export default function App() {
   return (
     <Routes>
       <Route path="/" element={<AppShell user={user} onLogout={onLogout} />} />
-      <Route path="/orgs/:orgId" element={<AppShell user={user} onLogout={onLogout} />} />
-      <Route path="/orgs/:orgId/:section" element={<AppShell user={user} onLogout={onLogout} />} />
+      <Route path="/orgs/:orgId" element={<AppShell user={user} onLogout={onLogout} />}>
+        <Route index element={<OverviewPage />} />
+        <Route path="members" element={<MembersIndex />} />
+        <Route path="members/new" element={<MembersNew />} />
+        <Route path="members/:id" element={<MembersShow />} />
+        <Route path="members/:id/edit" element={<MembersEdit />} />
+        <Route path="roles" element={<RolesIndex />} />
+        <Route path="roles/new" element={<RolesNew />} />
+        <Route path="roles/:id" element={<RolesShow />} />
+        <Route path="roles/:id/edit" element={<RolesEdit />} />
+        <Route path="users" element={<UsersIndex />} />
+        <Route path="users/new" element={<UsersNew />} />
+        <Route path="users/:id" element={<UsersShow />} />
+        <Route path="users/:id/edit" element={<UsersEdit />} />
+        <Route path="attributes" element={<AttributesIndex />} />
+        <Route path="attributes/new" element={<AttributesNew />} />
+        <Route path="attributes/:id" element={<AttributesShow />} />
+        <Route path="attributes/:id/edit" element={<AttributesEdit />} />
+        <Route path="email-templates" element={<EmailTemplatesIndex />} />
+        <Route path="email-templates/new" element={<EmailTemplatesNew />} />
+        <Route path="email-templates/:id" element={<EmailTemplatesShow />} />
+        <Route path="email-templates/:id/edit" element={<EmailTemplatesEdit />} />
+        <Route path="billing" element={<BillingPage />} />
+      </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   )

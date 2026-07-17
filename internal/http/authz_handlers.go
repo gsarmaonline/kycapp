@@ -82,6 +82,19 @@ func (s *Server) handleCreateRole(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusCreated, roleJSON(role))
 }
 
+func (s *Server) handleGetRole(w http.ResponseWriter, r *http.Request) {
+	role, err := s.svc.GetRole(r.Context(), r.PathValue("id"))
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	if _, err := s.svc.RequireOrgPermission(r.Context(), role.Role.OrganisationID, "roles:read"); err != nil {
+		writeError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, roleJSON(role))
+}
+
 func (s *Server) handlePatchRole(w http.ResponseWriter, r *http.Request) {
 	role, err := s.svc.GetRole(r.Context(), r.PathValue("id"))
 	if err != nil {
@@ -109,6 +122,23 @@ func (s *Server) handlePatchRole(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, roleJSON(updated))
+}
+
+func (s *Server) handleDeleteRole(w http.ResponseWriter, r *http.Request) {
+	role, err := s.svc.GetRole(r.Context(), r.PathValue("id"))
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	if _, err := s.svc.RequireOrgPermission(r.Context(), role.Role.OrganisationID, "roles:manage"); err != nil {
+		writeError(w, err)
+		return
+	}
+	if err := s.svc.DeleteRole(r.Context(), r.PathValue("id")); err != nil {
+		writeError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
 }
 
 func (s *Server) handleAuthzCheck(w http.ResponseWriter, r *http.Request) {

@@ -11,6 +11,33 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const archiveEmailTemplate = `-- name: ArchiveEmailTemplate :one
+UPDATE email_templates
+SET status = 'archived', updated_at = now()
+WHERE id = $1
+RETURNING id, organisation_id, key, name, description, subject, body_text, body_html, status, is_system, created_at, updated_at
+`
+
+func (q *Queries) ArchiveEmailTemplate(ctx context.Context, id string) (EmailTemplate, error) {
+	row := q.db.QueryRow(ctx, archiveEmailTemplate, id)
+	var i EmailTemplate
+	err := row.Scan(
+		&i.ID,
+		&i.OrganisationID,
+		&i.Key,
+		&i.Name,
+		&i.Description,
+		&i.Subject,
+		&i.BodyText,
+		&i.BodyHtml,
+		&i.Status,
+		&i.IsSystem,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
 const createEmailTemplate = `-- name: CreateEmailTemplate :one
 INSERT INTO email_templates (
     id, organisation_id, key, name, description,

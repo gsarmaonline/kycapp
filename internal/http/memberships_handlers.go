@@ -65,6 +65,29 @@ func (s *Server) handleListMemberships(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"items": items})
 }
 
+func (s *Server) handleGetMembership(w http.ResponseWriter, r *http.Request) {
+	row, err := s.svc.GetMembershipDetail(r.Context(), r.PathValue("id"))
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	if _, err := s.svc.RequireOrgPermission(r.Context(), row.OrganisationID, "members:read"); err != nil {
+		writeError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{
+		"id":              row.ID,
+		"organisation_id": row.OrganisationID,
+		"user_id":         row.UserID,
+		"role_id":         row.RoleID,
+		"status":          row.Status,
+		"created_at":      row.CreatedAt.UTC().Format(time.RFC3339Nano),
+		"user_email":      row.UserEmail,
+		"user_name":       row.UserName,
+		"role_key":        row.RoleKey,
+	})
+}
+
 func (s *Server) handleAcceptMembership(w http.ResponseWriter, r *http.Request) {
 	p, err := service.RequireUser(r.Context())
 	if err != nil {

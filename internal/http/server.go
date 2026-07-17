@@ -106,12 +106,15 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /v1/users/{id}/memberships", s.handleListUserMemberships)
 
 	s.mux.HandleFunc("POST /v1/memberships/{id}/accept", s.handleAcceptMembership)
+	s.mux.HandleFunc("GET /v1/memberships/{id}", s.handleGetMembership)
 	s.mux.HandleFunc("PATCH /v1/memberships/{id}", s.handlePatchMembership)
 	s.mux.HandleFunc("DELETE /v1/memberships/{id}", s.handleRevokeMembership)
 
 	s.mux.HandleFunc("GET /v1/permissions", s.handleListPermissions)
 	s.mux.HandleFunc("GET /v1/permissions/{key}", s.handleGetPermission)
+	s.mux.HandleFunc("GET /v1/roles/{id}", s.handleGetRole)
 	s.mux.HandleFunc("PATCH /v1/roles/{id}", s.handlePatchRole)
+	s.mux.HandleFunc("DELETE /v1/roles/{id}", s.handleDeleteRole)
 	s.mux.HandleFunc("POST /v1/authz/check", s.handleAuthzCheck)
 
 	s.mux.HandleFunc("POST /v1/plans", s.handleCreatePlan)
@@ -133,16 +136,20 @@ func (s *Server) routes() {
 
 	s.mux.HandleFunc("POST /v1/organisations/{id}/attribute-definitions", s.handleCreateAttributeDefinition)
 	s.mux.HandleFunc("GET /v1/organisations/{id}/attribute-definitions", s.handleListAttributeDefinitions)
+	s.mux.HandleFunc("GET /v1/attribute-definitions/{id}", s.handleGetAttributeDefinition)
 	s.mux.HandleFunc("PATCH /v1/attribute-definitions/{id}", s.handlePatchAttributeDefinition)
+	s.mux.HandleFunc("DELETE /v1/attribute-definitions/{id}", s.handleDeleteAttributeDefinition)
 	s.mux.HandleFunc("POST /v1/organisations/{id}/app-users", s.handleCreateAppUser)
 	s.mux.HandleFunc("GET /v1/organisations/{id}/app-users", s.handleListAppUsers)
 	s.mux.HandleFunc("GET /v1/app-users/{id}", s.handleGetAppUser)
 	s.mux.HandleFunc("PATCH /v1/app-users/{id}", s.handlePatchAppUser)
+	s.mux.HandleFunc("DELETE /v1/app-users/{id}", s.handleDeleteAppUser)
 
 	s.mux.HandleFunc("POST /v1/organisations/{id}/email-templates", s.handleCreateEmailTemplate)
 	s.mux.HandleFunc("GET /v1/organisations/{id}/email-templates", s.handleListEmailTemplates)
 	s.mux.HandleFunc("GET /v1/email-templates/{id}", s.handleGetEmailTemplate)
 	s.mux.HandleFunc("PATCH /v1/email-templates/{id}", s.handlePatchEmailTemplate)
+	s.mux.HandleFunc("DELETE /v1/email-templates/{id}", s.handleDeleteEmailTemplate)
 }
 
 // Handler returns the root handler with auth, audit, rate limit, and optional CORS.

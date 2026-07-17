@@ -7,6 +7,17 @@ RETURNING *;
 SELECT * FROM memberships
 WHERE id = $1;
 
+-- name: GetMembershipDetail :one
+SELECT
+  m.*,
+  u.email AS user_email,
+  u.name AS user_name,
+  r.key AS role_key
+FROM memberships m
+JOIN users u ON u.id = m.user_id
+JOIN roles r ON r.id = m.role_id
+WHERE m.id = $1;
+
 -- name: ListMembershipsByOrganisation :many
 SELECT
   m.*,

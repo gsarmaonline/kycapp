@@ -17,15 +17,19 @@ export const ORG_SECTIONS: { id: OrgSection; label: string; path: string }[] = [
   { id: 'billing', label: 'Billing', path: 'billing' },
 ]
 
-export function sectionFromParam(section?: string): OrgSection {
-  switch (section) {
+export function sectionFromPathname(pathname: string, orgId: string): OrgSection {
+  const prefix = `/orgs/${orgId}`
+  if (!pathname.startsWith(prefix)) return 'overview'
+  const rest = pathname.slice(prefix.length).replace(/^\//, '')
+  const head = rest.split('/')[0] || ''
+  switch (head) {
     case 'members':
     case 'roles':
     case 'users':
     case 'attributes':
     case 'email-templates':
     case 'billing':
-      return section
+      return head
     case 'schema':
       return 'attributes'
     default:
@@ -37,4 +41,14 @@ export function orgPath(orgId: string, section: OrgSection = 'overview') {
   const base = `/orgs/${orgId}`
   if (section === 'overview') return base
   return `${base}/${section}`
+}
+
+export function resourcePath(
+  orgId: string,
+  section: Exclude<OrgSection, 'overview' | 'billing'>,
+  ...parts: string[]
+) {
+  const base = orgPath(orgId, section)
+  if (!parts.length) return base
+  return `${base}/${parts.join('/')}`
 }

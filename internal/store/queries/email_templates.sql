@@ -32,3 +32,9 @@ UPDATE email_templates SET
     updated_at = now()
 WHERE id = $1
 RETURNING *;
+
+-- name: ArchiveEmailTemplate :one
+UPDATE email_templates
+SET status = 'archived', updated_at = now()
+WHERE id = $1
+RETURNING *;

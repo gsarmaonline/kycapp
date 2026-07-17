@@ -136,6 +136,47 @@ func (q *Queries) GetMembershipByOrgAndUser(ctx context.Context, arg GetMembersh
 	return i, err
 }
 
+const getMembershipDetail = `-- name: GetMembershipDetail :one
+SELECT
+  m.id, m.organisation_id, m.user_id, m.role_id, m.status, m.created_at,
+  u.email AS user_email,
+  u.name AS user_name,
+  r.key AS role_key
+FROM memberships m
+JOIN users u ON u.id = m.user_id
+JOIN roles r ON r.id = m.role_id
+WHERE m.id = $1
+`
+
+type GetMembershipDetailRow struct {
+	ID             string    `json:"id"`
+	OrganisationID string    `json:"organisation_id"`
+	UserID         string    `json:"user_id"`
+	RoleID         string    `json:"role_id"`
+	Status         string    `json:"status"`
+	CreatedAt      time.Time `json:"created_at"`
+	UserEmail      string    `json:"user_email"`
+	UserName       string    `json:"user_name"`
+	RoleKey        string    `json:"role_key"`
+}
+
+func (q *Queries) GetMembershipDetail(ctx context.Context, id string) (GetMembershipDetailRow, error) {
+	row := q.db.QueryRow(ctx, getMembershipDetail, id)
+	var i GetMembershipDetailRow
+	err := row.Scan(
+		&i.ID,
+		&i.OrganisationID,
+		&i.UserID,
+		&i.RoleID,
+		&i.Status,
+		&i.CreatedAt,
+		&i.UserEmail,
+		&i.UserName,
+		&i.RoleKey,
+	)
+	return i, err
+}
+
 const listMembershipsByOrganisation = `-- name: ListMembershipsByOrganisation :many
 SELECT
   m.id, m.organisation_id, m.user_id, m.role_id, m.status, m.created_at,

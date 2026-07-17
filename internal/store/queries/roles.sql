@@ -24,6 +24,10 @@ SET
 WHERE id = sqlc.arg('id')
 RETURNING *;
 
+-- name: DeleteRole :exec
+DELETE FROM roles
+WHERE id = $1 AND is_system = false;
+
 -- name: AddRolePermission :exec
 INSERT INTO role_permissions (role_id, permission_id)
 VALUES ($1, $2)

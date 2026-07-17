@@ -12,6 +12,59 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const archiveAppUser = `-- name: ArchiveAppUser :one
+UPDATE app_users
+SET status = 'archived', updated_at = now()
+WHERE id = $1
+RETURNING id, organisation_id, external_id, email, display_name, status, attributes, created_at, updated_at
+`
+
+func (q *Queries) ArchiveAppUser(ctx context.Context, id string) (AppUser, error) {
+	row := q.db.QueryRow(ctx, archiveAppUser, id)
+	var i AppUser
+	err := row.Scan(
+		&i.ID,
+		&i.OrganisationID,
+		&i.ExternalID,
+		&i.Email,
+		&i.DisplayName,
+		&i.Status,
+		&i.Attributes,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const archiveAttributeDefinition = `-- name: ArchiveAttributeDefinition :one
+UPDATE attribute_definitions
+SET status = 'archived', updated_at = now()
+WHERE id = $1
+RETURNING id, organisation_id, key, label, description, value_type, section, sort_order, required, enum_values, is_pii, status, created_at, updated_at
+`
+
+func (q *Queries) ArchiveAttributeDefinition(ctx context.Context, id string) (AttributeDefinition, error) {
+	row := q.db.QueryRow(ctx, archiveAttributeDefinition, id)
+	var i AttributeDefinition
+	err := row.Scan(
+		&i.ID,
+		&i.OrganisationID,
+		&i.Key,
+		&i.Label,
+		&i.Description,
+		&i.ValueType,
+		&i.Section,
+		&i.SortOrder,
+		&i.Required,
+		&i.EnumValues,
+		&i.IsPii,
+		&i.Status,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
 const createAppUser = `-- name: CreateAppUser :one
 INSERT INTO app_users (
     id, organisation_id, external_id, email, display_name, status, attributes

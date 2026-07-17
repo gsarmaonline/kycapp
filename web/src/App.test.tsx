@@ -69,5 +69,6 @@ describe('App', () => {
     expect(await screen.findByRole('heading', { name: 'Acme' })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Members' })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Members' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Create member' })).toBeInTheDocument()
   })
 })

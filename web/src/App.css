@@ -117,8 +117,13 @@ body {
 }
 
 .main {
+  min-width: 0;
   padding: 1.75rem 1.75rem 3rem;
-  max-width: 880px;
+}
+
+.workspace {
+  width: 100%;
+  max-width: none;
 }
 
 .workspace-header {
@@ -374,9 +379,136 @@ button:disabled {
   resize: vertical;
 }
 
-.email-templates code {
-  font-size: 0.9em;
+.page-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1rem;
 }
+
+.page-header .section-title {
+  margin: 0;
+}
+
+a.button,
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.45rem 0.9rem;
+  border-radius: 4px;
+  background: #1f4d3a;
+  color: #f8faf8;
+  text-decoration: none;
+  border: 0;
+  font: inherit;
+  cursor: pointer;
+}
+
+a.button:hover,
+.button:hover {
+  background: #16382a;
+}
+
+.table-wrap {
+  overflow-x: auto;
+  border: 1px solid #e7e5e4;
+  border-radius: 6px;
+  background: rgba(255, 253, 248, 0.9);
+}
+
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.95rem;
+}
+
+.data-table th,
+.data-table td {
+  padding: 0.65rem 0.75rem;
+  text-align: left;
+  border-bottom: 1px solid #e7e5e4;
+  vertical-align: top;
+}
+
+.data-table th {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #78716c;
+  background: #fafaf9;
+}
+
+.data-table td.empty {
+  color: #78716c;
+  text-align: center;
+}
+
+.actions-col {
+  width: 1%;
+  white-space: nowrap;
+}
+
+.row-actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.link-btn {
+  background: none;
+  border: 0;
+  padding: 0;
+  color: #1f4d3a;
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.link-btn.danger {
+  color: #9f1239;
+}
+
+.link-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  text-decoration: none;
+}
+
+.detail-list {
+  margin: 0 0 1rem;
+  display: grid;
+  gap: 0.75rem;
+}
+
+.detail-row {
+  display: grid;
+  gap: 0.2rem;
+}
+
+.detail-row dt {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #78716c;
+}
+
+.detail-row dd {
+  margin: 0;
+}
+
+.form-actions {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+  margin-top: 0.75rem;
+}
+
+.form-actions a.ghost {
+  text-decoration: none;
+}
+
 
 .email-preview {
   margin-top: 1.25rem;

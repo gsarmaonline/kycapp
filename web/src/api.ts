@@ -158,8 +158,8 @@ export function listMemberships(orgId: string) {
   return request<{ items: Membership[] }>(`/v1/organisations/${orgId}/memberships`)
 }
 
-export function listRoles(orgId: string) {
-  return request<{ items: Role[] }>(`/v1/organisations/${orgId}/roles`)
+export function getMembership(id: string) {
+  return request<Membership>(`/v1/memberships/${id}`)
 }
 
 export function inviteMember(orgId: string, email: string, roleId: string) {
@@ -169,14 +169,39 @@ export function inviteMember(orgId: string, email: string, roleId: string) {
   })
 }
 
+export function updateMembership(
+  id: string,
+  input: { role_id?: string; status?: string },
+) {
+  return request<Membership>(`/v1/memberships/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(input),
+  })
+}
+
+export function deleteMembership(id: string) {
+  return request<Membership>(`/v1/memberships/${id}`, { method: 'DELETE' })
+}
+
+export function listRoles(orgId: string) {
+  return request<{ items: Role[] }>(`/v1/organisations/${orgId}/roles`)
+}
+
+export function getRole(id: string) {
+  return request<Role>(`/v1/roles/${id}`)
+}
+
 export function listPermissions() {
   return request<{ items: Permission[] }>('/v1/permissions')
 }
 
-export function updateRole(roleId: string, permissionKeys: string[]) {
+export function updateRole(
+  roleId: string,
+  input: { name?: string; description?: string; permission_keys?: string[] },
+) {
   return request<Role>(`/v1/roles/${roleId}`, {
     method: 'PATCH',
-    body: JSON.stringify({ permission_keys: permissionKeys }),
+    body: JSON.stringify(input),
   })
 }
 
@@ -188,6 +213,10 @@ export function createRole(
     method: 'POST',
     body: JSON.stringify(input),
   })
+}
+
+export function deleteRole(id: string) {
+  return request<{ ok: boolean }>(`/v1/roles/${id}`, { method: 'DELETE' })
 }
 
 export type Plan = {
@@ -259,6 +288,10 @@ export function listAttributeDefinitions(orgId: string, status?: string) {
   )
 }
 
+export function getAttributeDefinition(id: string) {
+  return request<AttributeDefinition>(`/v1/attribute-definitions/${id}`)
+}
+
 export function createAttributeDefinition(
   orgId: string,
   input: {
@@ -279,9 +312,37 @@ export function createAttributeDefinition(
   })
 }
 
+export function updateAttributeDefinition(
+  id: string,
+  input: {
+    label?: string
+    description?: string
+    value_type?: string
+    section?: string
+    sort_order?: number
+    required?: boolean
+    enum_values?: string[]
+    is_pii?: boolean
+    status?: string
+  },
+) {
+  return request<AttributeDefinition>(`/v1/attribute-definitions/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(input),
+  })
+}
+
+export function deleteAttributeDefinition(id: string) {
+  return request<AttributeDefinition>(`/v1/attribute-definitions/${id}`, { method: 'DELETE' })
+}
+
 export function listAppUsers(orgId: string, status?: string) {
   const q = status ? `?status=${encodeURIComponent(status)}` : ''
   return request<{ items: AppUser[] }>(`/v1/organisations/${orgId}/app-users${q}`)
+}
+
+export function getAppUser(id: string) {
+  return request<AppUser>(`/v1/app-users/${id}`)
 }
 
 export function createAppUser(
@@ -298,6 +359,26 @@ export function createAppUser(
     method: 'POST',
     body: JSON.stringify(input),
   })
+}
+
+export function updateAppUser(
+  id: string,
+  input: {
+    email?: string
+    external_id?: string
+    display_name?: string
+    status?: string
+    attributes?: Record<string, unknown>
+  },
+) {
+  return request<AppUser>(`/v1/app-users/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(input),
+  })
+}
+
+export function deleteAppUser(id: string) {
+  return request<AppUser>(`/v1/app-users/${id}`, { method: 'DELETE' })
 }
 
 export type EmailTemplate = {
@@ -352,4 +433,12 @@ export function updateEmailTemplate(
     method: 'PATCH',
     body: JSON.stringify(input),
   })
+}
+
+export function getEmailTemplate(id: string) {
+  return request<EmailTemplate>(`/v1/email-templates/${id}`)
+}
+
+export function deleteEmailTemplate(id: string) {
+  return request<EmailTemplate>(`/v1/email-templates/${id}`, { method: 'DELETE' })
 }

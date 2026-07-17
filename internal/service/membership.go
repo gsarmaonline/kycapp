@@ -25,6 +25,11 @@ func (s *Service) GetMembership(ctx context.Context, id string) (sqlc.Membership
 	return m, mapNotFound(err, "membership not found")
 }
 
+func (s *Service) GetMembershipDetail(ctx context.Context, id string) (sqlc.GetMembershipDetailRow, error) {
+	m, err := s.db.Q().GetMembershipDetail(ctx, id)
+	return m, mapNotFound(err, "membership not found")
+}
+
 func (s *Service) CreateMembership(ctx context.Context, orgID string, in CreateMembershipInput) (sqlc.Membership, error) {
 	if _, err := s.GetOrganisation(ctx, orgID); err != nil {
 		return sqlc.Membership{}, err

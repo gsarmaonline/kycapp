@@ -272,6 +272,16 @@ func (s *Service) UpdateAppUser(ctx context.Context, id string, in UpdateAppUser
 	return row, nil
 }
 
+func (s *Service) DeleteAppUser(ctx context.Context, id string) (sqlc.AppUser, error) {
+	row, err := s.db.Q().ArchiveAppUser(ctx, id)
+	return row, mapNotFound(err, "app user not found")
+}
+
+func (s *Service) DeleteAttributeDefinition(ctx context.Context, id string) (sqlc.AttributeDefinition, error) {
+	row, err := s.db.Q().ArchiveAttributeDefinition(ctx, id)
+	return row, mapNotFound(err, "attribute definition not found")
+}
+
 func (s *Service) validateAttributes(ctx context.Context, orgID string, attrs map[string]any, enforceRequired bool) error {
 	defs, err := s.ListAttributeDefinitions(ctx, orgID, "active")
 	if err != nil {

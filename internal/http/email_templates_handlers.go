@@ -99,3 +99,21 @@ func (s *Server) handlePatchEmailTemplate(w http.ResponseWriter, r *http.Request
 	}
 	writeJSON(w, http.StatusOK, emailTemplateJSON(row))
 }
+
+func (s *Server) handleDeleteEmailTemplate(w http.ResponseWriter, r *http.Request) {
+	existing, err := s.svc.GetEmailTemplate(r.Context(), r.PathValue("id"))
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	if _, err := s.svc.RequireOrgPermission(r.Context(), existing.OrganisationID, "email_templates:manage"); err != nil {
+		writeError(w, err)
+		return
+	}
+	row, err := s.svc.DeleteEmailTemplate(r.Context(), r.PathValue("id"))
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, emailTemplateJSON(row))
+}

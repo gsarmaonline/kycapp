@@ -59,3 +59,15 @@ UPDATE app_users SET
     updated_at = now()
 WHERE id = $1
 RETURNING *;
+
+-- name: ArchiveAppUser :one
+UPDATE app_users
+SET status = 'archived', updated_at = now()
+WHERE id = $1
+RETURNING *;
+
+-- name: ArchiveAttributeDefinition :one
+UPDATE attribute_definitions
+SET status = 'archived', updated_at = now()
+WHERE id = $1
+RETURNING *;

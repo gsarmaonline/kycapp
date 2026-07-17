@@ -91,6 +91,16 @@ func (q *Queries) CreateRole(ctx context.Context, arg CreateRoleParams) (Role, e
 	return i, err
 }
 
+const deleteRole = `-- name: DeleteRole :exec
+DELETE FROM roles
+WHERE id = $1 AND is_system = false
+`
+
+func (q *Queries) DeleteRole(ctx context.Context, id string) error {
+	_, err := q.db.Exec(ctx, deleteRole, id)
+	return err
+}
+
 const deleteRolePermissions = `-- name: DeleteRolePermissions :exec
 DELETE FROM role_permissions
 WHERE role_id = $1

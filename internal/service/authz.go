@@ -205,6 +205,30 @@ func (s *Service) UpdateRole(ctx context.Context, roleID string, in UpdateRoleIn
 	return RoleView{Role: role, PermissionKeys: keys}, nil
 }
 
+func (s *Service) DeleteRole(ctx context.Context, roleID string) error {
+	role, err := s.db.Q().GetRole(ctx, roleID)
+	if err != nil {
+		return mapNotFound(err, "role not found")
+	}
+	if role.IsSystem {
+		return apperr.Validation("system roles cannot be deleted")
+	}
+	// Reject if any membership still uses this role.
+	mems, err := s.db.Q().ListMembershipsByOrganisation(ctx, role.OrganisationID)
+	if err != nil {
+		return err
+	}
+	for _, m := range mems {
+		if m.RoleID == roleID && m.Status != "revoked" {
+			return apperr.Conflict("role is still assigned to members")
+		}
+	}
+	if err := s.db.Q().DeleteRole(ctx, roleID); err != nil {
+		return err
+	}
+	return nil
+}
+
 func (s *Service) CheckAuthz(ctx context.Context, in AuthzCheckInput) (bool, error) {
 	if strings.TrimSpace(in.OrganisationID) == "" || strings.TrimSpace(in.UserID) == "" {
 		return false, apperr.Validation("organisation_id and user_id are required")

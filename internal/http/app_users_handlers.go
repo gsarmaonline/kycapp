@@ -58,6 +58,19 @@ func (s *Server) handleListAttributeDefinitions(w http.ResponseWriter, r *http.R
 	writeJSON(w, http.StatusOK, map[string]any{"items": items})
 }
 
+func (s *Server) handleGetAttributeDefinition(w http.ResponseWriter, r *http.Request) {
+	row, err := s.svc.GetAttributeDefinition(r.Context(), r.PathValue("id"))
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	if _, err := s.svc.RequireOrgPermission(r.Context(), row.OrganisationID, "attributes:read"); err != nil {
+		writeError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, attributeDefinitionJSON(row))
+}
+
 func (s *Server) handlePatchAttributeDefinition(w http.ResponseWriter, r *http.Request) {
 	existing, err := s.svc.GetAttributeDefinition(r.Context(), r.PathValue("id"))
 	if err != nil {
@@ -88,6 +101,24 @@ func (s *Server) handlePatchAttributeDefinition(w http.ResponseWriter, r *http.R
 		Section: body.Section, SortOrder: body.SortOrder, Required: body.Required,
 		EnumValues: body.EnumValues, IsPII: body.IsPII, Status: body.Status,
 	})
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, attributeDefinitionJSON(row))
+}
+
+func (s *Server) handleDeleteAttributeDefinition(w http.ResponseWriter, r *http.Request) {
+	existing, err := s.svc.GetAttributeDefinition(r.Context(), r.PathValue("id"))
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	if _, err := s.svc.RequireOrgPermission(r.Context(), existing.OrganisationID, "attributes:manage"); err != nil {
+		writeError(w, err)
+		return
+	}
+	row, err := s.svc.DeleteAttributeDefinition(r.Context(), r.PathValue("id"))
 	if err != nil {
 		writeError(w, err)
 		return
@@ -183,6 +214,24 @@ func (s *Server) handlePatchAppUser(w http.ResponseWriter, r *http.Request) {
 		in.Attributes = *body.Attributes
 	}
 	row, err := s.svc.UpdateAppUser(r.Context(), r.PathValue("id"), in)
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, appUserJSON(row))
+}
+
+func (s *Server) handleDeleteAppUser(w http.ResponseWriter, r *http.Request) {
+	existing, err := s.svc.GetAppUser(r.Context(), r.PathValue("id"))
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	if _, err := s.svc.RequireOrgPermission(r.Context(), existing.OrganisationID, "app_users:write"); err != nil {
+		writeError(w, err)
+		return
+	}
+	row, err := s.svc.DeleteAppUser(r.Context(), r.PathValue("id"))
 	if err != nil {
 		writeError(w, err)
 		return

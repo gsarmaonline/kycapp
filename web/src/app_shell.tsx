@@ -1,35 +1,31 @@
 import { useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
-import { NavLink, useNavigate, useParams } from 'react-router-dom'
+import {
+  NavLink,
+  Outlet,
+  useLocation,
+  useNavigate,
+  useParams,
+} from 'react-router-dom'
 import {
   createOrganisation,
   getOrganisation,
-  listMemberships,
   listOrganisations,
-  listPermissions,
-  listRoles,
-  type Membership,
   type Organisation,
-  type Permission,
-  type Role,
   type User,
 } from './api'
-import { ORG_SECTIONS, orgPath, sectionFromParam } from './org_nav'
-import type { OrgSection } from './org_nav'
-import { OverviewPanel } from './panels/overview_panel'
-import { MembersPanel } from './panels/members_panel'
-import { RolesPanel } from './panels/roles_panel'
-import { UsersPanel } from './panels/users_panel'
-import { AttributesPanel } from './panels/attributes_panel'
-import { EmailTemplatesPanel } from './panels/email_templates_panel'
-import { BillingPanel } from './panels/billing_panel'
+import { ORG_SECTIONS, orgPath, sectionFromPathname } from './org_nav'
 
 export function AppShell({ user, onLogout }: { user: User | null; onLogout: () => Promise<void> }) {
-  const { orgId: routeOrgId, section: routeSection } = useParams()
+  const { orgId: routeOrgId } = useParams()
   const navigate = useNavigate()
-  const section = sectionFromParam(routeSection)
+  const location = useLocation()
+  const section = routeOrgId
+    ? sectionFromPathname(location.pathname, routeOrgId)
+    : 'overview'
 
   const [orgs, setOrgs] = useState<Organisation[]>([])
+  const [org, setOrg] = useState<Organisation | null>(null)
   const [orgsError, setOrgsError] = useState<string | null>(null)
   const [orgsLoading, setOrgsLoading] = useState(true)
   const [creating, setCreating] = useState(false)
@@ -60,9 +56,19 @@ export function AppShell({ user, onLogout }: { user: User | null; onLogout: () =
         return
       }
       if (routeOrgId && items.length > 0 && !items.some((o) => o.id === routeOrgId)) {
-        navigate(items[0] ? orgPath(items[0].id) : '/orgs', { replace: true })
+        navigate(items[0] ? orgPath(items[0].id) : '/', { replace: true })
       }
     })()
+  }, [routeOrgId])
+
+  useEffect(() => {
+    if (!routeOrgId) {
+      setOrg(null)
+      return
+    }
+    void getOrganisation(routeOrgId)
+      .then(setOrg)
+      .catch(() => setOrg(null))
   }, [routeOrgId])
 
   function switchOrg(id: string) {
@@ -73,11 +79,11 @@ export function AppShell({ user, onLogout }: { user: User | null; onLogout: () =
     e.preventDefault()
     setOrgsError(null)
     try {
-      const org = await createOrganisation(newOrgName)
+      const created = await createOrganisation(newOrgName)
       setNewOrgName('')
       setCreating(false)
       await refreshOrgs()
-      navigate(orgPath(org.id, 'overview'))
+      navigate(orgPath(created.id, 'overview'))
     } catch (err) {
       setOrgsError(err instanceof Error ? err.message : 'Create failed')
     }
@@ -162,113 +168,21 @@ export function AppShell({ user, onLogout }: { user: User | null; onLogout: () =
           </div>
         )}
         {selected && (
-          <OrgWorkspace
-            key={selected.id}
-            orgId={selected.id}
-            section={section}
-            user={user}
-          />
+          <div className="workspace">
+            <header className="workspace-header">
+              <div>
+                <p className="eyebrow">{org?.slug ?? selected.slug}</p>
+                <h1>{org?.name ?? selected.name}</h1>
+                <p className="status">
+                  {org?.status ?? selected.status}
+                  {user ? ` · ${user.email}` : ''}
+                </p>
+              </div>
+            </header>
+            <Outlet />
+          </div>
         )}
       </main>
-    </div>
-  )
-}
-
-function OrgWorkspace({
-  orgId,
-  section,
-  user,
-}: {
-  orgId: string
-  section: OrgSection
-  user: User | null
-}) {
-  const [org, setOrg] = useState<Organisation | null>(null)
-  const [members, setMembers] = useState<Membership[]>([])
-  const [roles, setRoles] = useState<Role[]>([])
-  const [permissions, setPermissions] = useState<Permission[]>([])
-  const [error, setError] = useState<string | null>(null)
-  const [loading, setLoading] = useState(true)
-
-  async function refresh() {
-    setError(null)
-    setLoading(true)
-    try {
-      const [o, m, r, p] = await Promise.all([
-        getOrganisation(orgId),
-        listMemberships(orgId),
-        listRoles(orgId),
-        listPermissions(),
-      ])
-      setOrg(o)
-      setMembers(m.items)
-      setRoles(r.items)
-      setPermissions(p.items)
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to load')
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  useEffect(() => {
-    void refresh()
-  }, [orgId])
-
-  const title = ORG_SECTIONS.find((s) => s.id === section)?.label ?? 'Overview'
-
-  return (
-    <div className="workspace">
-      <header className="workspace-header">
-        <div>
-          <p className="eyebrow">{org?.slug ?? '…'}</p>
-          <h1>{org?.name ?? 'Organisation'}</h1>
-          <p className="status">
-            {org?.status ?? '…'}
-            {user ? ` · ${user.email}` : ''}
-          </p>
-        </div>
-        <h2 className="section-title">{title}</h2>
-      </header>
-
-      {error && (
-        <p className="error" role="alert">
-          {error}
-        </p>
-      )}
-      {loading && <p>Loading…</p>}
-
-      {!loading && section === 'overview' && org && (
-        <OverviewPanel org={org} memberCount={members.length} roleCount={roles.length} />
-      )}
-      {!loading && section === 'members' && (
-        <MembersPanel
-          orgId={orgId}
-          members={members}
-          roles={roles}
-          onChanged={refresh}
-          onError={setError}
-        />
-      )}
-      {!loading && section === 'roles' && (
-        <RolesPanel
-          orgId={orgId}
-          roles={roles}
-          permissions={permissions}
-          onChanged={refresh}
-          onError={setError}
-        />
-      )}
-      {!loading && section === 'users' && (
-        <UsersPanel orgId={orgId} onError={setError} />
-      )}
-      {!loading && section === 'attributes' && (
-        <AttributesPanel orgId={orgId} onError={setError} />
-      )}
-      {!loading && section === 'email-templates' && (
-        <EmailTemplatesPanel orgId={orgId} onError={setError} />
-      )}
-      {!loading && section === 'billing' && <BillingPanel orgId={orgId} onError={setError} />}
     </div>
   )
 }

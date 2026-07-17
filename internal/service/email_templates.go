@@ -152,3 +152,15 @@ func (s *Service) UpdateEmailTemplate(ctx context.Context, id string, in UpdateE
 	row, err := s.db.Q().UpdateEmailTemplate(ctx, params)
 	return row, err
 }
+
+func (s *Service) DeleteEmailTemplate(ctx context.Context, id string) (sqlc.EmailTemplate, error) {
+	existing, err := s.GetEmailTemplate(ctx, id)
+	if err != nil {
+		return sqlc.EmailTemplate{}, err
+	}
+	if existing.IsSystem {
+		return sqlc.EmailTemplate{}, apperr.Validation("system email templates cannot be deleted")
+	}
+	row, err := s.db.Q().ArchiveEmailTemplate(ctx, id)
+	return row, mapNotFound(err, "email template not found")
+}

@@ -1,0 +1,117 @@
+import { useEffect, useMemo, useState } from 'react'
+import type { FormEvent } from 'react'
+import { useNavigate, useParams } from 'react-router-dom'
+import { getEmailTemplate, getOrganisation, updateEmailTemplate } from '../../api'
+import { FormActions, PageHeader } from '../../crud/ui'
+import { renderEmailTemplate } from '../../email_render'
+import { resourcePath } from '../../org_nav'
+
+export function EmailTemplatesEdit() {
+  const { orgId = '', id = '' } = useParams()
+  const navigate = useNavigate()
+  const [name, setName] = useState('')
+  const [subject, setSubject] = useState('')
+  const [bodyText, setBodyText] = useState('')
+  const [bodyHtml, setBodyHtml] = useState('')
+  const [sampleDisplayName, setSampleDisplayName] = useState('Pat')
+  const [sampleOrgName, setSampleOrgName] = useState('Acme')
+  const [error, setError] = useState<string | null>(null)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    void getEmailTemplate(id)
+      .then((t) => {
+        setName(t.name)
+        setSubject(t.subject)
+        setBodyText(t.body_text)
+        setBodyHtml(t.body_html)
+      })
+      .catch((e) => setError(e instanceof Error ? e.message : 'Failed to load'))
+      .finally(() => setLoading(false))
+  }, [id])
+
+  useEffect(() => {
+    void getOrganisation(orgId)
+      .then((o) => setSampleOrgName(o.name))
+      .catch(() => undefined)
+  }, [orgId])
+
+  const vars = useMemo(
+    () => ({ display_name: sampleDisplayName, org_name: sampleOrgName }),
+    [sampleDisplayName, sampleOrgName],
+  )
+
+  async function onSubmit(e: FormEvent) {
+    e.preventDefault()
+    setError(null)
+    try {
+      await updateEmailTemplate(id, {
+        name,
+        subject,
+        body_text: bodyText,
+        body_html: bodyHtml,
+      })
+      navigate(resourcePath(orgId, 'email-templates', id))
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Save failed')
+    }
+  }
+
+  if (loading) return <p>Loading…</p>
+
+  return (
+    <section>
+      <PageHeader title="Edit email template" />
+      {error && <p className="error">{error}</p>}
+      <form className="create stacked" onSubmit={onSubmit}>
+        <label>
+          Name
+          <input value={name} onChange={(e) => setName(e.target.value)} required />
+        </label>
+        <label>
+          Subject
+          <input value={subject} onChange={(e) => setSubject(e.target.value)} required />
+        </label>
+        <label>
+          Body (text)
+          <textarea value={bodyText} onChange={(e) => setBodyText(e.target.value)} rows={6} />
+        </label>
+        <label>
+          Body (HTML)
+          <textarea value={bodyHtml} onChange={(e) => setBodyHtml(e.target.value)} rows={4} />
+        </label>
+        <FormActions cancelTo={resourcePath(orgId, 'email-templates', id)} submitLabel="Save" />
+      </form>
+
+      <fieldset className="perm-group email-preview">
+        <legend>Preview</legend>
+        <div className="create stacked preview-vars">
+          <label>
+            Sample {'{{display_name}}'}
+            <input
+              value={sampleDisplayName}
+              onChange={(e) => setSampleDisplayName(e.target.value)}
+            />
+          </label>
+          <label>
+            Sample {'{{org_name}}'}
+            <input value={sampleOrgName} onChange={(e) => setSampleOrgName(e.target.value)} />
+          </label>
+        </div>
+        <p className="preview-subject">
+          <span className="preview-label">Subject</span>
+          {renderEmailTemplate(subject, vars)}
+        </p>
+        <pre className="preview-text">{renderEmailTemplate(bodyText, vars) || '—'}</pre>
+        {bodyHtml.trim() ? (
+          <iframe
+            title="HTML preview"
+            className="preview-html"
+            sandbox=""
+            srcDoc={renderEmailTemplate(bodyHtml, vars)}
+          />
+        ) : null}
+      </fieldset>
+    </section>
+  )
+}
