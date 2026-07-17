@@ -1,0 +1,11 @@
+DROP TABLE IF EXISTS organisation_entitlements;
+DROP TABLE IF EXISTS subscriptions;
+DROP TABLE IF EXISTS plan_entitlements;
+DROP TABLE IF EXISTS entitlements;
+DROP TABLE IF EXISTS plans;
+DROP TABLE IF EXISTS memberships;
+DROP TABLE IF EXISTS role_permissions;
+DROP TABLE IF EXISTS roles;
+DROP TABLE IF EXISTS permissions;
+DROP TABLE IF EXISTS users;
+DROP TABLE IF EXISTS organisations;

@@ -1,0 +1,57 @@
+package main
+
+import (
+	"context"
+	"log"
+	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
+	"time"
+
+	"github.com/gsarmaonline/kyc/internal/config"
+	httpserver "github.com/gsarmaonline/kyc/internal/http"
+	"github.com/gsarmaonline/kyc/internal/store"
+)
+
+func main() {
+	cfg, err := config.Load()
+	if err != nil {
+		log.Fatalf("config: %v", err)
+	}
+
+	ctx := context.Background()
+	db, err := store.Open(ctx, cfg.DatabaseURL)
+	if err != nil {
+		log.Fatalf("store: %v", err)
+	}
+	defer db.Close()
+
+	if err := db.Migrate(); err != nil {
+		log.Fatalf("migrate: %v", err)
+	}
+
+	srv := httpserver.New(db)
+	httpServer := &http.Server{
+		Addr:              cfg.HTTPAddr,
+		Handler:           srv.Handler(),
+		ReadHeaderTimeout: 5 * time.Second,
+	}
+
+	go func() {
+		log.Printf("listening on %s", cfg.HTTPAddr)
+		if err := httpServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Fatalf("http: %v", err)
+		}
+	}()
+
+	stop := make(chan os.Signal, 1)
+	signal.Notify(stop, syscall.SIGINT, syscall.SIGTERM)
+	<-stop
+
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	if err := httpServer.Shutdown(shutdownCtx); err != nil {
+		log.Printf("shutdown: %v", err)
+	}
+}
