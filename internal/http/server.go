@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/gsarmaonline/kyc/internal/apperr"
+	"github.com/gsarmaonline/kyc/internal/authn"
 	"github.com/gsarmaonline/kyc/internal/service"
 	"github.com/gsarmaonline/kyc/internal/store/sqlc"
 )
@@ -20,14 +21,19 @@ type DBPinger interface {
 
 // Server serves HTTP endpoints for the KYC API.
 type Server struct {
-	db                 DBPinger
-	svc                *service.Service
-	mux                *http.ServeMux
-	now                func() time.Time
-	corsOrigin         string
-	apiTokens          []string
-	authRequired       bool
-	checkRatePerMinute int
+	db                  DBPinger
+	svc                 *service.Service
+	mux                 *http.ServeMux
+	now                 func() time.Time
+	corsOrigin          string
+	apiTokens           []string
+	platformAdminEmails []string
+	checkRatePerMinute  int
+	authRatePerMinute   int
+	google              *service.GoogleOAuth
+	oauthStateSecret    string
+	appOrigin           string
+	authDevLogin        bool
 }
 
 // Options configures the HTTP server.
@@ -35,20 +41,39 @@ type Options struct {
 	Service              *service.Service
 	CORSOrigin           string
 	APITokens            []string
+	PlatformAdminEmails  []string
 	CheckRateLimitPerMin int
+	AuthRateLimitPerMin  int
+	GoogleClientID       string
+	GoogleClientSecret   string
+	OAuthRedirectURL     string
+	OAuthStateSecret     string
+	AppOrigin            string
+	AuthDevLogin         bool
 }
 
 // New constructs an HTTP server.
 func New(db DBPinger, opts Options) *Server {
 	s := &Server{
-		db:                 db,
-		svc:                opts.Service,
-		mux:                http.NewServeMux(),
-		now:                time.Now,
-		corsOrigin:         opts.CORSOrigin,
-		apiTokens:          opts.APITokens,
-		authRequired:       len(opts.APITokens) > 0,
-		checkRatePerMinute: opts.CheckRateLimitPerMin,
+		db:                  db,
+		svc:                 opts.Service,
+		mux:                 http.NewServeMux(),
+		now:                 time.Now,
+		corsOrigin:          opts.CORSOrigin,
+		apiTokens:           opts.APITokens,
+		platformAdminEmails: opts.PlatformAdminEmails,
+		checkRatePerMinute:  opts.CheckRateLimitPerMin,
+		authRatePerMinute:   opts.AuthRateLimitPerMin,
+		google:              service.NewGoogleOAuth(opts.GoogleClientID, opts.GoogleClientSecret, opts.OAuthRedirectURL),
+		oauthStateSecret:    opts.OAuthStateSecret,
+		appOrigin:           opts.AppOrigin,
+		authDevLogin:        opts.AuthDevLogin,
+	}
+	if s.appOrigin == "" {
+		s.appOrigin = "http://localhost:8080"
+	}
+	if s.oauthStateSecret == "" {
+		s.oauthStateSecret = "dev-insecure-oauth-state"
 	}
 	s.routes()
 	return s
@@ -62,7 +87,12 @@ func (s *Server) routes() {
 		return
 	}
 
-	s.mux.HandleFunc("POST /v1/signup", s.handleSignup)
+	s.mux.HandleFunc("GET /v1/auth/providers", s.handleAuthProviders)
+	s.mux.HandleFunc("GET /v1/auth/google", s.handleGoogleStart)
+	s.mux.HandleFunc("GET /v1/auth/google/callback", s.handleGoogleCallback)
+	s.mux.HandleFunc("POST /v1/auth/dev-login", s.handleDevLogin)
+	s.mux.HandleFunc("POST /v1/auth/logout", s.handleLogout)
+	s.mux.HandleFunc("GET /v1/me", s.handleMe)
 
 	s.mux.HandleFunc("POST /v1/organisations", s.handleCreateOrganisation)
 	s.mux.HandleFunc("GET /v1/organisations", s.handleListOrganisations)
@@ -113,9 +143,10 @@ func (s *Server) Handler() http.Handler {
 	if s.svc != nil {
 		h = auditMiddleware(s.svc.RecordAudit, h)
 		h = rateLimitMiddleware(newRateLimiter(s.checkRatePerMinute), h)
-		h = authMiddleware(func(ctx context.Context, token string) (string, bool) {
-			return s.svc.AuthenticateToken(ctx, token, s.apiTokens)
-		}, s.authRequired, h)
+		h = authMiddleware(func(ctx context.Context, token string) (authn.Principal, bool) {
+			return s.svc.AuthenticateBearer(ctx, token, s.apiTokens, s.platformAdminEmails)
+		}, h)
+		h = authRateLimitMiddleware(newRateLimiter(s.authRatePerMinute), h)
 	}
 	if s.corsOrigin != "" {
 		h = corsMiddleware(s.corsOrigin, h)
@@ -190,6 +221,8 @@ func writeError(w http.ResponseWriter, err error) {
 			status = http.StatusBadRequest
 		case errors.Is(ae.Err, apperr.ErrUnauthorized):
 			status = http.StatusUnauthorized
+		case errors.Is(ae.Err, apperr.ErrForbidden):
+			status = http.StatusForbidden
 		case errors.Is(ae.Err, apperr.ErrRateLimited):
 			status = http.StatusTooManyRequests
 		}
@@ -234,12 +267,13 @@ func orgJSON(o sqlc.Organisation) map[string]any {
 
 func userJSON(u sqlc.User) map[string]any {
 	return map[string]any{
-		"id":         u.ID,
-		"email":      u.Email,
-		"name":       u.Name,
-		"status":     u.Status,
-		"created_at": u.CreatedAt.UTC().Format(time.RFC3339Nano),
-		"updated_at": u.UpdatedAt.UTC().Format(time.RFC3339Nano),
+		"id":             u.ID,
+		"email":          u.Email,
+		"name":           u.Name,
+		"status":         u.Status,
+		"platform_admin": u.PlatformAdmin,
+		"created_at":     u.CreatedAt.UTC().Format(time.RFC3339Nano),
+		"updated_at":     u.UpdatedAt.UTC().Format(time.RFC3339Nano),
 	}
 }
 
@@ -308,5 +342,13 @@ func entitlementJSON(e sqlc.Entitlement) map[string]any {
 		"id":          e.ID,
 		"key":         e.Key,
 		"description": e.Description,
+	}
+}
+
+func authResultJSON(a service.AuthResult) map[string]any {
+	return map[string]any{
+		"token":      a.Token,
+		"expires_at": a.ExpiresAt.UTC().Format(time.RFC3339Nano),
+		"user":       userJSON(a.User),
 	}
 }

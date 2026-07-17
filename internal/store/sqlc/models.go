@@ -103,6 +103,15 @@ type RolePermission struct {
 	PermissionID string `json:"permission_id"`
 }
 
+type Session struct {
+	ID        string             `json:"id"`
+	UserID    string             `json:"user_id"`
+	TokenHash string             `json:"token_hash"`
+	ExpiresAt time.Time          `json:"expires_at"`
+	RevokedAt pgtype.Timestamptz `json:"revoked_at"`
+	CreatedAt time.Time          `json:"created_at"`
+}
+
 type Subscription struct {
 	ID               string             `json:"id"`
 	OrganisationID   string             `json:"organisation_id"`
@@ -112,10 +121,12 @@ type Subscription struct {
 }
 
 type User struct {
-	ID        string    `json:"id"`
-	Email     string    `json:"email"`
-	Name      string    `json:"name"`
-	Status    string    `json:"status"`
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
+	ID            string      `json:"id"`
+	Email         string      `json:"email"`
+	Name          string      `json:"name"`
+	Status        string      `json:"status"`
+	CreatedAt     time.Time   `json:"created_at"`
+	UpdatedAt     time.Time   `json:"updated_at"`
+	PlatformAdmin bool        `json:"platform_admin"`
+	GoogleSub     pgtype.Text `json:"google_sub"`
 }

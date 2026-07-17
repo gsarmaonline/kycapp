@@ -8,6 +8,7 @@ var (
 	ErrValidation          = errors.New("validation_error")
 	ErrIdempotencyConflict = errors.New("idempotency_conflict")
 	ErrUnauthorized        = errors.New("unauthorized")
+	ErrForbidden           = errors.New("forbidden")
 	ErrRateLimited         = errors.New("rate_limited")
 )
 
@@ -45,6 +46,10 @@ func IdempotencyConflict(msg string) error {
 
 func Unauthorized(msg string) error {
 	return &Error{Code: "unauthorized", Message: msg, Err: ErrUnauthorized}
+}
+
+func Forbidden(msg string) error {
+	return &Error{Code: "forbidden", Message: msg, Err: ErrForbidden}
 }
 
 func RateLimited(msg string) error {

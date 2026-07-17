@@ -26,6 +26,9 @@ func TestLoadDefaultsHTTPAddr(t *testing.T) {
 	if cfg.CheckRateLimitPerMin != 120 {
 		t.Fatalf("CheckRateLimitPerMin = %d", cfg.CheckRateLimitPerMin)
 	}
+	if cfg.AuthRateLimitPerMin != 20 {
+		t.Fatalf("AuthRateLimitPerMin = %d", cfg.AuthRateLimitPerMin)
+	}
 }
 
 func TestLoadCustomHTTPAddr(t *testing.T) {

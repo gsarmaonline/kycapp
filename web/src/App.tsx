@@ -1,12 +1,16 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { FormEvent } from 'react'
 import {
+  authProviders,
+  captureOAuthTokenFromHash,
   createOrganisation,
-  createPlan,
   createRole,
+  devLogin,
   getOrganisation,
   getOrgEntitlements,
   getSubscription,
+  getToken,
+  googleAuthURL,
   inviteMember,
   listEntitlementsCatalog,
   listMemberships,
@@ -14,40 +18,182 @@ import {
   listPermissions,
   listPlans,
   listRoles,
-  setOrgEntitlements,
-  setPlanEntitlements,
+  logout,
+  me,
+  setToken,
   updateRole,
-  upsertSubscription,
-  type Entitlement,
+  type AuthProviders,
   type Membership,
   type Organisation,
   type Permission,
   type Plan,
   type Role,
   type Subscription,
+  type User,
 } from './api'
 import './App.css'
 
-type View =
-  | { name: 'list' }
-  | { name: 'detail'; orgId: string }
+type Gate = 'loading' | 'auth' | 'app'
+type View = { name: 'list' } | { name: 'detail'; orgId: string }
 
 export default function App() {
+  const [gate, setGate] = useState<Gate>('loading')
+  const [user, setUser] = useState<User | null>(null)
   const [view, setView] = useState<View>({ name: 'list' })
+
+  async function refreshSession() {
+    captureOAuthTokenFromHash()
+    const token = getToken()
+    if (!token) {
+      setUser(null)
+      setGate('auth')
+      return
+    }
+    try {
+      const res = await me()
+      setUser(res.user)
+      setGate('app')
+    } catch {
+      setToken(null)
+      setUser(null)
+      setGate('auth')
+    }
+  }
+
+  useEffect(() => {
+    void refreshSession()
+  }, [])
+
+  async function onAuthed(token: string) {
+    setToken(token)
+    await refreshSession()
+  }
+
+  async function onLogout() {
+    await logout()
+    setUser(null)
+    setView({ name: 'list' })
+    setGate('auth')
+  }
+
+  if (gate === 'loading') {
+    return (
+      <main className="page">
+        <p>Loading…</p>
+      </main>
+    )
+  }
+
+  if (gate === 'auth') {
+    return <AuthScreen onAuthed={onAuthed} />
+  }
 
   if (view.name === 'detail') {
     return (
       <OrganisationDetail
         orgId={view.orgId}
+        user={user}
         onBack={() => setView({ name: 'list' })}
+        onLogout={onLogout}
       />
     )
   }
 
-  return <OrganisationList onOpen={(id) => setView({ name: 'detail', orgId: id })} />
+  return (
+    <OrganisationList
+      user={user}
+      onOpen={(id) => setView({ name: 'detail', orgId: id })}
+      onLogout={onLogout}
+    />
+  )
 }
 
-function OrganisationList({ onOpen }: { onOpen: (id: string) => void }) {
+function AuthScreen({ onAuthed }: { onAuthed: (token: string) => Promise<void> }) {
+  const [providers, setProviders] = useState<AuthProviders | null>(null)
+  const [email, setEmail] = useState('')
+  const [name, setName] = useState('')
+  const [error, setError] = useState<string | null>(null)
+  const [busy, setBusy] = useState(false)
+
+  useEffect(() => {
+    void authProviders()
+      .then(setProviders)
+      .catch((err) => setError(err instanceof Error ? err.message : 'Failed to load auth'))
+  }, [])
+
+  async function onDevLogin(e: FormEvent) {
+    e.preventDefault()
+    setError(null)
+    setBusy(true)
+    try {
+      const res = await devLogin(email, name || email)
+      await onAuthed(res.token)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Sign-in failed')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <main className="page auth-page">
+      <header>
+        <p className="eyebrow">KYC</p>
+        <h1>Sign in</h1>
+        <p className="lede">Continue with Google to manage your organisations.</p>
+      </header>
+
+      {error && (
+        <p className="error" role="alert">
+          {error}
+        </p>
+      )}
+
+      {providers?.google && (
+        <a className="google-btn" href={googleAuthURL()}>
+          Continue with Google
+        </a>
+      )}
+
+      {!providers?.google && !providers?.dev_login && providers !== null && (
+        <p className="lede">Google OAuth is not configured on this server.</p>
+      )}
+
+      {providers?.dev_login && (
+        <form className="auth-form" onSubmit={onDevLogin}>
+          <p className="lede">Local/dev sign-in (AUTH_DEV_LOGIN)</p>
+          <label>
+            Email
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+              autoComplete="email"
+            />
+          </label>
+          <label>
+            Name
+            <input value={name} onChange={(e) => setName(e.target.value)} autoComplete="name" />
+          </label>
+          <button type="submit" disabled={busy}>
+            {busy ? 'Please wait…' : 'Dev sign in'}
+          </button>
+        </form>
+      )}
+    </main>
+  )
+}
+
+function OrganisationList({
+  user,
+  onOpen,
+  onLogout,
+}: {
+  user: User | null
+  onOpen: (id: string) => void
+  onLogout: () => Promise<void>
+}) {
   const [items, setItems] = useState<Organisation[]>([])
   const [name, setName] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -85,9 +231,15 @@ function OrganisationList({ onOpen }: { onOpen: (id: string) => void }) {
 
   return (
     <main className="page">
-      <header>
-        <p className="eyebrow">KYC ops</p>
-        <h1>Organisations</h1>
+      <header className="topbar">
+        <div>
+          <p className="eyebrow">KYC</p>
+          <h1>Your organisations</h1>
+          {user && <p className="lede">{user.email}</p>}
+        </div>
+        <button type="button" className="ghost" onClick={() => void onLogout()}>
+          Sign out
+        </button>
       </header>
 
       <form className="create" onSubmit={onCreate}>
@@ -103,7 +255,11 @@ function OrganisationList({ onOpen }: { onOpen: (id: string) => void }) {
         <button type="submit">Create</button>
       </form>
 
-      {error && <p className="error" role="alert">{error}</p>}
+      {error && (
+        <p className="error" role="alert">
+          {error}
+        </p>
+      )}
       {loading ? (
         <p>Loading…</p>
       ) : (
@@ -117,7 +273,7 @@ function OrganisationList({ onOpen }: { onOpen: (id: string) => void }) {
               </button>
             </li>
           ))}
-          {items.length === 0 && <li className="empty">No organisations yet.</li>}
+          {items.length === 0 && <li className="empty">No organisations yet — create one above.</li>}
         </ul>
       )}
     </main>
@@ -126,10 +282,14 @@ function OrganisationList({ onOpen }: { onOpen: (id: string) => void }) {
 
 function OrganisationDetail({
   orgId,
+  user,
   onBack,
+  onLogout,
 }: {
   orgId: string
+  user: User | null
   onBack: () => void
+  onLogout: () => Promise<void>
 }) {
   const [org, setOrg] = useState<Organisation | null>(null)
   const [members, setMembers] = useState<Membership[]>([])
@@ -177,14 +337,20 @@ function OrganisationDetail({
 
   return (
     <main className="page">
-      <button type="button" className="back" onClick={onBack}>
-        ← Organisations
-      </button>
+      <header className="topbar">
+        <button type="button" className="back" onClick={onBack}>
+          ← Organisations
+        </button>
+        <button type="button" className="ghost" onClick={() => void onLogout()}>
+          Sign out
+        </button>
+      </header>
       {org && (
         <header>
           <p className="eyebrow">{org.slug}</p>
           <h1>{org.name}</h1>
           <p className="status">{org.status}</p>
+          {user && <p className="lede">Signed in as {user.email}</p>}
         </header>
       )}
 
@@ -213,7 +379,11 @@ function OrganisationDetail({
           <button type="submit">Invite</button>
         </form>
 
-        {error && <p className="error" role="alert">{error}</p>}
+        {error && (
+          <p className="error" role="alert">
+            {error}
+          </p>
+        )}
 
         <ul className="list">
           {members.map((m) => (
@@ -326,10 +496,7 @@ function RoleEditor({
       <div className="role-toolbar">
         <label>
           Edit role
-          <select
-            value={selected?.id ?? ''}
-            onChange={(e) => setSelectedId(e.target.value)}
-          >
+          <select value={selected?.id ?? ''} onChange={(e) => setSelectedId(e.target.value)}>
             {roles.map((r) => (
               <option key={r.id} value={r.id}>
                 {r.name} ({r.key})
@@ -388,34 +555,22 @@ function BillingPanel({
   onError: (msg: string | null) => void
 }) {
   const [plans, setPlans] = useState<Plan[]>([])
-  const [catalog, setCatalog] = useState<Entitlement[]>([])
   const [subscription, setSubscription] = useState<Subscription | null>(null)
   const [effective, setEffective] = useState<string[]>([])
-  const [planId, setPlanId] = useState('')
-  const [grantKey, setGrantKey] = useState('')
-  const [denyKey, setDenyKey] = useState('')
-  const [newPlanKey, setNewPlanKey] = useState('')
-  const [newPlanName, setNewPlanName] = useState('')
 
   async function refresh() {
     onError(null)
     try {
-      const [p, c, e] = await Promise.all([
-        listPlans(),
-        listEntitlementsCatalog(),
-        getOrgEntitlements(orgId),
-      ])
+      const [p, e] = await Promise.all([listPlans(), getOrgEntitlements(orgId)])
       setPlans(p.items)
-      setCatalog(c.items)
       setEffective(e.entitlements)
       try {
         const sub = await getSubscription(orgId)
         setSubscription(sub)
-        setPlanId(sub.plan_id)
       } catch {
         setSubscription(null)
-        setPlanId(p.items[0]?.id ?? '')
       }
+      await listEntitlementsCatalog()
     } catch (err) {
       onError(err instanceof Error ? err.message : 'Billing load failed')
     }
@@ -424,49 +579,6 @@ function BillingPanel({
   useEffect(() => {
     void refresh()
   }, [orgId])
-
-  async function onAssign(e: FormEvent) {
-    e.preventDefault()
-    onError(null)
-    try {
-      await upsertSubscription(orgId, planId, 'active')
-      await refresh()
-    } catch (err) {
-      onError(err instanceof Error ? err.message : 'Assign plan failed')
-    }
-  }
-
-  async function onOverride(e: FormEvent) {
-    e.preventDefault()
-    onError(null)
-    const overrides: { key: string; effect: 'grant' | 'deny' }[] = []
-    if (grantKey) overrides.push({ key: grantKey, effect: 'grant' })
-    if (denyKey) overrides.push({ key: denyKey, effect: 'deny' })
-    try {
-      await setOrgEntitlements(orgId, overrides)
-      await refresh()
-    } catch (err) {
-      onError(err instanceof Error ? err.message : 'Override failed')
-    }
-  }
-
-  async function onCreatePlan(e: FormEvent) {
-    e.preventDefault()
-    onError(null)
-    try {
-      const plan = await createPlan(newPlanKey, newPlanName)
-      const keys = catalog.map((c) => c.key)
-      if (keys.length) {
-        await setPlanEntitlements(plan.id, keys)
-      }
-      setNewPlanKey('')
-      setNewPlanName('')
-      await refresh()
-      setPlanId(plan.id)
-    } catch (err) {
-      onError(err instanceof Error ? err.message : 'Create plan failed')
-    }
-  }
 
   const currentPlan = plans.find((p) => p.id === subscription?.plan_id)
 
@@ -477,73 +589,8 @@ function BillingPanel({
         Subscription: {subscription ? `${subscription.status}` : 'none'}
         {currentPlan ? ` · ${currentPlan.name} (${currentPlan.key})` : ''}
       </p>
-      <p>
-        Effective entitlements:{' '}
-        {effective.length ? effective.join(', ') : 'none'}
-      </p>
-
-      <form className="create" onSubmit={onAssign}>
-        <label>
-          Plan
-          <select value={planId} onChange={(e) => setPlanId(e.target.value)} required>
-            {plans.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.name} ({p.key}) — {p.entitlement_keys.join(', ') || 'no entitlements'}
-              </option>
-            ))}
-          </select>
-        </label>
-        <button type="submit">Assign plan</button>
-      </form>
-
-      <form className="create" onSubmit={onOverride}>
-        <label>
-          Grant
-          <select value={grantKey} onChange={(e) => setGrantKey(e.target.value)}>
-            <option value="">—</option>
-            {catalog.map((c) => (
-              <option key={c.key} value={c.key}>
-                {c.key}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label>
-          Deny
-          <select value={denyKey} onChange={(e) => setDenyKey(e.target.value)}>
-            <option value="">—</option>
-            {catalog.map((c) => (
-              <option key={c.key} value={c.key}>
-                {c.key}
-              </option>
-            ))}
-          </select>
-        </label>
-        <button type="submit">Set overrides</button>
-      </form>
-
-      <form className="create role-create" onSubmit={onCreatePlan}>
-        <label>
-          New plan key
-          <input value={newPlanKey} onChange={(e) => setNewPlanKey(e.target.value)} required />
-        </label>
-        <label>
-          Name
-          <input value={newPlanName} onChange={(e) => setNewPlanName(e.target.value)} required />
-        </label>
-        <button type="submit">Create plan (all entitlements)</button>
-      </form>
-
-      <ul className="list">
-        {plans.map((p) => (
-          <li key={p.id} className="member">
-            <strong>{p.name}</strong>
-            <span>{p.key}</span>
-            <span>{p.entitlement_keys.join(', ') || '—'}</span>
-            <span className="status">{p.status}</span>
-          </li>
-        ))}
-      </ul>
+      <p>Effective entitlements: {effective.length ? effective.join(', ') : 'none'}</p>
+      <p className="lede">Plan changes are managed by platform admins until self-serve billing ships.</p>
     </section>
   )
 }

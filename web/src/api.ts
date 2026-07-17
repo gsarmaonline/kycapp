@@ -1,10 +1,19 @@
 const API_BASE = import.meta.env.VITE_API_BASE ?? ''
+const TOKEN_KEY = 'kyc_session_token'
 
 export type Organisation = {
   id: string
   name: string
   slug: string
   status: string
+}
+
+export type User = {
+  id: string
+  email: string
+  name: string
+  status: string
+  platform_admin?: boolean
 }
 
 export type Membership = {
@@ -16,6 +25,8 @@ export type Membership = {
   user_email?: string
   user_name?: string
   role_key?: string
+  organisation_name?: string
+  organisation_slug?: string
 }
 
 export type Role = {
@@ -36,20 +47,96 @@ export type Permission = {
   description: string
 }
 
+export type MeResponse = {
+  user: User
+  memberships: Membership[]
+  platform_admin: boolean
+}
+
+export type AuthProviders = {
+  google: boolean
+  dev_login: boolean
+}
+
+export function getToken(): string | null {
+  return localStorage.getItem(TOKEN_KEY)
+}
+
+export function setToken(token: string | null) {
+  if (token) {
+    localStorage.setItem(TOKEN_KEY, token)
+  } else {
+    localStorage.removeItem(TOKEN_KEY)
+  }
+}
+
+/** Capture `#token=` from Google OAuth redirect and persist it. */
+export function captureOAuthTokenFromHash(): boolean {
+  const hash = window.location.hash.replace(/^#/, '')
+  if (!hash) return false
+  const params = new URLSearchParams(hash)
+  const token = params.get('token')
+  if (!token) return false
+  setToken(token)
+  history.replaceState(null, '', window.location.pathname + window.location.search)
+  return true
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    ...(init?.headers as Record<string, string> | undefined),
+  }
+  const token = getToken()
+  if (token) {
+    headers.Authorization = `Bearer ${token}`
+  }
   const res = await fetch(`${API_BASE}${path}`, {
     ...init,
-    headers: {
-      'Content-Type': 'application/json',
-      ...(init?.headers ?? {}),
-    },
+    headers,
   })
   const data = await res.json().catch(() => ({}))
   if (!res.ok) {
     const message = data?.error?.message ?? res.statusText
-    throw new Error(message)
+    const err = new Error(message) as Error & { status?: number; code?: string }
+    err.status = res.status
+    err.code = data?.error?.code
+    throw err
   }
   return data as T
+}
+
+export type AuthResponse = {
+  token: string
+  expires_at: string
+  user: User
+}
+
+export function authProviders() {
+  return request<AuthProviders>('/v1/auth/providers')
+}
+
+export function googleAuthURL() {
+  return `${API_BASE}/v1/auth/google`
+}
+
+export function devLogin(email: string, name: string) {
+  return request<AuthResponse>('/v1/auth/dev-login', {
+    method: 'POST',
+    body: JSON.stringify({ email, name }),
+  })
+}
+
+export async function logout() {
+  try {
+    await request<{ ok: boolean }>('/v1/auth/logout', { method: 'POST' })
+  } finally {
+    setToken(null)
+  }
+}
+
+export function me() {
+  return request<MeResponse>('/v1/me')
 }
 
 export function listOrganisations() {
@@ -136,37 +223,6 @@ export function getSubscription(orgId: string) {
   return request<Subscription>(`/v1/organisations/${orgId}/subscription`)
 }
 
-export function upsertSubscription(orgId: string, planId: string, status = 'active') {
-  return request<Subscription>(`/v1/organisations/${orgId}/subscription`, {
-    method: 'PUT',
-    body: JSON.stringify({ plan_id: planId, status }),
-  })
-}
-
 export function getOrgEntitlements(orgId: string) {
   return request<{ entitlements: string[] }>(`/v1/organisations/${orgId}/entitlements`)
-}
-
-export function setOrgEntitlements(
-  orgId: string,
-  overrides: { key: string; effect: 'grant' | 'deny' }[],
-) {
-  return request<{ entitlements: string[] }>(`/v1/organisations/${orgId}/entitlements`, {
-    method: 'PUT',
-    body: JSON.stringify({ overrides }),
-  })
-}
-
-export function createPlan(key: string, name: string) {
-  return request<Plan>('/v1/plans', {
-    method: 'POST',
-    body: JSON.stringify({ key, name }),
-  })
-}
-
-export function setPlanEntitlements(planId: string, entitlementKeys: string[]) {
-  return request<Plan>(`/v1/plans/${planId}/entitlements`, {
-    method: 'PUT',
-    body: JSON.stringify({ entitlement_keys: entitlementKeys }),
-  })
 }

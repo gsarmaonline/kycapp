@@ -51,3 +51,13 @@ UPDATE memberships
 SET status = 'revoked'
 WHERE id = $1
 RETURNING *;
+
+-- name: GetMembershipByOrgAndUser :one
+SELECT * FROM memberships
+WHERE organisation_id = $1 AND user_id = $2;
+
+-- name: GetActiveMembershipByOrgAndUser :one
+SELECT * FROM memberships
+WHERE organisation_id = $1
+  AND user_id = $2
+  AND status = 'active';

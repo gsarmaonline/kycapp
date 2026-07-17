@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/rand"
 	"crypto/sha256"
-	"crypto/subtle"
 	"encoding/hex"
 	"strings"
 
@@ -20,23 +19,13 @@ func HashAPIToken(raw string) string {
 	return hex.EncodeToString(sum[:])
 }
 
-// AuthenticateToken validates an env bootstrap token or a DB api key.
-// Returns a short actor label for audit logs.
+// AuthenticateToken validates a bearer token and returns an audit actor label.
 func (s *Service) AuthenticateToken(ctx context.Context, raw string, envTokens []string) (actor string, ok bool) {
-	raw = strings.TrimSpace(raw)
-	if raw == "" {
+	p, ok := s.AuthenticateBearer(ctx, raw, envTokens, nil)
+	if !ok {
 		return "", false
 	}
-	for _, t := range envTokens {
-		if subtle.ConstantTimeCompare([]byte(raw), []byte(t)) == 1 {
-			return "env-token", true
-		}
-	}
-	key, err := s.db.Q().GetAPIKeyByHash(ctx, HashAPIToken(raw))
-	if err != nil {
-		return "", false
-	}
-	return "api-key:" + key.Name, true
+	return p.ActorLabel(), true
 }
 
 type CreateAPIKeyInput struct {

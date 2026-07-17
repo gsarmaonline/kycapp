@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/gsarmaonline/kyc/internal/apperr"
+	"github.com/gsarmaonline/kyc/internal/authn"
 )
 
 type ctxKey int
@@ -14,43 +15,59 @@ const actorCtxKey ctxKey = 1
 
 // ActorFrom returns the authenticated actor label, if any.
 func ActorFrom(ctx context.Context) string {
+	if p, ok := authn.FromContext(ctx); ok {
+		return p.ActorLabel()
+	}
 	v, _ := ctx.Value(actorCtxKey).(string)
 	return v
-}
-
-func withActor(ctx context.Context, actor string) context.Context {
-	return context.WithValue(ctx, actorCtxKey, actor)
-}
-
-func rateLimitedErr() error {
-	return apperr.RateLimited("rate limit exceeded")
 }
 
 func unauthorizedErr() error {
 	return apperr.Unauthorized("missing or invalid bearer token")
 }
 
-func authMiddleware(authenticate func(ctx context.Context, token string) (string, bool), required bool, next http.Handler) http.Handler {
+func rateLimitedErr() error {
+	return apperr.RateLimited("rate limit exceeded")
+}
+
+func isPublicAPIPath(path string) bool {
+	switch path {
+	case "/v1/auth/providers",
+		"/v1/auth/google",
+		"/v1/auth/google/callback",
+		"/v1/auth/dev-login":
+		return true
+	default:
+		return false
+	}
+}
+
+func authMiddleware(
+	authenticate func(ctx context.Context, token string) (authn.Principal, bool),
+	next http.Handler,
+) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if !strings.HasPrefix(r.URL.Path, "/v1/") {
 			next.ServeHTTP(w, r)
 			return
 		}
-		token := bearerToken(r.Header.Get("Authorization"))
-		if token == "" {
-			if required {
-				writeError(w, unauthorizedErr())
-				return
-			}
-			next.ServeHTTP(w, r.WithContext(withActor(r.Context(), "anonymous")))
+		if isPublicAPIPath(r.URL.Path) {
+			next.ServeHTTP(w, r)
 			return
 		}
-		actor, ok := authenticate(r.Context(), token)
+		token := bearerToken(r.Header.Get("Authorization"))
+		if token == "" {
+			writeError(w, unauthorizedErr())
+			return
+		}
+		principal, ok := authenticate(r.Context(), token)
 		if !ok {
 			writeError(w, unauthorizedErr())
 			return
 		}
-		next.ServeHTTP(w, r.WithContext(withActor(r.Context(), actor)))
+		ctx := authn.WithPrincipal(r.Context(), principal)
+		ctx = context.WithValue(ctx, actorCtxKey, principal.ActorLabel())
+		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }
 
@@ -88,7 +105,6 @@ func auditMiddleware(record func(ctx context.Context, actor, method, path string
 		if !strings.Contains(r.URL.Path, "/organisations/") {
 			orgID = ""
 		}
-		// Best-effort; never fail the request on audit write.
 		_ = record(r.Context(), actor, r.Method, r.URL.Path, rec.status, orgID)
 	})
 }
@@ -100,4 +116,21 @@ func isMutating(method string) bool {
 	default:
 		return false
 	}
+}
+
+func authRateLimitMiddleware(limiter *rateLimiter, next http.Handler) http.Handler {
+	if limiter == nil || limiter.limit <= 0 {
+		return next
+	}
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/v1/auth/google", "/v1/auth/google/callback", "/v1/auth/dev-login":
+			key := "auth:" + r.RemoteAddr
+			if !limiter.allow(key) {
+				writeError(w, rateLimitedErr())
+				return
+			}
+		}
+		next.ServeHTTP(w, r)
+	})
 }

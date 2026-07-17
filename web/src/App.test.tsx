@@ -1,11 +1,21 @@
 import { render, screen } from '@testing-library/react'
-import { describe, expect, it, vi } from 'vitest'
+import { describe, expect, it, vi, beforeEach } from 'vitest'
 import App from './App'
 
+const me = vi.fn()
+const listOrganisations = vi.fn()
+const authProviders = vi.fn()
+
 vi.mock('./api', () => ({
-  listOrganisations: vi.fn(async () => ({
-    items: [{ id: '1', name: 'Acme', slug: 'acme', status: 'active' }],
-  })),
+  getToken: vi.fn(() => 'test-token'),
+  setToken: vi.fn(),
+  captureOAuthTokenFromHash: vi.fn(() => false),
+  me: (...args: unknown[]) => me(...args),
+  logout: vi.fn(),
+  authProviders: (...args: unknown[]) => authProviders(...args),
+  googleAuthURL: vi.fn(() => '/v1/auth/google'),
+  devLogin: vi.fn(),
+  listOrganisations: (...args: unknown[]) => listOrganisations(...args),
   createOrganisation: vi.fn(),
   getOrganisation: vi.fn(),
   listMemberships: vi.fn(),
@@ -17,17 +27,25 @@ vi.mock('./api', () => ({
   listPlans: vi.fn(),
   listEntitlementsCatalog: vi.fn(),
   getSubscription: vi.fn(),
-  upsertSubscription: vi.fn(),
   getOrgEntitlements: vi.fn(),
-  setOrgEntitlements: vi.fn(),
-  createPlan: vi.fn(),
-  setPlanEntitlements: vi.fn(),
 }))
 
 describe('App', () => {
-  it('renders organisations heading and loaded org', async () => {
+  beforeEach(() => {
+    me.mockResolvedValue({
+      user: { id: 'u1', email: 'ada@acme.com', name: 'Ada', status: 'active' },
+      memberships: [],
+      platform_admin: false,
+    })
+    listOrganisations.mockResolvedValue({
+      items: [{ id: '1', name: 'Acme', slug: 'acme', status: 'active' }],
+    })
+    authProviders.mockResolvedValue({ google: true, dev_login: false })
+  })
+
+  it('renders organisations after session load', async () => {
     render(<App />)
-    expect(screen.getByRole('heading', { name: 'Organisations' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Your organisations' })).toBeInTheDocument()
     expect(await screen.findByText('Acme')).toBeInTheDocument()
   })
 })

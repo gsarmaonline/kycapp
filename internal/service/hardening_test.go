@@ -14,8 +14,10 @@ func TestAPIAuthRequired(t *testing.T) {
 	db := openTestDB(t, ctx)
 	svc := service.New(db)
 	h := httpserver.New(db, httpserver.Options{
-		Service:   svc,
-		APITokens: []string{"secret-token"},
+		Service:             svc,
+		APITokens:           []string{"secret-token"},
+		AuthRateLimitPerMin: 0,
+		AuthDevLogin:        true,
 	}).Handler()
 
 	denied := doJSON(t, h, http.MethodGet, "/v1/organisations", nil, nil)
@@ -30,7 +32,6 @@ func TestAPIAuthRequired(t *testing.T) {
 		t.Fatalf("want 200, got %d %s", ok.Code, ok.Body.String())
 	}
 
-	// healthz stays public
 	health := doJSON(t, h, http.MethodGet, "/healthz", nil, nil)
 	if health.Code != http.StatusOK {
 		t.Fatalf("healthz want 200, got %d", health.Code)
@@ -42,8 +43,10 @@ func TestAPIKeyLifecycleAndAudit(t *testing.T) {
 	db := openTestDB(t, ctx)
 	svc := service.New(db)
 	h := httpserver.New(db, httpserver.Options{
-		Service:   svc,
-		APITokens: []string{"bootstrap"},
+		Service:             svc,
+		APITokens:           []string{"bootstrap"},
+		AuthRateLimitPerMin: 0,
+		AuthDevLogin:        true,
 	}).Handler()
 
 	auth := map[string]string{"Authorization": "Bearer bootstrap"}
@@ -58,7 +61,6 @@ func TestAPIKeyLifecycleAndAudit(t *testing.T) {
 	raw := keyBody["token"].(string)
 	keyID := keyBody["id"].(string)
 
-	// Use minted key
 	list := doJSON(t, h, http.MethodGet, "/v1/organisations", nil, map[string]string{
 		"Authorization": "Bearer " + raw,
 	})
@@ -66,7 +68,6 @@ func TestAPIKeyLifecycleAndAudit(t *testing.T) {
 		t.Fatalf("minted key: %d %s", list.Code, list.Body.String())
 	}
 
-	// Mutation leaves audit trail
 	doJSON(t, h, http.MethodPost, "/v1/organisations", map[string]any{
 		"name": "Audited Org",
 		"slug": "audited-org",
@@ -102,26 +103,44 @@ func TestCheckRateLimit(t *testing.T) {
 	svc := service.New(db)
 	h := httpserver.New(db, httpserver.Options{
 		Service:              svc,
+		APITokens:            []string{testSvcToken},
 		CheckRateLimitPerMin: 2,
+		AuthRateLimitPerMin:  0,
+		AuthDevLogin:         true,
 	}).Handler()
 
-	signup := doJSON(t, h, http.MethodPost, "/v1/signup", map[string]any{
-		"user":         map[string]string{"email": "rate@acme.com", "name": "Rate"},
-		"organisation": map[string]string{"name": "Rate Org", "slug": "rate-org"},
-	}, map[string]string{"Idempotency-Key": "rate-1"})
-	var signed map[string]any
-	decodeBody(t, signup, &signed)
+	signed, token, _ := doBootstrapOrg(t, h, "rate@acme.com", "Rate", "Rate Org", "rate-org")
 	orgID := signed["organisation"].(map[string]any)["id"].(string)
 
 	body := map[string]any{"organisation_id": orgID, "entitlement": "api_access"}
-	if c := doJSON(t, h, http.MethodPost, "/v1/entitlements/check", body, nil); c.Code != http.StatusOK {
-		t.Fatalf("1st check: %d", c.Code)
+	auth := userAuth(token)
+	if c := doJSON(t, h, http.MethodPost, "/v1/entitlements/check", body, auth); c.Code != http.StatusOK {
+		t.Fatalf("1st check: %d %s", c.Code, c.Body.String())
 	}
-	if c := doJSON(t, h, http.MethodPost, "/v1/entitlements/check", body, nil); c.Code != http.StatusOK {
+	if c := doJSON(t, h, http.MethodPost, "/v1/entitlements/check", body, auth); c.Code != http.StatusOK {
 		t.Fatalf("2nd check: %d", c.Code)
 	}
-	third := doJSON(t, h, http.MethodPost, "/v1/entitlements/check", body, nil)
+	third := doJSON(t, h, http.MethodPost, "/v1/entitlements/check", body, auth)
 	if third.Code != http.StatusTooManyRequests {
 		t.Fatalf("3rd check want 429, got %d %s", third.Code, third.Body.String())
+	}
+}
+
+func TestMerchantCannotManagePlatformCatalog(t *testing.T) {
+	ctx := context.Background()
+	db := openTestDB(t, ctx)
+	h := testServer(t, db)
+	_, token, _ := doBootstrapOrg(t, h, "merchant@acme.com", "Merchant", "Merchant Co", "merchant-co")
+
+	denied := doJSON(t, h, http.MethodPost, "/v1/plans", map[string]any{
+		"key": "evil", "name": "Evil",
+	}, userAuth(token))
+	if denied.Code != http.StatusForbidden {
+		t.Fatalf("want 403, got %d %s", denied.Code, denied.Body.String())
+	}
+
+	keys := doJSON(t, h, http.MethodGet, "/v1/api-keys", nil, userAuth(token))
+	if keys.Code != http.StatusForbidden {
+		t.Fatalf("api-keys want 403, got %d", keys.Code)
 	}
 }

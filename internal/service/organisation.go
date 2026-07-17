@@ -13,8 +13,10 @@ import (
 )
 
 type CreateOrganisationInput struct {
-	Name string
-	Slug string
+	Name         string
+	Slug         string
+	OwnerUserID  string // when set, creates owner membership for this user
+	AttachTrial  bool
 }
 
 func (s *Service) CreateOrganisation(ctx context.Context, in CreateOrganisationInput) (sqlc.Organisation, error) {
@@ -42,8 +44,42 @@ func (s *Service) CreateOrganisation(ctx context.Context, in CreateOrganisationI
 			}
 			return err
 		}
-		_, _, _, err = seedSystemRoles(ctx, q, org.ID)
-		return err
+		ownerRole, _, _, err := seedSystemRoles(ctx, q, org.ID)
+		if err != nil {
+			return err
+		}
+		if in.OwnerUserID != "" {
+			if _, err := q.GetUser(ctx, in.OwnerUserID); err != nil {
+				return mapNotFound(err, "user not found")
+			}
+			if _, err := q.CreateMembership(ctx, sqlc.CreateMembershipParams{
+				ID:             ids.New(),
+				OrganisationID: org.ID,
+				UserID:         in.OwnerUserID,
+				RoleID:         ownerRole.ID,
+				Status:         "active",
+			}); err != nil {
+				if store.IsUniqueViolation(err) {
+					return apperr.Conflict("user already a member of organisation")
+				}
+				return err
+			}
+		}
+		if in.AttachTrial {
+			plan, err := q.GetPlanByKey(ctx, "trial")
+			if err != nil {
+				return err
+			}
+			_, err = q.CreateSubscription(ctx, sqlc.CreateSubscriptionParams{
+				ID:               ids.New(),
+				OrganisationID:   org.ID,
+				PlanID:           plan.ID,
+				Status:           "trialing",
+				CurrentPeriodEnd: pgtype.Timestamptz{},
+			})
+			return err
+		}
+		return nil
 	})
 	return org, err
 }
@@ -58,6 +94,19 @@ func (s *Service) ListOrganisations(ctx context.Context, status, q string, limit
 		limit = 50
 	}
 	return s.db.Q().ListOrganisations(ctx, sqlc.ListOrganisationsParams{
+		Status: textArg(status),
+		Q:      textArg(q),
+		Cursor: textArg(cursor),
+		Limit:  limit,
+	})
+}
+
+func (s *Service) ListOrganisationsForUser(ctx context.Context, userID, status, q string, limit int32, cursor string) ([]sqlc.Organisation, error) {
+	if limit <= 0 || limit > 100 {
+		limit = 50
+	}
+	return s.db.Q().ListOrganisationsForUser(ctx, sqlc.ListOrganisationsForUserParams{
+		UserID: userID,
 		Status: textArg(status),
 		Q:      textArg(q),
 		Cursor: textArg(cursor),

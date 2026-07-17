@@ -38,14 +38,22 @@ func main() {
 		corsOrigin = os.Getenv("CORS_ORIGIN")
 	}
 	if corsOrigin == "" {
-		corsOrigin = "http://localhost:8080"
+		corsOrigin = cfg.AppOrigin
 	}
 
 	srv := httpserver.New(db, httpserver.Options{
 		Service:              svc,
 		CORSOrigin:           corsOrigin,
 		APITokens:            cfg.APITokens,
+		PlatformAdminEmails:  cfg.PlatformAdminEmails,
 		CheckRateLimitPerMin: cfg.CheckRateLimitPerMin,
+		AuthRateLimitPerMin:  cfg.AuthRateLimitPerMin,
+		GoogleClientID:       cfg.GoogleClientID,
+		GoogleClientSecret:   cfg.GoogleClientSecret,
+		OAuthRedirectURL:     cfg.OAuthRedirectURL,
+		OAuthStateSecret:     cfg.OAuthStateSecret,
+		AppOrigin:            cfg.AppOrigin,
+		AuthDevLogin:         cfg.AuthDevLogin,
 	})
 	httpServer := &http.Server{
 		Addr:              cfg.HTTPAddr,
@@ -54,11 +62,10 @@ func main() {
 	}
 
 	go func() {
-		if len(cfg.APITokens) > 0 {
-			log.Printf("listening on %s (API auth enabled)", cfg.HTTPAddr)
-		} else {
-			log.Printf("listening on %s (API auth disabled)", cfg.HTTPAddr)
-		}
+		log.Printf(
+			"listening on %s (google_oauth=%v dev_login=%v service_tokens=%d)",
+			cfg.HTTPAddr, cfg.GoogleConfigured(), cfg.AuthDevLogin, len(cfg.APITokens),
+		)
 		if err := httpServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			log.Fatalf("http: %v", err)
 		}

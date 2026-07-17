@@ -7,6 +7,8 @@ sql:
       - "internal/store/migrations/000002_seed.up.sql"
       - "internal/store/migrations/000003_idempotency.up.sql"
       - "internal/store/migrations/000004_hardening.up.sql"
+      - "internal/store/migrations/000005_auth.up.sql"
+      - "internal/store/migrations/000006_google_oauth.up.sql"
     gen:
       go:
         package: "sqlc"

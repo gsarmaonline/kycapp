@@ -23,6 +23,78 @@ body {
   padding: 2.5rem 1.25rem 4rem;
 }
 
+.auth-page {
+  max-width: 420px;
+}
+
+.lede {
+  color: #57534e;
+  margin: -0.75rem 0 1.5rem;
+}
+
+.auth-form {
+  display: grid;
+  gap: 0.85rem;
+  margin-bottom: 1.5rem;
+}
+
+.auth-form label {
+  display: grid;
+  gap: 0.35rem;
+  font-size: 0.9rem;
+}
+
+.auth-form button {
+  margin-top: 0.35rem;
+}
+
+.auth-switch {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.auth-switch .linkish {
+  display: block;
+  padding: 0.35rem 0;
+  background: transparent;
+  color: #1f4d3a;
+  text-align: left;
+}
+
+.topbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+  margin-bottom: 0.5rem;
+}
+
+.ghost {
+  background: transparent;
+  color: #1f4d3a;
+  border: 1px solid #c7d2cc;
+}
+
+.ghost:hover {
+  background: rgba(31, 77, 58, 0.06);
+}
+
+.google-btn {
+  display: block;
+  text-align: center;
+  text-decoration: none;
+  padding: 0.85rem 1rem;
+  border-radius: 4px;
+  background: #1f4d3a;
+  color: #f8faf8;
+  font-weight: 600;
+  margin-bottom: 1.5rem;
+}
+
+.google-btn:hover {
+  background: #16382a;
+}
+
 .eyebrow {
   text-transform: uppercase;
   letter-spacing: 0.08em;

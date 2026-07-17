@@ -12,46 +12,34 @@ Related: [data model](data-model.md) · [flows](flows.md)
 | Errors | `{ "error": { "code": string, "message": string } }` |
 | Pagination | `?limit=&cursor=` on list endpoints |
 | Idempotency | `Idempotency-Key` header on signup, membership invite, subscription upsert |
-| Auth (v1) | Bearer token (ops or service); finer IdP later |
+| Auth (v1) | Bearer **session** (`kyc_sess_…`) or **service/platform** token; humans sign in with **Google OAuth** |
 
 ---
 
-## Onboarding
+## App auth
 
-### `POST /v1/signup`
+Public (no Bearer): `GET /v1/auth/providers`, `GET /v1/auth/google`, `GET /v1/auth/google/callback`, and (if enabled) `POST /v1/auth/dev-login`.
 
-Atomic create: user + organisation + owner membership + trial subscription.
+All other `/v1/*` require `Authorization: Bearer <token>`.
 
-**Headers:** `Idempotency-Key` (required)
+| Endpoint | Purpose |
+| --- | --- |
+| `GET /v1/auth/providers` | `{ "google": bool, "dev_login": bool }` |
+| `GET /v1/auth/google` | Start Google OAuth (redirect) |
+| `GET /v1/auth/google/callback` | OAuth callback → issue session → redirect to `APP_ORIGIN/#token=…` |
+| `POST /v1/auth/dev-login` | Local/test only when `AUTH_DEV_LOGIN=true` — `{ "email", "name?" }` |
+| `POST /v1/auth/logout` | Revoke current session |
+| `GET /v1/me` | Current user + memberships |
 
-**Request**
+**Session response** includes `token`, `expires_at`, `user`.
 
-```json
-{
-  "user": { "email": "ada@acme.com", "name": "Ada Lovelace" },
-  "organisation": { "name": "Acme Pty Ltd", "slug": "acme" },
-  "plan_key": "trial"
-}
-```
+**Tenancy:** user sessions may only access organisations with an **active** membership (plus RBAC on mutations). Service tokens and `platform_admin` users bypass membership for platform ops. Plan catalog writes, API keys, audit, and entitlement overrides are **platform-only**.
 
-`slug` optional (derived from name if omitted). `plan_key` defaults to `trial`.
-
-**Response** `201`
-
-```json
-{
-  "user": { "id": "...", "email": "ada@acme.com", "name": "Ada Lovelace", "status": "active" },
-  "organisation": { "id": "...", "name": "Acme Pty Ltd", "slug": "acme", "status": "active" },
-  "membership": { "id": "...", "organisation_id": "...", "user_id": "...", "role_id": "...", "status": "active" },
-  "subscription": { "id": "...", "organisation_id": "...", "plan_id": "...", "status": "trialing" }
-}
-```
-
-Also seeds system roles `owner`, `admin`, `member` on the organisation.
+**Onboarding:** sign in with Google, then `POST /v1/organisations` (caller becomes owner + trial). Invited users sign in with Google using the invited email to link `google_sub` and accept the invite.
 
 ### `POST /v1/memberships/{id}/accept`
 
-Invitee accepts: membership `invited` → `active`.
+Invitee accepts (must be logged in as the invited user): membership `invited` → `active`.
 
 **Response** `200` — updated membership.
 
@@ -61,13 +49,13 @@ Invitee accepts: membership `invited` → `active`.
 
 ### `POST /v1/organisations`
 
-Create `{ "name": string, "slug": string? }`.
+Create `{ "name": string, "slug": string? }`. Authenticated **users** become owner and get a trial subscription. Service/platform tokens may create orgs without an owner membership.
 
-**Response** `201` — organisation. Caller should attach an owner membership separately (or use signup).
+**Response** `201` — organisation.
 
 ### `GET /v1/organisations`
 
-List. Query: `status`, `q` (name/slug search), `limit`, `cursor`.
+List. Users see only orgs they belong to; platform/service see all. Query: `status`, `q`, `limit`, `cursor`.
 
 ### `GET /v1/organisations/{id}`
 
@@ -219,27 +207,30 @@ Requires an **active** membership. Suspended orgs / revoked memberships → `all
 
 ## Auth & hardening
 
-When `API_TOKENS` is set (or a DB-minted key is used), `/v1/*` requires:
-
 ```http
-Authorization: Bearer <token>
+Authorization: Bearer <session-or-service-token>
 ```
 
-`/healthz` and `/readyz` stay public.
+`/healthz` and `/readyz` stay public. Auth/signup routes are public; everything else under `/v1` requires a valid Bearer.
 
-### API keys
+### API keys (platform only)
 
 - `POST /v1/api-keys` — `{ "name" }` → returns `{ token }` once (store hashed)
 - `GET /v1/api-keys`
 - `DELETE /v1/api-keys/{id}` — revoke
 
-### Audit
+Env `API_TOKENS` are bootstrap service principals (same privilege as platform).
+
+### Audit (platform only)
 
 - `GET /v1/audit-events` — recent mutating `/v1` requests (`actor`, `method`, `path`, `status_code`)
 
 ### Rate limits
 
-`POST /v1/authz/check` and `POST /v1/entitlements/check` are rate-limited per actor (see `CHECK_RATE_LIMIT_PER_MIN`). Exceeding the limit returns `429` with `rate_limited`.
+- Check endpoints: `CHECK_RATE_LIMIT_PER_MIN` per actor
+- Login/OAuth starts: `AUTH_RATE_LIMIT_PER_MIN` per IP
+
+Exceeding either returns `429` with `rate_limited`.
 
 ---
 
@@ -252,4 +243,5 @@ Authorization: Bearer <token>
 | `validation_error` | Bad body / missing fields |
 | `idempotency_conflict` | Same key, different body |
 | `unauthorized` | Missing/invalid bearer token |
-| `rate_limited` | Check endpoint quota exceeded |
+| `forbidden` | Authenticated but not allowed (tenancy / RBAC / platform) |
+| `rate_limited` | Auth or check endpoint quota exceeded |

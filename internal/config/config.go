@@ -13,28 +13,46 @@ type Config struct {
 	DatabaseURL          string
 	CORSOrigin           string
 	APITokens            []string
+	PlatformAdminEmails  []string
 	CheckRateLimitPerMin int
+	AuthRateLimitPerMin  int
+
+	GoogleClientID     string
+	GoogleClientSecret string
+	OAuthRedirectURL   string
+	AppOrigin          string
+	OAuthStateSecret   string
+	AuthDevLogin       bool
 }
 
 // Load reads configuration from environment variables.
-//
-//	HTTP_ADDR                  listen address (default :8080)
-//	DATABASE_URL               Postgres connection string (required)
-//	CORS_ORIGIN                CORS allow origin (optional)
-//	API_TOKENS                 comma-separated Bearer tokens; empty disables auth
-//	CHECK_RATE_LIMIT_PER_MIN   max check requests per actor per minute (default 120; 0 disables)
 func Load() (Config, error) {
 	cfg := Config{
 		HTTPAddr:             envOr("HTTP_ADDR", ":8080"),
 		DatabaseURL:          os.Getenv("DATABASE_URL"),
 		CORSOrigin:           os.Getenv("CORS_ORIGIN"),
 		APITokens:            splitCSV(os.Getenv("API_TOKENS")),
+		PlatformAdminEmails:  splitCSV(os.Getenv("PLATFORM_ADMIN_EMAILS")),
 		CheckRateLimitPerMin: envInt("CHECK_RATE_LIMIT_PER_MIN", 120),
+		AuthRateLimitPerMin:  envInt("AUTH_RATE_LIMIT_PER_MIN", 20),
+		GoogleClientID:       os.Getenv("GOOGLE_CLIENT_ID"),
+		GoogleClientSecret:   os.Getenv("GOOGLE_CLIENT_SECRET"),
+		OAuthRedirectURL:     envOr("OAUTH_REDIRECT_URL", "http://localhost:8080/v1/auth/google/callback"),
+		AppOrigin:            envOr("APP_ORIGIN", "http://localhost:8080"),
+		OAuthStateSecret:     envOr("OAUTH_STATE_SECRET", os.Getenv("API_TOKENS")),
+		AuthDevLogin:         envBool("AUTH_DEV_LOGIN", false),
 	}
 	if cfg.DatabaseURL == "" {
 		return Config{}, fmt.Errorf("DATABASE_URL is required")
 	}
+	if cfg.OAuthStateSecret == "" {
+		cfg.OAuthStateSecret = "dev-insecure-oauth-state"
+	}
 	return cfg, nil
+}
+
+func (c Config) GoogleConfigured() bool {
+	return c.GoogleClientID != "" && c.GoogleClientSecret != ""
 }
 
 func envOr(key, fallback string) string {
@@ -54,6 +72,21 @@ func envInt(key string, fallback int) int {
 		return fallback
 	}
 	return n
+}
+
+func envBool(key string, fallback bool) bool {
+	v := strings.TrimSpace(strings.ToLower(os.Getenv(key)))
+	if v == "" {
+		return fallback
+	}
+	switch v {
+	case "1", "true", "yes", "on":
+		return true
+	case "0", "false", "no", "off":
+		return false
+	default:
+		return fallback
+	}
 }
 
 func splitCSV(s string) []string {

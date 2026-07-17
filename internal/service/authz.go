@@ -50,6 +50,18 @@ func (s *Service) GetPermission(ctx context.Context, key string) (sqlc.Permissio
 	return p, mapNotFound(err, "permission not found")
 }
 
+func (s *Service) GetRole(ctx context.Context, id string) (RoleView, error) {
+	role, err := s.db.Q().GetRole(ctx, id)
+	if err != nil {
+		return RoleView{}, mapNotFound(err, "role not found")
+	}
+	keys, err := s.db.Q().ListPermissionKeysByRole(ctx, role.ID)
+	if err != nil {
+		return RoleView{}, err
+	}
+	return RoleView{Role: role, PermissionKeys: keys}, nil
+}
+
 func (s *Service) ListRoles(ctx context.Context, orgID string) ([]RoleView, error) {
 	if _, err := s.GetOrganisation(ctx, orgID); err != nil {
 		return nil, err

@@ -26,10 +26,11 @@ func (s *Service) CreateUser(ctx context.Context, in CreateUserInput) (sqlc.User
 		return sqlc.User{}, apperr.Validation("name is required")
 	}
 	user, err := s.db.Q().CreateUser(ctx, sqlc.CreateUserParams{
-		ID:     ids.New(),
-		Email:  email,
-		Name:   name,
-		Status: "active",
+		ID:            ids.New(),
+		Email:         email,
+		Name:          name,
+		Status:        "active",
+		PlatformAdmin: false,
 	})
 	if err != nil {
 		if store.IsUniqueViolation(err) {

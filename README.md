@@ -15,24 +15,20 @@ KYC owns the organisation lifecycle:
 | **Authorisation** | Roles and permissions scoped to the organisation |
 | **Billing** | Plans, entitlements, and subscription state tied to the organisation |
 
-Auth providers and payment processors are integrations. This repo is the source of truth.
-
-## Who it's for
-
-- **Ops / platform teams** — provision organisations, users, plans
-- **Product services** — call authz and entitlement checks at runtime
+To **use this app**, people must log in. Whether KYC later sells auth services to customers is a separate product question.
 
 ## Design principles
 
 - **Organisation is the hub.** Users, authz, and billing hang off the organisation record.
-- **Own the model, integrate the rails.** Stripe moves money; an IdP may authenticate; KYC decides who the organisation is and what it's entitled to.
+- **Login required.** Session tokens authenticate humans; service API keys are for platform/integrations only.
+- **Tenancy by membership.** Normal users can only access organisations they belong to.
 - **Permissions ≠ entitlements.** Permissions gate what a *user* may do; entitlements gate what an *organisation* may use on its plan.
-- **Entitlements over plan checks.** Apps ask "can this organisation do X?" — not "are they on plan Pro?"
 
 ## Specs
 
 | Doc | Contents |
 | --- | --- |
+| [docs/saas-rethink.md](docs/saas-rethink.md) | SaaS gap analysis and revised roadmap |
 | [docs/data-model.md](docs/data-model.md) | Objects, relationships, permission catalog |
 | [docs/api.md](docs/api.md) | REST `/v1` surface |
 | [docs/flows.md](docs/flows.md) | Signup, invite, ops-provision, runtime checks |
@@ -40,24 +36,23 @@ Auth providers and payment processors are integrations. This repo is the source 
 
 ## Status
 
-**Phase 5 complete:** Bearer API auth, API key management, mutation audit log, and rate limits on check endpoints.
+**App login + API tenancy complete:** Google OAuth (passwordless), sessions, `GET /v1/me`, membership-scoped org APIs, platform-only catalog/API-key routes, login-gated UI.
 
-All planned phases (0–5) are implemented.
+Still later: Stripe payments, invite email delivery, full platform-admin UI.
 
 ## Run locally
 
 ### Docker (recommended)
 
 ```bash
-# Stop any local process already using :8080, then:
 docker compose up --build -d
 ```
 
-- **Ops UI + API:** http://localhost:8080  
-  (nginx serves the UI and proxies `/v1`, `/healthz`, `/readyz` to the API)
+- **App + API:** http://localhost:8080  
+  Sign up (creates org + session) or sign in. The UI stores a session Bearer token; nginx forwards `Authorization`.
 - Postgres: `localhost:5432`
-- Default API token (compose): `dev-local-token` — nginx injects it for the UI.  
-  Override with `API_TOKENS=...` when starting compose.
+- Optional service token for platform/ops scripts: `API_TOKENS` (default `dev-local-token`)
+- Local compose enables `AUTH_DEV_LOGIN=true` so you can sign in without Google credentials. Set `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` for real OAuth.
 
 ```bash
 docker compose down
@@ -69,30 +64,50 @@ docker compose down
 docker compose up -d postgres
 
 export DATABASE_URL='postgres://kyc:kyc@localhost:5432/kyc?sslmode=disable'
-# Optional: require Bearer auth for /v1
+# Google OAuth (required for production human login):
+# export GOOGLE_CLIENT_ID=...
+# export GOOGLE_CLIENT_SECRET=...
+# export OAUTH_REDIRECT_URL='http://localhost:8080/v1/auth/google/callback'
+# export APP_ORIGIN='http://localhost:8080'
+# Local-only bypass when Google is not configured:
+export AUTH_DEV_LOGIN=true
+# Optional platform/service tokens:
 # export API_TOKENS='my-secret'
+# export PLATFORM_ADMIN_EMAILS='you@example.com'
 go run ./cmd/api
 
-# Ops UI (separate terminal) — http://localhost:5173
+# App UI — http://localhost:5173
 cd web && npm run dev
 ```
 
-### Auth & hardening
+### Auth & security
 
 | Env | Purpose |
 | --- | --- |
-| `API_TOKENS` | Comma-separated bootstrap Bearer tokens. Empty = auth disabled (local/tests). |
-| `CHECK_RATE_LIMIT_PER_MIN` | Max `/v1/authz/check` + `/v1/entitlements/check` calls per actor/minute (default 120; `0` disables). |
+| `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | Google OAuth app credentials |
+| `OAUTH_REDIRECT_URL` | Must match Google console (default `http://localhost:8080/v1/auth/google/callback`) |
+| `APP_ORIGIN` | Where to redirect after login with `#token=` |
+| `OAUTH_STATE_SECRET` | HMAC secret for OAuth CSRF state |
+| `AUTH_DEV_LOGIN` | If `true`, enables `POST /v1/auth/dev-login` for local/tests (**never in prod**) |
+| `API_TOKENS` | Comma-separated **platform** service tokens |
+| `PLATFORM_ADMIN_EMAILS` | Emails granted `platform_admin` on Google/dev login |
+| `CHECK_RATE_LIMIT_PER_MIN` | Max check-endpoint calls per actor/minute (default 120; `0` disables) |
+| `AUTH_RATE_LIMIT_PER_MIN` | Max OAuth/dev-login starts per IP/minute (default 20; `0` disables) |
 
-- `POST /v1/api-keys` — mint a product API key (raw token returned once)
-- `GET /v1/api-keys` / `DELETE /v1/api-keys/{id}` — list / revoke
-- `GET /v1/audit-events` — recent mutating request audit trail
+| Principal | Can do |
+| --- | --- |
+| User session (Google or dev-login) | Own profile, orgs they belong to, RBAC-gated mutations |
+| Platform admin / service token | All orgs, plan catalog, API keys, audit, entitlement overrides |
+
+Public (no Bearer): `GET /v1/auth/providers`, `GET /v1/auth/google`, `GET /v1/auth/google/callback`, `POST /v1/auth/dev-login` (if enabled), health endpoints.
+
+**Human login is Google-only.** Create an organisation after sign-in via `POST /v1/organisations`. Invited users sign in with Google using the invited email to claim the account.
 
 ## Test
 
 ```bash
 make test-go    # Go unit + integration (Docker for Testcontainers)
-make test-web   # Vitest for ops UI
+make test-web   # Vitest for UI
 make test       # both
 ```
 
@@ -104,9 +119,9 @@ make sqlc
 
 ## Non-goals (v1)
 
-- Not a full CRM (pipeline, deals, marketing) — may grow later on top of Organisation
-- Not a general-purpose IdP
-- Not a payment processor
+- Not a full CRM
+- Not Auth0-for-your-customers (auth-as-a-service)
+- Not a payment processor (Stripe later)
 - No separate Account entity yet
 
 ## Layout
@@ -114,10 +129,11 @@ make sqlc
 ```
 cmd/api/                 # HTTP server entrypoint
 core/                    # domain helpers
+internal/authn/          # request principal
 internal/config/         # env config
-internal/http/           # HTTP handlers
+internal/http/           # HTTP handlers + auth middleware
 internal/service/        # application services
 internal/store/          # Postgres, migrations, sqlc queries
-web/                     # Vite + React ops console
+web/                     # Vite + React app (login-gated)
 docs/                    # data model, API, flows, testing
 ```

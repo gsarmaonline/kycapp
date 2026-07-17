@@ -19,6 +19,22 @@ WHERE (sqlc.narg('status')::text IS NULL OR status = sqlc.narg('status'))
 ORDER BY id
 LIMIT sqlc.arg('limit');
 
+-- name: ListOrganisationsForUser :many
+SELECT o.*
+FROM organisations o
+JOIN memberships m ON m.organisation_id = o.id
+WHERE m.user_id = sqlc.arg('user_id')
+  AND m.status IN ('active', 'invited')
+  AND (sqlc.narg('status')::text IS NULL OR o.status = sqlc.narg('status'))
+  AND (
+    sqlc.narg('q')::text IS NULL
+    OR o.name ILIKE '%' || sqlc.narg('q') || '%'
+    OR o.slug ILIKE '%' || sqlc.narg('q') || '%'
+  )
+  AND (sqlc.narg('cursor')::text IS NULL OR o.id > sqlc.narg('cursor'))
+ORDER BY o.id
+LIMIT sqlc.arg('limit');
+
 -- name: UpdateOrganisation :one
 UPDATE organisations
 SET

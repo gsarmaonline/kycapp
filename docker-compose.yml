@@ -22,7 +22,15 @@ services:
       DATABASE_URL: postgres://kyc:kyc@postgres:5432/kyc?sslmode=disable
       CORS_ORIGIN: http://localhost:8080
       API_TOKENS: ${API_TOKENS:-dev-local-token}
+      PLATFORM_ADMIN_EMAILS: ${PLATFORM_ADMIN_EMAILS:-}
       CHECK_RATE_LIMIT_PER_MIN: ${CHECK_RATE_LIMIT_PER_MIN:-120}
+      AUTH_RATE_LIMIT_PER_MIN: ${AUTH_RATE_LIMIT_PER_MIN:-20}
+      AUTH_DEV_LOGIN: ${AUTH_DEV_LOGIN:-true}
+      APP_ORIGIN: ${APP_ORIGIN:-http://localhost:8080}
+      OAUTH_REDIRECT_URL: ${OAUTH_REDIRECT_URL:-http://localhost:8080/v1/auth/google/callback}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      OAUTH_STATE_SECRET: ${OAUTH_STATE_SECRET:-dev-oauth-state}
     depends_on:
       postgres:
         condition: service_healthy
@@ -38,8 +46,6 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.web
-    environment:
-      API_TOKEN: ${API_TOKENS:-dev-local-token}
     ports:
       - "8080:80"
     depends_on:

@@ -67,6 +67,32 @@ func (q *Queries) CreateMembership(ctx context.Context, arg CreateMembershipPara
 	return i, err
 }
 
+const getActiveMembershipByOrgAndUser = `-- name: GetActiveMembershipByOrgAndUser :one
+SELECT id, organisation_id, user_id, role_id, status, created_at FROM memberships
+WHERE organisation_id = $1
+  AND user_id = $2
+  AND status = 'active'
+`
+
+type GetActiveMembershipByOrgAndUserParams struct {
+	OrganisationID string `json:"organisation_id"`
+	UserID         string `json:"user_id"`
+}
+
+func (q *Queries) GetActiveMembershipByOrgAndUser(ctx context.Context, arg GetActiveMembershipByOrgAndUserParams) (Membership, error) {
+	row := q.db.QueryRow(ctx, getActiveMembershipByOrgAndUser, arg.OrganisationID, arg.UserID)
+	var i Membership
+	err := row.Scan(
+		&i.ID,
+		&i.OrganisationID,
+		&i.UserID,
+		&i.RoleID,
+		&i.Status,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
 const getMembership = `-- name: GetMembership :one
 SELECT id, organisation_id, user_id, role_id, status, created_at FROM memberships
 WHERE id = $1
@@ -74,6 +100,30 @@ WHERE id = $1
 
 func (q *Queries) GetMembership(ctx context.Context, id string) (Membership, error) {
 	row := q.db.QueryRow(ctx, getMembership, id)
+	var i Membership
+	err := row.Scan(
+		&i.ID,
+		&i.OrganisationID,
+		&i.UserID,
+		&i.RoleID,
+		&i.Status,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
+const getMembershipByOrgAndUser = `-- name: GetMembershipByOrgAndUser :one
+SELECT id, organisation_id, user_id, role_id, status, created_at FROM memberships
+WHERE organisation_id = $1 AND user_id = $2
+`
+
+type GetMembershipByOrgAndUserParams struct {
+	OrganisationID string `json:"organisation_id"`
+	UserID         string `json:"user_id"`
+}
+
+func (q *Queries) GetMembershipByOrgAndUser(ctx context.Context, arg GetMembershipByOrgAndUserParams) (Membership, error) {
+	row := q.db.QueryRow(ctx, getMembershipByOrgAndUser, arg.OrganisationID, arg.UserID)
 	var i Membership
 	err := row.Scan(
 		&i.ID,

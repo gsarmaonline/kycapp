@@ -12,16 +12,18 @@ import (
 )
 
 const createUser = `-- name: CreateUser :one
-INSERT INTO users (id, email, name, status)
-VALUES ($1, $2, $3, $4)
-RETURNING id, email, name, status, created_at, updated_at
+INSERT INTO users (id, email, name, status, platform_admin, google_sub)
+VALUES ($1, $2, $3, $4, $5, $6)
+RETURNING id, email, name, status, created_at, updated_at, platform_admin, google_sub
 `
 
 type CreateUserParams struct {
-	ID     string `json:"id"`
-	Email  string `json:"email"`
-	Name   string `json:"name"`
-	Status string `json:"status"`
+	ID            string      `json:"id"`
+	Email         string      `json:"email"`
+	Name          string      `json:"name"`
+	Status        string      `json:"status"`
+	PlatformAdmin bool        `json:"platform_admin"`
+	GoogleSub     pgtype.Text `json:"google_sub"`
 }
 
 func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, error) {
@@ -30,6 +32,8 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, e
 		arg.Email,
 		arg.Name,
 		arg.Status,
+		arg.PlatformAdmin,
+		arg.GoogleSub,
 	)
 	var i User
 	err := row.Scan(
@@ -39,12 +43,14 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, e
 		&i.Status,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.PlatformAdmin,
+		&i.GoogleSub,
 	)
 	return i, err
 }
 
 const getUser = `-- name: GetUser :one
-SELECT id, email, name, status, created_at, updated_at FROM users
+SELECT id, email, name, status, created_at, updated_at, platform_admin, google_sub FROM users
 WHERE id = $1
 `
 
@@ -58,12 +64,14 @@ func (q *Queries) GetUser(ctx context.Context, id string) (User, error) {
 		&i.Status,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.PlatformAdmin,
+		&i.GoogleSub,
 	)
 	return i, err
 }
 
 const getUserByEmail = `-- name: GetUserByEmail :one
-SELECT id, email, name, status, created_at, updated_at FROM users
+SELECT id, email, name, status, created_at, updated_at, platform_admin, google_sub FROM users
 WHERE email = $1
 `
 
@@ -77,12 +85,35 @@ func (q *Queries) GetUserByEmail(ctx context.Context, email string) (User, error
 		&i.Status,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.PlatformAdmin,
+		&i.GoogleSub,
+	)
+	return i, err
+}
+
+const getUserByGoogleSub = `-- name: GetUserByGoogleSub :one
+SELECT id, email, name, status, created_at, updated_at, platform_admin, google_sub FROM users
+WHERE google_sub = $1
+`
+
+func (q *Queries) GetUserByGoogleSub(ctx context.Context, googleSub pgtype.Text) (User, error) {
+	row := q.db.QueryRow(ctx, getUserByGoogleSub, googleSub)
+	var i User
+	err := row.Scan(
+		&i.ID,
+		&i.Email,
+		&i.Name,
+		&i.Status,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.PlatformAdmin,
+		&i.GoogleSub,
 	)
 	return i, err
 }
 
 const listUsers = `-- name: ListUsers :many
-SELECT id, email, name, status, created_at, updated_at FROM users
+SELECT id, email, name, status, created_at, updated_at, platform_admin, google_sub FROM users
 WHERE (
     $1::text IS NULL
     OR name ILIKE '%' || $1 || '%'
@@ -115,6 +146,8 @@ func (q *Queries) ListUsers(ctx context.Context, arg ListUsersParams) ([]User, e
 			&i.Status,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.PlatformAdmin,
+			&i.GoogleSub,
 		); err != nil {
 			return nil, err
 		}
@@ -131,19 +164,29 @@ UPDATE users
 SET
   name = COALESCE($1, name),
   status = COALESCE($2, status),
+  platform_admin = COALESCE($3, platform_admin),
+  google_sub = COALESCE($4, google_sub),
   updated_at = now()
-WHERE id = $3
-RETURNING id, email, name, status, created_at, updated_at
+WHERE id = $5
+RETURNING id, email, name, status, created_at, updated_at, platform_admin, google_sub
 `
 
 type UpdateUserParams struct {
-	Name   pgtype.Text `json:"name"`
-	Status pgtype.Text `json:"status"`
-	ID     string      `json:"id"`
+	Name          pgtype.Text `json:"name"`
+	Status        pgtype.Text `json:"status"`
+	PlatformAdmin pgtype.Bool `json:"platform_admin"`
+	GoogleSub     pgtype.Text `json:"google_sub"`
+	ID            string      `json:"id"`
 }
 
 func (q *Queries) UpdateUser(ctx context.Context, arg UpdateUserParams) (User, error) {
-	row := q.db.QueryRow(ctx, updateUser, arg.Name, arg.Status, arg.ID)
+	row := q.db.QueryRow(ctx, updateUser,
+		arg.Name,
+		arg.Status,
+		arg.PlatformAdmin,
+		arg.GoogleSub,
+		arg.ID,
+	)
 	var i User
 	err := row.Scan(
 		&i.ID,
@@ -152,6 +195,8 @@ func (q *Queries) UpdateUser(ctx context.Context, arg UpdateUserParams) (User, e
 		&i.Status,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.PlatformAdmin,
+		&i.GoogleSub,
 	)
 	return i, err
 }

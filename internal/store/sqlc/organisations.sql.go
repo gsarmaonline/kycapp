@@ -135,6 +135,64 @@ func (q *Queries) ListOrganisations(ctx context.Context, arg ListOrganisationsPa
 	return items, nil
 }
 
+const listOrganisationsForUser = `-- name: ListOrganisationsForUser :many
+SELECT o.id, o.name, o.slug, o.status, o.created_at, o.updated_at
+FROM organisations o
+JOIN memberships m ON m.organisation_id = o.id
+WHERE m.user_id = $1
+  AND m.status IN ('active', 'invited')
+  AND ($2::text IS NULL OR o.status = $2)
+  AND (
+    $3::text IS NULL
+    OR o.name ILIKE '%' || $3 || '%'
+    OR o.slug ILIKE '%' || $3 || '%'
+  )
+  AND ($4::text IS NULL OR o.id > $4)
+ORDER BY o.id
+LIMIT $5
+`
+
+type ListOrganisationsForUserParams struct {
+	UserID string      `json:"user_id"`
+	Status pgtype.Text `json:"status"`
+	Q      pgtype.Text `json:"q"`
+	Cursor pgtype.Text `json:"cursor"`
+	Limit  int32       `json:"limit"`
+}
+
+func (q *Queries) ListOrganisationsForUser(ctx context.Context, arg ListOrganisationsForUserParams) ([]Organisation, error) {
+	rows, err := q.db.Query(ctx, listOrganisationsForUser,
+		arg.UserID,
+		arg.Status,
+		arg.Q,
+		arg.Cursor,
+		arg.Limit,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []Organisation{}
+	for rows.Next() {
+		var i Organisation
+		if err := rows.Scan(
+			&i.ID,
+			&i.Name,
+			&i.Slug,
+			&i.Status,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const updateOrganisation = `-- name: UpdateOrganisation :one
 UPDATE organisations
 SET

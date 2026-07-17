@@ -20,6 +20,11 @@ type CreateMembershipInput struct {
 	Status string // optional; default invited
 }
 
+func (s *Service) GetMembership(ctx context.Context, id string) (sqlc.Membership, error) {
+	m, err := s.db.Q().GetMembership(ctx, id)
+	return m, mapNotFound(err, "membership not found")
+}
+
 func (s *Service) CreateMembership(ctx context.Context, orgID string, in CreateMembershipInput) (sqlc.Membership, error) {
 	if _, err := s.GetOrganisation(ctx, orgID); err != nil {
 		return sqlc.Membership{}, err
@@ -58,10 +63,11 @@ func (s *Service) CreateMembership(ctx context.Context, orgID string, in CreateM
 		user, err := s.db.Q().GetUserByEmail(ctx, email)
 		if errors.Is(err, pgx.ErrNoRows) {
 			user, err = s.db.Q().CreateUser(ctx, sqlc.CreateUserParams{
-				ID:     ids.New(),
-				Email:  email,
-				Name:   email,
-				Status: "active",
+				ID:            ids.New(),
+				Email:         email,
+				Name:          email,
+				Status:        "active",
+				PlatformAdmin: false,
 			})
 			if err != nil {
 				if store.IsUniqueViolation(err) {
@@ -137,6 +143,21 @@ func (s *Service) UpdateMembership(ctx context.Context, id string, in UpdateMemb
 func (s *Service) AcceptMembership(ctx context.Context, id string) (sqlc.Membership, error) {
 	m, err := s.db.Q().AcceptMembership(ctx, id)
 	return m, mapNotFound(err, "membership not found or not invited")
+}
+
+// AcceptMembershipAsUser accepts an invite only if it belongs to the given user.
+func (s *Service) AcceptMembershipAsUser(ctx context.Context, id, userID string) (sqlc.Membership, error) {
+	m, err := s.db.Q().GetMembership(ctx, id)
+	if err != nil {
+		return sqlc.Membership{}, mapNotFound(err, "membership not found")
+	}
+	if m.UserID != userID {
+		return sqlc.Membership{}, apperr.Forbidden("invite does not belong to this user")
+	}
+	if m.Status != "invited" {
+		return sqlc.Membership{}, apperr.Validation("membership is not invited")
+	}
+	return s.AcceptMembership(ctx, id)
 }
 
 func (s *Service) RevokeMembership(ctx context.Context, id string) (sqlc.Membership, error) {
