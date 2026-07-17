@@ -15,6 +15,7 @@ func TestLoadRequiresDatabaseURL(t *testing.T) {
 func TestLoadDefaultsHTTPAddr(t *testing.T) {
 	t.Setenv("DATABASE_URL", "postgres://localhost/kyc?sslmode=disable")
 	t.Setenv("HTTP_ADDR", "")
+	t.Setenv("API_TOKENS", "")
 	cfg, err := Load()
 	if err != nil {
 		t.Fatal(err)
@@ -22,8 +23,8 @@ func TestLoadDefaultsHTTPAddr(t *testing.T) {
 	if cfg.HTTPAddr != ":8080" {
 		t.Fatalf("HTTPAddr = %q, want :8080", cfg.HTTPAddr)
 	}
-	if cfg.DatabaseURL != "postgres://localhost/kyc?sslmode=disable" {
-		t.Fatalf("DatabaseURL = %q", cfg.DatabaseURL)
+	if cfg.CheckRateLimitPerMin != 120 {
+		t.Fatalf("CheckRateLimitPerMin = %d", cfg.CheckRateLimitPerMin)
 	}
 }
 
@@ -36,5 +37,17 @@ func TestLoadCustomHTTPAddr(t *testing.T) {
 	}
 	if cfg.HTTPAddr != ":9090" {
 		t.Fatalf("HTTPAddr = %q, want :9090", cfg.HTTPAddr)
+	}
+}
+
+func TestLoadAPITokens(t *testing.T) {
+	t.Setenv("DATABASE_URL", "postgres://localhost/kyc?sslmode=disable")
+	t.Setenv("API_TOKENS", " a, b , ")
+	cfg, err := Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(cfg.APITokens) != 2 || cfg.APITokens[0] != "a" || cfg.APITokens[1] != "b" {
+		t.Fatalf("APITokens = %#v", cfg.APITokens)
 	}
 }

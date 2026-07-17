@@ -7,6 +7,8 @@ var (
 	ErrConflict            = errors.New("conflict")
 	ErrValidation          = errors.New("validation_error")
 	ErrIdempotencyConflict = errors.New("idempotency_conflict")
+	ErrUnauthorized        = errors.New("unauthorized")
+	ErrRateLimited         = errors.New("rate_limited")
 )
 
 // Error carries an API error code and message.
@@ -39,4 +41,12 @@ func Conflict(msg string) error {
 
 func IdempotencyConflict(msg string) error {
 	return &Error{Code: "idempotency_conflict", Message: msg, Err: ErrIdempotencyConflict}
+}
+
+func Unauthorized(msg string) error {
+	return &Error{Code: "unauthorized", Message: msg, Err: ErrUnauthorized}
+}
+
+func RateLimited(msg string) error {
+	return &Error{Code: "rate_limited", Message: msg, Err: ErrRateLimited}
 }

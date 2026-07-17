@@ -40,9 +40,9 @@ Auth providers and payment processors are integrations. This repo is the source 
 
 ## Status
 
-**Phase 4 complete:** plans, entitlements, subscriptions, overrides, and `POST /v1/entitlements/check`, plus ops billing panel.
+**Phase 5 complete:** Bearer API auth, API key management, mutation audit log, and rate limits on check endpoints.
 
-Next: Phase 5 — service auth, audit log, hardening.
+All planned phases (0–5) are implemented.
 
 ## Run locally
 
@@ -56,6 +56,8 @@ docker compose up --build -d
 - **Ops UI + API:** http://localhost:8080  
   (nginx serves the UI and proxies `/v1`, `/healthz`, `/readyz` to the API)
 - Postgres: `localhost:5432`
+- Default API token (compose): `dev-local-token` — nginx injects it for the UI.  
+  Override with `API_TOKENS=...` when starting compose.
 
 ```bash
 docker compose down
@@ -67,11 +69,24 @@ docker compose down
 docker compose up -d postgres
 
 export DATABASE_URL='postgres://kyc:kyc@localhost:5432/kyc?sslmode=disable'
+# Optional: require Bearer auth for /v1
+# export API_TOKENS='my-secret'
 go run ./cmd/api
 
 # Ops UI (separate terminal) — http://localhost:5173
 cd web && npm run dev
 ```
+
+### Auth & hardening
+
+| Env | Purpose |
+| --- | --- |
+| `API_TOKENS` | Comma-separated bootstrap Bearer tokens. Empty = auth disabled (local/tests). |
+| `CHECK_RATE_LIMIT_PER_MIN` | Max `/v1/authz/check` + `/v1/entitlements/check` calls per actor/minute (default 120; `0` disables). |
+
+- `POST /v1/api-keys` — mint a product API key (raw token returned once)
+- `GET /v1/api-keys` / `DELETE /v1/api-keys/{id}` — list / revoke
+- `GET /v1/audit-events` — recent mutating request audit trail
 
 ## Test
 

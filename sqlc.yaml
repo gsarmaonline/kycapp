@@ -6,6 +6,7 @@ sql:
       - "internal/store/migrations/000001_init.up.sql"
       - "internal/store/migrations/000002_seed.up.sql"
       - "internal/store/migrations/000003_idempotency.up.sql"
+      - "internal/store/migrations/000004_hardening.up.sql"
     gen:
       go:
         package: "sqlc"

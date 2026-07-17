@@ -20,27 +20,35 @@ type DBPinger interface {
 
 // Server serves HTTP endpoints for the KYC API.
 type Server struct {
-	db         DBPinger
-	svc        *service.Service
-	mux        *http.ServeMux
-	now        func() time.Time
-	corsOrigin string
+	db                 DBPinger
+	svc                *service.Service
+	mux                *http.ServeMux
+	now                func() time.Time
+	corsOrigin         string
+	apiTokens          []string
+	authRequired       bool
+	checkRatePerMinute int
 }
 
 // Options configures the HTTP server.
 type Options struct {
-	Service    *service.Service
-	CORSOrigin string
+	Service              *service.Service
+	CORSOrigin           string
+	APITokens            []string
+	CheckRateLimitPerMin int
 }
 
 // New constructs an HTTP server.
 func New(db DBPinger, opts Options) *Server {
 	s := &Server{
-		db:         db,
-		svc:        opts.Service,
-		mux:        http.NewServeMux(),
-		now:        time.Now,
-		corsOrigin: opts.CORSOrigin,
+		db:                 db,
+		svc:                opts.Service,
+		mux:                http.NewServeMux(),
+		now:                time.Now,
+		corsOrigin:         opts.CORSOrigin,
+		apiTokens:          opts.APITokens,
+		authRequired:       len(opts.APITokens) > 0,
+		checkRatePerMinute: opts.CheckRateLimitPerMin,
 	}
 	s.routes()
 	return s
@@ -92,11 +100,23 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("PUT /v1/organisations/{id}/entitlements", s.handleSetOrgEntitlements)
 	s.mux.HandleFunc("GET /v1/organisations/{id}/entitlements", s.handleGetOrgEntitlements)
 	s.mux.HandleFunc("POST /v1/entitlements/check", s.handleEntitlementsCheck)
+
+	s.mux.HandleFunc("POST /v1/api-keys", s.handleCreateAPIKey)
+	s.mux.HandleFunc("GET /v1/api-keys", s.handleListAPIKeys)
+	s.mux.HandleFunc("DELETE /v1/api-keys/{id}", s.handleRevokeAPIKey)
+	s.mux.HandleFunc("GET /v1/audit-events", s.handleListAuditEvents)
 }
 
-// Handler returns the root handler (with optional CORS).
+// Handler returns the root handler with auth, audit, rate limit, and optional CORS.
 func (s *Server) Handler() http.Handler {
-	h := http.Handler(s.mux)
+	var h http.Handler = s.mux
+	if s.svc != nil {
+		h = auditMiddleware(s.svc.RecordAudit, h)
+		h = rateLimitMiddleware(newRateLimiter(s.checkRatePerMinute), h)
+		h = authMiddleware(func(ctx context.Context, token string) (string, bool) {
+			return s.svc.AuthenticateToken(ctx, token, s.apiTokens)
+		}, s.authRequired, h)
+	}
 	if s.corsOrigin != "" {
 		h = corsMiddleware(s.corsOrigin, h)
 	}
@@ -106,8 +126,8 @@ func (s *Server) Handler() http.Handler {
 func corsMiddleware(origin string, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Access-Control-Allow-Origin", origin)
-		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Idempotency-Key")
-		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PATCH, DELETE, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Idempotency-Key, Authorization")
+		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS")
 		if r.Method == http.MethodOptions {
 			w.WriteHeader(http.StatusNoContent)
 			return
@@ -168,6 +188,10 @@ func writeError(w http.ResponseWriter, err error) {
 			status = http.StatusConflict
 		case errors.Is(ae.Err, apperr.ErrValidation):
 			status = http.StatusBadRequest
+		case errors.Is(ae.Err, apperr.ErrUnauthorized):
+			status = http.StatusUnauthorized
+		case errors.Is(ae.Err, apperr.ErrRateLimited):
+			status = http.StatusTooManyRequests
 		}
 		writeJSON(w, status, map[string]any{
 			"error": map[string]string{"code": ae.Code, "message": ae.Message},

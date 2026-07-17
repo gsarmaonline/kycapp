@@ -217,6 +217,32 @@ Requires an **active** membership. Suspended orgs / revoked memberships → `all
 
 ---
 
+## Auth & hardening
+
+When `API_TOKENS` is set (or a DB-minted key is used), `/v1/*` requires:
+
+```http
+Authorization: Bearer <token>
+```
+
+`/healthz` and `/readyz` stay public.
+
+### API keys
+
+- `POST /v1/api-keys` — `{ "name" }` → returns `{ token }` once (store hashed)
+- `GET /v1/api-keys`
+- `DELETE /v1/api-keys/{id}` — revoke
+
+### Audit
+
+- `GET /v1/audit-events` — recent mutating `/v1` requests (`actor`, `method`, `path`, `status_code`)
+
+### Rate limits
+
+`POST /v1/authz/check` and `POST /v1/entitlements/check` are rate-limited per actor (see `CHECK_RATE_LIMIT_PER_MIN`). Exceeding the limit returns `429` with `rate_limited`.
+
+---
+
 ## Error codes (illustrative)
 
 | code | When |
@@ -225,4 +251,5 @@ Requires an **active** membership. Suspended orgs / revoked memberships → `all
 | `conflict` | Unique violation (email, slug, membership) |
 | `validation_error` | Bad body / missing fields |
 | `idempotency_conflict` | Same key, different body |
-| `forbidden` | Caller not allowed (later) |
+| `unauthorized` | Missing/invalid bearer token |
+| `rate_limited` | Check endpoint quota exceeded |

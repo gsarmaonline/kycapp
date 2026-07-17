@@ -10,6 +10,25 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+type ApiKey struct {
+	ID        string             `json:"id"`
+	Name      string             `json:"name"`
+	KeyPrefix string             `json:"key_prefix"`
+	KeyHash   string             `json:"key_hash"`
+	CreatedAt time.Time          `json:"created_at"`
+	RevokedAt pgtype.Timestamptz `json:"revoked_at"`
+}
+
+type AuditEvent struct {
+	ID             string      `json:"id"`
+	Actor          string      `json:"actor"`
+	Method         string      `json:"method"`
+	Path           string      `json:"path"`
+	StatusCode     int32       `json:"status_code"`
+	OrganisationID pgtype.Text `json:"organisation_id"`
+	CreatedAt      time.Time   `json:"created_at"`
+}
+
 type Entitlement struct {
 	ID          string `json:"id"`
 	Key         string `json:"key"`

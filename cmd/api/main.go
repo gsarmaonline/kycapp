@@ -33,14 +33,19 @@ func main() {
 	}
 
 	svc := service.New(db)
-	corsOrigin := os.Getenv("CORS_ORIGIN")
+	corsOrigin := cfg.CORSOrigin
 	if corsOrigin == "" {
-		corsOrigin = "http://localhost:5173"
+		corsOrigin = os.Getenv("CORS_ORIGIN")
+	}
+	if corsOrigin == "" {
+		corsOrigin = "http://localhost:8080"
 	}
 
 	srv := httpserver.New(db, httpserver.Options{
-		Service:    svc,
-		CORSOrigin: corsOrigin,
+		Service:              svc,
+		CORSOrigin:           corsOrigin,
+		APITokens:            cfg.APITokens,
+		CheckRateLimitPerMin: cfg.CheckRateLimitPerMin,
 	})
 	httpServer := &http.Server{
 		Addr:              cfg.HTTPAddr,
@@ -49,7 +54,11 @@ func main() {
 	}
 
 	go func() {
-		log.Printf("listening on %s", cfg.HTTPAddr)
+		if len(cfg.APITokens) > 0 {
+			log.Printf("listening on %s (API auth enabled)", cfg.HTTPAddr)
+		} else {
+			log.Printf("listening on %s (API auth disabled)", cfg.HTTPAddr)
+		}
 		if err := httpServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			log.Fatalf("http: %v", err)
 		}
