@@ -378,6 +378,48 @@ button:disabled {
   font-size: 0.9em;
 }
 
+.email-preview {
+  margin-top: 1.25rem;
+}
+
+.email-preview .preview-vars {
+  margin-bottom: 0.75rem;
+}
+
+.email-preview .preview-label {
+  display: block;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #78716c;
+  margin-bottom: 0.25rem;
+}
+
+.email-preview .preview-subject {
+  margin: 0 0 0.75rem;
+  font-weight: 600;
+}
+
+.email-preview .preview-text {
+  margin: 0 0 0.75rem;
+  padding: 0.75rem;
+  background: #fafaf9;
+  border: 1px solid #e7e5e4;
+  border-radius: 6px;
+  white-space: pre-wrap;
+  font: inherit;
+  font-size: 0.95rem;
+}
+
+.email-preview .preview-html {
+  display: block;
+  width: 100%;
+  min-height: 10rem;
+  border: 1px solid #e7e5e4;
+  border-radius: 6px;
+  background: #fff;
+}
+
 .create.stacked {
   grid-template-columns: 1fr;
 }
