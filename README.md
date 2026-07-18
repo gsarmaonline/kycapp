@@ -34,6 +34,11 @@ To **use this app**, people must log in. Whether KYC later sells auth services t
 | [docs/api.md](docs/api.md) | REST `/v1` surface |
 | [docs/flows.md](docs/flows.md) | Signup, invite, ops-provision, runtime checks |
 | [docs/testing.md](docs/testing.md) | Testing expectations |
+| [docs/deploy-railway.md](docs/deploy-railway.md) | Deploy Postgres + API + web on Railway |
+
+## Deploy
+
+**Railway** is the recommended host (Go API + Postgres + logo volume). See [docs/deploy-railway.md](docs/deploy-railway.md).
 
 ## Status
 

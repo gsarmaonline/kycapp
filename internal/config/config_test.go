@@ -15,6 +15,7 @@ func TestLoadRequiresDatabaseURL(t *testing.T) {
 func TestLoadDefaultsHTTPAddr(t *testing.T) {
 	t.Setenv("DATABASE_URL", "postgres://localhost/kyc?sslmode=disable")
 	t.Setenv("HTTP_ADDR", "")
+	t.Setenv("PORT", "")
 	t.Setenv("API_TOKENS", "")
 	cfg, err := Load()
 	if err != nil {
@@ -46,6 +47,19 @@ func TestLoadCustomHTTPAddr(t *testing.T) {
 	}
 	if cfg.HTTPAddr != ":9090" {
 		t.Fatalf("HTTPAddr = %q, want :9090", cfg.HTTPAddr)
+	}
+}
+
+func TestLoadPortFallback(t *testing.T) {
+	t.Setenv("DATABASE_URL", "postgres://localhost/kyc?sslmode=disable")
+	t.Setenv("HTTP_ADDR", "")
+	t.Setenv("PORT", "3000")
+	cfg, err := Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.HTTPAddr != ":3000" {
+		t.Fatalf("HTTPAddr = %q, want :3000", cfg.HTTPAddr)
 	}
 }
 

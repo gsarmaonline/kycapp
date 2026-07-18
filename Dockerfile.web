@@ -9,9 +9,13 @@ ENV VITE_API_BASE=
 RUN npm run build
 
 FROM nginx:1.27-alpine
-# Static conf (not templates/) so entrypoint envsubst does not mangle $nginx vars.
-COPY web/nginx.conf /etc/nginx/conf.d/default.conf
+# Template + entrypoint so Railway can set PORT and API_UPSTREAM.
+COPY web/nginx.conf.template /etc/nginx/nginx.conf.template
+COPY web/docker-entrypoint.sh /docker-entrypoint-kyc.sh
+RUN chmod +x /docker-entrypoint-kyc.sh
 COPY --from=build /src/dist /usr/share/nginx/html
+ENV API_UPSTREAM=api:8080
 EXPOSE 80
 HEALTHCHECK --interval=5s --timeout=3s --retries=10 \
-  CMD wget -qO- http://127.0.0.1/ >/dev/null || exit 1
+  CMD wget -qO- http://127.0.0.1:${PORT:-80}/ >/dev/null || exit 1
+ENTRYPOINT ["/docker-entrypoint-kyc.sh"]

@@ -1,0 +1,31 @@
+server {
+    listen __LISTEN_PORT__;
+    server_name _;
+    root /usr/share/nginx/html;
+    index index.html;
+
+    location /healthz {
+        proxy_pass http://__API_UPSTREAM__;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+    }
+
+    location /readyz {
+        proxy_pass http://__API_UPSTREAM__;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+    }
+
+    location /v1/ {
+        proxy_pass http://__API_UPSTREAM__;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header Idempotency-Key $http_idempotency_key;
+        proxy_set_header Authorization $http_authorization;
+    }
+
+    location / {
+        try_files $uri /index.html;
+    }
+}

@@ -31,7 +31,7 @@ type Config struct {
 // Load reads configuration from environment variables.
 func Load() (Config, error) {
 	cfg := Config{
-		HTTPAddr:             envOr("HTTP_ADDR", ":8080"),
+		HTTPAddr:             httpListenAddr(),
 		DatabaseURL:          os.Getenv("DATABASE_URL"),
 		CORSOrigin:           os.Getenv("CORS_ORIGIN"),
 		APITokens:            splitCSV(os.Getenv("API_TOKENS")),
@@ -54,6 +54,20 @@ func Load() (Config, error) {
 		cfg.OAuthStateSecret = "dev-insecure-oauth-state"
 	}
 	return cfg, nil
+}
+
+// httpListenAddr prefers HTTP_ADDR; otherwise Railway-style PORT; else :8080.
+func httpListenAddr() string {
+	if v := os.Getenv("HTTP_ADDR"); v != "" {
+		return v
+	}
+	if p := strings.TrimSpace(os.Getenv("PORT")); p != "" {
+		if strings.HasPrefix(p, ":") {
+			return p
+		}
+		return ":" + p
+	}
+	return ":8080"
 }
 
 func (c Config) GoogleConfigured() bool {
