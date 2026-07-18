@@ -11,6 +11,7 @@ import (
 
 	"github.com/gsarmaonline/kyc/internal/config"
 	httpserver "github.com/gsarmaonline/kyc/internal/http"
+	"github.com/gsarmaonline/kyc/internal/jobs"
 	"github.com/gsarmaonline/kyc/internal/service"
 	"github.com/gsarmaonline/kyc/internal/store"
 )
@@ -34,6 +35,11 @@ func main() {
 
 	svc := service.New(db)
 	svc.ConfigureAssets(cfg.UploadDir, cfg.PublicBaseURL)
+	if riverClient, err := jobs.NewInsertClient(db.Pool()); err != nil {
+		log.Fatalf("river: %v", err)
+	} else {
+		svc.SetEnqueuer(riverClient)
+	}
 	corsOrigin := cfg.CORSOrigin
 	if corsOrigin == "" {
 		corsOrigin = os.Getenv("CORS_ORIGIN")

@@ -60,6 +60,29 @@ type AuditEvent struct {
 	CreatedAt      time.Time   `json:"created_at"`
 }
 
+type Automation struct {
+	ID             string          `json:"id"`
+	OrganisationID string          `json:"organisation_id"`
+	Name           string          `json:"name"`
+	Trigger        string          `json:"trigger"`
+	Enabled        bool            `json:"enabled"`
+	Conditions     json.RawMessage `json:"conditions"`
+	Actions        json.RawMessage `json:"actions"`
+	CreatedAt      time.Time       `json:"created_at"`
+	UpdatedAt      time.Time       `json:"updated_at"`
+}
+
+type AutomationRun struct {
+	ID             string          `json:"id"`
+	OrganisationID string          `json:"organisation_id"`
+	AutomationID   string          `json:"automation_id"`
+	Trigger        string          `json:"trigger"`
+	Status         string          `json:"status"`
+	Detail         string          `json:"detail"`
+	Payload        json.RawMessage `json:"payload"`
+	CreatedAt      time.Time       `json:"created_at"`
+}
+
 type EmailTemplate struct {
 	ID             string    `json:"id"`
 	OrganisationID string    `json:"organisation_id"`

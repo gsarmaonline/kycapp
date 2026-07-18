@@ -599,6 +599,31 @@ a.button:hover,
   grid-template-columns: 1fr;
 }
 
+.condition-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+  margin-bottom: 0.5rem;
+}
+
+.condition-row input,
+.condition-row select {
+  flex: 1 1 8rem;
+  min-width: 6rem;
+}
+
+.run-list {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 1.25rem;
+}
+
+.run-list li {
+  padding: 0.4rem 0;
+  border-bottom: 1px solid color-mix(in srgb, CanvasText 12%, transparent);
+}
+
 .attr-section {
   margin-top: 0.75rem;
 }

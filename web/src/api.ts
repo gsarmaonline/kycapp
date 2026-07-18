@@ -489,3 +489,85 @@ export function getEmailTemplate(id: string) {
 export function deleteEmailTemplate(id: string) {
   return request<EmailTemplate>(`/v1/email-templates/${id}`, { method: 'DELETE' })
 }
+
+export type AutomationCondition = {
+  field: string
+  op: 'eq' | 'neq' | 'exists' | 'not_exists'
+  value?: string
+}
+
+export type AutomationAction = {
+  type: string
+  template_key?: string
+}
+
+export type Automation = {
+  id: string
+  organisation_id: string
+  name: string
+  trigger: string
+  enabled: boolean
+  conditions: { all: AutomationCondition[] }
+  actions: AutomationAction[]
+}
+
+export type AutomationRun = {
+  id: string
+  organisation_id: string
+  automation_id: string
+  trigger: string
+  status: string
+  detail: string
+  created_at: string
+}
+
+export function listAutomations(orgId: string) {
+  return request<{ items: Automation[] }>(`/v1/organisations/${orgId}/automations`)
+}
+
+export function getAutomation(id: string) {
+  return request<Automation>(`/v1/automations/${id}`)
+}
+
+export function createAutomation(
+  orgId: string,
+  input: {
+    name?: string
+    trigger: string
+    enabled?: boolean
+    conditions: { all: AutomationCondition[] }
+    actions: AutomationAction[]
+  },
+) {
+  return request<Automation>(`/v1/organisations/${orgId}/automations`, {
+    method: 'POST',
+    body: JSON.stringify(input),
+  })
+}
+
+export function updateAutomation(
+  id: string,
+  input: {
+    name?: string
+    trigger?: string
+    enabled?: boolean
+    conditions?: { all: AutomationCondition[] }
+    actions?: AutomationAction[]
+  },
+) {
+  return request<Automation>(`/v1/automations/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(input),
+  })
+}
+
+export function deleteAutomation(id: string) {
+  return request<{ ok: boolean }>(`/v1/automations/${id}`, { method: 'DELETE' })
+}
+
+export function listAutomationRuns(orgId: string, automationId?: string) {
+  const q = automationId ? `?automation_id=${encodeURIComponent(automationId)}` : ''
+  return request<{ items: AutomationRun[] }>(
+    `/v1/organisations/${orgId}/automation-runs${q}`,
+  )
+}

@@ -6,7 +6,8 @@ builder = "DOCKERFILE"
 dockerfilePath = "Dockerfile.worker"
 watchPatterns = [
   "cmd/worker/**",
-  "internal/workflows/**",
+  "internal/**",
+  "core/**",
   "go.mod",
   "go.sum",
   "Dockerfile.worker",

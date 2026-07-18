@@ -14,6 +14,8 @@ import (
 	"github.com/gsarmaonline/kyc/internal/store/sqlc"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/riverqueue/river/riverdriver/riverpgxv5"
+	"github.com/riverqueue/river/rivermigrate"
 )
 
 //go:embed migrations/*.sql
@@ -61,6 +63,11 @@ func (s *Store) Q() *sqlc.Queries {
 	return s.q
 }
 
+// Pool returns the underlying pgx pool (River, etc.).
+func (s *Store) Pool() *pgxpool.Pool {
+	return s.pool
+}
+
 // WithTx runs fn inside a database transaction.
 func (s *Store) WithTx(ctx context.Context, fn func(q *sqlc.Queries) error) error {
 	tx, err := s.pool.Begin(ctx)
@@ -78,9 +85,24 @@ func (s *Store) WithTx(ctx context.Context, fn func(q *sqlc.Queries) error) erro
 	return nil
 }
 
-// Migrate applies all embedded up migrations.
+// Migrate applies all embedded up migrations, then River's schema.
 func (s *Store) Migrate() error {
-	return migrateUp(s.databaseURL)
+	if err := migrateUp(s.databaseURL); err != nil {
+		return err
+	}
+	return s.MigrateRiver(context.Background())
+}
+
+// MigrateRiver applies River queue tables (idempotent).
+func (s *Store) MigrateRiver(ctx context.Context) error {
+	migrator, err := rivermigrate.New(riverpgxv5.New(s.pool), nil)
+	if err != nil {
+		return fmt.Errorf("river migrator: %w", err)
+	}
+	if _, err := migrator.Migrate(ctx, rivermigrate.DirectionUp, &rivermigrate.MigrateOpts{}); err != nil {
+		return fmt.Errorf("river migrate: %w", err)
+	}
+	return nil
 }
 
 func migrateUp(databaseURL string) error {

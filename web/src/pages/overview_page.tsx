@@ -4,6 +4,7 @@ import {
   getOrganisation,
   listAppUsers,
   listAttributeDefinitions,
+  listAutomations,
   listEmailTemplates,
   listMemberships,
   listRoles,
@@ -19,18 +20,20 @@ export function OverviewPage() {
   const [userCount, setUserCount] = useState(0)
   const [attributeCount, setAttributeCount] = useState(0)
   const [templateCount, setTemplateCount] = useState(0)
+  const [automationCount, setAutomationCount] = useState(0)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     void (async () => {
       try {
-        const [o, m, r, users, attrs, templates] = await Promise.all([
+        const [o, m, r, users, attrs, templates, automations] = await Promise.all([
           getOrganisation(orgId),
           listMemberships(orgId),
           listRoles(orgId),
           listAppUsers(orgId),
           listAttributeDefinitions(orgId),
           listEmailTemplates(orgId),
+          listAutomations(orgId),
         ])
         setOrg(o)
         setMemberCount(m.items.length)
@@ -38,6 +41,7 @@ export function OverviewPage() {
         setUserCount(users.items.length)
         setAttributeCount(attrs.items.length)
         setTemplateCount(templates.items.length)
+        setAutomationCount(automations.items.length)
       } catch (e) {
         setError(e instanceof Error ? e.message : 'Failed to load')
       }
@@ -57,6 +61,7 @@ export function OverviewPage() {
         { label: 'Users', value: userCount, to: 'users' },
         { label: 'User Attributes', value: attributeCount, to: 'attributes' },
         { label: 'Email templates', value: templateCount, to: 'email-templates' },
+        { label: 'Automations', value: automationCount, to: 'automations' },
         { label: 'Branding', value: 'Open', to: 'branding' },
         { label: 'Billing', value: 'Open', to: 'billing' },
       ]}

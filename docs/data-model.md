@@ -194,6 +194,34 @@ Org-scoped email copy for messaging app users. Seeded system templates per org; 
 
 Default keys: `welcome`, `payment_thank_you`, `profile_incomplete`.
 
+### Automation
+
+Org-scoped rule (trigger + conditions + actions). Domain: `core/automations`. Runs via River jobs.
+
+| Field | Type | Notes |
+| --- | --- | --- |
+| `id` | string | PK |
+| `organisation_id` | string | FK → Organisation |
+| `name` | string | Optional label |
+| `trigger` | string | e.g. `app_user.created` |
+| `enabled` | bool | |
+| `conditions` | jsonb | `{ "all": [{ field, op, value? }] }` |
+| `actions` | jsonb | `[{ "type": "send_email", "template_key" }]` |
+
+### AutomationRun
+
+Execution log for one automation against one event.
+
+| Field | Type | Notes |
+| --- | --- | --- |
+| `id` | string | PK |
+| `organisation_id` | string | FK → Organisation |
+| `automation_id` | string | FK → Automation |
+| `trigger` | string | |
+| `status` | enum | `success` \| `skipped` \| `error` |
+| `detail` | string | Human-readable outcome |
+| `payload` | jsonb | Event snapshot |
+
 ### RolePermission
 
 Join: Role ↔ Permission (many-to-many).

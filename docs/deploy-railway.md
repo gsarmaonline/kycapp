@@ -1,6 +1,8 @@
 # Deploy on Railway
 
-Recommended layout: **Postgres** + **api** + **web** (web is the public URL; it proxies `/v1` to the API). Optional: **worker** + Temporal (Cloud or self-hosted) — see [temporal.md](temporal.md).
+Recommended layout: **Postgres** + **api** + **web** (web is the public URL; it proxies `/v1` to the API).
+
+Merchant automations use a **worker** on the same Postgres (River) — see [automations.md](automations.md).
 
 ## Config as code
 
@@ -78,12 +80,10 @@ Then set `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` on the API service and set 
 2. Create an organisation.  
 3. Branding → upload a logo → confirm it appears in an email template preview.
 
-## 7. Temporal worker (optional)
-
-See [temporal.md](temporal.md) for Cloud vs self-hosted Temporal on Railway.
+## 7. Automation worker (optional until you use Automations)
 
 - Add a **worker** service; Config-as-code → `/railway.worker.toml`.
-- Set `TEMPORAL_ADDRESS` (+ namespace / task queue). No public domain needed.
+- Set `DATABASE_URL=${{Postgres.DATABASE_URL}}` (same DB as API). No public domain.
 
 ## Local compose vs Railway
 
@@ -93,4 +93,4 @@ See [temporal.md](temporal.md) for Cloud vs self-hosted Temporal on Railway.
 | Listen port (web) | `80` | Railway `PORT` |
 | Listen port (api) | `:8080` | Railway `PORT` |
 | Logos | named volume | attach volume at `UPLOAD_DIR` |
-| Temporal | `temporal` + UI `:8088` + `worker` | Temporal Cloud or Railway Temporal template + `worker` |
+| Automations worker | compose `worker` | `/railway.worker.toml` + same `DATABASE_URL` |

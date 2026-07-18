@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/gsarmaonline/kyc/core/automations"
 	"github.com/gsarmaonline/kyc/internal/apperr"
 	"github.com/gsarmaonline/kyc/internal/ids"
 	"github.com/gsarmaonline/kyc/internal/store"
@@ -220,6 +221,9 @@ func (s *Service) CreateAppUser(ctx context.Context, orgID string, in CreateAppU
 		}
 		return sqlc.AppUser{}, err
 	}
+	if payload, err := AppUserEventPayload(row); err == nil {
+		s.EnqueueAutomationEvent(ctx, orgID, automations.TriggerAppUserCreated, payload)
+	}
 	return row, nil
 }
 
@@ -275,6 +279,9 @@ func (s *Service) UpdateAppUser(ctx context.Context, id string, in UpdateAppUser
 			return sqlc.AppUser{}, apperr.Conflict("app user email or external_id already exists in organisation")
 		}
 		return sqlc.AppUser{}, err
+	}
+	if payload, err := AppUserEventPayload(row); err == nil {
+		s.EnqueueAutomationEvent(ctx, existing.OrganisationID, automations.TriggerAppUserUpdated, payload)
 	}
 	return row, nil
 }

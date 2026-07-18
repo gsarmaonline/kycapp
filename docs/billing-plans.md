@@ -5,11 +5,23 @@ Context: catalog + subscription/entitlements already live in KYC; Stripe Checkou
 
 ## Goal
 
-Offer clear commercial plans (fixed, usage, hybrid) while:
+KYC is **not a payment processor**. It is a **strong implementor/executor** of a PSP’s APIs (Stripe first): checkout, portal, webhooks, usage reporting, and reconciliation — so companies can fall back on KYC APIs instead of wiring Stripe themselves.
 
-1. Keeping **KYC as system of record** for org → plan → entitlements.
-2. Treating **Stripe (or any PSP)** as a replaceable adapter, not the source of truth for product access.
-3. Supporting evolution from simple fixed SaaS pricing to metered / hybrid without rewriting merchant APIs.
+Alongside that:
+
+1. Keep **KYC as system of record** for org → plan → entitlements / access.
+2. Treat **Stripe (or any PSP)** as the money rail via a replaceable adapter; never as the source of truth for product access.
+3. Support evolution from simple fixed SaaS pricing to metered / hybrid without rewriting merchant-facing KYC APIs.
+
+### Product stance
+
+| We are | We are not |
+| --- | --- |
+| Executor of Checkout, Portal, Customers, Subscriptions, Meters | Merchant of record for arbitrary third-party commerce (unless Connect later) |
+| Webhook verify + idempotent reconcile → org subscription/entitlements | Invoicing, tax filing, payout, or card vault of our own |
+| Stable KYC billing APIs companies call instead of Stripe SDK | A second Stripe / Adyen / Braintree |
+
+Companies integrate **KYC**; KYC integrates **Stripe**.
 
 ---
 
@@ -17,12 +29,14 @@ Offer clear commercial plans (fixed, usage, hybrid) while:
 
 | Principle | Meaning |
 | --- | --- |
+| Executor, not PSP | Call processor APIs well; do not reimplement money movement, ledgers, or PCI. |
 | Org is the billable entity | One billing customer per organisation (no separate Account in v1). |
 | Entitlements gate product | Paid state updates subscription + entitlements; handlers check entitlements, not Stripe. |
 | Catalog owns commercial intent | Plan key, included entitlements, pricing shape, and limits live in KYC. |
-| Processor owns money movement | Checkout, invoices, payment methods, tax, dunning via adapter. |
+| Processor owns money movement | Checkout, invoices, payment methods, tax, dunning stay with the PSP. |
 | Idempotent sync | Webhooks / pollers map processor events → KYC subscription state with idempotency keys. |
 | Soft coupling | KYC stores opaque processor refs (`customer_id`, `subscription_id`, `price_ids`); never encode Stripe-only enums in core domain. |
+| Merchant-facing stability | Companies depend on KYC billing routes; adapter details may change underneath. |
 
 ---
 
@@ -358,8 +372,9 @@ Public:
 
 ## Non-goals (for this design)
 
-- Replacing Stripe invoicing/accounting
-- Crypto / alternate PSPs in v1 (interface only)
+- Being a payment processor (cards, settlement, acquiring)
+- Replacing Stripe invoicing / accounting / tax engines
+- Crypto / alternate PSPs in v1 (keep the port; ship Stripe)
 - Per-app-user consumer checkout
 - Complex CPQ / quote builder
 
@@ -367,9 +382,9 @@ Public:
 
 ## Summary recommendation
 
-1. **Sell fixed plans first** (Checkout + Portal + webhooks), with PlanPrice refs to Stripe.
-2. **Introduce limits + UsageEvent early** so the UI and enforcement path exist before money meters.
-3. **Add one metered dimension** as hybrid overage when a real metric is clear.
-4. **Keep a `PaymentsProcessor` port** so Stripe stays an adapter; KYC remains authoritative for entitlements and org access.
+1. **Position:** PSP executor — companies use KYC billing APIs; KYC executes Stripe.
+2. **Ship first:** Checkout + Portal + signed webhooks → reconcile into existing Subscription / Entitlements.
+3. **Add limits + UsageEvent** when access packing matters; meter to Stripe only when overage is sold.
+4. **Keep a `PaymentsProcessor` port** so the executor stays swappable; KYC stays authoritative for org access.
 
 When decisions in the checklist are locked, Phase C0 implementation can follow without revisiting commercial architecture.

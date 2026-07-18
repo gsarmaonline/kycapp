@@ -228,6 +228,24 @@ Org-scoped message copy for **app users** (not KYC member invites). Domain helpe
 
 ---
 
+## Automations
+
+Org-scoped rules: trigger → simple AND conditions → ordered actions. Executed by the River worker (`cmd/worker`). Domain: `core/automations`. See [automations.md](automations.md).
+
+- `GET /v1/organisations/{id}/automations` — requires `automations:read`
+- `POST /v1/organisations/{id}/automations` — requires `automations:manage`  
+  `{ "name"?, "trigger", "enabled"?, "conditions": { "all": [{ "field", "op", "value"? }] }, "actions": [{ "type": "send_email", "template_key" }] }`  
+  Triggers: `app_user.created`, `app_user.updated`. Ops: `eq`, `neq`, `exists`, `not_exists`.
+- `GET /v1/automations/{id}` — requires `automations:read`
+- `PATCH /v1/automations/{id}` — requires `automations:manage`
+- `DELETE /v1/automations/{id}` — requires `automations:manage`
+- `GET /v1/organisations/{id}/automation-runs` — requires `automations:read`  
+  Query: `automation_id`
+
+Email delivery is stubbed (logged) until an ESP is wired.
+
+---
+
 ## Billing / entitlements
 
 ### Plans

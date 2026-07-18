@@ -5,6 +5,7 @@ export type OrgSection =
   | 'users'
   | 'attributes'
   | 'email-templates'
+  | 'automations'
   | 'branding'
   | 'billing'
 
@@ -15,6 +16,7 @@ export const ORG_SECTIONS: { id: OrgSection; label: string; path: string }[] = [
   { id: 'users', label: 'Users', path: 'users' },
   { id: 'attributes', label: 'User Attributes', path: 'attributes' },
   { id: 'email-templates', label: 'Email templates', path: 'email-templates' },
+  { id: 'automations', label: 'Automations', path: 'automations' },
   { id: 'branding', label: 'Branding', path: 'branding' },
   { id: 'billing', label: 'Billing', path: 'billing' },
 ]
@@ -30,6 +32,7 @@ export function sectionFromPathname(pathname: string, orgId: string): OrgSection
     case 'users':
     case 'attributes':
     case 'email-templates':
+    case 'automations':
     case 'branding':
     case 'billing':
       return head

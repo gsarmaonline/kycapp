@@ -18,6 +18,12 @@ type Service struct {
 	db            *store.Store
 	uploadDir     string
 	publicBaseURL string
+	enqueue       Enqueuer
+}
+
+// Enqueuer inserts background jobs (River). Optional — nil skips enqueue.
+type Enqueuer interface {
+	EnqueueAutomationEvent(ctx context.Context, orgID, trigger string, payload any) error
 }
 
 func New(db *store.Store) *Service {
@@ -26,6 +32,11 @@ func New(db *store.Store) *Service {
 		uploadDir:     "data/uploads",
 		publicBaseURL: "http://localhost:8080",
 	}
+}
+
+// SetEnqueuer attaches a job enqueue implementation (typically River).
+func (s *Service) SetEnqueuer(e Enqueuer) {
+	s.enqueue = e
 }
 
 // ConfigureAssets sets local upload directory and public base URL for logos.
@@ -90,6 +101,7 @@ func seedSystemRoles(ctx context.Context, q *sqlc.Queries, orgID string) (owner,
 		"attributes:read":       true,
 		"app_users:read":        true,
 		"email_templates:read":  true,
+		"automations:read":      true,
 	}
 	for _, p := range perms {
 		if memberKeys[p.Key] {

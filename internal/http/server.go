@@ -153,6 +153,13 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /v1/email-templates/{id}", s.handleGetEmailTemplate)
 	s.mux.HandleFunc("PATCH /v1/email-templates/{id}", s.handlePatchEmailTemplate)
 	s.mux.HandleFunc("DELETE /v1/email-templates/{id}", s.handleDeleteEmailTemplate)
+
+	s.mux.HandleFunc("POST /v1/organisations/{id}/automations", s.handleCreateAutomation)
+	s.mux.HandleFunc("GET /v1/organisations/{id}/automations", s.handleListAutomations)
+	s.mux.HandleFunc("GET /v1/organisations/{id}/automation-runs", s.handleListAutomationRuns)
+	s.mux.HandleFunc("GET /v1/automations/{id}", s.handleGetAutomation)
+	s.mux.HandleFunc("PATCH /v1/automations/{id}", s.handlePatchAutomation)
+	s.mux.HandleFunc("DELETE /v1/automations/{id}", s.handleDeleteAutomation)
 }
 
 // Handler returns the root handler with auth, audit, rate limit, and optional CORS.

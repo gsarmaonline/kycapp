@@ -16,6 +16,7 @@ sql:
       - "internal/store/migrations/000011_org_branding.up.sql"
       - "internal/store/migrations/000012_org_email_font.up.sql"
       - "internal/store/migrations/000013_attribute_is_system.up.sql"
+      - "internal/store/migrations/000014_automations.up.sql"
     gen:
       go:
         package: "sqlc"

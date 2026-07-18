@@ -1,40 +1,57 @@
 package main
 
 import (
+	"context"
 	"log"
 	"os"
+	"os/signal"
+	"syscall"
+	"time"
 
-	"github.com/gsarmaonline/kyc/internal/workflows"
-	"go.temporal.io/sdk/client"
-	"go.temporal.io/sdk/worker"
+	"github.com/gsarmaonline/kyc/internal/config"
+	"github.com/gsarmaonline/kyc/internal/jobs"
+	"github.com/gsarmaonline/kyc/internal/service"
+	"github.com/gsarmaonline/kyc/internal/store"
 )
 
 func main() {
-	addr := envOr("TEMPORAL_ADDRESS", "localhost:7233")
-	namespace := envOr("TEMPORAL_NAMESPACE", "default")
-	taskQueue := envOr("TEMPORAL_TASK_QUEUE", workflows.TaskQueue)
-
-	c, err := client.Dial(client.Options{
-		HostPort:  addr,
-		Namespace: namespace,
-	})
+	cfg, err := config.Load()
 	if err != nil {
-		log.Fatalf("temporal dial %s: %v", addr, err)
+		log.Fatalf("config: %v", err)
 	}
-	defer c.Close()
 
-	w := worker.New(c, taskQueue, worker.Options{})
-	workflows.Register(w)
-
-	log.Printf("temporal worker listening addr=%s namespace=%s queue=%s", addr, namespace, taskQueue)
-	if err := w.Run(worker.InterruptCh()); err != nil {
-		log.Fatalf("worker: %v", err)
+	ctx := context.Background()
+	db, err := store.Open(ctx, cfg.DatabaseURL)
+	if err != nil {
+		log.Fatalf("store: %v", err)
 	}
-}
+	defer db.Close()
 
-func envOr(key, fallback string) string {
-	if v := os.Getenv(key); v != "" {
-		return v
+	if err := db.Migrate(); err != nil {
+		log.Fatalf("migrate: %v", err)
 	}
-	return fallback
+
+	svc := service.New(db)
+	riverClient, err := jobs.NewWorkerClient(db.Pool(), svc.ProcessAutomationEvent)
+	if err != nil {
+		log.Fatalf("river: %v", err)
+	}
+
+	runCtx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	if err := riverClient.Start(runCtx); err != nil {
+		log.Fatalf("river start: %v", err)
+	}
+	log.Printf("automation worker running (river)")
+
+	stop := make(chan os.Signal, 1)
+	signal.Notify(stop, syscall.SIGINT, syscall.SIGTERM)
+	<-stop
+
+	shutdownCtx, cancelShutdown := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancelShutdown()
+	if err := riverClient.Stop(shutdownCtx); err != nil {
+		log.Printf("river stop: %v", err)
+	}
 }

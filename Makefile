@@ -24,10 +24,10 @@ build:
 	go build -o bin/worker ./cmd/worker
 
 worker:
-	TEMPORAL_ADDRESS=$${TEMPORAL_ADDRESS:-localhost:7233} go run ./cmd/worker
+	go run ./cmd/worker
 
 run: compose-up
-	@echo "Open http://localhost:8080 (Temporal UI http://localhost:8088)"
+	@echo "Open http://localhost:8080"
 
 compose-up:
 	docker compose up --build -d

@@ -82,6 +82,7 @@ flowchart TB
 - **App users + attribute schema** (org-scoped end users; definitions with `section` grouping) — **done (v1)**
 - **Email templates** (org-scoped catalog + `core/emailtemplates`; no send yet) — **done (v1)**
 - **Org email branding** (logo upload, colors, footer chrome at render time; visual builder deferred) — **done (v1)**
+- **Automations** (org rules UI: simple conditions + action list; River on Postgres) — **done (v1)**; see [automations.md](automations.md)
 
 ### Phase C — Real billing
 - Stripe Customer per org, Checkout, Portal, webhooks → Subscription / Entitlements
