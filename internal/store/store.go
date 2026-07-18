@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"strings"
 
 	"github.com/golang-migrate/migrate/v4"
 	_ "github.com/golang-migrate/migrate/v4/database/pgx/v5"
@@ -101,15 +102,16 @@ func migrateUp(databaseURL string) error {
 }
 
 func toMigrateURL(databaseURL string) string {
-	switch {
-	case len(databaseURL) >= 11 && databaseURL[:11] == "postgres://":
-		return "pgx5://" + databaseURL[11:]
-	case len(databaseURL) >= 14 && databaseURL[:14] == "postgresql://":
-		return "pgx5://" + databaseURL[14:]
-	case len(databaseURL) >= 7 && databaseURL[:7] == "pgx5://":
-		return databaseURL
+	u := strings.Trim(strings.TrimSpace(databaseURL), `"'`)
+	scheme, rest, ok := strings.Cut(u, "://")
+	if !ok {
+		return u
+	}
+	switch strings.ToLower(scheme) {
+	case "postgres", "postgresql", "pgx5":
+		return "pgx5://" + rest
 	default:
-		return databaseURL
+		return u
 	}
 }
 

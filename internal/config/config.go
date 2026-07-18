@@ -50,10 +50,24 @@ func Load() (Config, error) {
 	if cfg.DatabaseURL == "" {
 		return Config{}, fmt.Errorf("DATABASE_URL is required")
 	}
+	cfg.DatabaseURL = normalizeDatabaseURL(cfg.DatabaseURL)
 	if cfg.OAuthStateSecret == "" {
 		cfg.OAuthStateSecret = "dev-insecure-oauth-state"
 	}
 	return cfg, nil
+}
+
+// normalizeDatabaseURL trims quoting and maps postgresql:// → postgres:// (Railway).
+func normalizeDatabaseURL(u string) string {
+	u = strings.Trim(strings.TrimSpace(u), `"'`)
+	scheme, rest, ok := strings.Cut(u, "://")
+	if !ok {
+		return u
+	}
+	if strings.EqualFold(scheme, "postgresql") {
+		return "postgres://" + rest
+	}
+	return u
 }
 
 // httpListenAddr prefers HTTP_ADDR; otherwise Railway-style PORT; else :8080.
