@@ -53,7 +53,7 @@ For each service: **Settings → Config-as-code** → set the config file path t
 | `API_UPSTREAM` | `kycapp.railway.internal:8080` (pin API with `HTTP_ADDR=:8080`; `${{kycapp.PORT}}` is often empty) |
 | `RAILWAY_DOCKERFILE_PATH` | `Dockerfile.web` |
 
-Generate a **public domain** only on **web** (keep API private). That URL is your `APP_ORIGIN` / `PUBLIC_BASE_URL` / `CORS_ORIGIN`.
+Generate a **public domain** only on **web** (`kycweb`; keep API private). That URL is your `APP_ORIGIN` / `PUBLIC_BASE_URL` / `CORS_ORIGIN` (e.g. `https://kycweb-production.up.railway.app`).
 
 ## 4. Security checklist
 

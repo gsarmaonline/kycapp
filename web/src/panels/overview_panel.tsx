@@ -1,30 +1,37 @@
+import { Link } from 'react-router-dom'
 import type { Organisation } from '../api'
+import { orgPath, type OrgSection } from '../org_nav'
+
+type Tile = {
+  label: string
+  value: string | number
+  to: OrgSection
+}
 
 export function OverviewPanel({
+  orgId,
   org,
-  memberCount,
-  roleCount,
+  tiles,
 }: {
+  orgId: string
   org: Organisation
-  memberCount: number
-  roleCount: number
+  tiles: Tile[]
 }) {
   return (
     <section className="overview">
       <p className="lede">
-        Use the sidebar to open Members, Roles, Users, User Attributes, Email templates, or Billing.
-        Switch organisations with the dropdown above.
+        Jump into a section below, or use the sidebar. Switch organisations with the dropdown above.
       </p>
       <ul className="overview-stats">
-        <li>
-          <strong>{memberCount}</strong>
-          <span>Members</span>
-        </li>
-        <li>
-          <strong>{roleCount}</strong>
-          <span>Roles</span>
-        </li>
-        <li>
+        {tiles.map((tile) => (
+          <li key={tile.to}>
+            <Link className="overview-tile" to={orgPath(orgId, tile.to)}>
+              <strong>{tile.value}</strong>
+              <span>{tile.label}</span>
+            </Link>
+          </li>
+        ))}
+        <li className="overview-tile-static" aria-label="Organisation status">
           <strong>{org.status}</strong>
           <span>Status</span>
         </li>
