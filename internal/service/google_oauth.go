@@ -68,6 +68,7 @@ func (g *GoogleOAuth) FetchIdentity(ctx context.Context, tok *oauth2.Token) (Goo
 		Email         string `json:"email"`
 		EmailVerified any    `json:"email_verified"`
 		Name          string `json:"name"`
+		Picture       string `json:"picture"`
 	}
 	if err := json.Unmarshal(body, &raw); err != nil {
 		return GoogleIdentity{}, err
@@ -84,5 +85,6 @@ func (g *GoogleOAuth) FetchIdentity(ctx context.Context, tok *oauth2.Token) (Goo
 		Email:         raw.Email,
 		EmailVerified: verified,
 		Name:          raw.Name,
+		Picture:       strings.TrimSpace(raw.Picture),
 	}, nil
 }

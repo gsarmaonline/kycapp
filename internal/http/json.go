@@ -81,15 +81,20 @@ func orgJSON(o sqlc.Organisation) map[string]any {
 }
 
 func userJSON(u sqlc.User) map[string]any {
-	return map[string]any{
+	out := map[string]any{
 		"id":             u.ID,
 		"email":          u.Email,
 		"name":           u.Name,
 		"status":         u.Status,
 		"platform_admin": u.PlatformAdmin,
+		"avatar_url":     u.AvatarUrl,
 		"created_at":     u.CreatedAt.UTC().Format(time.RFC3339Nano),
 		"updated_at":     u.UpdatedAt.UTC().Format(time.RFC3339Nano),
 	}
+	if u.AvatarUrl == "" {
+		out["avatar_url"] = nil
+	}
+	return out
 }
 
 func membershipJSON(m sqlc.Membership) map[string]any {

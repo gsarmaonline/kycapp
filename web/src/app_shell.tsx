@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
 import {
+  Link,
   NavLink,
   Outlet,
   useLocation,
@@ -15,6 +16,13 @@ import {
   type User,
 } from './api'
 import { ORG_SECTIONS, orgPath, sectionFromPathname } from './org_nav'
+
+function userInitials(label: string): string {
+  const parts = label.trim().split(/\s+/).filter(Boolean)
+  if (parts.length === 0) return '?'
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase()
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
+}
 
 export function AppShell({ user, onLogout }: { user: User | null; onLogout: () => Promise<void> }) {
   const { orgId: routeOrgId } = useParams()
@@ -93,7 +101,9 @@ export function AppShell({ user, onLogout }: { user: User | null; onLogout: () =
     <div className="shell">
       <aside className="sidebar" aria-label="Organisation navigation">
         <div className="sidebar-brand">
-          <p className="eyebrow">KYC</p>
+          <Link to="/" className="sidebar-brand-link eyebrow">
+            KYC
+          </Link>
           <strong>Organisations</strong>
         </div>
 
@@ -147,9 +157,28 @@ export function AppShell({ user, onLogout }: { user: User | null; onLogout: () =
         </div>
 
         <div className="sidebar-footer">
-          {user && <p className="sidebar-user">{user.email}</p>}
+          {user && (
+            <div className="sidebar-account">
+              {user.avatar_url ? (
+                <img
+                  className="sidebar-avatar"
+                  src={user.avatar_url}
+                  alt=""
+                  referrerPolicy="no-referrer"
+                />
+              ) : (
+                <span className="sidebar-avatar sidebar-avatar-fallback" aria-hidden="true">
+                  {userInitials(user.name || user.email)}
+                </span>
+              )}
+              <div className="sidebar-account-text">
+                <strong className="sidebar-user-name">{user.name || user.email}</strong>
+                <p className="sidebar-user">{user.email}</p>
+              </div>
+            </div>
+          )}
           <button type="button" className="ghost full" onClick={() => void onLogout()}>
-            Sign out
+            Log out
           </button>
         </div>
       </aside>
@@ -173,10 +202,7 @@ export function AppShell({ user, onLogout }: { user: User | null; onLogout: () =
               <div>
                 <p className="eyebrow">{org?.slug ?? selected.slug}</p>
                 <h1>{org?.name ?? selected.name}</h1>
-                <p className="status">
-                  {org?.status ?? selected.status}
-                  {user ? ` · ${user.email}` : ''}
-                </p>
+                <p className="status">{org?.status ?? selected.status}</p>
               </div>
             </header>
             <Outlet />

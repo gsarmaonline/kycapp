@@ -79,6 +79,7 @@ type GoogleIdentity struct {
 	Email         string
 	EmailVerified bool
 	Name          string
+	Picture       string
 }
 
 // LoginWithGoogle upserts a user from a verified Google identity and issues a session.
@@ -100,10 +101,12 @@ func (s *Service) LoginWithGoogle(ctx context.Context, id GoogleIdentity, platfo
 	}
 	admin := emailInList(email, platformAdminEmails)
 	subArg := pgtype.Text{String: sub, Valid: true}
+	avatar := strings.TrimSpace(id.Picture)
+	avatarArg := pgtype.Text{String: avatar, Valid: avatar != ""}
 
 	user, err := s.db.Q().GetUserByGoogleSub(ctx, subArg)
 	if err == nil {
-		return s.finishGoogleLogin(ctx, user, name, admin)
+		return s.finishGoogleLogin(ctx, user, name, avatar, admin)
 	}
 	if !errors.Is(err, pgx.ErrNoRows) {
 		return AuthResult{}, err
@@ -118,6 +121,7 @@ func (s *Service) LoginWithGoogle(ctx context.Context, id GoogleIdentity, platfo
 			ID:            existing.ID,
 			Name:          pgtype.Text{String: name, Valid: true},
 			GoogleSub:     subArg,
+			AvatarUrl:     avatarArg,
 			PlatformAdmin: pgtype.Bool{Bool: admin || existing.PlatformAdmin, Valid: true},
 		})
 		if err != nil {
@@ -136,6 +140,7 @@ func (s *Service) LoginWithGoogle(ctx context.Context, id GoogleIdentity, platfo
 		Status:        "active",
 		PlatformAdmin: admin,
 		GoogleSub:     subArg,
+		AvatarUrl:     avatar,
 	})
 	if err != nil {
 		if store.IsUniqueViolation(err) {
@@ -165,6 +170,7 @@ func (s *Service) DevLogin(ctx context.Context, email, name string, platformAdmi
 			Name:          name,
 			Status:        "active",
 			PlatformAdmin: admin,
+			AvatarUrl:     "",
 		})
 		if err != nil {
 			if store.IsUniqueViolation(err) {
@@ -191,7 +197,7 @@ func (s *Service) DevLogin(ctx context.Context, email, name string, platformAdmi
 	return s.issueSession(ctx, user)
 }
 
-func (s *Service) finishGoogleLogin(ctx context.Context, user sqlc.User, name string, admin bool) (AuthResult, error) {
+func (s *Service) finishGoogleLogin(ctx context.Context, user sqlc.User, name, avatar string, admin bool) (AuthResult, error) {
 	if user.Status != "active" {
 		return AuthResult{}, apperr.Unauthorized("account disabled")
 	}
@@ -199,6 +205,10 @@ func (s *Service) finishGoogleLogin(ctx context.Context, user sqlc.User, name st
 	changed := false
 	if name != "" && name != user.Name {
 		params.Name = pgtype.Text{String: name, Valid: true}
+		changed = true
+	}
+	if avatar != "" && avatar != user.AvatarUrl {
+		params.AvatarUrl = pgtype.Text{String: avatar, Valid: true}
 		changed = true
 	}
 	if admin && !user.PlatformAdmin {

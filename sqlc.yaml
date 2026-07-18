@@ -18,6 +18,7 @@ sql:
       - "internal/store/migrations/000013_attribute_is_system.up.sql"
       - "internal/store/migrations/000014_automations.up.sql"
       - "internal/store/migrations/000015_billing_payments.up.sql"
+      - "internal/store/migrations/000016_user_avatar.up.sql"
     gen:
       go:
         package: "sqlc"

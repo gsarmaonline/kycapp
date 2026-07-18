@@ -2,6 +2,7 @@ import { render, screen } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { describe, expect, it, vi, beforeEach } from 'vitest'
 import App from './App'
+import { getToken } from './api'
 
 const me = vi.fn()
 const listOrganisations = vi.fn()
@@ -40,10 +41,12 @@ vi.mock('./api', () => ({
   listEmailTemplates: vi.fn(async () => ({ items: [] })),
   createEmailTemplate: vi.fn(),
   updateEmailTemplate: vi.fn(),
+  listAutomations: vi.fn(async () => ({ items: [] })),
 }))
 
 describe('App', () => {
   beforeEach(() => {
+    vi.mocked(getToken).mockReturnValue('test-token')
     me.mockResolvedValue({
       user: { id: 'u1', email: 'ada@acme.com', name: 'Ada', status: 'active' },
       memberships: [],
@@ -70,5 +73,32 @@ describe('App', () => {
     expect(screen.getByRole('link', { name: 'Members' })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Members' })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Create member' })).toBeInTheDocument()
+  })
+
+  it('shows Sign in on the landing page when signed out', async () => {
+    vi.mocked(getToken).mockReturnValue(null)
+    render(
+      <MemoryRouter initialEntries={['/']}>
+        <App />
+      </MemoryRouter>,
+    )
+    expect(
+      await screen.findByRole('heading', { name: /system of record for organisations/i }),
+    ).toBeInTheDocument()
+    const signIns = screen.getAllByRole('link', { name: 'Sign in' })
+    expect(signIns.some((el) => el.getAttribute('href') === '/login')).toBe(true)
+  })
+
+  it('shows Dashboard on the landing page when signed in', async () => {
+    render(
+      <MemoryRouter initialEntries={['/']}>
+        <App />
+      </MemoryRouter>,
+    )
+    const dashboards = await screen.findAllByRole('link', { name: /^Dashboard$/ })
+    expect(dashboards.length).toBeGreaterThan(0)
+    expect(dashboards.every((el) => el.getAttribute('href') === '/app')).toBe(true)
+    // Session may still be resolving on first paint; assert final CTA targets /app.
+    expect(dashboards.some((el) => el.classList.contains('landing-cta-primary'))).toBe(true)
   })
 })

@@ -19,6 +19,7 @@ export type User = {
   name: string
   status: string
   platform_admin?: boolean
+  avatar_url?: string | null
 }
 
 export type Membership = {

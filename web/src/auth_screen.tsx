@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
+import { Link } from 'react-router-dom'
 import {
   authProviders,
   devLogin,
@@ -37,7 +38,11 @@ export function AuthScreen({ onAuthed }: { onAuthed: (token: string) => Promise<
   return (
     <main className="page auth-page">
       <header>
-        <p className="eyebrow">KYC</p>
+        <p className="eyebrow">
+          <Link to="/" className="auth-home-link">
+            KYC
+          </Link>
+        </p>
         <h1>Sign in</h1>
         <p className="lede">Continue with Google to manage your organisations.</p>
       </header>

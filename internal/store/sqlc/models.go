@@ -236,4 +236,5 @@ type User struct {
 	UpdatedAt     time.Time   `json:"updated_at"`
 	PlatformAdmin bool        `json:"platform_admin"`
 	GoogleSub     pgtype.Text `json:"google_sub"`
+	AvatarUrl     string      `json:"avatar_url"`
 }

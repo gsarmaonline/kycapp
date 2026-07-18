@@ -24,6 +24,7 @@ import { EmailTemplatesEdit } from './pages/email_templates/email_templates_edit
 import { EmailTemplatesIndex } from './pages/email_templates/email_templates_index'
 import { EmailTemplatesNew } from './pages/email_templates/email_templates_new'
 import { EmailTemplatesShow } from './pages/email_templates/email_templates_show'
+import { LandingPage } from './pages/landing_page'
 import { MembersEdit } from './pages/members/members_edit'
 import { MembersIndex } from './pages/members/members_index'
 import { MembersNew } from './pages/members/members_new'
@@ -39,7 +40,7 @@ import { UsersNew } from './pages/users/users_new'
 import { UsersShow } from './pages/users/users_show'
 import './App.css'
 
-type Gate = 'loading' | 'auth' | 'app'
+type Gate = 'loading' | 'ready'
 
 export default function App() {
   const [gate, setGate] = useState<Gate>('loading')
@@ -51,17 +52,17 @@ export default function App() {
     const token = getToken()
     if (!token) {
       setUser(null)
-      setGate('auth')
+      setGate('ready')
       return
     }
     try {
       const res = await me()
       setUser(res.user)
-      setGate('app')
+      setGate('ready')
     } catch {
       setToken(null)
       setUser(null)
-      setGate('auth')
+      setGate('ready')
     }
   }
 
@@ -72,14 +73,14 @@ export default function App() {
   async function onAuthed(token: string) {
     setToken(token)
     await refreshSession()
-    navigate('/')
+    navigate('/app')
   }
 
   async function onLogout() {
     await logout()
     setUser(null)
-    setGate('auth')
-    navigate('/')
+    setGate('ready')
+    navigate('/', { replace: true })
   }
 
   if (gate === 'loading') {
@@ -90,18 +91,33 @@ export default function App() {
     )
   }
 
-  if (gate === 'auth') {
-    return (
-      <div className="app">
-        <AuthScreen onAuthed={onAuthed} />
-      </div>
-    )
-  }
-
   return (
     <Routes>
-      <Route path="/" element={<AppShell user={user} onLogout={onLogout} />} />
-      <Route path="/orgs/:orgId" element={<AppShell user={user} onLogout={onLogout} />}>
+      <Route path="/" element={<LandingPage user={user} />} />
+      <Route
+        path="/login"
+        element={
+          user ? (
+            <Navigate to="/app" replace />
+          ) : (
+            <div className="app">
+              <AuthScreen onAuthed={onAuthed} />
+            </div>
+          )
+        }
+      />
+      <Route
+        path="/app"
+        element={
+          user ? <AppShell user={user} onLogout={onLogout} /> : <Navigate to="/login" replace />
+        }
+      />
+      <Route
+        path="/orgs/:orgId"
+        element={
+          user ? <AppShell user={user} onLogout={onLogout} /> : <Navigate to="/login" replace />
+        }
+      >
         <Route index element={<OverviewPage />} />
         <Route path="members" element={<MembersIndex />} />
         <Route path="members/new" element={<MembersNew />} />

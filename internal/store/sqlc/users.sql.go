@@ -12,9 +12,9 @@ import (
 )
 
 const createUser = `-- name: CreateUser :one
-INSERT INTO users (id, email, name, status, platform_admin, google_sub)
-VALUES ($1, $2, $3, $4, $5, $6)
-RETURNING id, email, name, status, created_at, updated_at, platform_admin, google_sub
+INSERT INTO users (id, email, name, status, platform_admin, google_sub, avatar_url)
+VALUES ($1, $2, $3, $4, $5, $6, $7)
+RETURNING id, email, name, status, created_at, updated_at, platform_admin, google_sub, avatar_url
 `
 
 type CreateUserParams struct {
@@ -24,6 +24,7 @@ type CreateUserParams struct {
 	Status        string      `json:"status"`
 	PlatformAdmin bool        `json:"platform_admin"`
 	GoogleSub     pgtype.Text `json:"google_sub"`
+	AvatarUrl     string      `json:"avatar_url"`
 }
 
 func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, error) {
@@ -34,6 +35,7 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, e
 		arg.Status,
 		arg.PlatformAdmin,
 		arg.GoogleSub,
+		arg.AvatarUrl,
 	)
 	var i User
 	err := row.Scan(
@@ -45,12 +47,13 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, e
 		&i.UpdatedAt,
 		&i.PlatformAdmin,
 		&i.GoogleSub,
+		&i.AvatarUrl,
 	)
 	return i, err
 }
 
 const getUser = `-- name: GetUser :one
-SELECT id, email, name, status, created_at, updated_at, platform_admin, google_sub FROM users
+SELECT id, email, name, status, created_at, updated_at, platform_admin, google_sub, avatar_url FROM users
 WHERE id = $1
 `
 
@@ -66,12 +69,13 @@ func (q *Queries) GetUser(ctx context.Context, id string) (User, error) {
 		&i.UpdatedAt,
 		&i.PlatformAdmin,
 		&i.GoogleSub,
+		&i.AvatarUrl,
 	)
 	return i, err
 }
 
 const getUserByEmail = `-- name: GetUserByEmail :one
-SELECT id, email, name, status, created_at, updated_at, platform_admin, google_sub FROM users
+SELECT id, email, name, status, created_at, updated_at, platform_admin, google_sub, avatar_url FROM users
 WHERE email = $1
 `
 
@@ -87,12 +91,13 @@ func (q *Queries) GetUserByEmail(ctx context.Context, email string) (User, error
 		&i.UpdatedAt,
 		&i.PlatformAdmin,
 		&i.GoogleSub,
+		&i.AvatarUrl,
 	)
 	return i, err
 }
 
 const getUserByGoogleSub = `-- name: GetUserByGoogleSub :one
-SELECT id, email, name, status, created_at, updated_at, platform_admin, google_sub FROM users
+SELECT id, email, name, status, created_at, updated_at, platform_admin, google_sub, avatar_url FROM users
 WHERE google_sub = $1
 `
 
@@ -108,12 +113,13 @@ func (q *Queries) GetUserByGoogleSub(ctx context.Context, googleSub pgtype.Text)
 		&i.UpdatedAt,
 		&i.PlatformAdmin,
 		&i.GoogleSub,
+		&i.AvatarUrl,
 	)
 	return i, err
 }
 
 const listUsers = `-- name: ListUsers :many
-SELECT id, email, name, status, created_at, updated_at, platform_admin, google_sub FROM users
+SELECT id, email, name, status, created_at, updated_at, platform_admin, google_sub, avatar_url FROM users
 WHERE (
     $1::text IS NULL
     OR name ILIKE '%' || $1 || '%'
@@ -148,6 +154,7 @@ func (q *Queries) ListUsers(ctx context.Context, arg ListUsersParams) ([]User, e
 			&i.UpdatedAt,
 			&i.PlatformAdmin,
 			&i.GoogleSub,
+			&i.AvatarUrl,
 		); err != nil {
 			return nil, err
 		}
@@ -166,9 +173,10 @@ SET
   status = COALESCE($2, status),
   platform_admin = COALESCE($3, platform_admin),
   google_sub = COALESCE($4, google_sub),
+  avatar_url = COALESCE($5, avatar_url),
   updated_at = now()
-WHERE id = $5
-RETURNING id, email, name, status, created_at, updated_at, platform_admin, google_sub
+WHERE id = $6
+RETURNING id, email, name, status, created_at, updated_at, platform_admin, google_sub, avatar_url
 `
 
 type UpdateUserParams struct {
@@ -176,6 +184,7 @@ type UpdateUserParams struct {
 	Status        pgtype.Text `json:"status"`
 	PlatformAdmin pgtype.Bool `json:"platform_admin"`
 	GoogleSub     pgtype.Text `json:"google_sub"`
+	AvatarUrl     pgtype.Text `json:"avatar_url"`
 	ID            string      `json:"id"`
 }
 
@@ -185,6 +194,7 @@ func (q *Queries) UpdateUser(ctx context.Context, arg UpdateUserParams) (User, e
 		arg.Status,
 		arg.PlatformAdmin,
 		arg.GoogleSub,
+		arg.AvatarUrl,
 		arg.ID,
 	)
 	var i User
@@ -197,6 +207,7 @@ func (q *Queries) UpdateUser(ctx context.Context, arg UpdateUserParams) (User, e
 		&i.UpdatedAt,
 		&i.PlatformAdmin,
 		&i.GoogleSub,
+		&i.AvatarUrl,
 	)
 	return i, err
 }

@@ -1,6 +1,6 @@
 -- name: CreateUser :one
-INSERT INTO users (id, email, name, status, platform_admin, google_sub)
-VALUES ($1, $2, $3, $4, $5, $6)
+INSERT INTO users (id, email, name, status, platform_admin, google_sub, avatar_url)
+VALUES ($1, $2, $3, $4, $5, $6, $7)
 RETURNING *;
 
 -- name: GetUser :one
@@ -33,6 +33,7 @@ SET
   status = COALESCE(sqlc.narg('status'), status),
   platform_admin = COALESCE(sqlc.narg('platform_admin'), platform_admin),
   google_sub = COALESCE(sqlc.narg('google_sub'), google_sub),
+  avatar_url = COALESCE(sqlc.narg('avatar_url'), avatar_url),
   updated_at = now()
 WHERE id = sqlc.arg('id')
 RETURNING *;
