@@ -6,7 +6,7 @@
 
 | Need | Choice |
 | --- | --- |
-| Authors = merchants + team | In-app CRUD UI (forms, not a separate n8n) |
+| Authors = merchants + team | In-app visual DAG editor (React Flow), not a separate n8n |
 | Simple conditions | JSON rule DSL evaluated in Go |
 | Series of actions | Ordered action list on the rule |
 | Ops / scale (for now) | River job queue on KYC Postgres; one worker process |
@@ -70,10 +70,9 @@ Same worker binary serves platform and merchant automations; tenancy is always `
 Under `/orgs/:orgId/automations`:
 
 - List / create / edit / enable-disable / delete
-- Form: trigger select → condition rows → action rows (template picker for email)
-- Optional “Runs” list later
-
-No drag-and-drop canvas in v1.
+- **Visual DAG** (React Flow): trigger → conditions (AND fan-out) → ordered actions
+- Node fields edit inline; add condition/action from the toolbar
+- Show page renders the same DAG read-only, plus recent runs
 
 ## Local & Railway
 

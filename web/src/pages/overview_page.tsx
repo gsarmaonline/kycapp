@@ -1,20 +1,18 @@
 import { useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import {
-  getOrganisation,
   listAppUsers,
   listAttributeDefinitions,
   listAutomations,
   listEmailTemplates,
   listMemberships,
   listRoles,
-  type Organisation,
 } from '../api'
 import { OverviewPanel } from '../panels/overview_panel'
 
 export function OverviewPage() {
   const { orgId = '' } = useParams()
-  const [org, setOrg] = useState<Organisation | null>(null)
+  const [ready, setReady] = useState(false)
   const [memberCount, setMemberCount] = useState(0)
   const [roleCount, setRoleCount] = useState(0)
   const [userCount, setUserCount] = useState(0)
@@ -26,8 +24,7 @@ export function OverviewPage() {
   useEffect(() => {
     void (async () => {
       try {
-        const [o, m, r, users, attrs, templates, automations] = await Promise.all([
-          getOrganisation(orgId),
+        const [m, r, users, attrs, templates, automations] = await Promise.all([
           listMemberships(orgId),
           listRoles(orgId),
           listAppUsers(orgId),
@@ -35,13 +32,13 @@ export function OverviewPage() {
           listEmailTemplates(orgId),
           listAutomations(orgId),
         ])
-        setOrg(o)
         setMemberCount(m.items.length)
         setRoleCount(r.items.length)
         setUserCount(users.items.length)
         setAttributeCount(attrs.items.length)
         setTemplateCount(templates.items.length)
         setAutomationCount(automations.items.length)
+        setReady(true)
       } catch (e) {
         setError(e instanceof Error ? e.message : 'Failed to load')
       }
@@ -49,12 +46,11 @@ export function OverviewPage() {
   }, [orgId])
 
   if (error) return <p className="error">{error}</p>
-  if (!org) return <p>Loading…</p>
+  if (!ready) return <p>Loading…</p>
 
   return (
     <OverviewPanel
       orgId={orgId}
-      org={org}
       tiles={[
         { label: 'Members', value: memberCount, to: 'members' },
         { label: 'Roles', value: roleCount, to: 'roles' },
@@ -62,8 +58,6 @@ export function OverviewPage() {
         { label: 'User Attributes', value: attributeCount, to: 'attributes' },
         { label: 'Email templates', value: templateCount, to: 'email-templates' },
         { label: 'Automations', value: automationCount, to: 'automations' },
-        { label: 'Branding', value: 'Open', to: 'branding' },
-        { label: 'Billing', value: 'Open', to: 'billing' },
       ]}
     />
   )

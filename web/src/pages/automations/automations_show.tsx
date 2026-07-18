@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { getAutomation, listAutomationRuns, type Automation, type AutomationRun } from '../../api'
-import { DetailList, PageHeader } from '../../crud/ui'
+import { PageHeader } from '../../crud/ui'
 import { resourcePath } from '../../org_nav'
+import { AutomationDag } from './dag/AutomationDag'
+import { normalizeGraph } from './dag/build_graph'
 
 export function AutomationsShow() {
   const { orgId = '', id = '' } = useParams()
@@ -28,28 +30,23 @@ export function AutomationsShow() {
   if (error) return <p className="error">{error}</p>
   if (!item) return <p>Loading…</p>
 
+  const graph = normalizeGraph({
+    trigger: item.trigger,
+    conditions: item.conditions?.all ?? [],
+    actions: item.actions ?? [],
+  }) // read-only: no invented defaults
+
   return (
     <section>
-      <PageHeader title="Automation" />
-      <DetailList
-        items={[
-          { label: 'Name', value: item.name || '—' },
-          { label: 'Trigger', value: item.trigger },
-          { label: 'Enabled', value: item.enabled ? 'yes' : 'no' },
-          {
-            label: 'Conditions',
-            value:
-              item.conditions?.all?.length
-                ? item.conditions.all
-                    .map((c) => `${c.field} ${c.op} ${c.value ?? ''}`.trim())
-                    .join('; ')
-                : '(none)',
-          },
-          {
-            label: 'Actions',
-            value: item.actions.map((a) => `${a.type}:${a.template_key ?? ''}`).join(', '),
-          },
-        ]}
+      <PageHeader title={item.name || 'Automation'} />
+      <p className="lede">
+        {item.enabled ? 'Enabled' : 'Disabled'} · trigger <code>{item.trigger}</code>
+      </p>
+      <AutomationDag
+        readOnly
+        trigger={graph.trigger}
+        conditions={graph.conditions}
+        actions={graph.actions}
       />
       <h3>Recent runs</h3>
       {runs.length === 0 ? (
