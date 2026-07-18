@@ -63,10 +63,11 @@ Get one.
 
 ### `PATCH /v1/organisations/{id}`
 
-Update `{ "name"?, "status"?, "primary_color"?, "accent_color"?, "email_footer"? }`.  
-Colors must be `#RGB` or `#RRGGBB`. Requires `organisation:update`.
+Update `{ "name"?, "status"?, "primary_color"?, "accent_color"?, "email_footer"?, "email_font"? }`.  
+Colors must be `#RGB` or `#RRGGBB`.  
+`email_font` is one of: `arial`, `helvetica`, `verdana`, `trebuchet`, `georgia`, `times`, `courier` (email-safe stacks). Requires `organisation:update`.
 
-Organisation JSON also includes `logo_url` (read-only; set via logo upload).
+Organisation JSON also includes `logo_url` (read-only; set via logo upload) and `email_font`.
 
 ### `POST /v1/organisations/{id}/archive`
 

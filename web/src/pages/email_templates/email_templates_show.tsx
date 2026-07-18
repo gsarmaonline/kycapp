@@ -41,6 +41,7 @@ export function EmailTemplatesShow() {
       primary_color: org?.primary_color,
       accent_color: org?.accent_color,
       footer: org?.email_footer,
+      font: org?.email_font,
     })
   }, [item, vars, org])
 

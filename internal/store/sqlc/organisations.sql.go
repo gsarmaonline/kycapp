@@ -15,7 +15,7 @@ const archiveOrganisation = `-- name: ArchiveOrganisation :one
 UPDATE organisations
 SET status = 'archived', updated_at = now()
 WHERE id = $1
-RETURNING id, name, slug, status, created_at, updated_at, logo_url, primary_color, accent_color, email_footer
+RETURNING id, name, slug, status, created_at, updated_at, logo_url, primary_color, accent_color, email_footer, email_font
 `
 
 func (q *Queries) ArchiveOrganisation(ctx context.Context, id string) (Organisation, error) {
@@ -32,6 +32,7 @@ func (q *Queries) ArchiveOrganisation(ctx context.Context, id string) (Organisat
 		&i.PrimaryColor,
 		&i.AccentColor,
 		&i.EmailFooter,
+		&i.EmailFont,
 	)
 	return i, err
 }
@@ -39,7 +40,7 @@ func (q *Queries) ArchiveOrganisation(ctx context.Context, id string) (Organisat
 const createOrganisation = `-- name: CreateOrganisation :one
 INSERT INTO organisations (id, name, slug, status)
 VALUES ($1, $2, $3, $4)
-RETURNING id, name, slug, status, created_at, updated_at, logo_url, primary_color, accent_color, email_footer
+RETURNING id, name, slug, status, created_at, updated_at, logo_url, primary_color, accent_color, email_footer, email_font
 `
 
 type CreateOrganisationParams struct {
@@ -68,12 +69,13 @@ func (q *Queries) CreateOrganisation(ctx context.Context, arg CreateOrganisation
 		&i.PrimaryColor,
 		&i.AccentColor,
 		&i.EmailFooter,
+		&i.EmailFont,
 	)
 	return i, err
 }
 
 const getOrganisation = `-- name: GetOrganisation :one
-SELECT id, name, slug, status, created_at, updated_at, logo_url, primary_color, accent_color, email_footer FROM organisations
+SELECT id, name, slug, status, created_at, updated_at, logo_url, primary_color, accent_color, email_footer, email_font FROM organisations
 WHERE id = $1
 `
 
@@ -91,12 +93,13 @@ func (q *Queries) GetOrganisation(ctx context.Context, id string) (Organisation,
 		&i.PrimaryColor,
 		&i.AccentColor,
 		&i.EmailFooter,
+		&i.EmailFont,
 	)
 	return i, err
 }
 
 const listOrganisations = `-- name: ListOrganisations :many
-SELECT id, name, slug, status, created_at, updated_at, logo_url, primary_color, accent_color, email_footer FROM organisations
+SELECT id, name, slug, status, created_at, updated_at, logo_url, primary_color, accent_color, email_footer, email_font FROM organisations
 WHERE ($1::text IS NULL OR status = $1)
   AND (
     $2::text IS NULL
@@ -140,6 +143,7 @@ func (q *Queries) ListOrganisations(ctx context.Context, arg ListOrganisationsPa
 			&i.PrimaryColor,
 			&i.AccentColor,
 			&i.EmailFooter,
+			&i.EmailFont,
 		); err != nil {
 			return nil, err
 		}
@@ -152,7 +156,7 @@ func (q *Queries) ListOrganisations(ctx context.Context, arg ListOrganisationsPa
 }
 
 const listOrganisationsForUser = `-- name: ListOrganisationsForUser :many
-SELECT o.id, o.name, o.slug, o.status, o.created_at, o.updated_at, o.logo_url, o.primary_color, o.accent_color, o.email_footer
+SELECT o.id, o.name, o.slug, o.status, o.created_at, o.updated_at, o.logo_url, o.primary_color, o.accent_color, o.email_footer, o.email_font
 FROM organisations o
 JOIN memberships m ON m.organisation_id = o.id
 WHERE m.user_id = $1
@@ -202,6 +206,7 @@ func (q *Queries) ListOrganisationsForUser(ctx context.Context, arg ListOrganisa
 			&i.PrimaryColor,
 			&i.AccentColor,
 			&i.EmailFooter,
+			&i.EmailFont,
 		); err != nil {
 			return nil, err
 		}
@@ -217,7 +222,7 @@ const setOrganisationLogoURL = `-- name: SetOrganisationLogoURL :one
 UPDATE organisations
 SET logo_url = $2, updated_at = now()
 WHERE id = $1
-RETURNING id, name, slug, status, created_at, updated_at, logo_url, primary_color, accent_color, email_footer
+RETURNING id, name, slug, status, created_at, updated_at, logo_url, primary_color, accent_color, email_footer, email_font
 `
 
 type SetOrganisationLogoURLParams struct {
@@ -239,6 +244,7 @@ func (q *Queries) SetOrganisationLogoURL(ctx context.Context, arg SetOrganisatio
 		&i.PrimaryColor,
 		&i.AccentColor,
 		&i.EmailFooter,
+		&i.EmailFont,
 	)
 	return i, err
 }
@@ -251,9 +257,10 @@ SET
   primary_color = COALESCE($3, primary_color),
   accent_color = COALESCE($4, accent_color),
   email_footer = COALESCE($5, email_footer),
+  email_font = COALESCE($6, email_font),
   updated_at = now()
-WHERE id = $6
-RETURNING id, name, slug, status, created_at, updated_at, logo_url, primary_color, accent_color, email_footer
+WHERE id = $7
+RETURNING id, name, slug, status, created_at, updated_at, logo_url, primary_color, accent_color, email_footer, email_font
 `
 
 type UpdateOrganisationParams struct {
@@ -262,6 +269,7 @@ type UpdateOrganisationParams struct {
 	PrimaryColor pgtype.Text `json:"primary_color"`
 	AccentColor  pgtype.Text `json:"accent_color"`
 	EmailFooter  pgtype.Text `json:"email_footer"`
+	EmailFont    pgtype.Text `json:"email_font"`
 	ID           string      `json:"id"`
 }
 
@@ -272,6 +280,7 @@ func (q *Queries) UpdateOrganisation(ctx context.Context, arg UpdateOrganisation
 		arg.PrimaryColor,
 		arg.AccentColor,
 		arg.EmailFooter,
+		arg.EmailFont,
 		arg.ID,
 	)
 	var i Organisation
@@ -286,6 +295,7 @@ func (q *Queries) UpdateOrganisation(ctx context.Context, arg UpdateOrganisation
 		&i.PrimaryColor,
 		&i.AccentColor,
 		&i.EmailFooter,
+		&i.EmailFont,
 	)
 	return i, err
 }

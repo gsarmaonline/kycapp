@@ -108,6 +108,7 @@ type Organisation struct {
 	PrimaryColor string    `json:"primary_color"`
 	AccentColor  string    `json:"accent_color"`
 	EmailFooter  string    `json:"email_footer"`
+	EmailFont    string    `json:"email_font"`
 }
 
 type OrganisationEntitlement struct {

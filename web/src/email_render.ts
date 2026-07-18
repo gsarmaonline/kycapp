@@ -1,5 +1,7 @@
 /** Matches core/emailtemplates.Render / Wrap. */
 
+import { emailFontStack } from './email_fonts'
+
 const PLACEHOLDER_RE = /\{\{\s*([a-zA-Z0-9_]+)\s*\}\}/g
 
 export type EmailBranding = {
@@ -8,6 +10,7 @@ export type EmailBranding = {
   primary_color?: string
   accent_color?: string
   footer?: string
+  font?: string
 }
 
 export function renderEmailTemplate(template: string, vars: Record<string, string>): string {
@@ -37,6 +40,7 @@ export function wrapEmailHtml(content: string, branding: EmailBranding): string 
 
   const primary = branding.primary_color?.trim() || '#1f4d3a'
   const accent = branding.accent_color?.trim() || primary
+  const font = emailFontStack(branding.font)
   const orgName = escapeHtml((branding.org_name || '').trim())
   let footer = escapeHtml((branding.footer || '').trim())
   if (!footer && orgName) footer = orgName
@@ -55,27 +59,27 @@ export function wrapEmailHtml(content: string, branding: EmailBranding): string 
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>${orgName}</title>
 </head>
-<body style="margin:0;padding:0;background:#f4f4f5;font-family:Arial,Helvetica,sans-serif;color:#1c1917;">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f5;padding:24px 12px;">
+<body style="margin:0;padding:0;background:#f4f4f5;font-family:${font};color:#1c1917;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f5;padding:24px 12px;font-family:${font};">
   <tr>
     <td align="center">
-      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;background:#ffffff;border-radius:8px;overflow:hidden;">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;background:#ffffff;border-radius:8px;overflow:hidden;font-family:${font};">
         <tr>
           <td style="background:${escapeHtml(primary)};height:6px;font-size:0;line-height:0;">&nbsp;</td>
         </tr>
         <tr>
-          <td style="padding:28px 28px 12px;text-align:center;">
+          <td style="padding:28px 28px 12px;text-align:center;font-family:${font};">
             ${logoBlock}
-            <div style="font-size:20px;font-weight:700;color:${escapeHtml(accent)};letter-spacing:0.01em;">${orgName}</div>
+            <div style="font-size:20px;font-weight:700;color:${escapeHtml(accent)};letter-spacing:0.01em;font-family:${font};">${orgName}</div>
           </td>
         </tr>
         <tr>
-          <td style="padding:8px 28px 28px;font-size:16px;line-height:1.55;color:#1c1917;text-align:left;">
+          <td style="padding:8px 28px 28px;font-size:16px;line-height:1.55;color:#1c1917;text-align:left;font-family:${font};">
             ${inner}
           </td>
         </tr>
         <tr>
-          <td style="padding:16px 28px;background:${escapeHtml(primary)};color:#f8faf8;font-size:12px;line-height:1.4;text-align:center;">
+          <td style="padding:16px 28px;background:${escapeHtml(primary)};color:#f8faf8;font-size:12px;line-height:1.4;text-align:center;font-family:${font};">
             ${footer}
           </td>
         </tr>

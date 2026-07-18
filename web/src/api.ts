@@ -10,6 +10,7 @@ export type Organisation = {
   primary_color?: string
   accent_color?: string
   email_footer?: string
+  email_font?: string
 }
 
 export type User = {
@@ -166,6 +167,7 @@ export function updateOrganisation(
     primary_color?: string
     accent_color?: string
     email_footer?: string
+    email_font?: string
   },
 ) {
   return request<Organisation>(`/v1/organisations/${id}`, {

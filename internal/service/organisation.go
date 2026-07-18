@@ -123,6 +123,7 @@ type UpdateOrganisationInput struct {
 	PrimaryColor  *string
 	AccentColor   *string
 	EmailFooter   *string
+	EmailFont     *string
 }
 
 func (s *Service) UpdateOrganisation(ctx context.Context, id string, in UpdateOrganisationInput) (sqlc.Organisation, error) {

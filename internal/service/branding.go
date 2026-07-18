@@ -64,6 +64,13 @@ func (s *Service) UpdateOrganisationBranding(ctx context.Context, id string, in 
 	if in.EmailFooter != nil {
 		params.EmailFooter = pgtype.Text{String: *in.EmailFooter, Valid: true}
 	}
+	if in.EmailFont != nil {
+		font, err := emailtemplates.NormalizeFont(*in.EmailFont)
+		if err != nil {
+			return sqlc.Organisation{}, apperr.Validation(err.Error())
+		}
+		params.EmailFont = pgtype.Text{String: font, Valid: true}
+	}
 	org, err := s.db.Q().UpdateOrganisation(ctx, params)
 	return org, mapNotFound(err, "organisation not found")
 }
@@ -161,5 +168,6 @@ func BrandingFromOrg(o sqlc.Organisation) emailtemplates.Branding {
 		PrimaryColor: o.PrimaryColor,
 		AccentColor:  o.AccentColor,
 		Footer:       o.EmailFooter,
+		Font:         o.EmailFont,
 	}
 }

@@ -9,6 +9,7 @@ import {
   type Organisation,
 } from '../api'
 import { PageHeader } from '../crud/ui'
+import { EMAIL_FONTS } from '../email_fonts'
 import { wrapEmailHtml } from '../email_render'
 
 export function BrandingPage() {
@@ -17,6 +18,7 @@ export function BrandingPage() {
   const [primary, setPrimary] = useState('#1f4d3a')
   const [accent, setAccent] = useState('#16382a')
   const [footer, setFooter] = useState('')
+  const [font, setFont] = useState('arial')
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [loading, setLoading] = useState(true)
@@ -30,6 +32,7 @@ export function BrandingPage() {
       setPrimary(o.primary_color || '#1f4d3a')
       setAccent(o.accent_color || o.primary_color || '#16382a')
       setFooter(o.email_footer || '')
+      setFont(o.email_font || 'arial')
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to load branding')
     } finally {
@@ -49,8 +52,9 @@ export function BrandingPage() {
       primary_color: primary,
       accent_color: accent,
       footer,
+      font,
     }).replace(/\{\{\s*display_name\s*\}\}/g, 'Pat')
-  }, [org, primary, accent, footer])
+  }, [org, primary, accent, footer, font])
 
   async function onSave(e: FormEvent) {
     e.preventDefault()
@@ -61,6 +65,7 @@ export function BrandingPage() {
         primary_color: primary,
         accent_color: accent,
         email_footer: footer,
+        email_font: font,
       })
       setOrg(o)
     } catch (err) {
@@ -97,7 +102,7 @@ export function BrandingPage() {
     <section>
       <PageHeader title="Branding" />
       <p className="lede">
-        Logo, colors, and footer are applied to all email templates at preview (and send) time.
+        Logo, colors, font, and footer are applied to all email templates at preview (and send) time.
       </p>
       {error && <p className="error">{error}</p>}
       <form className="create stacked" onSubmit={onSave}>
@@ -130,6 +135,16 @@ export function BrandingPage() {
           Accent color
           <input type="color" value={normalizeColorInput(accent)} onChange={(e) => setAccent(e.target.value)} />
           <input value={accent} onChange={(e) => setAccent(e.target.value)} placeholder="#16382a" />
+        </label>
+        <label>
+          Email font
+          <select value={font} onChange={(e) => setFont(e.target.value)} aria-label="Email font">
+            {EMAIL_FONTS.map((f) => (
+              <option key={f.key} value={f.key} style={{ fontFamily: f.stack }}>
+                {f.label}
+              </option>
+            ))}
+          </select>
         </label>
         <label>
           Email footer

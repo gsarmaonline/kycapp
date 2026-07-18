@@ -53,6 +53,7 @@ Tenant hub. Everything else hangs off this record.
 | `primary_color` | string | Hex `#RGB` / `#RRGGBB`; default `#1f4d3a` |
 | `accent_color` | string | Optional hex for header title |
 | `email_footer` | string | Footer text for branded email chrome |
+| `email_font` | string | Font key: `arial`, `helvetica`, `verdana`, `trebuchet`, `georgia`, `times`, `courier` |
 | `created_at` | timestamptz | |
 | `updated_at` | timestamptz | |
 

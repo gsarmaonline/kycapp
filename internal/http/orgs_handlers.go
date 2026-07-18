@@ -100,6 +100,7 @@ func (s *Server) handlePatchOrganisation(w http.ResponseWriter, r *http.Request)
 		PrimaryColor *string `json:"primary_color"`
 		AccentColor  *string `json:"accent_color"`
 		EmailFooter  *string `json:"email_footer"`
+		EmailFont    *string `json:"email_font"`
 	}
 	if err := decodeJSON(r, &body); err != nil {
 		writeError(w, apperr.Validation("invalid JSON body"))
@@ -108,7 +109,7 @@ func (s *Server) handlePatchOrganisation(w http.ResponseWriter, r *http.Request)
 	org, err := s.svc.UpdateOrganisation(r.Context(), orgID, service.UpdateOrganisationInput{
 		Name: body.Name, Status: body.Status,
 		PrimaryColor: body.PrimaryColor, AccentColor: body.AccentColor,
-		EmailFooter: body.EmailFooter,
+		EmailFooter: body.EmailFooter, EmailFont: body.EmailFont,
 	})
 	if err != nil {
 		writeError(w, err)

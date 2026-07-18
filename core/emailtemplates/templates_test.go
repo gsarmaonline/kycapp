@@ -87,3 +87,20 @@ func TestNormalizeColor(t *testing.T) {
 		t.Fatal("expected error")
 	}
 }
+
+func TestWrapFont(t *testing.T) {
+	got := Wrap(`<p>Hi</p>`, Branding{OrgName: "Acme", Font: "georgia"})
+	if !strings.Contains(got, "Georgia") {
+		t.Fatalf("expected georgia stack in:\n%s", got)
+	}
+}
+
+func TestNormalizeFont(t *testing.T) {
+	k, err := NormalizeFont(" Georgia ")
+	if err != nil || k != "georgia" {
+		t.Fatalf("got %q %v", k, err)
+	}
+	if _, err := NormalizeFont("comic-sans"); err == nil {
+		t.Fatal("expected error")
+	}
+}

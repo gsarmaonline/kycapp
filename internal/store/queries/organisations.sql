@@ -43,6 +43,7 @@ SET
   primary_color = COALESCE(sqlc.narg('primary_color'), primary_color),
   accent_color = COALESCE(sqlc.narg('accent_color'), accent_color),
   email_footer = COALESCE(sqlc.narg('email_footer'), email_footer),
+  email_font = COALESCE(sqlc.narg('email_font'), email_font),
   updated_at = now()
 WHERE id = sqlc.arg('id')
 RETURNING *;

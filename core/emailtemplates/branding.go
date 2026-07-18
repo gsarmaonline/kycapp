@@ -14,6 +14,52 @@ type Branding struct {
 	PrimaryColor string
 	AccentColor  string
 	Footer       string
+	Font         string // key from FontStacks (e.g. "arial")
+}
+
+// FontOption is a selectable email-safe font stack.
+type FontOption struct {
+	Key   string
+	Label string
+	Stack string
+}
+
+// FontStacks lists fonts that work reliably across major email clients.
+func FontStacks() []FontOption {
+	return []FontOption{
+		{Key: "arial", Label: "Arial", Stack: "Arial, Helvetica, sans-serif"},
+		{Key: "helvetica", Label: "Helvetica", Stack: "Helvetica, Arial, sans-serif"},
+		{Key: "verdana", Label: "Verdana", Stack: "Verdana, Geneva, sans-serif"},
+		{Key: "trebuchet", Label: "Trebuchet MS", Stack: "'Trebuchet MS', Helvetica, sans-serif"},
+		{Key: "georgia", Label: "Georgia", Stack: "Georgia, 'Times New Roman', serif"},
+		{Key: "times", Label: "Times New Roman", Stack: "'Times New Roman', Times, serif"},
+		{Key: "courier", Label: "Courier New", Stack: "'Courier New', Courier, monospace"},
+	}
+}
+
+// NormalizeFont returns a known font key or an error.
+func NormalizeFont(s string) (string, error) {
+	key := strings.ToLower(strings.TrimSpace(s))
+	if key == "" {
+		return "", nil
+	}
+	for _, f := range FontStacks() {
+		if f.Key == key {
+			return key, nil
+		}
+	}
+	return "", fmt.Errorf("unsupported email font")
+}
+
+// FontStack resolves a font key to a CSS font-family value.
+func FontStack(key string) string {
+	key = strings.ToLower(strings.TrimSpace(key))
+	for _, f := range FontStacks() {
+		if f.Key == key {
+			return f.Stack
+		}
+	}
+	return FontStacks()[0].Stack
 }
 
 var hexColorRE = regexp.MustCompile(`^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$`)
@@ -51,6 +97,7 @@ func Wrap(content string, b Branding) string {
 	if accent == "" {
 		accent = primary
 	}
+	font := FontStack(b.Font)
 	orgName := html.EscapeString(strings.TrimSpace(b.OrgName))
 	footer := html.EscapeString(strings.TrimSpace(b.Footer))
 	if footer == "" && orgName != "" {
@@ -78,27 +125,27 @@ func Wrap(content string, b Branding) string {
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>%s</title>
 </head>
-<body style="margin:0;padding:0;background:#f4f4f5;font-family:Arial,Helvetica,sans-serif;color:#1c1917;">
-<table role="presentation" width="100%%" cellpadding="0" cellspacing="0" style="background:#f4f4f5;padding:24px 12px;">
+<body style="margin:0;padding:0;background:#f4f4f5;font-family:%s;color:#1c1917;">
+<table role="presentation" width="100%%" cellpadding="0" cellspacing="0" style="background:#f4f4f5;padding:24px 12px;font-family:%s;">
   <tr>
     <td align="center">
-      <table role="presentation" width="100%%" cellpadding="0" cellspacing="0" style="max-width:560px;background:#ffffff;border-radius:8px;overflow:hidden;">
+      <table role="presentation" width="100%%" cellpadding="0" cellspacing="0" style="max-width:560px;background:#ffffff;border-radius:8px;overflow:hidden;font-family:%s;">
         <tr>
           <td style="background:%s;height:6px;font-size:0;line-height:0;">&nbsp;</td>
         </tr>
         <tr>
-          <td style="padding:28px 28px 12px;text-align:center;">
+          <td style="padding:28px 28px 12px;text-align:center;font-family:%s;">
             %s
-            <div style="font-size:20px;font-weight:700;color:%s;letter-spacing:0.01em;">%s</div>
+            <div style="font-size:20px;font-weight:700;color:%s;letter-spacing:0.01em;font-family:%s;">%s</div>
           </td>
         </tr>
         <tr>
-          <td style="padding:8px 28px 28px;font-size:16px;line-height:1.55;color:#1c1917;text-align:left;">
+          <td style="padding:8px 28px 28px;font-size:16px;line-height:1.55;color:#1c1917;text-align:left;font-family:%s;">
             %s
           </td>
         </tr>
         <tr>
-          <td style="padding:16px 28px;background:%s;color:#f8faf8;font-size:12px;line-height:1.4;text-align:center;">
+          <td style="padding:16px 28px;background:%s;color:#f8faf8;font-size:12px;line-height:1.4;text-align:center;font-family:%s;">
             %s
           </td>
         </tr>
@@ -109,12 +156,17 @@ func Wrap(content string, b Branding) string {
 </body>
 </html>`,
 		orgName,
+		font, font, font,
 		html.EscapeString(primary),
+		font,
 		logoBlock,
 		html.EscapeString(accent),
+		font,
 		orgName,
+		font,
 		inner,
 		html.EscapeString(primary),
+		font,
 		footer,
 	)
 }

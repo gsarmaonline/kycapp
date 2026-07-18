@@ -74,6 +74,7 @@ func orgJSON(o sqlc.Organisation) map[string]any {
 		"primary_color":  o.PrimaryColor,
 		"accent_color":   o.AccentColor,
 		"email_footer":   o.EmailFooter,
+		"email_font":     o.EmailFont,
 		"created_at":     o.CreatedAt.UTC().Format(time.RFC3339Nano),
 		"updated_at":     o.UpdatedAt.UTC().Format(time.RFC3339Nano),
 	}
