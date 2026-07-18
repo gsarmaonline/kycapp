@@ -1,7 +1,9 @@
 package httpserver
 
 import (
+	"io"
 	"net/http"
+	"strings"
 
 	"github.com/gsarmaonline/kyc/internal/apperr"
 	"github.com/gsarmaonline/kyc/internal/service"
@@ -229,4 +231,118 @@ func (s *Server) handleEntitlementsCheck(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"allowed": allowed})
+}
+
+func (s *Server) handleUpsertPlanPrice(w http.ResponseWriter, r *http.Request) {
+	if _, err := service.RequirePlatform(r.Context()); err != nil {
+		writeError(w, err)
+		return
+	}
+	var body struct {
+		Interval          string `json:"interval"`
+		Currency          string `json:"currency"`
+		UnitAmount        int64  `json:"unit_amount"`
+		ProcessorPriceRef string `json:"processor_price_ref"`
+		Status            string `json:"status"`
+	}
+	if err := decodeJSON(r, &body); err != nil {
+		writeError(w, apperr.Validation("invalid JSON body"))
+		return
+	}
+	price, err := s.svc.UpsertPlanPrice(r.Context(), r.PathValue("id"), service.UpsertPlanPriceInput{
+		Interval:          body.Interval,
+		Currency:          body.Currency,
+		UnitAmount:        body.UnitAmount,
+		ProcessorPriceRef: body.ProcessorPriceRef,
+		Status:            body.Status,
+	})
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, planPriceJSON(price))
+}
+
+func (s *Server) handleListPlanPrices(w http.ResponseWriter, r *http.Request) {
+	if _, err := service.RequirePrincipal(r.Context()); err != nil {
+		writeError(w, err)
+		return
+	}
+	prices, err := s.svc.ListPlanPrices(r.Context(), r.PathValue("id"))
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	items := make([]map[string]any, 0, len(prices))
+	for _, p := range prices {
+		items = append(items, planPriceJSON(p))
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"items": items})
+}
+
+func (s *Server) handleBillingCheckout(w http.ResponseWriter, r *http.Request) {
+	orgID := r.PathValue("id")
+	if _, err := s.svc.RequireOrgPermission(r.Context(), orgID, "billing:manage"); err != nil {
+		writeError(w, err)
+		return
+	}
+	var body struct {
+		PlanID     string `json:"plan_id"`
+		Interval   string `json:"interval"`
+		SuccessURL string `json:"success_url"`
+		CancelURL  string `json:"cancel_url"`
+	}
+	if err := decodeJSON(r, &body); err != nil {
+		writeError(w, apperr.Validation("invalid JSON body"))
+		return
+	}
+	out, err := s.svc.CreateBillingCheckout(r.Context(), orgID, service.CreateCheckoutInput{
+		PlanID:     body.PlanID,
+		Interval:   body.Interval,
+		SuccessURL: body.SuccessURL,
+		CancelURL:  body.CancelURL,
+	})
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"url": out.URL})
+}
+
+func (s *Server) handleBillingPortal(w http.ResponseWriter, r *http.Request) {
+	orgID := r.PathValue("id")
+	if _, err := s.svc.RequireOrgPermission(r.Context(), orgID, "billing:manage"); err != nil {
+		writeError(w, err)
+		return
+	}
+	var body struct {
+		ReturnURL string `json:"return_url"`
+	}
+	_ = decodeJSON(r, &body) // body optional
+	out, err := s.svc.CreateBillingPortal(r.Context(), orgID, service.CreatePortalInput{
+		ReturnURL: body.ReturnURL,
+	})
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"url": out.URL})
+}
+
+func (s *Server) handleBillingWebhook(w http.ResponseWriter, r *http.Request) {
+	provider := strings.ToLower(strings.TrimSpace(r.PathValue("provider")))
+	if provider == "" || provider != s.svc.PaymentsProvider() {
+		writeError(w, apperr.NotFound("webhook provider not configured"))
+		return
+	}
+	body, err := io.ReadAll(io.LimitReader(r.Body, 1<<20))
+	if err != nil {
+		writeError(w, apperr.Validation("could not read body"))
+		return
+	}
+	if err := s.svc.HandlePaymentWebhook(r.Context(), r.Header, body); err != nil {
+		writeError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"received": true})
 }

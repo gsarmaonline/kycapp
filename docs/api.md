@@ -248,12 +248,17 @@ Email delivery is stubbed (logged) until an ESP is wired.
 
 ## Billing / entitlements
 
+See [billing-plans.md](./billing-plans.md) for the Stripe executor design.
+
 ### Plans
 
-- `POST /v1/plans` — `{ "key", "name" }`
+- `POST /v1/plans` — `{ "key", "name" }` (platform)
 - `GET /v1/plans`
 - `GET /v1/plans/{id}`
-- `PUT /v1/plans/{id}/entitlements` — `{ "entitlement_keys": string[] }` replace set
+- `PUT /v1/plans/{id}/entitlements` — `{ "entitlement_keys": string[] }` replace set (platform)
+- `PUT /v1/plans/{id}/price` — link Stripe Price (platform)  
+  `{ "interval": "month"|"year", "currency"?, "unit_amount", "processor_price_ref", "status"? }`
+- `GET /v1/plans/{id}/prices`
 
 ### Entitlements (catalog)
 
@@ -262,8 +267,16 @@ Email delivery is stubbed (logged) until an ESP is wired.
 
 ### Organisation subscription
 
-- `PUT /v1/organisations/{id}/subscription` — `{ "plan_id", "status"? }` upsert (`Idempotency-Key` recommended)
-- `GET /v1/organisations/{id}/subscription`
+- `PUT /v1/organisations/{id}/subscription` — `{ "plan_id", "status"? }` upsert (platform / comps)
+- `GET /v1/organisations/{id}/subscription` — requires `billing:read`
+
+### Self-serve billing (Stripe executor)
+
+- `POST /v1/organisations/{id}/billing/checkout` — requires `billing:manage`  
+  `{ "plan_id", "interval"?, "success_url"?, "cancel_url"? }` → `{ "url" }`
+- `POST /v1/organisations/{id}/billing/portal` — requires `billing:manage`  
+  `{ "return_url"? }` → `{ "url" }`
+- `POST /v1/billing/webhooks/{provider}` — public; `provider` must match `PAYMENTS_PROVIDER` (`stripe` or `noop`)
 
 ### Organisation entitlement overrides
 

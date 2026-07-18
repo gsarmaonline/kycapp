@@ -261,6 +261,29 @@ Join: Plan ↔ Entitlement.
 | `plan_id` | FK → Plan |
 | `entitlement_id` | FK → Entitlement |
 
+### PlanPrice
+
+Flat recurring offer linked to a PSP Price id. See [billing-plans.md](./billing-plans.md).
+
+| Field | Type | Notes |
+| --- | --- | --- |
+| `id` | string | PK |
+| `plan_id` | string | FK → Plan |
+| `interval` | enum | `month` \| `year` |
+| `currency` | string | e.g. `usd` |
+| `unit_amount` | int64 | Minor units (cents) |
+| `processor` | string | e.g. `stripe`, `noop` |
+| `processor_price_ref` | string | Stripe Price id |
+| `status` | enum | `active` \| `archived` |
+
+### BillingCustomer
+
+Org ↔ PSP customer mapping.
+
+### ProcessorEvent
+
+Idempotent webhook inbox (`processor` + `event_ref` unique).
+
 ### Subscription
 
 Attaches a plan to an organisation. One active subscription per organisation in v1.
@@ -272,6 +295,8 @@ Attaches a plan to an organisation. One active subscription per organisation in 
 | `plan_id` | string | FK → Plan |
 | `status` | enum | `trialing` \| `active` \| `past_due` \| `canceled` |
 | `current_period_end` | timestamptz | Nullable |
+| `processor` | string? | e.g. `stripe` |
+| `subscription_ref` | string? | PSP subscription id |
 
 ### OrganisationEntitlement
 

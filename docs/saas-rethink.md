@@ -58,7 +58,7 @@ flowchart TB
 | 2 | Tenancy / authz hole | **Done** | Org routes require active membership; lists scoped to user’s orgs; RBAC on mutations; **403** when denied. |
 | 3 | Merchant vs ops UI | **Partial** | Login-gated merchant UI (orgs, members, roles, billing read). No separate platform-admin console yet. |
 | 4 | Auth model | **Done** | Humans = Google session. Machines = `API_TOKENS` / DB API keys (platform). |
-| 5 | Real billing | **Open** | Catalog + subscription/entitlements in DB; no Stripe Checkout/Portal/webhooks. |
+| 5 | Real billing | **Partial** | Stripe executor (Checkout/Portal/webhooks → subscription). See [billing-plans.md](./billing-plans.md). Metering / Connect later. |
 | 6 | Invite email | **Partial** | Invite + accept-while-logged-in works; no email delivery or magic invite links. |
 | 7 | Platform admin | **Partial** | `platform_admin` flag + `PLATFORM_ADMIN_EMAILS`; no dedicated admin UI. |
 | 8 | Production essentials | **Partial** | Auth/check rate limits, mutation audit. Still missing: email provider, merchant-scoped API keys, GDPR export/delete, hardened cookie sessions, etc. |
@@ -84,8 +84,8 @@ flowchart TB
 - **Org email branding** (logo upload, colors, footer chrome at render time; visual builder deferred) — **done (v1)**
 - **Automations** (org rules UI: simple conditions + action list; River on Postgres) — **done (v1)**; see [automations.md](automations.md)
 
-### Phase C — Real billing
-- Stripe Customer per org, Checkout, Portal, webhooks → Subscription / Entitlements
+### Phase C — Real billing — **C0 done (executor)**
+- Stripe Customer per org, Checkout, Portal, webhooks → Subscription / Entitlements ([billing-plans.md](./billing-plans.md))
 
 ### Phase D — Platform admin
 - Separate admin surface for `platform_admin` (support, plan catalog, impersonation)

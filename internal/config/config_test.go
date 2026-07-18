@@ -36,6 +36,9 @@ func TestLoadDefaultsHTTPAddr(t *testing.T) {
 	if cfg.PublicBaseURL != "http://localhost:8080" {
 		t.Fatalf("PublicBaseURL = %q", cfg.PublicBaseURL)
 	}
+	if cfg.PaymentsProvider != "noop" {
+		t.Fatalf("PaymentsProvider = %q, want noop", cfg.PaymentsProvider)
+	}
 }
 
 func TestLoadCustomHTTPAddr(t *testing.T) {

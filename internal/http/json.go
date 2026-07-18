@@ -115,7 +115,26 @@ func subscriptionJSON(sub sqlc.Subscription) map[string]any {
 	} else {
 		out["current_period_end"] = nil
 	}
+	if sub.Processor.Valid {
+		out["processor"] = sub.Processor.String
+	}
+	if sub.SubscriptionRef.Valid {
+		out["subscription_ref"] = sub.SubscriptionRef.String
+	}
 	return out
+}
+
+func planPriceJSON(p sqlc.PlanPrice) map[string]any {
+	return map[string]any{
+		"id":                  p.ID,
+		"plan_id":             p.PlanID,
+		"interval":            p.Interval,
+		"currency":            p.Currency,
+		"unit_amount":         p.UnitAmount,
+		"processor":           p.Processor,
+		"processor_price_ref": p.ProcessorPriceRef,
+		"status":              p.Status,
+	}
 }
 
 func permissionJSON(p sqlc.Permission) map[string]any {

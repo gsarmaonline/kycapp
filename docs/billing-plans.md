@@ -1,27 +1,118 @@
-# Billing plans — pricing models & payment processor interface
+# Billing — Stripe executor (v1)
 
-Status: **design / decision doc** (Phase C precursor).  
-Context: catalog + subscription/entitlements already live in KYC; Stripe Checkout/Portal/webhooks are not wired yet ([saas-rethink.md](./saas-rethink.md) gap #5).
+Status: **C0 implemented**.  
+Context: Stripe executor behind KYC APIs; set `PAYMENTS_PROVIDER=stripe` plus `STRIPE_*` env to go live ([saas-rethink.md](./saas-rethink.md) gap #5).
 
 ## Goal
 
-KYC is **not a payment processor**. It is a **strong implementor/executor** of a PSP’s APIs (Stripe first): checkout, portal, webhooks, usage reporting, and reconciliation — so companies can fall back on KYC APIs instead of wiring Stripe themselves.
+KYC is **not a payment processor**. It is a **strong implementor/executor** of Stripe’s APIs: checkout, portal, webhooks, and reconciliation — so companies can use KYC APIs instead of wiring Stripe themselves.
 
-Alongside that:
-
-1. Keep **KYC as system of record** for org → plan → entitlements / access.
-2. Treat **Stripe (or any PSP)** as the money rail via a replaceable adapter; never as the source of truth for product access.
-3. Support evolution from simple fixed SaaS pricing to metered / hybrid without rewriting merchant-facing KYC APIs.
-
-### Product stance
+1. **KYC** is system of record for org → plan → entitlements / access.
+2. **Stripe** is the money rail via a thin adapter; never the source of truth for product access.
+3. Merchant-facing KYC billing APIs stay stable; adapter details can change underneath.
 
 | We are | We are not |
 | --- | --- |
-| Executor of Checkout, Portal, Customers, Subscriptions, Meters | Merchant of record for arbitrary third-party commerce (unless Connect later) |
+| Executor of Checkout, Portal, Customers, Subscriptions | A payment processor or second Stripe |
 | Webhook verify + idempotent reconcile → org subscription/entitlements | Invoicing, tax filing, payout, or card vault of our own |
-| Stable KYC billing APIs companies call instead of Stripe SDK | A second Stripe / Adyen / Braintree |
+| Stable KYC billing APIs companies call instead of Stripe SDK | Multi-PSP or Stripe Connect (v1) |
 
 Companies integrate **KYC**; KYC integrates **Stripe**.
+
+---
+
+## How this helps KYC users
+
+KYC users are organisations (and the people who run them) that already rely on KYC for members, roles, and entitlements. Billing v1 closes the loop: **pay → plan → access** without each company inventing Stripe plumbing.
+
+| User | Without KYC billing | With KYC billing |
+| --- | --- | --- |
+| **Product / eng team** integrating KYC | Build Checkout, Portal, webhook verify, retries, and “paid → unlock feature” themselves | Call KYC checkout/portal APIs; trust webhooks are verified and reconciled into subscription state |
+| **Org admin** (`billing:manage`) | Juggle Stripe Dashboard and KYC entitlements separately | Upgrade / manage payment method in-app; see plan and status next to the rest of org settings |
+| **App runtime / API consumers** | Guess access from Stripe or stale flags | Check entitlements as today — paid state is already reflected on the org |
+| **Platform / ops** | Manual spreadsheet comps and drift between Stripe and KYC | Comps via existing subscription upsert; Stripe remains source for real charges |
+
+**Concrete wins**
+
+1. **One integration surface** — Companies talk to KYC for org, authz, *and* billing actions. Stripe stays an implementation detail.
+2. **Webhook burden lifted** — Signature verify, idempotency, and status mapping (`active` / `past_due` / `canceled`) live in KYC once, not in every customer app.
+3. **Access stays consistent** — Entitlement checks do not call Stripe. After reconcile, “can this org use X?” has a single answer in KYC.
+4. **Safer self-serve money UI** — Card entry and cancellation stay on Stripe Checkout/Portal (PCI); KYC only starts those sessions and shows outcomes.
+5. **Less drift** — Org, plan, and payment status live together, so support and product logic stop disagreeing about who is paid.
+
+**What users still do elsewhere**
+
+- Configure Products/Prices in Stripe (KYC stores the Price id on the plan).
+- Handle refunds, disputes, and tax filings in Stripe Dashboard (or later Stripe features) — KYC does not replace those tools.
+
+---
+
+## What input we need from users
+
+v1 asks for very little at runtime. Most setup is one-time platform config; org admins mostly click and pay on Stripe-hosted pages.
+
+### Platform / ops (one-time + catalog)
+
+| Input | Why | Where |
+| --- | --- | --- |
+| Stripe secret key + webhook signing secret | KYC can call Stripe and verify events | Env (`STRIPE_*`) |
+| Success / cancel URLs | Where Checkout returns the browser | Env or checkout request |
+| Stripe Product + Price per sellable plan | What Checkout charges | Stripe Dashboard |
+| Link Price id → KYC plan | KYC knows which plan a payment activates | `PlanPrice.processor_price_ref` |
+
+No card data, bank details, or invoice templates — those stay in Stripe.
+
+### Org admin (`billing:manage`) — self-serve
+
+| Input | Required? | Notes |
+| --- | --- | --- |
+| Which plan to buy | **Yes** (checkout) | Plan id/key; KYC resolves the Stripe Price |
+| Payment method | **Yes**, but collected by **Stripe Checkout**, not KYC | Cards never touch KYC |
+| Billing email / name | Usually **no** | Default from acting user + org name when creating the Stripe Customer |
+| Portal actions (update card, cancel) | On Stripe Portal | KYC only opens the session |
+
+Typical checkout body: `{ "plan_id": "…" }` (optional success/cancel URL overrides). Portal: org id in the path, no body.
+
+### Eng team integrating KYC APIs
+
+| Input | Notes |
+| --- | --- |
+| Session (or principal) with `billing:manage` | Same auth as the rest of KYC |
+| `plan_id` on checkout | Same as admin UI |
+| Webhook URL in Stripe Dashboard | Points at `POST /v1/billing/webhooks/stripe` (platform configures once) |
+
+They do **not** pass Stripe secrets, raw webhook payloads to parse themselves, or card fields through KYC.
+
+### Derived automatically (no user form)
+
+| Field | Source |
+| --- | --- |
+| Stripe Customer | Created/linked on first checkout from org + billing email |
+| Subscription + status | From Stripe webhooks after pay / renew / fail / cancel |
+| Entitlements | From KYC plan attached on reconcile |
+
+---
+
+## What we will build
+
+A Stripe executor behind KYC APIs that reconciles paid state into the existing Plan → Subscription → Entitlements model. **Flat recurring plans only.**
+
+| Deliverable | What it does |
+| --- | --- |
+| `PaymentsProcessor` port + `stripe` + `noop` adapters | EnsureCustomer, CreateCheckout, CreatePortal, webhook verify. `noop` for local/CI. |
+| Org ↔ Stripe customer mapping | Store `processor` + `customer_ref` (and subscription ref). |
+| Plan ↔ Stripe Price link | One flat recurring price per sellable plan (`processor_price_ref`). Catalog + entitlements stay in KYC. |
+| Merchant APIs | `POST …/billing/checkout`, `POST …/billing/portal` (`billing:manage`). |
+| Webhook endpoint | `POST /v1/billing/webhooks/stripe` — verify signature, idempotent inbox, apply status. |
+| Reconciliation → access | Map events → `trialing` / `active` / `past_due` / `canceled` + plan on Subscription. Entitlement checks stay DB-only. |
+| Merchant Billing UI | Plan/status/period; **Upgrade** → Checkout; **Manage** → Portal. |
+| Platform escape hatch | Keep manual `PUT …/subscription` for comps / enterprise (audited). |
+
+```text
+Merchant → KYC checkout/portal APIs → Stripe
+Stripe webhooks → KYC verify + reconcile → Subscription / Entitlements
+Product checks → KYC entitlements only (never Stripe on hot path)
+```
 
 ---
 
@@ -29,186 +120,75 @@ Companies integrate **KYC**; KYC integrates **Stripe**.
 
 | Principle | Meaning |
 | --- | --- |
-| Executor, not PSP | Call processor APIs well; do not reimplement money movement, ledgers, or PCI. |
-| Org is the billable entity | One billing customer per organisation (no separate Account in v1). |
-| Entitlements gate product | Paid state updates subscription + entitlements; handlers check entitlements, not Stripe. |
-| Catalog owns commercial intent | Plan key, included entitlements, pricing shape, and limits live in KYC. |
-| Processor owns money movement | Checkout, invoices, payment methods, tax, dunning stay with the PSP. |
-| Idempotent sync | Webhooks / pollers map processor events → KYC subscription state with idempotency keys. |
-| Soft coupling | KYC stores opaque processor refs (`customer_id`, `subscription_id`, `price_ids`); never encode Stripe-only enums in core domain. |
-| Merchant-facing stability | Companies depend on KYC billing routes; adapter details may change underneath. |
+| Executor, not PSP | Call Stripe well; do not reimplement money movement, ledgers, or PCI. |
+| Org is the billable entity | One billing customer per organisation. |
+| Entitlements gate product | Handlers check entitlements, not Stripe. |
+| Catalog owns commercial intent | Plan key + entitlements in KYC; Price ID is a processor ref. |
+| Processor owns money movement | Checkout, invoices, payment methods, dunning stay with Stripe. |
+| Idempotent sync | Webhooks map to KYC subscription state with idempotency keys. |
+| Soft coupling | Store opaque refs; core domain applies outcome commands, not raw Stripe enums. |
 
 ---
 
-## Pricing model catalog (all options)
+## Domain model (v1 additions)
 
-Think in two layers:
-
-1. **Commercial shape** — how the merchant is charged.
-2. **Access shape** — what the org may use (entitlements + numeric limits).
-
-These are independent. A “Pro” plan can be fixed-price with soft limits, or fixed base + usage overage on the same entitlements.
-
-### A. Fixed amount (recurring)
-
-| Variant | Description | Typical use |
-| --- | --- | --- |
-| **Flat subscription** | Fixed price per period (month/year). | Classic SaaS tiers. |
-| **Seat-based (licensed)** | Fixed price × quantity (seats/members). Quantity set at checkout or updated later. | Team products. |
-| **Tiered seats** | Volume tiers on seat count (e.g. 1–10 @ $X, 11–50 @ $Y). | Growing teams. |
-| **Package / prepaid credits** | Pay fixed amount for a credit pool that expires or rolls. | Predictable spend with burst room. |
-| **One-time / lifetime** | Single charge, long-lived access. | Rare for B2B; keep optional. |
-| **Annual prepay discount** | Same entitlements; different billing interval price. | Cash / retention. |
-
-**KYC mapping:** Plan + Subscription period; optional `quantity` (seats). Entitlements boolean; limits via separate limit keys (below).
-
-### B. Per-usage (metered)
-
-| Variant | Description | Typical use |
-| --- | --- | --- |
-| **Pure metered** | Bill only for reported usage (API calls, checks, MAUs, storage GB). | Infrastructure-ish APIs. |
-| **Included + overage** | Flat fee includes N units; overage per unit. | Most B2B SaaS. |
-| **Tiered usage** | Unit price falls as volume rises. | High-volume APIs. |
-| **Graduated / volume pricing** | Stripe-style graduated vs volume aggregation. | Cost-sensitive APIs. |
-| **Multiple meters** | Separate prices for distinct dimensions (e.g. `api_calls` + `email_sends`). | Multi-product platforms. |
-| **Prepaid usage wallet** | Credits drawn down by meters; top-up when low. | Predictable spend + metered burn. |
-
-**KYC mapping:** Meter definitions + usage events (source of truth for *what happened*); processor invoices from aggregated usage (source of truth for *what was charged*). Entitlements may still gate features; meters enforce/bill quantity.
-
-### C. Hybrid (recommended default for later stages)
-
-| Pattern | Formula | Why |
-| --- | --- | --- |
-| **Base + usage** | Fixed subscription + metered overage | Predictable floor + upside. |
-| **Base + seats + usage** | Platform fee + seat fee + meter | Matches org/user/API reality. |
-| **Entitlement packs add-ons** | Core plan + purchasable add-on plans/prices | Sell SSO, branding, higher limits without new base tiers. |
-| **Enterprise override** | Negotiated price / custom entitlements; invoice outside self-serve | Sales-led deals. |
-
-### D. Commercial modifiers (orthogonal)
-
-| Modifier | Notes |
-| --- | --- |
-| **Trial** | Time-boxed `trialing` subscription; already in status enum. |
-| **Freemium / free plan** | `$0` plan with limited entitlements; no processor required until upgrade. |
-| **Coupons / promo codes** | Prefer processor-native (Stripe Coupons/Promotion Codes) via checkout session params. |
-| **Minimum commit** | Contractual floor on usage; may be invoice line or custom agreement. |
-| **Soft vs hard limits** | Soft: allow + bill overage. Hard: 429 / entitlement deny at quota. |
-| **Grace / past_due** | Keep read access; restrict writes while `past_due`. |
-| **Tax / VAT** | Processor Tax / external tax; KYC stores address on org when needed. |
-| **Multi-currency** | Catalog prices per currency; org billing currency locked at customer create. |
-
-### E. What we should *not* invent early
-
-- Marketplace split payouts / Connect (unless you sell through partners).
-- Per-end-user consumer billing (KYC bills organisations).
-- In-app ledger that reimplements invoicing (keep a thin usage ledger; let PSP invoice).
-
----
-
-## Recommended commercial ladder (product view)
-
-Start simple; keep schema ready for meters.
-
-| Tier | Pricing shape | Access |
-| --- | --- | --- |
-| **Free / Trial** | $0 or time-boxed trial | Core entitlements, hard low limits |
-| **Team** | Fixed monthly/annual (± seats) | Full merchant product, soft/hard member limits |
-| **Growth** | Fixed + included usage + overage | Higher limits; metered API/email/etc. |
-| **Enterprise** | Custom / invoice | Overrides via `organisation_entitlements`; optional offline payment |
-
-Exact names/prices are product decisions; the **shapes** above are what the system must support.
-
----
-
-## Domain model extensions (KYC-owned)
-
-Keep existing objects; add only what pricing needs.
+Keep existing Plan / Entitlement / Subscription. Add only:
 
 ```mermaid
 erDiagram
-  Plan ||--o{ PlanPrice : has
+  Plan ||--o| PlanPrice : has
   Plan ||--o{ PlanEntitlement : includes
-  Plan ||--o{ PlanLimit : defines
-  Meter ||--o{ UsageEvent : records
   Organisation ||--|| Subscription : has
   Subscription }o--|| Plan : of
-  Subscription ||--o{ SubscriptionItem : bills
   Organisation ||--o| BillingCustomer : maps
-  BillingCustomer ||--o{ ProcessorRef : stores
+  BillingCustomer ||--o{ ProcessorEvent : receives
 ```
-
-### New / extended concepts
 
 | Concept | Purpose |
 | --- | --- |
-| **PlanPrice** | Commercial offer attached to a plan: `model` (`flat` \| `per_unit` \| `tiered` \| `metered`), `interval`, `currency`, `unit_amount`, optional `meter_key`, `processor_price_ref`. |
-| **PlanLimit** | Numeric caps: e.g. `members.max=25`, `api_calls.included=10000`. Soft/hard flag. |
-| **Meter** | Usage dimension: `key`, aggregation (`sum`/`max`), unit label. |
-| **UsageEvent** | Append-only: org, meter, quantity, occurred_at, idempotency_key, source. |
-| **BillingCustomer** | Org ↔ processor customer mapping + default currency/email. |
-| **SubscriptionItem** | Line items under subscription (base price, seat price, meter price). |
-| **ProcessorEvent** | Inbox for webhooks (id, type, payload hash, processed_at) for idempotency. |
+| **PlanPrice** | Flat recurring offer: `interval`, `currency`, `unit_amount`, `processor_price_ref`. |
+| **BillingCustomer** | Org ↔ processor customer mapping. |
+| **ProcessorEvent** | Webhook inbox (`id`, `type`, processed_at) for idempotency. |
 
-### Effective access (unchanged idea)
+Subscription gains processor refs (`subscription_ref`, optional period end sync from Stripe).
 
 ```text
 effective_entitlements = plan ∪ grants − denies
-effective_limits       = plan limits ± overrides
-allowed(feature)       = entitlement + (usage < hard_limit if any)
 ```
 
-Money and access stay separated: failing payment → subscription status change → access policy; never “call Stripe inside every check”.
+Failing payment → subscription status change → access policy. Never call Stripe inside entitlement checks.
 
 ---
 
 ## Payment processor interface
 
-Stripe first; design as a **port** with one adapter.
-
-### Port (KYC → processor)
-
 ```go
 // Conceptual — names illustrative
 type PaymentsProcessor interface {
     EnsureCustomer(ctx, CustomerInput) (CustomerRef, error)
-    CreateCheckout(ctx, CheckoutInput) (CheckoutSession, error)      // subscribe / upgrade
-    CreatePortal(ctx, PortalInput) (PortalSession, error)            // payment method / cancel
-    ReportUsage(ctx, UsageReport) error                             // metered price usage records
-    GetSubscription(ctx, SubscriptionRef) (RemoteSubscription, error)
-    // Optional later:
-    // CreateInvoice, ApplyCoupon, CancelSubscription, ListInvoices
+    CreateCheckout(ctx, CheckoutInput) (CheckoutSession, error)
+    CreatePortal(ctx, PortalInput) (PortalSession, error)
 }
 
 type WebhookHandler interface {
     ParseAndVerify(headers, body) (ProcessorEvent, error)
-    // Application maps ProcessorEvent → domain commands
 }
 ```
 
-### Responsibilities split
-
 | KYC (core) | Adapter (Stripe) | Out of band |
 | --- | --- | --- |
-| Plan catalog, entitlements, limits | Product/Price IDs | Tax filings |
-| Org subscription status | Checkout, Customer Portal | Chargebacks UI |
-| Usage event ingest + aggregation | Usage records / Billing Meters | Accounting export |
-| Entitlement checks | Webhook signature verify | Support refunds in Dashboard (v1 OK) |
+| Plan catalog, entitlements | Product/Price IDs | Tax filings, chargebacks UI |
+| Org subscription status | Checkout, Customer Portal | Refunds in Dashboard |
+| Entitlement checks | Webhook signature verify | |
 | Idempotent apply of remote state | Map Stripe objects ↔ refs | |
-
-### Event → domain mapping (adapter-agnostic outcomes)
 
 | Outcome command | Typical Stripe triggers |
 | --- | --- |
-| `CustomerLinked` | `customer.created` / checkout completed |
+| `CustomerLinked` | checkout completed |
 | `SubscriptionActivated` | `checkout.session.completed`, `customer.subscription.created/updated` |
 | `SubscriptionPeriodRenewed` | `invoice.paid` |
 | `SubscriptionPastDue` | `invoice.payment_failed` |
 | `SubscriptionCanceled` | `customer.subscription.deleted` |
-| `UsageAccepted` | (internal) after successful report — or meter errors |
-
-Core code should apply **these commands**, not raw Stripe event types.
-
-### Config surface
 
 ```text
 PAYMENTS_PROVIDER=stripe|noop
@@ -216,175 +196,84 @@ STRIPE_SECRET_KEY=
 STRIPE_WEBHOOK_SECRET=
 STRIPE_SUCCESS_URL=
 STRIPE_CANCEL_URL=
-# Price IDs live in DB on PlanPrice.processor_price_ref, not only in env
 ```
 
-`noop` provider: local/dev — manually set subscription via existing platform APIs.
+Price IDs live on `PlanPrice.processor_price_ref`. `noop`: local/dev; set subscription via platform APIs.
 
 ---
 
-## Stripe mapping (v1 adapter)
+## Stripe mapping
 
 | KYC | Stripe |
 | --- | --- |
 | Organisation | Customer (`metadata.org_id`) |
 | PlanPrice (flat) | Price (`recurring`) on Product |
-| PlanPrice (seats) | Price with `per_unit` + subscription quantity |
-| PlanPrice (metered) | Price with `meter` / legacy usage-record price |
-| Meter usage | Billing Meter events or subscription item usage records |
 | Self-serve subscribe/upgrade | Checkout Session (`mode=subscription`) |
 | Manage card / cancel / invoices | Customer Portal |
 | Truth for paid state | Webhooks → KYC Subscription |
 
-**Rules of engagement with Stripe:**
-
-- Create Products/Prices in Stripe (Dashboard or Terraform); store Price IDs on `PlanPrice`.
-- Do not invent a second invoice system.
-- Prefer Checkout + Portal over custom card UI in v1.
-- Sync subscription status from webhooks; treat KYC manual `PUT …/subscription` as platform/ops override (enterprise / comps).
+- Create Products/Prices in Stripe; store Price IDs on `PlanPrice`.
+- Prefer Checkout + Portal over custom card UI.
+- Webhooks own paid state; manual `PUT …/subscription` is ops override only.
 
 ---
 
-## Metering design (when you add usage)
-
-### Ingest path
-
-```text
-Product action → UsageEvent (idempotent) → aggregator →
-  (optional) enforce hard limit →
-  (async) PaymentsProcessor.ReportUsage
-```
-
-### Meter candidates for this product
-
-| Meter key | Unit | Notes |
-| --- | --- | --- |
-| `members.active` | seats | Often licensed (quantity), not pure meter |
-| `api_calls` | count | Platform / check APIs |
-| `authz_checks` | count | High volume; sample or aggregate carefully |
-| `email_sends` | count | Once email delivery ships |
-| `app_users.active` | MAU | If you monetize end-user records |
-| `storage_bytes` | bytes | Logos / uploads |
-
-Start with **one** meter that maps to real cost or value; do not meter everything.
-
-### Aggregation
-
-- Store raw events (or minute/hour rollups) in Postgres.
-- Report to Stripe on a schedule (e.g. hourly) or near-real-time for low volume.
-- Idempotency key: `(org_id, meter_key, window_start)` or event id.
-
----
-
-## Merchant & platform UX
-
-| Surface | Behaviour |
-| --- | --- |
-| Merchant Billing page | Current plan, status, period end, usage vs included, **Upgrade** → Checkout, **Manage** → Portal |
-| Plan picker | Shows fixed price + included usage + overage copy from PlanPrice/PlanLimit |
-| Platform admin | Catalog CRUD, link Stripe price IDs, comps/overrides, reconcile stuck subs |
-| Runtime | `entitlements/check` + future `limits/check`; no Stripe latency on hot path |
-
----
-
-## Phased rollout
-
-### Phase C0 — Interface + Stripe skeleton (no usage yet)
-
-- `PaymentsProcessor` + `noop` + `stripe` adapters
-- `BillingCustomer` + processor refs on subscription
-- Checkout + Portal endpoints
-- Webhook inbox → activate / past_due / canceled
-- Keep flat Plan → Entitlements; add `PlanPrice` for one flat monthly price per plan
-
-**Outcome:** real card billing for fixed plans.
-
-### Phase C1 — Limits (still mostly fixed)
-
-- `PlanLimit` + enforcement (hard/soft)
-- UsageEvent for limit counting even if not billed
-- Billing UI: “12 / 25 members”
-
-**Outcome:** fair packing without metered invoices.
-
-### Phase C2 — Metered / hybrid
-
-- Meter catalog + ReportUsage
-- Included + overage prices on Growth plan
-- Usage dashboard for merchants
-
-**Outcome:** per-usage pricing without abandoning fixed tiers.
-
-### Phase C3 — Add-ons & enterprise polish
-
-- Add-on prices / entitlement packs
-- Quotes / manual invoices for enterprise
-- Coupons, annual plans, multi-currency as needed
-
----
-
-## Decision checklist (fill before build)
-
-| # | Decision | Options | Suggestion |
-| --- | --- | --- | --- |
-| 1 | First sold shape | Flat only vs flat+seats vs hybrid | **Flat monthly + annual**; seats if members are the value metric |
-| 2 | Free tier? | None / forever-free / trial-only | Trial + paid; optional free with hard caps |
-| 3 | Overage policy | Soft bill vs hard block | Soft for API meters; hard for seats if licensed |
-| 4 | Billable metric #1 | Members / API / app users / email | Pick one tied to cost or willingness-to-pay |
-| 5 | Who may change plan | Owner only vs `billing:manage` | Keep `billing:manage` |
-| 6 | Source of truth on conflict | Stripe webhook vs KYC admin | Webhook for paid state; admin override with audit |
-| 7 | Tax | Stripe Tax vs manual | Stripe Tax when going live |
-| 8 | Provider abstraction depth | Thin Stripe SDK wrap vs full port | **Port with Stripe adapter** (this doc) |
-| 9 | Price catalog location | Stripe-only vs KYC+refs | **KYC PlanPrice + Stripe price id** |
-| 10 | Cancel behaviour | End of period vs immediate | End of period via Portal default |
-
----
-
-## API sketch (additive)
+## APIs
 
 Merchant (session + `billing:manage`):
 
 - `POST /v1/organisations/{id}/billing/checkout` → `{ url }`
 - `POST /v1/organisations/{id}/billing/portal` → `{ url }`
-- `GET  /v1/organisations/{id}/billing/usage` → period usage vs included
 
 Platform:
 
-- PlanPrice / Meter CRUD (or seed + admin later)
-- Existing subscription upsert remains for comps / enterprise
+- PlanPrice link (or seed); existing subscription upsert for comps / enterprise
 
 Public:
 
-- `POST /v1/billing/webhooks/{provider}` — raw body, signature verify in adapter
+- `POST /v1/billing/webhooks/stripe` — raw body, signature verify in adapter
 
 ---
 
-## Testing strategy
+## UX
+
+| Surface | Behaviour |
+| --- | --- |
+| Merchant Billing | Plan, status, period end; **Upgrade** → Checkout; **Manage** → Portal |
+| Platform | Link Stripe price IDs; comps/overrides; reconcile stuck subs |
+| Runtime | `entitlements/check` only — no Stripe on hot path |
+
+---
+
+## Decisions (v1 locked)
+
+| Topic | Choice |
+| --- | --- |
+| Pricing shape | Flat recurring (monthly; annual price optional as second PlanPrice) |
+| Who may change plan | `billing:manage` |
+| Paid-state truth | Stripe webhooks; admin override with audit |
+| Provider | Stripe adapter behind port; `noop` for CI |
+| Price catalog | KYC `PlanPrice` + Stripe price id |
+| Cancel | End of period via Portal default |
+
+---
+
+## Testing
 
 | Layer | What |
 | --- | --- |
-| Domain | Entitlement + limit math; status → access matrix |
-| Adapter | Stripe test mode fixtures; signed webhook samples |
-| Integration | `noop` provider in CI; optional Stripe test clocks in staging |
-| Idempotency | Replay same webhook → no double status flip |
+| Domain | Status → access; entitlement math unchanged |
+| Adapter | Stripe test fixtures; signed webhook samples |
+| Integration | `noop` in CI |
+| Idempotency | Replay same webhook → no double apply |
 
 ---
 
-## Non-goals (for this design)
+## Non-goals (v1)
 
-- Being a payment processor (cards, settlement, acquiring)
-- Replacing Stripe invoicing / accounting / tax engines
-- Crypto / alternate PSPs in v1 (keep the port; ship Stripe)
-- Per-app-user consumer checkout
-- Complex CPQ / quote builder
-
----
-
-## Summary recommendation
-
-1. **Position:** PSP executor — companies use KYC billing APIs; KYC executes Stripe.
-2. **Ship first:** Checkout + Portal + signed webhooks → reconcile into existing Subscription / Entitlements.
-3. **Add limits + UsageEvent** when access packing matters; meter to Stripe only when overage is sold.
-4. **Keep a `PaymentsProcessor` port** so the executor stays swappable; KYC stays authoritative for org access.
-
-When decisions in the checklist are locked, Phase C0 implementation can follow without revisiting commercial architecture.
+- Being a payment processor
+- Usage meters, overage, seat quantity billing
+- Limits / usage dashboards
+- Stripe Tax, coupons, multi-currency complexity
+- Second PSP or Stripe Connect
+- Replacing Stripe invoices, dunning, or Dashboard tools

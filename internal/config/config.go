@@ -26,6 +26,12 @@ type Config struct {
 
 	UploadDir     string
 	PublicBaseURL string
+
+	PaymentsProvider    string
+	StripeSecretKey     string
+	StripeWebhookSecret string
+	StripeSuccessURL    string
+	StripeCancelURL     string
 }
 
 // Load reads configuration from environment variables.
@@ -46,6 +52,11 @@ func Load() (Config, error) {
 		AuthDevLogin:         envBool("AUTH_DEV_LOGIN", false),
 		UploadDir:            envOr("UPLOAD_DIR", "data/uploads"),
 		PublicBaseURL:        envOr("PUBLIC_BASE_URL", envOr("APP_ORIGIN", "http://localhost:8080")),
+		PaymentsProvider:     envOr("PAYMENTS_PROVIDER", "noop"),
+		StripeSecretKey:      os.Getenv("STRIPE_SECRET_KEY"),
+		StripeWebhookSecret:  os.Getenv("STRIPE_WEBHOOK_SECRET"),
+		StripeSuccessURL:     os.Getenv("STRIPE_SUCCESS_URL"),
+		StripeCancelURL:      os.Getenv("STRIPE_CANCEL_URL"),
 	}
 	if cfg.DatabaseURL == "" {
 		return Config{}, fmt.Errorf("DATABASE_URL is required")

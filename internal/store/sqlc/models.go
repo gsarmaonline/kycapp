@@ -83,6 +83,16 @@ type AutomationRun struct {
 	CreatedAt      time.Time       `json:"created_at"`
 }
 
+type BillingCustomer struct {
+	ID             string    `json:"id"`
+	OrganisationID string    `json:"organisation_id"`
+	Processor      string    `json:"processor"`
+	CustomerRef    string    `json:"customer_ref"`
+	Email          string    `json:"email"`
+	CreatedAt      time.Time `json:"created_at"`
+	UpdatedAt      time.Time `json:"updated_at"`
+}
+
 type EmailTemplate struct {
 	ID             string    `json:"id"`
 	OrganisationID string    `json:"organisation_id"`
@@ -163,6 +173,27 @@ type PlanEntitlement struct {
 	EntitlementID string `json:"entitlement_id"`
 }
 
+type PlanPrice struct {
+	ID                string `json:"id"`
+	PlanID            string `json:"plan_id"`
+	Interval          string `json:"interval"`
+	Currency          string `json:"currency"`
+	UnitAmount        int64  `json:"unit_amount"`
+	Processor         string `json:"processor"`
+	ProcessorPriceRef string `json:"processor_price_ref"`
+	Status            string `json:"status"`
+}
+
+type ProcessorEvent struct {
+	ID          string             `json:"id"`
+	Processor   string             `json:"processor"`
+	EventRef    string             `json:"event_ref"`
+	EventType   string             `json:"event_type"`
+	Payload     json.RawMessage    `json:"payload"`
+	ProcessedAt pgtype.Timestamptz `json:"processed_at"`
+	CreatedAt   time.Time          `json:"created_at"`
+}
+
 type Role struct {
 	ID             string `json:"id"`
 	OrganisationID string `json:"organisation_id"`
@@ -192,6 +223,8 @@ type Subscription struct {
 	PlanID           string             `json:"plan_id"`
 	Status           string             `json:"status"`
 	CurrentPeriodEnd pgtype.Timestamptz `json:"current_period_end"`
+	Processor        pgtype.Text        `json:"processor"`
+	SubscriptionRef  pgtype.Text        `json:"subscription_ref"`
 }
 
 type User struct {

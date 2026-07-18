@@ -131,6 +131,11 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("PUT /v1/organisations/{id}/entitlements", s.handleSetOrgEntitlements)
 	s.mux.HandleFunc("GET /v1/organisations/{id}/entitlements", s.handleGetOrgEntitlements)
 	s.mux.HandleFunc("POST /v1/entitlements/check", s.handleEntitlementsCheck)
+	s.mux.HandleFunc("PUT /v1/plans/{id}/price", s.handleUpsertPlanPrice)
+	s.mux.HandleFunc("GET /v1/plans/{id}/prices", s.handleListPlanPrices)
+	s.mux.HandleFunc("POST /v1/organisations/{id}/billing/checkout", s.handleBillingCheckout)
+	s.mux.HandleFunc("POST /v1/organisations/{id}/billing/portal", s.handleBillingPortal)
+	s.mux.HandleFunc("POST /v1/billing/webhooks/{provider}", s.handleBillingWebhook)
 
 	s.mux.HandleFunc("POST /v1/api-keys", s.handleCreateAPIKey)
 	s.mux.HandleFunc("GET /v1/api-keys", s.handleListAPIKeys)

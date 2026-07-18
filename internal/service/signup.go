@@ -7,6 +7,7 @@ import (
 
 	"github.com/gsarmaonline/kyc/internal/apperr"
 	"github.com/gsarmaonline/kyc/internal/ids"
+	"github.com/gsarmaonline/kyc/internal/payments"
 	"github.com/gsarmaonline/kyc/internal/store"
 	"github.com/gsarmaonline/kyc/internal/store/sqlc"
 	"github.com/jackc/pgx/v5"
@@ -15,10 +16,13 @@ import (
 
 // Service implements domain operations.
 type Service struct {
-	db            *store.Store
-	uploadDir     string
-	publicBaseURL string
-	enqueue       Enqueuer
+	db                 *store.Store
+	uploadDir          string
+	publicBaseURL      string
+	enqueue            Enqueuer
+	payments           payments.Processor
+	checkoutSuccessURL string
+	checkoutCancelURL  string
 }
 
 // Enqueuer inserts background jobs (River). Optional — nil skips enqueue.

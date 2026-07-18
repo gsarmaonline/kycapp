@@ -284,6 +284,20 @@ export type Subscription = {
   organisation_id: string
   plan_id: string
   status: string
+  current_period_end?: string | null
+  processor?: string
+  subscription_ref?: string
+}
+
+export type PlanPrice = {
+  id: string
+  plan_id: string
+  interval: string
+  currency: string
+  unit_amount: number
+  processor: string
+  processor_price_ref: string
+  status: string
 }
 
 export function listPlans() {
@@ -294,12 +308,33 @@ export function listEntitlementsCatalog() {
   return request<{ items: Entitlement[] }>('/v1/entitlements')
 }
 
+export function listPlanPrices(planId: string) {
+  return request<{ items: PlanPrice[] }>(`/v1/plans/${planId}/prices`)
+}
+
 export function getSubscription(orgId: string) {
   return request<Subscription>(`/v1/organisations/${orgId}/subscription`)
 }
 
 export function getOrgEntitlements(orgId: string) {
   return request<{ entitlements: string[] }>(`/v1/organisations/${orgId}/entitlements`)
+}
+
+export function createBillingCheckout(
+  orgId: string,
+  input: { plan_id: string; interval?: string; success_url?: string; cancel_url?: string },
+) {
+  return request<{ url: string }>(`/v1/organisations/${orgId}/billing/checkout`, {
+    method: 'POST',
+    body: JSON.stringify(input),
+  })
+}
+
+export function createBillingPortal(orgId: string, input?: { return_url?: string }) {
+  return request<{ url: string }>(`/v1/organisations/${orgId}/billing/portal`, {
+    method: 'POST',
+    body: JSON.stringify(input ?? {}),
+  })
 }
 
 export type AttributeDefinition = {

@@ -74,6 +74,21 @@ In Google Cloud Console → OAuth client → Authorized redirect URIs, add:
 
 Then set `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` on the API service and set `AUTH_DEV_LOGIN=false`.
 
+## 5b. Billing (Stripe executor)
+
+Default is `PAYMENTS_PROVIDER=noop` (Checkout/Portal unavailable; comps via `PUT …/subscription`).
+
+To enable Stripe on the API service:
+
+| Variable | Value |
+| --- | --- |
+| `PAYMENTS_PROVIDER` | `stripe` |
+| `STRIPE_SECRET_KEY` | Stripe secret key |
+| `STRIPE_WEBHOOK_SECRET` | Endpoint signing secret |
+| `STRIPE_SUCCESS_URL` / `STRIPE_CANCEL_URL` | Optional; defaults to `/orgs/{id}/billing` on `APP_ORIGIN` |
+
+Point a Stripe webhook at `https://<api-or-web-domain>/v1/billing/webhooks/stripe` (events: `checkout.session.completed`, `customer.subscription.*`, `invoice.paid`, `invoice.payment_failed`). Link each sellable plan with `PUT /v1/plans/{id}/price` (`processor_price_ref` = Stripe Price id).
+
 ## 6. Smoke check
 
 1. Open the web public URL → sign in (Google, or Dev login while enabled).  

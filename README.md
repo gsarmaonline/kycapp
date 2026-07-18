@@ -45,7 +45,7 @@ To **use this app**, people must log in. Whether KYC later sells auth services t
 
 **App login + API tenancy complete:** Google OAuth (passwordless), sessions, `GET /v1/me`, membership-scoped org APIs, platform-only catalog/API-key routes, login-gated UI.
 
-Still later: Stripe payments, invite email delivery, full platform-admin UI.
+Billing v1: Stripe executor (Checkout / Portal / webhooks) behind KYC APIs — see [docs/billing-plans.md](docs/billing-plans.md). Still later: invite email delivery, full platform-admin UI.
 
 ## Run locally
 
@@ -102,6 +102,10 @@ cd web && npm run dev
 | `AUTH_RATE_LIMIT_PER_MIN` | Max OAuth/dev-login starts per IP/minute (default 20; `0` disables) |
 | `UPLOAD_DIR` | Local directory for org logo files (default `data/uploads`) |
 | `PUBLIC_BASE_URL` | Absolute origin for public logo URLs (default `APP_ORIGIN`) |
+| `PAYMENTS_PROVIDER` | `noop` (default) or `stripe` |
+| `STRIPE_SECRET_KEY` | Stripe API secret (required when provider is `stripe`) |
+| `STRIPE_WEBHOOK_SECRET` | Webhook signing secret |
+| `STRIPE_SUCCESS_URL` / `STRIPE_CANCEL_URL` | Optional Checkout return URL defaults |
 
 | Principal | Can do |
 | --- | --- |

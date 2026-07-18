@@ -79,7 +79,7 @@ func (q *Queries) CreatePlan(ctx context.Context, arg CreatePlanParams) (Plan, e
 const createSubscription = `-- name: CreateSubscription :one
 INSERT INTO subscriptions (id, organisation_id, plan_id, status, current_period_end)
 VALUES ($1, $2, $3, $4, $5)
-RETURNING id, organisation_id, plan_id, status, current_period_end
+RETURNING id, organisation_id, plan_id, status, current_period_end, processor, subscription_ref
 `
 
 type CreateSubscriptionParams struct {
@@ -105,6 +105,8 @@ func (q *Queries) CreateSubscription(ctx context.Context, arg CreateSubscription
 		&i.PlanID,
 		&i.Status,
 		&i.CurrentPeriodEnd,
+		&i.Processor,
+		&i.SubscriptionRef,
 	)
 	return i, err
 }
@@ -176,7 +178,7 @@ func (q *Queries) GetPlanByKey(ctx context.Context, key string) (Plan, error) {
 }
 
 const getSubscriptionByOrganisation = `-- name: GetSubscriptionByOrganisation :one
-SELECT id, organisation_id, plan_id, status, current_period_end FROM subscriptions
+SELECT id, organisation_id, plan_id, status, current_period_end, processor, subscription_ref FROM subscriptions
 WHERE organisation_id = $1
 `
 
@@ -189,6 +191,8 @@ func (q *Queries) GetSubscriptionByOrganisation(ctx context.Context, organisatio
 		&i.PlanID,
 		&i.Status,
 		&i.CurrentPeriodEnd,
+		&i.Processor,
+		&i.SubscriptionRef,
 	)
 	return i, err
 }
@@ -365,7 +369,7 @@ ON CONFLICT (organisation_id) DO UPDATE
 SET plan_id = EXCLUDED.plan_id,
     status = EXCLUDED.status,
     current_period_end = EXCLUDED.current_period_end
-RETURNING id, organisation_id, plan_id, status, current_period_end
+RETURNING id, organisation_id, plan_id, status, current_period_end, processor, subscription_ref
 `
 
 type UpsertSubscriptionParams struct {
@@ -391,6 +395,8 @@ func (q *Queries) UpsertSubscription(ctx context.Context, arg UpsertSubscription
 		&i.PlanID,
 		&i.Status,
 		&i.CurrentPeriodEnd,
+		&i.Processor,
+		&i.SubscriptionRef,
 	)
 	return i, err
 }

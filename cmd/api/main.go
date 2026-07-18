@@ -12,6 +12,7 @@ import (
 	"github.com/gsarmaonline/kyc/internal/config"
 	httpserver "github.com/gsarmaonline/kyc/internal/http"
 	"github.com/gsarmaonline/kyc/internal/jobs"
+	"github.com/gsarmaonline/kyc/internal/payments"
 	"github.com/gsarmaonline/kyc/internal/service"
 	"github.com/gsarmaonline/kyc/internal/store"
 )
@@ -35,6 +36,15 @@ func main() {
 
 	svc := service.New(db)
 	svc.ConfigureAssets(cfg.UploadDir, cfg.PublicBaseURL)
+	pay, err := payments.NewFromConfig(payments.Config{
+		Provider:      cfg.PaymentsProvider,
+		StripeSecret:  cfg.StripeSecretKey,
+		WebhookSecret: cfg.StripeWebhookSecret,
+	})
+	if err != nil {
+		log.Fatalf("payments: %v", err)
+	}
+	svc.SetPayments(pay, cfg.StripeSuccessURL, cfg.StripeCancelURL, cfg.AppOrigin)
 	if riverClient, err := jobs.NewInsertClient(db.Pool()); err != nil {
 		log.Fatalf("river: %v", err)
 	} else {
@@ -70,8 +80,8 @@ func main() {
 
 	go func() {
 		log.Printf(
-			"listening on %s (google_oauth=%v dev_login=%v service_tokens=%d)",
-			cfg.HTTPAddr, cfg.GoogleConfigured(), cfg.AuthDevLogin, len(cfg.APITokens),
+			"listening on %s (google_oauth=%v dev_login=%v service_tokens=%d payments=%s)",
+			cfg.HTTPAddr, cfg.GoogleConfigured(), cfg.AuthDevLogin, len(cfg.APITokens), pay.Name(),
 		)
 		if err := httpServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			log.Fatalf("http: %v", err)
