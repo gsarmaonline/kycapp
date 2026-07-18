@@ -113,7 +113,8 @@ function AutomationDagInner({
             Add action
           </button>
           <span className="field-hint">
-            Trigger fans out to conditions (all must match), then runs actions in order.
+            All conditions must match (AND), then every action runs. Use Add action for a
+            second email/step — not separate branches per condition.
           </span>
         </div>
       )}

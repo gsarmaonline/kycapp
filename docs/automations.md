@@ -56,6 +56,8 @@ Add more later (`membership.invited`, `subscription.updated`, …) without chang
 
 Unknown action types fail the run with a clear error (no silent skip).
 
+**Topology is fixed for v1:** one trigger → AND conditions → **all** actions in the list (in order). There is no “this condition → only these actions” branching. Add multiple actions with **Add action**; they all run when the conditions match. Per-path branches would need a richer DSL later.
+
 ## Runtime
 
 1. Domain event in API/service → enqueue River job `{ org_id, trigger, payload }`.

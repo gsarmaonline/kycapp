@@ -105,16 +105,21 @@ export function buildFlowElements(
     })
   })
 
+  // Topology (fixed v1 semantics):
+  //   trigger → every condition (AND)
+  //   every condition → every action (all actions run when conditions match)
+  // Actions still execute in list order at runtime; the graph shows fan-out, not
+  // per-condition branching (that would need a richer DSL).
   const edges: Edge[] = []
   if (graph.conditions.length === 0) {
-    if (graph.actions.length > 0) {
+    graph.actions.forEach((_, j) => {
       edges.push({
-        id: 'e-trigger-action-0',
+        id: `e-trigger-action-${j}`,
         source: 'trigger',
-        target: 'action-0',
+        target: `action-${j}`,
         animated: true,
       })
-    }
+    })
   } else {
     graph.conditions.forEach((_, i) => {
       edges.push({
@@ -123,22 +128,13 @@ export function buildFlowElements(
         target: `cond-${i}`,
         animated: true,
       })
-      if (graph.actions.length > 0) {
+      graph.actions.forEach((_, j) => {
         edges.push({
-          id: `e-cond-${i}-action-0`,
+          id: `e-cond-${i}-action-${j}`,
           source: `cond-${i}`,
-          target: 'action-0',
+          target: `action-${j}`,
         })
-      }
-    })
-  }
-
-  for (let i = 0; i < graph.actions.length - 1; i++) {
-    edges.push({
-      id: `e-action-${i}-${i + 1}`,
-      source: `action-${i}`,
-      target: `action-${i + 1}`,
-      animated: true,
+      })
     })
   }
 
