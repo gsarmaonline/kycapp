@@ -50,19 +50,30 @@ For each service: **Settings → Config-as-code** → set the config file path t
 
 | Variable | Value |
 | --- | --- |
-| `API_UPSTREAM` | `{api-service-name}.railway.internal:{api PORT}` — e.g. `api.railway.internal:8080` (use the API service’s private host + its `PORT`) |
+| `API_UPSTREAM` | `kycapp.railway.internal:8080` (pin API with `HTTP_ADDR=:8080`; `${{kycapp.PORT}}` is often empty) |
+| `RAILWAY_DOCKERFILE_PATH` | `Dockerfile.web` |
 
-Generate a **public domain** for web. That URL is your `APP_ORIGIN` / `PUBLIC_BASE_URL` / `CORS_ORIGIN`.
+Generate a **public domain** only on **web** (keep API private). That URL is your `APP_ORIGIN` / `PUBLIC_BASE_URL` / `CORS_ORIGIN`.
 
-## 4. Google OAuth
+## 4. Security checklist
+
+- **Do not** give the API a public domain; only web is public and proxies `/v1`.
+- Set `AUTH_DEV_LOGIN=false` once Google OAuth works. Dev-login is for bootstrap only.
+- Use long random `OAUTH_STATE_SECRET` and `API_TOKENS` (never commit them).
+- Mount a volume at `UPLOAD_DIR=/data/uploads` for logos.
+- Lock `CORS_ORIGIN` / `APP_ORIGIN` / `PUBLIC_BASE_URL` to the web HTTPS origin.
+
+## 5. Google OAuth
 
 In Google Cloud Console → OAuth client → Authorized redirect URIs, add:
 
 `https://<your-web-domain>/v1/auth/google/callback`
 
-## 5. Smoke check
+Then set `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` on the API service and set `AUTH_DEV_LOGIN=false`.
 
-1. Open the web public URL → sign in with Google.  
+## 6. Smoke check
+
+1. Open the web public URL → sign in (Google, or Dev login while enabled).  
 2. Create an organisation.  
 3. Branding → upload a logo → confirm it appears in an email template preview.
 
