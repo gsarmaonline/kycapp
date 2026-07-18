@@ -42,7 +42,7 @@ For each service: **Settings → Config-as-code** → set the config file path t
 
 `PORT` is set by Railway; the API listens on it automatically.
 
-**Volume:** mount a volume at `/data/uploads` so logos survive redeploys.
+**Volume:** mount a volume at `/data/uploads` so logos survive redeploys. Set `UPLOAD_DIR=/data/uploads`. The API entrypoint `chown`s that path for the non-root process — without a volume (or with a root-only mount), logo `POST` returns 500.
 
 **Networking:** private network is enough for the API (no public domain required if web proxies). Note the service name (e.g. `api`) and the port Railway assigns (`PORT`).
 

@@ -91,11 +91,21 @@ func (s *Service) SetOrganisationLogo(ctx context.Context, orgID string, r io.Re
 
 	dir := filepath.Join(s.uploadDir, orgID)
 	if err := os.MkdirAll(dir, 0o755); err != nil {
+		if os.IsPermission(err) {
+			return sqlc.Organisation{}, apperr.Validation(
+				"upload directory is not writable; check UPLOAD_DIR volume permissions",
+			)
+		}
 		return sqlc.Organisation{}, fmt.Errorf("create upload dir: %w", err)
 	}
 	path := s.logoPath(orgID)
 	f, err := os.Create(path)
 	if err != nil {
+		if os.IsPermission(err) {
+			return sqlc.Organisation{}, apperr.Validation(
+				"upload directory is not writable; check UPLOAD_DIR volume permissions",
+			)
+		}
 		return sqlc.Organisation{}, fmt.Errorf("create logo file: %w", err)
 	}
 	defer f.Close()
