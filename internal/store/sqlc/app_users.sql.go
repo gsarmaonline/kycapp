@@ -40,7 +40,8 @@ const archiveAttributeDefinition = `-- name: ArchiveAttributeDefinition :one
 UPDATE attribute_definitions
 SET status = 'archived', updated_at = now()
 WHERE id = $1
-RETURNING id, organisation_id, key, label, description, value_type, section, sort_order, required, enum_values, is_pii, status, created_at, updated_at
+  AND is_system = false
+RETURNING id, organisation_id, key, label, description, value_type, section, sort_order, required, enum_values, is_pii, status, created_at, updated_at, is_system
 `
 
 func (q *Queries) ArchiveAttributeDefinition(ctx context.Context, id string) (AttributeDefinition, error) {
@@ -61,6 +62,7 @@ func (q *Queries) ArchiveAttributeDefinition(ctx context.Context, id string) (At
 		&i.Status,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.IsSystem,
 	)
 	return i, err
 }
@@ -112,12 +114,12 @@ func (q *Queries) CreateAppUser(ctx context.Context, arg CreateAppUserParams) (A
 const createAttributeDefinition = `-- name: CreateAttributeDefinition :one
 INSERT INTO attribute_definitions (
     id, organisation_id, key, label, description, value_type,
-    section, sort_order, required, enum_values, is_pii, status
+    section, sort_order, required, enum_values, is_pii, status, is_system
 ) VALUES (
     $1, $2, $3, $4, $5, $6,
-    $7, $8, $9, $10, $11, $12
+    $7, $8, $9, $10, $11, $12, $13
 )
-RETURNING id, organisation_id, key, label, description, value_type, section, sort_order, required, enum_values, is_pii, status, created_at, updated_at
+RETURNING id, organisation_id, key, label, description, value_type, section, sort_order, required, enum_values, is_pii, status, created_at, updated_at, is_system
 `
 
 type CreateAttributeDefinitionParams struct {
@@ -133,6 +135,7 @@ type CreateAttributeDefinitionParams struct {
 	EnumValues     json.RawMessage `json:"enum_values"`
 	IsPii          bool            `json:"is_pii"`
 	Status         string          `json:"status"`
+	IsSystem       bool            `json:"is_system"`
 }
 
 func (q *Queries) CreateAttributeDefinition(ctx context.Context, arg CreateAttributeDefinitionParams) (AttributeDefinition, error) {
@@ -149,6 +152,7 @@ func (q *Queries) CreateAttributeDefinition(ctx context.Context, arg CreateAttri
 		arg.EnumValues,
 		arg.IsPii,
 		arg.Status,
+		arg.IsSystem,
 	)
 	var i AttributeDefinition
 	err := row.Scan(
@@ -166,6 +170,7 @@ func (q *Queries) CreateAttributeDefinition(ctx context.Context, arg CreateAttri
 		&i.Status,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.IsSystem,
 	)
 	return i, err
 }
@@ -192,7 +197,7 @@ func (q *Queries) GetAppUser(ctx context.Context, id string) (AppUser, error) {
 }
 
 const getAttributeDefinition = `-- name: GetAttributeDefinition :one
-SELECT id, organisation_id, key, label, description, value_type, section, sort_order, required, enum_values, is_pii, status, created_at, updated_at FROM attribute_definitions WHERE id = $1
+SELECT id, organisation_id, key, label, description, value_type, section, sort_order, required, enum_values, is_pii, status, created_at, updated_at, is_system FROM attribute_definitions WHERE id = $1
 `
 
 func (q *Queries) GetAttributeDefinition(ctx context.Context, id string) (AttributeDefinition, error) {
@@ -213,6 +218,40 @@ func (q *Queries) GetAttributeDefinition(ctx context.Context, id string) (Attrib
 		&i.Status,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.IsSystem,
+	)
+	return i, err
+}
+
+const getAttributeDefinitionByOrgKey = `-- name: GetAttributeDefinitionByOrgKey :one
+SELECT id, organisation_id, key, label, description, value_type, section, sort_order, required, enum_values, is_pii, status, created_at, updated_at, is_system FROM attribute_definitions
+WHERE organisation_id = $1 AND key = $2
+`
+
+type GetAttributeDefinitionByOrgKeyParams struct {
+	OrganisationID string `json:"organisation_id"`
+	Key            string `json:"key"`
+}
+
+func (q *Queries) GetAttributeDefinitionByOrgKey(ctx context.Context, arg GetAttributeDefinitionByOrgKeyParams) (AttributeDefinition, error) {
+	row := q.db.QueryRow(ctx, getAttributeDefinitionByOrgKey, arg.OrganisationID, arg.Key)
+	var i AttributeDefinition
+	err := row.Scan(
+		&i.ID,
+		&i.OrganisationID,
+		&i.Key,
+		&i.Label,
+		&i.Description,
+		&i.ValueType,
+		&i.Section,
+		&i.SortOrder,
+		&i.Required,
+		&i.EnumValues,
+		&i.IsPii,
+		&i.Status,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.IsSystem,
 	)
 	return i, err
 }
@@ -260,7 +299,7 @@ func (q *Queries) ListAppUsers(ctx context.Context, arg ListAppUsersParams) ([]A
 }
 
 const listAttributeDefinitions = `-- name: ListAttributeDefinitions :many
-SELECT id, organisation_id, key, label, description, value_type, section, sort_order, required, enum_values, is_pii, status, created_at, updated_at FROM attribute_definitions
+SELECT id, organisation_id, key, label, description, value_type, section, sort_order, required, enum_values, is_pii, status, created_at, updated_at, is_system FROM attribute_definitions
 WHERE organisation_id = $1
   AND ($2::text IS NULL OR status = $2)
 ORDER BY section ASC, sort_order ASC, key ASC
@@ -295,6 +334,7 @@ func (q *Queries) ListAttributeDefinitions(ctx context.Context, arg ListAttribut
 			&i.Status,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.IsSystem,
 		); err != nil {
 			return nil, err
 		}
@@ -364,7 +404,7 @@ UPDATE attribute_definitions SET
     status = COALESCE($10, status),
     updated_at = now()
 WHERE id = $1
-RETURNING id, organisation_id, key, label, description, value_type, section, sort_order, required, enum_values, is_pii, status, created_at, updated_at
+RETURNING id, organisation_id, key, label, description, value_type, section, sort_order, required, enum_values, is_pii, status, created_at, updated_at, is_system
 `
 
 type UpdateAttributeDefinitionParams struct {
@@ -409,6 +449,7 @@ func (q *Queries) UpdateAttributeDefinition(ctx context.Context, arg UpdateAttri
 		&i.Status,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.IsSystem,
 	)
 	return i, err
 }

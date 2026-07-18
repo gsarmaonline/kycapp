@@ -51,6 +51,9 @@ func (s *Service) CreateOrganisation(ctx context.Context, in CreateOrganisationI
 		if err := ensureDefaultEmailTemplates(ctx, q, org.ID); err != nil {
 			return err
 		}
+		if err := ensureDefaultAttributeDefinitions(ctx, q, org.ID); err != nil {
+			return err
+		}
 		if in.OwnerUserID != "" {
 			if _, err := q.GetUser(ctx, in.OwnerUserID); err != nil {
 				return mapNotFound(err, "user not found")

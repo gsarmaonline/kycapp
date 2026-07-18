@@ -83,6 +83,9 @@ func (s *Service) CreateAttributeDefinition(ctx context.Context, orgID string, i
 		return sqlc.AttributeDefinition{}, err
 	}
 
+	if err := s.EnsureDefaultAttributeDefinitions(ctx, orgID); err != nil {
+		return sqlc.AttributeDefinition{}, err
+	}
 	row, err := s.db.Q().CreateAttributeDefinition(ctx, sqlc.CreateAttributeDefinitionParams{
 		ID:             ids.New(),
 		OrganisationID: orgID,
@@ -96,6 +99,7 @@ func (s *Service) CreateAttributeDefinition(ctx context.Context, orgID string, i
 		EnumValues:     enumRaw,
 		IsPii:          in.IsPII,
 		Status:         "active",
+		IsSystem:       false,
 	})
 	if err != nil {
 		if store.IsUniqueViolation(err) {
@@ -112,6 +116,9 @@ func (s *Service) GetAttributeDefinition(ctx context.Context, id string) (sqlc.A
 }
 
 func (s *Service) ListAttributeDefinitions(ctx context.Context, orgID, status string) ([]sqlc.AttributeDefinition, error) {
+	if err := s.EnsureDefaultAttributeDefinitions(ctx, orgID); err != nil {
+		return nil, err
+	}
 	return s.db.Q().ListAttributeDefinitions(ctx, sqlc.ListAttributeDefinitionsParams{
 		OrganisationID: orgID,
 		Status:         textArg(status),
@@ -163,6 +170,9 @@ func (s *Service) UpdateAttributeDefinition(ctx context.Context, id string, in U
 		status := strings.TrimSpace(*in.Status)
 		if status != "active" && status != "archived" {
 			return sqlc.AttributeDefinition{}, apperr.Validation("status must be active or archived")
+		}
+		if status == "archived" && existing.IsSystem {
+			return sqlc.AttributeDefinition{}, apperr.Validation("system attribute definitions cannot be archived")
 		}
 		params.Status = pgtype.Text{String: status, Valid: true}
 	}
@@ -278,6 +288,13 @@ func (s *Service) DeleteAppUser(ctx context.Context, id string) (sqlc.AppUser, e
 }
 
 func (s *Service) DeleteAttributeDefinition(ctx context.Context, id string) (sqlc.AttributeDefinition, error) {
+	existing, err := s.GetAttributeDefinition(ctx, id)
+	if err != nil {
+		return sqlc.AttributeDefinition{}, err
+	}
+	if existing.IsSystem {
+		return sqlc.AttributeDefinition{}, apperr.Validation("system attribute definitions cannot be deleted")
+	}
 	row, err := s.db.Q().ArchiveAttributeDefinition(ctx, id)
 	return row, mapNotFound(err, "attribute definition not found")
 }

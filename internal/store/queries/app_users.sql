@@ -1,15 +1,19 @@
 -- name: CreateAttributeDefinition :one
 INSERT INTO attribute_definitions (
     id, organisation_id, key, label, description, value_type,
-    section, sort_order, required, enum_values, is_pii, status
+    section, sort_order, required, enum_values, is_pii, status, is_system
 ) VALUES (
     $1, $2, $3, $4, $5, $6,
-    $7, $8, $9, $10, $11, $12
+    $7, $8, $9, $10, $11, $12, $13
 )
 RETURNING *;
 
 -- name: GetAttributeDefinition :one
 SELECT * FROM attribute_definitions WHERE id = $1;
+
+-- name: GetAttributeDefinitionByOrgKey :one
+SELECT * FROM attribute_definitions
+WHERE organisation_id = $1 AND key = $2;
 
 -- name: ListAttributeDefinitions :many
 SELECT * FROM attribute_definitions
@@ -70,4 +74,5 @@ RETURNING *;
 UPDATE attribute_definitions
 SET status = 'archived', updated_at = now()
 WHERE id = $1
+  AND is_system = false
 RETURNING *;

@@ -188,6 +188,7 @@ func attributeDefinitionJSON(d sqlc.AttributeDefinition) map[string]any {
 		"required":        d.Required,
 		"enum_values":     enumValues,
 		"is_pii":          d.IsPii,
+		"is_system":       d.IsSystem,
 		"status":          d.Status,
 		"created_at":      d.CreatedAt.UTC().Format(time.RFC3339Nano),
 		"updated_at":      d.UpdatedAt.UTC().Format(time.RFC3339Nano),

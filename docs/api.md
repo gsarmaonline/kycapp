@@ -184,15 +184,20 @@ End users of a merchant’s product (not KYC team **members**). Profile fields a
 
 ### Attribute definitions
 
+System defaults (`phone`, `location`, `country`, …) are seeded per org on create and lazily on list (same pattern as email templates). `is_system` definitions cannot be deleted or archived.
+
 - `POST /v1/organisations/{id}/attribute-definitions` — requires `attributes:manage`  
   `{ "key", "label", "value_type", "section"?, "sort_order"?, "required"?, "enum_values"?, "description"?, "is_pii"? }`  
   `value_type`: `string` \| `number` \| `boolean` \| `date` \| `dropdown`  
   `section`: UI grouping label (default `general`)  
   For `dropdown`, pass `enum_values` (allowed options).
 - `GET /v1/organisations/{id}/attribute-definitions` — requires `attributes:read`  
-  Query: `status` (`active` \| `archived`)
+  Seeds system defaults if missing. Query: `status` (`active` \| `archived`)
 - `PATCH /v1/attribute-definitions/{id}` — requires `attributes:manage`  
-  `{ "label"?, "description"?, "value_type"?, "section"?, "sort_order"?, "required"?, "enum_values"?, "is_pii"?, "status"? }`
+  `{ "label"?, "description"?, "value_type"?, "section"?, "sort_order"?, "required"?, "enum_values"?, "is_pii"?, "status"? }`  
+  System definitions cannot be set to `archived`.
+- `DELETE /v1/attribute-definitions/{id}` — requires `attributes:manage`  
+  Archives a custom definition; system definitions return 400.
 
 ### App users
 

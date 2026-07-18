@@ -52,7 +52,7 @@ export function AttributesIndex() {
         <p>Loading…</p>
       ) : (
         <ResourceTable
-          columns={['Label', 'Key', 'Type', 'Section', 'Required', 'Status']}
+          columns={['Label', 'Key', 'Type', 'Section', 'System', 'Required', 'Status']}
           empty="No attributes defined yet."
           rows={items.map((d) => ({
             key: d.id,
@@ -61,6 +61,7 @@ export function AttributesIndex() {
               d.key,
               d.value_type,
               d.section,
+              d.is_system ? 'yes' : 'no',
               d.required ? 'yes' : 'no',
               d.status,
             ],
@@ -69,7 +70,14 @@ export function AttributesIndex() {
                 viewTo={resourcePath(orgId, 'attributes', d.id)}
                 editTo={resourcePath(orgId, 'attributes', d.id, 'edit')}
                 onDelete={() => void onDelete(d)}
-                deleteDisabled={d.status === 'archived'}
+                deleteDisabled={d.is_system || d.status === 'archived'}
+                deleteTitle={
+                  d.is_system
+                    ? 'System attributes cannot be deleted'
+                    : d.status === 'archived'
+                      ? 'Already archived'
+                      : undefined
+                }
               />
             ),
           }))}

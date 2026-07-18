@@ -29,6 +29,7 @@ export function AttributesShow() {
           { label: 'Section', value: item.section },
           { label: 'Required', value: item.required ? 'yes' : 'no' },
           { label: 'PII', value: item.is_pii ? 'yes' : 'no' },
+          { label: 'System', value: item.is_system ? 'yes' : 'no' },
           { label: 'Status', value: item.status },
           {
             label: 'Options',

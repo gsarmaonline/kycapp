@@ -314,6 +314,7 @@ export type AttributeDefinition = {
   required: boolean
   enum_values: string[]
   is_pii: boolean
+  is_system: boolean
   status: string
 }
 

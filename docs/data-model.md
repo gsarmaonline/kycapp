@@ -141,6 +141,7 @@ Constraints: unique `key`; unique `(resource, action)`.
 ### AttributeDefinition
 
 Org-scoped schema for end-user profile fields. Used by the merchant UI to group inputs via `section`.
+System defaults (`phone`, `location`, `country`, `date_of_birth`, `address_line1`, `city`, `postal_code`) are seeded per org (`core/userattributes`); `display_name` / `email` remain AppUser columns.
 
 | Field | Type | Notes |
 | --- | --- | --- |
@@ -155,6 +156,7 @@ Org-scoped schema for end-user profile fields. Used by the merchant UI to group 
 | `required` | bool | |
 | `enum_values` | jsonb | Allowed options when `value_type` is `dropdown` |
 | `is_pii` | bool | |
+| `is_system` | bool | Seeded defaults; not deletable/archivable |
 | `status` | enum | `active` \| `archived` |
 
 ### AppUser

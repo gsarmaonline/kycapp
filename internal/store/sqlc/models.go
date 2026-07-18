@@ -47,6 +47,7 @@ type AttributeDefinition struct {
 	Status         string          `json:"status"`
 	CreatedAt      time.Time       `json:"created_at"`
 	UpdatedAt      time.Time       `json:"updated_at"`
+	IsSystem       bool            `json:"is_system"`
 }
 
 type AuditEvent struct {
