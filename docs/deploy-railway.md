@@ -2,15 +2,26 @@
 
 Recommended layout: **Postgres** + **api** + **web** (web is the public URL; it proxies `/v1` to the API).
 
+## Config as code
+
+There is **no** single root `railway.toml` on purpose: Railway applies that file to every service, and this repo has two Dockerfiles.
+
+| Service | Config file |
+| --- | --- |
+| api | [`railway.api.toml`](../railway.api.toml) → `Dockerfile.api` |
+| web | [`railway.web.toml`](../railway.web.toml) → `Dockerfile.web` |
+
+For each service: **Settings → Config-as-code** → set the config file path to `/railway.api.toml` or `/railway.web.toml`. Leave **Root Directory** empty so the Docker build context stays the repo root.
+
 ## 1. Create a project
 
 1. [Railway](https://railway.app) → New Project → **Deploy from GitHub** (this repo).
 2. Add a **PostgreSQL** plugin/service.
+3. Add empty **api** and **web** services from the same repo; attach the config files above.
 
 ## 2. API service
 
-- **Root directory:** repo root  
-- **Dockerfile:** `Dockerfile.api`  
+- **Config file:** `/railway.api.toml`  
 - **Variables** (link `DATABASE_URL` from the Postgres service):
 
 | Variable | Value |
@@ -34,8 +45,7 @@ Recommended layout: **Postgres** + **api** + **web** (web is the public URL; it 
 
 ## 3. Web service
 
-- **Root directory:** repo root  
-- **Dockerfile:** `Dockerfile.web`  
+- **Config file:** `/railway.web.toml`  
 - **Variables:**
 
 | Variable | Value |

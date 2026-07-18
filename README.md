@@ -38,7 +38,7 @@ To **use this app**, people must log in. Whether KYC later sells auth services t
 
 ## Deploy
 
-**Railway** is the recommended host (Go API + Postgres + logo volume). See [docs/deploy-railway.md](docs/deploy-railway.md).
+**Railway** is the recommended host (Go API + Postgres + logo volume). See [docs/deploy-railway.md](docs/deploy-railway.md). Per-service configs: [`railway.api.toml`](railway.api.toml), [`railway.web.toml`](railway.web.toml).
 
 ## Status
 

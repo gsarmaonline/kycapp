@@ -1,0 +1,17 @@
+# Point the Railway "web" service Config File at /railway.web.toml
+# (Settings → Config-as-code). Shared monorepo: keep Root Directory empty.
+
+[build]
+builder = "DOCKERFILE"
+dockerfilePath = "Dockerfile.web"
+watchPatterns = [
+  "web/**",
+  "Dockerfile.web",
+  "railway.web.toml",
+]
+
+[deploy]
+healthcheckPath = "/"
+healthcheckTimeout = 120
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 5
