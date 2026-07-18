@@ -1,0 +1,7 @@
+# Local Temporal dynamic config (mounted into auto-setup).
+limit.maxIDLength:
+  - value: 255
+    constraints: {}
+system.forceSearchAttributesCacheRefreshOnRead:
+  - value: true
+    constraints: {}

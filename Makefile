@@ -1,4 +1,4 @@
-.PHONY: test test-unit test-store test-web build run sqlc compose-up compose-down compose-logs web
+.PHONY: test test-unit test-store test-web build run sqlc compose-up compose-down compose-logs web worker
 
 test:
 	go test ./... -count=1 -timeout 5m
@@ -21,9 +21,13 @@ sqlc:
 
 build:
 	go build -o bin/api ./cmd/api
+	go build -o bin/worker ./cmd/worker
+
+worker:
+	TEMPORAL_ADDRESS=$${TEMPORAL_ADDRESS:-localhost:7233} go run ./cmd/worker
 
 run: compose-up
-	@echo "Open http://localhost:8080"
+	@echo "Open http://localhost:8080 (Temporal UI http://localhost:8088)"
 
 compose-up:
 	docker compose up --build -d

@@ -1,15 +1,16 @@
 # Deploy on Railway
 
-Recommended layout: **Postgres** + **api** + **web** (web is the public URL; it proxies `/v1` to the API).
+Recommended layout: **Postgres** + **api** + **web** (web is the public URL; it proxies `/v1` to the API). Optional: **worker** + Temporal (Cloud or self-hosted) — see [temporal.md](temporal.md).
 
 ## Config as code
 
-There is **no** single root `railway.toml` on purpose: Railway applies that file to every service, and this repo has two Dockerfiles.
+There is **no** single root `railway.toml` on purpose: Railway applies that file to every service, and this repo has multiple Dockerfiles.
 
 | Service | Config file |
 | --- | --- |
 | api | [`railway.api.toml`](../railway.api.toml) → `Dockerfile.api` |
 | web | [`railway.web.toml`](../railway.web.toml) → `Dockerfile.web` |
+| worker | [`railway.worker.toml`](../railway.worker.toml) → `Dockerfile.worker` |
 
 For each service: **Settings → Config-as-code** → set the config file path to `/railway.api.toml` or `/railway.web.toml`. Leave **Root Directory** empty so the Docker build context stays the repo root.
 
@@ -77,6 +78,13 @@ Then set `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` on the API service and set 
 2. Create an organisation.  
 3. Branding → upload a logo → confirm it appears in an email template preview.
 
+## 7. Temporal worker (optional)
+
+See [temporal.md](temporal.md) for Cloud vs self-hosted Temporal on Railway.
+
+- Add a **worker** service; Config-as-code → `/railway.worker.toml`.
+- Set `TEMPORAL_ADDRESS` (+ namespace / task queue). No public domain needed.
+
 ## Local compose vs Railway
 
 | Concern | Compose | Railway |
@@ -85,3 +93,4 @@ Then set `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` on the API service and set 
 | Listen port (web) | `80` | Railway `PORT` |
 | Listen port (api) | `:8080` | Railway `PORT` |
 | Logos | named volume | attach volume at `UPLOAD_DIR` |
+| Temporal | `temporal` + UI `:8088` + `worker` | Temporal Cloud or Railway Temporal template + `worker` |

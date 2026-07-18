@@ -1,0 +1,18 @@
+# Point the Railway "worker" service Config File at /railway.worker.toml
+# (Settings → Config-as-code). Shared monorepo: keep Root Directory empty.
+
+[build]
+builder = "DOCKERFILE"
+dockerfilePath = "Dockerfile.worker"
+watchPatterns = [
+  "cmd/worker/**",
+  "internal/workflows/**",
+  "go.mod",
+  "go.sum",
+  "Dockerfile.worker",
+  "railway.worker.toml",
+]
+
+[deploy]
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 5

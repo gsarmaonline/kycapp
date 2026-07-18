@@ -35,10 +35,11 @@ To **use this app**, people must log in. Whether KYC later sells auth services t
 | [docs/flows.md](docs/flows.md) | Signup, invite, ops-provision, runtime checks |
 | [docs/testing.md](docs/testing.md) | Testing expectations |
 | [docs/deploy-railway.md](docs/deploy-railway.md) | Deploy Postgres + API + web on Railway |
+| [docs/temporal.md](docs/temporal.md) | Temporal workflows (local compose + Railway) |
 
 ## Deploy
 
-**Railway** is the recommended host (Go API + Postgres + logo volume). See [docs/deploy-railway.md](docs/deploy-railway.md). Per-service configs: [`railway.api.toml`](railway.api.toml), [`railway.web.toml`](railway.web.toml).
+**Railway** is the recommended host (Go API + Postgres + logo volume). See [docs/deploy-railway.md](docs/deploy-railway.md). Per-service configs: [`railway.api.toml`](railway.api.toml), [`railway.web.toml`](railway.web.toml), [`railway.worker.toml`](railway.worker.toml) (Temporal).
 
 ## Status
 
@@ -57,6 +58,7 @@ docker compose up --build -d
 - **App + API:** http://localhost:8080  
   Sign up (creates org + session) or sign in. The UI stores a session Bearer token; nginx forwards `Authorization`.
 - Postgres: `localhost:5432`
+- **Temporal UI:** http://localhost:8088 (gRPC `localhost:7233`; worker service included) — see [docs/temporal.md](docs/temporal.md)
 - Optional service token for platform/ops scripts: `API_TOKENS` (default `dev-local-token`)
 - Local compose enables `AUTH_DEV_LOGIN=true` so you can sign in without Google credentials. Set `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` for real OAuth.
 
