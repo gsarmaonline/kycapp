@@ -70,14 +70,8 @@ export function AttributesIndex() {
                 viewTo={resourcePath(orgId, 'attributes', d.id)}
                 editTo={resourcePath(orgId, 'attributes', d.id, 'edit')}
                 onDelete={() => void onDelete(d)}
-                deleteDisabled={d.is_system || d.status === 'archived'}
-                deleteTitle={
-                  d.is_system
-                    ? 'System attributes cannot be deleted'
-                    : d.status === 'archived'
-                      ? 'Already archived'
-                      : undefined
-                }
+                deleteDisabled={d.status === 'archived'}
+                deleteTitle={d.status === 'archived' ? 'Already archived' : undefined}
               />
             ),
           }))}

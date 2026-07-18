@@ -156,7 +156,7 @@ System defaults (`phone`, `location`, `country`, `date_of_birth`, `address_line1
 | `required` | bool | |
 | `enum_values` | jsonb | Allowed options when `value_type` is `dropdown` |
 | `is_pii` | bool | |
-| `is_system` | bool | Seeded defaults; not deletable/archivable |
+| `is_system` | bool | Seeded defaults; editable/deletable like custom attrs |
 | `status` | enum | `active` \| `archived` |
 
 ### AppUser

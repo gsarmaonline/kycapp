@@ -184,7 +184,7 @@ End users of a merchant’s product (not KYC team **members**). Profile fields a
 
 ### Attribute definitions
 
-System defaults (`phone`, `location`, `country`, …) are seeded per org on create and lazily on list (same pattern as email templates). `is_system` definitions cannot be deleted or archived.
+System defaults (`phone`, `location`, `country`, …) are seeded per org on create and lazily on list (same pattern as email templates). Seeded rows are fully editable and deletable; `is_system` is informational. Re-seeding skips keys that already exist (including archived), so a deleted default is not recreated unless the row is removed.
 
 - `POST /v1/organisations/{id}/attribute-definitions` — requires `attributes:manage`  
   `{ "key", "label", "value_type", "section"?, "sort_order"?, "required"?, "enum_values"?, "description"?, "is_pii"? }`  
@@ -194,10 +194,9 @@ System defaults (`phone`, `location`, `country`, …) are seeded per org on crea
 - `GET /v1/organisations/{id}/attribute-definitions` — requires `attributes:read`  
   Seeds system defaults if missing. Query: `status` (`active` \| `archived`)
 - `PATCH /v1/attribute-definitions/{id}` — requires `attributes:manage`  
-  `{ "label"?, "description"?, "value_type"?, "section"?, "sort_order"?, "required"?, "enum_values"?, "is_pii"?, "status"? }`  
-  System definitions cannot be set to `archived`.
+  `{ "label"?, "description"?, "value_type"?, "section"?, "sort_order"?, "required"?, "enum_values"?, "is_pii"?, "status"? }`
 - `DELETE /v1/attribute-definitions/{id}` — requires `attributes:manage`  
-  Archives a custom definition; system definitions return 400.
+  Archives the definition (including seeded defaults).
 
 ### App users
 

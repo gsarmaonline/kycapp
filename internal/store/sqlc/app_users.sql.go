@@ -40,7 +40,6 @@ const archiveAttributeDefinition = `-- name: ArchiveAttributeDefinition :one
 UPDATE attribute_definitions
 SET status = 'archived', updated_at = now()
 WHERE id = $1
-  AND is_system = false
 RETURNING id, organisation_id, key, label, description, value_type, section, sort_order, required, enum_values, is_pii, status, created_at, updated_at, is_system
 `
 

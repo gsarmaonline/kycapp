@@ -171,9 +171,6 @@ func (s *Service) UpdateAttributeDefinition(ctx context.Context, id string, in U
 		if status != "active" && status != "archived" {
 			return sqlc.AttributeDefinition{}, apperr.Validation("status must be active or archived")
 		}
-		if status == "archived" && existing.IsSystem {
-			return sqlc.AttributeDefinition{}, apperr.Validation("system attribute definitions cannot be archived")
-		}
 		params.Status = pgtype.Text{String: status, Valid: true}
 	}
 	if in.EnumValues != nil {
@@ -288,13 +285,6 @@ func (s *Service) DeleteAppUser(ctx context.Context, id string) (sqlc.AppUser, e
 }
 
 func (s *Service) DeleteAttributeDefinition(ctx context.Context, id string) (sqlc.AttributeDefinition, error) {
-	existing, err := s.GetAttributeDefinition(ctx, id)
-	if err != nil {
-		return sqlc.AttributeDefinition{}, err
-	}
-	if existing.IsSystem {
-		return sqlc.AttributeDefinition{}, apperr.Validation("system attribute definitions cannot be deleted")
-	}
 	row, err := s.db.Q().ArchiveAttributeDefinition(ctx, id)
 	return row, mapNotFound(err, "attribute definition not found")
 }

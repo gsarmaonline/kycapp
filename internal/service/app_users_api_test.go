@@ -89,7 +89,12 @@ func TestAppUsersAndAttributeSchema(t *testing.T) {
 		t.Fatal("phone id missing")
 	}
 	delSystem := doJSON(t, h, http.MethodDelete, "/v1/attribute-definitions/"+phoneID, nil, userAuth(token))
-	if delSystem.Code != http.StatusBadRequest {
-		t.Fatalf("delete system want 400 got %d body=%s", delSystem.Code, delSystem.Body.String())
+	if delSystem.Code != http.StatusOK {
+		t.Fatalf("delete system status=%d body=%s", delSystem.Code, delSystem.Body.String())
+	}
+	var archived map[string]any
+	decodeBody(t, delSystem, &archived)
+	if archived["status"] != "archived" || archived["is_system"] != true {
+		t.Fatalf("archived phone=%v", archived)
 	}
 }

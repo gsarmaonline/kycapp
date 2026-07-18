@@ -13,7 +13,6 @@ export function AttributesEdit() {
   const [valueType, setValueType] = useState('string')
   const [required, setRequired] = useState(false)
   const [status, setStatus] = useState('active')
-  const [isSystem, setIsSystem] = useState(false)
   const [enumValues, setEnumValues] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
@@ -26,7 +25,6 @@ export function AttributesEdit() {
         setValueType(d.value_type)
         setRequired(d.required)
         setStatus(d.status)
-        setIsSystem(!!d.is_system)
         setEnumValues((d.enum_values || []).join(', '))
       })
       .catch((e) => setError(e instanceof Error ? e.message : 'Failed to load'))
@@ -90,14 +88,9 @@ export function AttributesEdit() {
         )}
         <label>
           Status
-          <select
-            value={status}
-            onChange={(e) => setStatus(e.target.value)}
-            disabled={isSystem}
-            title={isSystem ? 'System attributes cannot be archived' : undefined}
-          >
+          <select value={status} onChange={(e) => setStatus(e.target.value)}>
             <option value="active">active</option>
-            {!isSystem && <option value="archived">archived</option>}
+            <option value="archived">archived</option>
           </select>
         </label>
         <label className="perm">

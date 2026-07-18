@@ -74,5 +74,4 @@ RETURNING *;
 UPDATE attribute_definitions
 SET status = 'archived', updated_at = now()
 WHERE id = $1
-  AND is_system = false
 RETURNING *;
