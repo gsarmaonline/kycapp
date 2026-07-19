@@ -30,6 +30,7 @@ import { MembersIndex } from './pages/members/members_index'
 import { MembersNew } from './pages/members/members_new'
 import { MembersShow } from './pages/members/members_show'
 import { OverviewPage } from './pages/overview_page'
+import { SettingsPage } from './pages/settings_page'
 import { ProductFeaturesEdit } from './pages/product_features/product_features_edit'
 import { ProductFeaturesIndex } from './pages/product_features/product_features_index'
 import { ProductFeaturesNew } from './pages/product_features/product_features_new'
@@ -161,6 +162,7 @@ export default function App() {
         <Route path="product-plans/:id/edit" element={<ProductPlansEdit />} />
         <Route path="branding" element={<BrandingPage />} />
         <Route path="billing" element={<BillingPage />} />
+        <Route path="settings" element={<SettingsPage />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

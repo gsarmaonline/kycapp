@@ -33,7 +33,7 @@ All other `/v1/*` require `Authorization: Bearer <token>`.
 
 **Session response** includes `token`, `expires_at`, `user`.
 
-**Tenancy:** user sessions may only access organisations with an **active** membership (plus RBAC on mutations). Service tokens and `platform_admin` users bypass membership for platform ops. Plan catalog writes, API keys, audit, and entitlement overrides are **platform-only**.
+**Tenancy:** user sessions may only access organisations with an **active** membership (plus RBAC on mutations). Unscoped service tokens and `platform_admin` users bypass membership for platform ops. Org-scoped API keys act only within their organisation. Plan catalog writes, platform API keys, audit, and entitlement overrides are **platform-only**.
 
 **Onboarding:** sign in with Google, then `POST /v1/organisations` (caller becomes owner + trial). Invited users sign in with Google using the invited email to link `google_sub` and accept the invite.
 
@@ -71,7 +71,20 @@ Organisation JSON also includes `logo_url` (read-only; set via logo upload) and 
 
 ### `POST /v1/organisations/{id}/archive`
 
-Soft-archive (`status=archived`).
+Soft-archive (`status=archived`). Requires `organisation:update`.
+
+### Settings / integrations / org API keys
+
+Requires `organisation:update`.
+
+- `GET /v1/organisations/{id}/integrations` — connected tools (secrets masked as hints)
+- `PUT /v1/organisations/{id}/integrations/stripe` — `{ "secret_key"?, "publishable_key"? }` (omit a field to keep the current value)
+- `DELETE /v1/organisations/{id}/integrations/{provider}` — disconnect
+- `POST /v1/organisations/{id}/api-keys` — `{ "name" }` → includes `token` once
+- `GET /v1/organisations/{id}/api-keys`
+- `DELETE /v1/api-keys/{id}` — revoke (org keys: org admin; platform keys: platform)
+
+Org-scoped API keys authenticate as a service principal for that organisation only (not platform admin). Platform `POST /v1/api-keys` remains for ops.
 
 ### Branding / logo
 
@@ -338,10 +351,12 @@ Authorization: Bearer <session-or-service-token>
 
 `/healthz` and `/readyz` stay public. Auth/signup routes are public; everything else under `/v1` requires a valid Bearer.
 
-### API keys (platform only)
+### API keys (platform)
+
+Unscoped keys with full platform privilege. Merchant backends should use org keys under Settings instead.
 
 - `POST /v1/api-keys` — `{ "name" }` → returns `{ token }` once (store hashed)
-- `GET /v1/api-keys`
+- `GET /v1/api-keys` — platform keys only
 - `DELETE /v1/api-keys/{id}` — revoke
 
 Env `API_TOKENS` are bootstrap service principals (same privilege as platform).

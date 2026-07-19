@@ -59,11 +59,16 @@ func (s *Service) AuthenticateBearer(ctx context.Context, raw string, envTokens 
 	if err != nil {
 		return authn.Principal{}, false
 	}
-	return authn.Principal{
-		Kind:          authn.KindService,
-		PlatformAdmin: true,
-		Actor:         "api-key:" + key.Name,
-	}, true
+	p := authn.Principal{
+		Kind:  authn.KindService,
+		Actor: "api-key:" + key.Name,
+	}
+	if key.OrganisationID.Valid {
+		p.OrganisationID = key.OrganisationID.String
+	} else {
+		p.PlatformAdmin = true
+	}
+	return p, true
 }
 
 type AuthResult struct {

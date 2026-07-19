@@ -38,6 +38,17 @@ type CreatedAPIKey struct {
 }
 
 func (s *Service) CreateAPIKey(ctx context.Context, in CreateAPIKeyInput) (CreatedAPIKey, error) {
+	return s.createAPIKey(ctx, "", in)
+}
+
+func (s *Service) CreateOrganisationAPIKey(ctx context.Context, orgID string, in CreateAPIKeyInput) (CreatedAPIKey, error) {
+	if _, err := s.GetOrganisation(ctx, orgID); err != nil {
+		return CreatedAPIKey{}, err
+	}
+	return s.createAPIKey(ctx, orgID, in)
+}
+
+func (s *Service) createAPIKey(ctx context.Context, orgID string, in CreateAPIKeyInput) (CreatedAPIKey, error) {
 	name := strings.TrimSpace(in.Name)
 	if name == "" {
 		return CreatedAPIKey{}, apperr.Validation("name is required")
@@ -51,10 +62,11 @@ func (s *Service) CreateAPIKey(ctx context.Context, in CreateAPIKeyInput) (Creat
 		prefix = prefix[:12]
 	}
 	row, err := s.db.Q().CreateAPIKey(ctx, sqlc.CreateAPIKeyParams{
-		ID:        ids.New(),
-		Name:      name,
-		KeyPrefix: prefix,
-		KeyHash:   HashAPIToken(raw),
+		ID:             ids.New(),
+		Name:           name,
+		KeyPrefix:      prefix,
+		KeyHash:        HashAPIToken(raw),
+		OrganisationID: textArg(orgID),
 	})
 	if err != nil {
 		return CreatedAPIKey{}, err
@@ -66,8 +78,20 @@ func (s *Service) ListAPIKeys(ctx context.Context) ([]sqlc.ApiKey, error) {
 	return s.db.Q().ListAPIKeys(ctx)
 }
 
+func (s *Service) ListOrganisationAPIKeys(ctx context.Context, orgID string) ([]sqlc.ApiKey, error) {
+	if _, err := s.GetOrganisation(ctx, orgID); err != nil {
+		return nil, err
+	}
+	return s.db.Q().ListAPIKeysByOrg(ctx, textArg(orgID))
+}
+
 func (s *Service) RevokeAPIKey(ctx context.Context, id string) (sqlc.ApiKey, error) {
 	key, err := s.db.Q().RevokeAPIKey(ctx, id)
+	return key, mapNotFound(err, "api key not found")
+}
+
+func (s *Service) GetAPIKey(ctx context.Context, id string) (sqlc.ApiKey, error) {
+	key, err := s.db.Q().GetAPIKey(ctx, id)
 	return key, mapNotFound(err, "api key not found")
 }
 

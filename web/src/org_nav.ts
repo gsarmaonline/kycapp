@@ -10,6 +10,7 @@ export type OrgSection =
   | 'product-plans'
   | 'branding'
   | 'billing'
+  | 'settings'
 
 export type NavGroupId = 'platform' | 'product'
 
@@ -35,21 +36,11 @@ export const ORG_SECTIONS: OrgNavItem[] = [
   { id: 'product-plans', label: 'Plans', path: 'product-plans' },
   { id: 'branding', label: 'Branding', path: 'branding' },
   { id: 'billing', label: 'Billing', path: 'billing' },
+  { id: 'settings', label: 'Settings', path: 'settings' },
 ]
 
-/** Sidebar groups: KYC platform vs customer product. */
+/** Sidebar groups: customer product first, then KYC platform. */
 export const ORG_NAV_GROUPS: OrgNavGroup[] = [
-  {
-    id: 'platform',
-    label: 'Platform capabilities',
-    hint: 'What this organisation uses inside KYC',
-    items: [
-      { id: 'members', label: 'Members', path: 'members' },
-      { id: 'roles', label: 'Roles', path: 'roles' },
-      { id: 'branding', label: 'Branding', path: 'branding' },
-      { id: 'billing', label: 'Billing', path: 'billing' },
-    ],
-  },
   {
     id: 'product',
     label: 'Product features',
@@ -59,8 +50,20 @@ export const ORG_NAV_GROUPS: OrgNavGroup[] = [
       { id: 'attributes', label: 'User Attributes', path: 'attributes' },
       { id: 'email-templates', label: 'Email templates', path: 'email-templates' },
       { id: 'automations', label: 'Automations', path: 'automations' },
+      { id: 'branding', label: 'Branding', path: 'branding' },
       { id: 'product-features', label: 'Features', path: 'product-features' },
       { id: 'product-plans', label: 'Plans', path: 'product-plans' },
+      { id: 'billing', label: 'Billing', path: 'billing' },
+    ],
+  },
+  {
+    id: 'platform',
+    label: 'Platform capabilities',
+    hint: 'What this organisation uses inside KYC',
+    items: [
+      { id: 'members', label: 'Members', path: 'members' },
+      { id: 'roles', label: 'Roles', path: 'roles' },
+      { id: 'settings', label: 'Settings', path: 'settings' },
     ],
   },
 ]
@@ -81,6 +84,7 @@ export function sectionFromPathname(pathname: string, orgId: string): OrgSection
     case 'product-plans':
     case 'branding':
     case 'billing':
+    case 'settings':
       return head
     case 'schema':
       return 'attributes'
@@ -97,7 +101,7 @@ export function orgPath(orgId: string, section: OrgSection = 'overview') {
 
 export function resourcePath(
   orgId: string,
-  section: Exclude<OrgSection, 'overview' | 'billing' | 'branding'>,
+  section: Exclude<OrgSection, 'overview' | 'billing' | 'branding' | 'settings'>,
   ...parts: string[]
 ) {
   const base = orgPath(orgId, section)

@@ -177,6 +177,64 @@ export function updateOrganisation(
   })
 }
 
+export function archiveOrganisation(id: string) {
+  return request<Organisation>(`/v1/organisations/${id}/archive`, { method: 'POST' })
+}
+
+export type OrgIntegration = {
+  provider: string
+  status: string
+  secret_hint?: string
+  public_key_hint?: string
+  has_secret: boolean
+  has_public_key: boolean
+}
+
+export type OrgAPIKey = {
+  id: string
+  name: string
+  key_prefix: string
+  created_at: string
+  revoked: boolean
+  revoked_at?: string
+  token?: string
+}
+
+export function listOrgIntegrations(orgId: string) {
+  return request<{ items: OrgIntegration[] }>(`/v1/organisations/${orgId}/integrations`)
+}
+
+export function upsertStripeIntegration(
+  orgId: string,
+  input: { secret_key?: string; publishable_key?: string },
+) {
+  return request<OrgIntegration>(`/v1/organisations/${orgId}/integrations/stripe`, {
+    method: 'PUT',
+    body: JSON.stringify(input),
+  })
+}
+
+export function deleteOrgIntegration(orgId: string, provider: string) {
+  return request<{ ok: boolean }>(`/v1/organisations/${orgId}/integrations/${provider}`, {
+    method: 'DELETE',
+  })
+}
+
+export function listOrgAPIKeys(orgId: string) {
+  return request<{ items: OrgAPIKey[] }>(`/v1/organisations/${orgId}/api-keys`)
+}
+
+export function createOrgAPIKey(orgId: string, name: string) {
+  return request<OrgAPIKey>(`/v1/organisations/${orgId}/api-keys`, {
+    method: 'POST',
+    body: JSON.stringify({ name }),
+  })
+}
+
+export function revokeAPIKey(id: string) {
+  return request<{ id: string; revoked: boolean }>(`/v1/api-keys/${id}`, { method: 'DELETE' })
+}
+
 export async function uploadOrganisationLogo(id: string, file: File) {
   const headers: Record<string, string> = {}
   const token = getToken()

@@ -12,16 +12,17 @@ import (
 )
 
 const createAPIKey = `-- name: CreateAPIKey :one
-INSERT INTO api_keys (id, name, key_prefix, key_hash)
-VALUES ($1, $2, $3, $4)
-RETURNING id, name, key_prefix, key_hash, created_at, revoked_at
+INSERT INTO api_keys (id, name, key_prefix, key_hash, organisation_id)
+VALUES ($1, $2, $3, $4, $5)
+RETURNING id, name, key_prefix, key_hash, created_at, revoked_at, organisation_id
 `
 
 type CreateAPIKeyParams struct {
-	ID        string `json:"id"`
-	Name      string `json:"name"`
-	KeyPrefix string `json:"key_prefix"`
-	KeyHash   string `json:"key_hash"`
+	ID             string      `json:"id"`
+	Name           string      `json:"name"`
+	KeyPrefix      string      `json:"key_prefix"`
+	KeyHash        string      `json:"key_hash"`
+	OrganisationID pgtype.Text `json:"organisation_id"`
 }
 
 func (q *Queries) CreateAPIKey(ctx context.Context, arg CreateAPIKeyParams) (ApiKey, error) {
@@ -30,6 +31,7 @@ func (q *Queries) CreateAPIKey(ctx context.Context, arg CreateAPIKeyParams) (Api
 		arg.Name,
 		arg.KeyPrefix,
 		arg.KeyHash,
+		arg.OrganisationID,
 	)
 	var i ApiKey
 	err := row.Scan(
@@ -39,12 +41,33 @@ func (q *Queries) CreateAPIKey(ctx context.Context, arg CreateAPIKeyParams) (Api
 		&i.KeyHash,
 		&i.CreatedAt,
 		&i.RevokedAt,
+		&i.OrganisationID,
+	)
+	return i, err
+}
+
+const getAPIKey = `-- name: GetAPIKey :one
+SELECT id, name, key_prefix, key_hash, created_at, revoked_at, organisation_id FROM api_keys
+WHERE id = $1
+`
+
+func (q *Queries) GetAPIKey(ctx context.Context, id string) (ApiKey, error) {
+	row := q.db.QueryRow(ctx, getAPIKey, id)
+	var i ApiKey
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
+		&i.KeyPrefix,
+		&i.KeyHash,
+		&i.CreatedAt,
+		&i.RevokedAt,
+		&i.OrganisationID,
 	)
 	return i, err
 }
 
 const getAPIKeyByHash = `-- name: GetAPIKeyByHash :one
-SELECT id, name, key_prefix, key_hash, created_at, revoked_at FROM api_keys
+SELECT id, name, key_prefix, key_hash, created_at, revoked_at, organisation_id FROM api_keys
 WHERE key_hash = $1 AND revoked_at IS NULL
 `
 
@@ -58,6 +81,7 @@ func (q *Queries) GetAPIKeyByHash(ctx context.Context, keyHash string) (ApiKey, 
 		&i.KeyHash,
 		&i.CreatedAt,
 		&i.RevokedAt,
+		&i.OrganisationID,
 	)
 	return i, err
 }
@@ -100,7 +124,8 @@ func (q *Queries) InsertAuditEvent(ctx context.Context, arg InsertAuditEventPara
 }
 
 const listAPIKeys = `-- name: ListAPIKeys :many
-SELECT id, name, key_prefix, key_hash, created_at, revoked_at FROM api_keys
+SELECT id, name, key_prefix, key_hash, created_at, revoked_at, organisation_id FROM api_keys
+WHERE organisation_id IS NULL
 ORDER BY created_at DESC
 `
 
@@ -120,6 +145,41 @@ func (q *Queries) ListAPIKeys(ctx context.Context) ([]ApiKey, error) {
 			&i.KeyHash,
 			&i.CreatedAt,
 			&i.RevokedAt,
+			&i.OrganisationID,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listAPIKeysByOrg = `-- name: ListAPIKeysByOrg :many
+SELECT id, name, key_prefix, key_hash, created_at, revoked_at, organisation_id FROM api_keys
+WHERE organisation_id = $1
+ORDER BY created_at DESC
+`
+
+func (q *Queries) ListAPIKeysByOrg(ctx context.Context, organisationID pgtype.Text) ([]ApiKey, error) {
+	rows, err := q.db.Query(ctx, listAPIKeysByOrg, organisationID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ApiKey{}
+	for rows.Next() {
+		var i ApiKey
+		if err := rows.Scan(
+			&i.ID,
+			&i.Name,
+			&i.KeyPrefix,
+			&i.KeyHash,
+			&i.CreatedAt,
+			&i.RevokedAt,
+			&i.OrganisationID,
 		); err != nil {
 			return nil, err
 		}
@@ -169,7 +229,7 @@ const revokeAPIKey = `-- name: RevokeAPIKey :one
 UPDATE api_keys
 SET revoked_at = now()
 WHERE id = $1 AND revoked_at IS NULL
-RETURNING id, name, key_prefix, key_hash, created_at, revoked_at
+RETURNING id, name, key_prefix, key_hash, created_at, revoked_at, organisation_id
 `
 
 func (q *Queries) RevokeAPIKey(ctx context.Context, id string) (ApiKey, error) {
@@ -182,6 +242,7 @@ func (q *Queries) RevokeAPIKey(ctx context.Context, id string) (ApiKey, error) {
 		&i.KeyHash,
 		&i.CreatedAt,
 		&i.RevokedAt,
+		&i.OrganisationID,
 	)
 	return i, err
 }

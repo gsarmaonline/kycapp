@@ -1,7 +1,11 @@
 -- name: CreateAPIKey :one
-INSERT INTO api_keys (id, name, key_prefix, key_hash)
-VALUES ($1, $2, $3, $4)
+INSERT INTO api_keys (id, name, key_prefix, key_hash, organisation_id)
+VALUES ($1, $2, $3, $4, $5)
 RETURNING *;
+
+-- name: GetAPIKey :one
+SELECT * FROM api_keys
+WHERE id = $1;
 
 -- name: GetAPIKeyByHash :one
 SELECT * FROM api_keys
@@ -9,6 +13,12 @@ WHERE key_hash = $1 AND revoked_at IS NULL;
 
 -- name: ListAPIKeys :many
 SELECT * FROM api_keys
+WHERE organisation_id IS NULL
+ORDER BY created_at DESC;
+
+-- name: ListAPIKeysByOrg :many
+SELECT * FROM api_keys
+WHERE organisation_id = $1
 ORDER BY created_at DESC;
 
 -- name: RevokeAPIKey :one

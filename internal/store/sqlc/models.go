@@ -12,12 +12,13 @@ import (
 )
 
 type ApiKey struct {
-	ID        string             `json:"id"`
-	Name      string             `json:"name"`
-	KeyPrefix string             `json:"key_prefix"`
-	KeyHash   string             `json:"key_hash"`
-	CreatedAt time.Time          `json:"created_at"`
-	RevokedAt pgtype.Timestamptz `json:"revoked_at"`
+	ID             string             `json:"id"`
+	Name           string             `json:"name"`
+	KeyPrefix      string             `json:"key_prefix"`
+	KeyHash        string             `json:"key_hash"`
+	CreatedAt      time.Time          `json:"created_at"`
+	RevokedAt      pgtype.Timestamptz `json:"revoked_at"`
+	OrganisationID pgtype.Text        `json:"organisation_id"`
 }
 
 type AppUser struct {
@@ -151,6 +152,15 @@ type OrganisationEntitlement struct {
 	OrganisationID string `json:"organisation_id"`
 	EntitlementID  string `json:"entitlement_id"`
 	Effect         string `json:"effect"`
+}
+
+type OrganisationIntegration struct {
+	OrganisationID string    `json:"organisation_id"`
+	Provider       string    `json:"provider"`
+	Status         string    `json:"status"`
+	SecretKey      string    `json:"secret_key"`
+	PublicKey      string    `json:"public_key"`
+	UpdatedAt      time.Time `json:"updated_at"`
 }
 
 type OrganisationProductPlan struct {
