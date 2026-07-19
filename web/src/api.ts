@@ -266,18 +266,29 @@ export function deleteRole(id: string) {
   return request<{ ok: boolean }>(`/v1/roles/${id}`, { method: 'DELETE' })
 }
 
+export type EntitlementScope = 'platform' | 'product'
+
 export type Plan = {
   id: string
   key: string
   name: string
   status: string
   entitlement_keys: string[]
+  platform_capability_keys?: string[]
+  product_feature_keys?: string[]
 }
 
 export type Entitlement = {
   id: string
   key: string
   description: string
+  scope: EntitlementScope
+}
+
+export type OrgEntitlements = {
+  entitlements: string[]
+  platform_capabilities: string[]
+  product_features: string[]
 }
 
 export type Subscription = {
@@ -318,7 +329,7 @@ export function getSubscription(orgId: string) {
 }
 
 export function getOrgEntitlements(orgId: string) {
-  return request<{ entitlements: string[] }>(`/v1/organisations/${orgId}/entitlements`)
+  return request<OrgEntitlements>(`/v1/organisations/${orgId}/entitlements`)
 }
 
 export function createBillingCheckout(

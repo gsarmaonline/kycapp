@@ -168,11 +168,13 @@ func roleJSON(role service.RoleView) map[string]any {
 
 func planJSON(p service.PlanView) map[string]any {
 	return map[string]any{
-		"id":               p.Plan.ID,
-		"key":              p.Plan.Key,
-		"name":             p.Plan.Name,
-		"status":           p.Plan.Status,
-		"entitlement_keys": p.EntitlementKeys,
+		"id":                       p.Plan.ID,
+		"key":                      p.Plan.Key,
+		"name":                     p.Plan.Name,
+		"status":                   p.Plan.Status,
+		"entitlement_keys":         p.EntitlementKeys,
+		"platform_capability_keys": p.PlatformCapabilityKeys,
+		"product_feature_keys":     p.ProductFeatureKeys,
 	}
 }
 
@@ -181,6 +183,15 @@ func entitlementJSON(e sqlc.Entitlement) map[string]any {
 		"id":          e.ID,
 		"key":         e.Key,
 		"description": e.Description,
+		"scope":       e.Scope,
+	}
+}
+
+func effectiveEntitlementsJSON(v service.EffectiveEntitlementsView) map[string]any {
+	return map[string]any{
+		"entitlements":          v.Entitlements,
+		"platform_capabilities": v.PlatformCapabilities,
+		"product_features":      v.ProductFeatures,
 	}
 }
 

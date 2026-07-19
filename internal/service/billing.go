@@ -15,8 +15,16 @@ import (
 )
 
 type PlanView struct {
-	Plan            sqlc.Plan
-	EntitlementKeys []string
+	Plan                   sqlc.Plan
+	EntitlementKeys        []string
+	PlatformCapabilityKeys []string
+	ProductFeatureKeys     []string
+}
+
+type EffectiveEntitlementsView struct {
+	Entitlements         []string
+	PlatformCapabilities []string
+	ProductFeatures      []string
 }
 
 type CreatePlanInput struct {
@@ -27,6 +35,7 @@ type CreatePlanInput struct {
 type CreateEntitlementInput struct {
 	Key         string
 	Description string
+	Scope       string
 }
 
 type SetPlanEntitlementsInput struct {
@@ -68,16 +77,37 @@ func (s *Service) CreatePlan(ctx context.Context, in CreatePlanInput) (sqlc.Plan
 	return plan, nil
 }
 
+func (s *Service) planView(ctx context.Context, plan sqlc.Plan) (PlanView, error) {
+	rows, err := s.db.Q().ListEntitlementsByPlan(ctx, plan.ID)
+	if err != nil {
+		return PlanView{}, err
+	}
+	keys := make([]string, 0, len(rows))
+	platform := make([]string, 0)
+	product := make([]string, 0)
+	for _, row := range rows {
+		keys = append(keys, row.Key)
+		switch row.Scope {
+		case "product":
+			product = append(product, row.Key)
+		default:
+			platform = append(platform, row.Key)
+		}
+	}
+	return PlanView{
+		Plan:                   plan,
+		EntitlementKeys:        keys,
+		PlatformCapabilityKeys: platform,
+		ProductFeatureKeys:     product,
+	}, nil
+}
+
 func (s *Service) GetPlan(ctx context.Context, id string) (PlanView, error) {
 	plan, err := s.db.Q().GetPlan(ctx, id)
 	if err != nil {
 		return PlanView{}, mapNotFound(err, "plan not found")
 	}
-	keys, err := s.db.Q().ListEntitlementKeysByPlan(ctx, plan.ID)
-	if err != nil {
-		return PlanView{}, err
-	}
-	return PlanView{Plan: plan, EntitlementKeys: keys}, nil
+	return s.planView(ctx, plan)
 }
 
 func (s *Service) ListPlans(ctx context.Context) ([]PlanView, error) {
@@ -87,11 +117,11 @@ func (s *Service) ListPlans(ctx context.Context) ([]PlanView, error) {
 	}
 	out := make([]PlanView, 0, len(plans))
 	for _, p := range plans {
-		keys, err := s.db.Q().ListEntitlementKeysByPlan(ctx, p.ID)
+		view, err := s.planView(ctx, p)
 		if err != nil {
 			return nil, err
 		}
-		out = append(out, PlanView{Plan: p, EntitlementKeys: keys})
+		out = append(out, view)
 	}
 	return out, nil
 }
@@ -137,10 +167,20 @@ func (s *Service) CreateEntitlement(ctx context.Context, in CreateEntitlementInp
 	if key == "" {
 		return sqlc.Entitlement{}, apperr.Validation("key is required")
 	}
+	scope := strings.TrimSpace(in.Scope)
+	if scope == "" {
+		scope = "platform"
+	}
+	switch scope {
+	case "platform", "product":
+	default:
+		return sqlc.Entitlement{}, apperr.Validation("scope must be platform or product")
+	}
 	ent, err := s.db.Q().CreateEntitlement(ctx, sqlc.CreateEntitlementParams{
 		ID:          ids.New(),
 		Key:         key,
 		Description: strings.TrimSpace(in.Description),
+		Scope:       scope,
 	})
 	if err != nil {
 		if store.IsUniqueViolation(err) {
@@ -240,36 +280,80 @@ func (s *Service) SetOrganisationEntitlements(ctx context.Context, orgID string,
 	if err != nil {
 		return nil, err
 	}
-	return s.EffectiveEntitlements(ctx, orgID)
-}
-
-func (s *Service) EffectiveEntitlements(ctx context.Context, orgID string) ([]string, error) {
-	org, err := s.GetOrganisation(ctx, orgID)
+	view, err := s.EffectiveEntitlementsView(ctx, orgID)
 	if err != nil {
 		return nil, err
 	}
-	_ = org
+	return view.Entitlements, nil
+}
+
+func (s *Service) EffectiveEntitlements(ctx context.Context, orgID string) ([]string, error) {
+	view, err := s.EffectiveEntitlementsView(ctx, orgID)
+	if err != nil {
+		return nil, err
+	}
+	return view.Entitlements, nil
+}
+
+func (s *Service) EffectiveEntitlementsView(ctx context.Context, orgID string) (EffectiveEntitlementsView, error) {
+	if _, err := s.GetOrganisation(ctx, orgID); err != nil {
+		return EffectiveEntitlementsView{}, err
+	}
 
 	var planKeys []string
 	sub, err := s.db.Q().GetSubscriptionByOrganisation(ctx, orgID)
 	if err == nil {
 		planKeys, err = s.db.Q().ListEntitlementKeysByPlan(ctx, sub.PlanID)
 		if err != nil {
-			return nil, err
+			return EffectiveEntitlementsView{}, err
 		}
 	} else if !errors.Is(err, pgx.ErrNoRows) {
-		return nil, err
+		return EffectiveEntitlementsView{}, err
 	}
 
 	overrideRows, err := s.db.Q().ListOrganisationEntitlementOverrides(ctx, orgID)
 	if err != nil {
-		return nil, err
+		return EffectiveEntitlementsView{}, err
 	}
 	overrides := make(map[string]string, len(overrideRows))
 	for _, row := range overrideRows {
 		overrides[row.Key] = row.Effect
 	}
-	return billing.EffectiveKeys(planKeys, overrides), nil
+	keys := billing.EffectiveKeys(planKeys, overrides)
+	platform, product, err := s.splitEntitlementKeysByScope(ctx, keys)
+	if err != nil {
+		return EffectiveEntitlementsView{}, err
+	}
+	return EffectiveEntitlementsView{
+		Entitlements:         keys,
+		PlatformCapabilities: platform,
+		ProductFeatures:      product,
+	}, nil
+}
+
+func (s *Service) splitEntitlementKeysByScope(ctx context.Context, keys []string) (platform, product []string, err error) {
+	platform = []string{}
+	product = []string{}
+	if len(keys) == 0 {
+		return platform, product, nil
+	}
+	rows, err := s.db.Q().ListEntitlementScopesByKeys(ctx, keys)
+	if err != nil {
+		return nil, nil, err
+	}
+	byKey := make(map[string]string, len(rows))
+	for _, row := range rows {
+		byKey[row.Key] = row.Scope
+	}
+	for _, key := range keys {
+		switch byKey[key] {
+		case "product":
+			product = append(product, key)
+		default:
+			platform = append(platform, key)
+		}
+	}
+	return platform, product, nil
 }
 
 func (s *Service) CheckEntitlement(ctx context.Context, orgID, entitlementKey string) (bool, error) {

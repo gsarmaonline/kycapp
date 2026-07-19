@@ -16,8 +16,8 @@ SELECT * FROM plans
 ORDER BY key;
 
 -- name: CreateEntitlement :one
-INSERT INTO entitlements (id, key, description)
-VALUES ($1, $2, $3)
+INSERT INTO entitlements (id, key, description, scope)
+VALUES ($1, $2, $3, $4)
 RETURNING *;
 
 -- name: GetEntitlementByKey :one
@@ -26,7 +26,7 @@ WHERE key = $1;
 
 -- name: ListEntitlements :many
 SELECT * FROM entitlements
-ORDER BY key;
+ORDER BY scope, key;
 
 -- name: ListEntitlementKeysByPlan :many
 SELECT e.key
@@ -34,6 +34,18 @@ FROM plan_entitlements pe
 JOIN entitlements e ON e.id = pe.entitlement_id
 WHERE pe.plan_id = $1
 ORDER BY e.key;
+
+-- name: ListEntitlementsByPlan :many
+SELECT e.key, e.scope
+FROM plan_entitlements pe
+JOIN entitlements e ON e.id = pe.entitlement_id
+WHERE pe.plan_id = $1
+ORDER BY e.scope, e.key;
+
+-- name: ListEntitlementScopesByKeys :many
+SELECT key, scope FROM entitlements
+WHERE key = ANY(sqlc.arg('keys')::text[])
+ORDER BY scope, key;
 
 -- name: DeletePlanEntitlements :exec
 DELETE FROM plan_entitlements

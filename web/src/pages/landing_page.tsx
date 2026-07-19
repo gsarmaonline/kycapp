@@ -52,8 +52,8 @@ export function LandingPage({ user }: { user: User | null }) {
       <section className="landing-section landing-section-alt">
         <h2>Access that matches how you work</h2>
         <p>
-          Roles and permissions decide what people may do. Entitlements decide what the
-          organisation has paid for. Checks stay clear at runtime.
+          Roles and permissions decide what people may do. Platform capabilities gate KYC
+          itself; product features gate what the organisation unlocks in its own app.
         </p>
       </section>
 

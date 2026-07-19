@@ -262,8 +262,10 @@ See [billing-plans.md](./billing-plans.md) for the Stripe executor design.
 
 ### Entitlements (catalog)
 
-- `POST /v1/entitlements` — `{ "key", "description" }`
-- `GET /v1/entitlements`
+Each entitlement has `scope`: `platform` (KYC / platform capabilities) or `product` (customer product features).
+
+- `POST /v1/entitlements` — `{ "key", "description", "scope"? }` (`scope` defaults to `platform`)
+- `GET /v1/entitlements` — items include `scope`
 
 ### Organisation subscription
 
@@ -281,7 +283,17 @@ See [billing-plans.md](./billing-plans.md) for the Stripe executor design.
 ### Organisation entitlement overrides
 
 - `PUT /v1/organisations/{id}/entitlements` — `{ "overrides": [{ "key", "effect": "grant"|"deny" }] }`
-- `GET /v1/organisations/{id}/entitlements` — **effective** set (plan ∪ grants − denies)
+- `GET /v1/organisations/{id}/entitlements` — **effective** set (plan ∪ grants − denies), split by scope:
+
+```json
+{
+  "entitlements": ["api_access", "sso"],
+  "platform_capabilities": ["api_access", "sso"],
+  "product_features": []
+}
+```
+
+Plans also expose `platform_capability_keys` and `product_feature_keys` alongside flat `entitlement_keys`.
 
 ### `POST /v1/entitlements/check`
 

@@ -16,7 +16,7 @@ KYC is a **system of record for organisations**: orgs, users, memberships, RBAC,
 | --- | --- |
 | Organisation as tenant hub | Multi-tenant B2B model |
 | Global User + Membership | Multi-org users |
-| Roles / Permissions vs Entitlements | Who can act vs what the org paid for |
+| Roles / Permissions vs Entitlements | Who can act vs org platform capabilities / product features |
 | `authz/check` + `entitlements/check` | Runtime gating primitives |
 | Postgres + Go + sqlc | Fine for SaaS |
 

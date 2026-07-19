@@ -27,7 +27,12 @@ func (s *Server) handleCreatePlan(w http.ResponseWriter, r *http.Request) {
 		writeError(w, err)
 		return
 	}
-	writeJSON(w, http.StatusCreated, planJSON(service.PlanView{Plan: plan, EntitlementKeys: []string{}}))
+	writeJSON(w, http.StatusCreated, planJSON(service.PlanView{
+		Plan:                   plan,
+		EntitlementKeys:        []string{},
+		PlatformCapabilityKeys: []string{},
+		ProductFeatureKeys:     []string{},
+	}))
 }
 
 func (s *Server) handleListPlans(w http.ResponseWriter, r *http.Request) {
@@ -90,13 +95,14 @@ func (s *Server) handleCreateEntitlement(w http.ResponseWriter, r *http.Request)
 	var body struct {
 		Key         string `json:"key"`
 		Description string `json:"description"`
+		Scope       string `json:"scope"`
 	}
 	if err := decodeJSON(r, &body); err != nil {
 		writeError(w, apperr.Validation("invalid JSON body"))
 		return
 	}
 	ent, err := s.svc.CreateEntitlement(r.Context(), service.CreateEntitlementInput{
-		Key: body.Key, Description: body.Description,
+		Key: body.Key, Description: body.Description, Scope: body.Scope,
 	})
 	if err != nil {
 		writeError(w, err)
@@ -181,14 +187,18 @@ func (s *Server) handleSetOrgEntitlements(w http.ResponseWriter, r *http.Request
 	for _, o := range body.Overrides {
 		overrides = append(overrides, service.EntitlementOverride{Key: o.Key, Effect: o.Effect})
 	}
-	keys, err := s.svc.SetOrganisationEntitlements(r.Context(), r.PathValue("id"), service.SetOrganisationEntitlementsInput{
+	if _, err := s.svc.SetOrganisationEntitlements(r.Context(), r.PathValue("id"), service.SetOrganisationEntitlementsInput{
 		Overrides: overrides,
-	})
+	}); err != nil {
+		writeError(w, err)
+		return
+	}
+	view, err := s.svc.EffectiveEntitlementsView(r.Context(), r.PathValue("id"))
 	if err != nil {
 		writeError(w, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"entitlements": keys})
+	writeJSON(w, http.StatusOK, effectiveEntitlementsJSON(view))
 }
 
 func (s *Server) handleGetOrgEntitlements(w http.ResponseWriter, r *http.Request) {
@@ -197,12 +207,12 @@ func (s *Server) handleGetOrgEntitlements(w http.ResponseWriter, r *http.Request
 		writeError(w, err)
 		return
 	}
-	keys, err := s.svc.EffectiveEntitlements(r.Context(), orgID)
+	view, err := s.svc.EffectiveEntitlementsView(r.Context(), orgID)
 	if err != nil {
 		writeError(w, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"entitlements": keys})
+	writeJSON(w, http.StatusOK, effectiveEntitlementsJSON(view))
 }
 
 func (s *Server) handleEntitlementsCheck(w http.ResponseWriter, r *http.Request) {

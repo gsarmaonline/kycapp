@@ -15,7 +15,7 @@ import {
   type Organisation,
   type User,
 } from './api'
-import { ORG_SECTIONS, orgPath, sectionFromPathname } from './org_nav'
+import { ORG_NAV_GROUPS, orgPath, sectionFromPathname } from './org_nav'
 
 function userInitials(label: string): string {
   const parts = label.trim().split(/\s+/).filter(Boolean)
@@ -126,15 +126,28 @@ export function AppShell({ user, onLogout }: { user: User | null; onLogout: () =
 
         {routeOrgId && (
           <nav className="sidebar-nav" aria-label="Organisation sections">
-            {ORG_SECTIONS.map((item) => (
-              <NavLink
-                key={item.id}
-                to={orgPath(routeOrgId, item.id)}
-                className={({ isActive }) => (isActive ? 'nav-item active' : 'nav-item')}
-                end={item.id === 'overview'}
-              >
-                {item.label}
-              </NavLink>
+            <NavLink
+              to={orgPath(routeOrgId, 'overview')}
+              className={({ isActive }) => (isActive ? 'nav-item active' : 'nav-item')}
+              end
+            >
+              Overview
+            </NavLink>
+            {ORG_NAV_GROUPS.map((group) => (
+              <div key={group.id} className="sidebar-nav-group">
+                <p className="sidebar-nav-group-label" title={group.hint}>
+                  {group.label}
+                </p>
+                {group.items.map((item) => (
+                  <NavLink
+                    key={item.id}
+                    to={orgPath(routeOrgId, item.id)}
+                    className={({ isActive }) => (isActive ? 'nav-item active' : 'nav-item')}
+                  >
+                    {item.label}
+                  </NavLink>
+                ))}
+              </div>
             ))}
           </nav>
         )}

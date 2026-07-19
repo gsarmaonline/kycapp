@@ -112,6 +112,7 @@ type Entitlement struct {
 	ID          string `json:"id"`
 	Key         string `json:"key"`
 	Description string `json:"description"`
+	Scope       string `json:"scope"`
 }
 
 type IdempotencyKey struct {

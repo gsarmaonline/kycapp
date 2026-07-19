@@ -19,6 +19,7 @@ sql:
       - "internal/store/migrations/000014_automations.up.sql"
       - "internal/store/migrations/000015_billing_payments.up.sql"
       - "internal/store/migrations/000016_user_avatar.up.sql"
+      - "internal/store/migrations/000017_entitlement_scope.up.sql"
     gen:
       go:
         package: "sqlc"

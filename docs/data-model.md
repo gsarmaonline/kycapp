@@ -244,13 +244,21 @@ Billing catalog entry.
 
 ### Entitlement
 
-Global catalog of what an **organisation** may use given its plan (product capabilities). Not the same as Permission.
+Global catalog of named capabilities an **organisation** may hold via its plan. Not the same as Permission.
+
+Each entitlement has a **scope**:
+
+| Scope | UI label | Meaning |
+| --- | --- | --- |
+| `platform` | Platform capabilities | Features of KYC itself (e.g. `sso`, `api_access`) |
+| `product` | Product features | Features the customer unlocks in their own app (e.g. `premium_reports`) |
 
 | Field | Type | Notes |
 | --- | --- | --- |
 | `id` | string | PK |
-| `key` | string | Unique, e.g. `sso`, `api_access` |
+| `key` | string | Unique, e.g. `sso`, `premium_reports` |
 | `description` | string | |
+| `scope` | enum | `platform` \| `product` |
 
 ### PlanEntitlement
 
@@ -317,10 +325,15 @@ Per-org overrides on top of the plan.
 | | Permission | Entitlement |
 | --- | --- | --- |
 | Subject | User (via role) | Organisation (via plan) |
-| Answers | “May Ada invite members?” | “May Acme use SSO?” |
-| Example | `members:invite` | `sso`, `api_access` |
+| Answers | “May Ada invite members?” | “May Acme use this capability?” |
+| Example | `members:invite` | `sso` (platform), `premium_reports` (product) |
 
-Product services often need both:
+| Entitlement scope | Answers |
+| --- | --- |
+| Platform capability | “May Acme use SSO / this KYC feature?” |
+| Product feature | “May Acme unlock this feature in its own product?” |
+
+Product services often need both permission and entitlement:
 
 ```text
 allowed = org_has_entitlement("sso") && user_has_permission("roles:manage")

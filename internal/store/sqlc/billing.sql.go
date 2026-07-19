@@ -28,21 +28,32 @@ func (q *Queries) AddPlanEntitlement(ctx context.Context, arg AddPlanEntitlement
 }
 
 const createEntitlement = `-- name: CreateEntitlement :one
-INSERT INTO entitlements (id, key, description)
-VALUES ($1, $2, $3)
-RETURNING id, key, description
+INSERT INTO entitlements (id, key, description, scope)
+VALUES ($1, $2, $3, $4)
+RETURNING id, key, description, scope
 `
 
 type CreateEntitlementParams struct {
 	ID          string `json:"id"`
 	Key         string `json:"key"`
 	Description string `json:"description"`
+	Scope       string `json:"scope"`
 }
 
 func (q *Queries) CreateEntitlement(ctx context.Context, arg CreateEntitlementParams) (Entitlement, error) {
-	row := q.db.QueryRow(ctx, createEntitlement, arg.ID, arg.Key, arg.Description)
+	row := q.db.QueryRow(ctx, createEntitlement,
+		arg.ID,
+		arg.Key,
+		arg.Description,
+		arg.Scope,
+	)
 	var i Entitlement
-	err := row.Scan(&i.ID, &i.Key, &i.Description)
+	err := row.Scan(
+		&i.ID,
+		&i.Key,
+		&i.Description,
+		&i.Scope,
+	)
 	return i, err
 }
 
@@ -132,14 +143,19 @@ func (q *Queries) DeletePlanEntitlements(ctx context.Context, planID string) err
 }
 
 const getEntitlementByKey = `-- name: GetEntitlementByKey :one
-SELECT id, key, description FROM entitlements
+SELECT id, key, description, scope FROM entitlements
 WHERE key = $1
 `
 
 func (q *Queries) GetEntitlementByKey(ctx context.Context, key string) (Entitlement, error) {
 	row := q.db.QueryRow(ctx, getEntitlementByKey, key)
 	var i Entitlement
-	err := row.Scan(&i.ID, &i.Key, &i.Description)
+	err := row.Scan(
+		&i.ID,
+		&i.Key,
+		&i.Description,
+		&i.Scope,
+	)
 	return i, err
 }
 
@@ -256,9 +272,40 @@ func (q *Queries) ListEntitlementKeysByPlan(ctx context.Context, planID string) 
 	return items, nil
 }
 
+const listEntitlementScopesByKeys = `-- name: ListEntitlementScopesByKeys :many
+SELECT key, scope FROM entitlements
+WHERE key = ANY($1::text[])
+ORDER BY scope, key
+`
+
+type ListEntitlementScopesByKeysRow struct {
+	Key   string `json:"key"`
+	Scope string `json:"scope"`
+}
+
+func (q *Queries) ListEntitlementScopesByKeys(ctx context.Context, keys []string) ([]ListEntitlementScopesByKeysRow, error) {
+	rows, err := q.db.Query(ctx, listEntitlementScopesByKeys, keys)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListEntitlementScopesByKeysRow{}
+	for rows.Next() {
+		var i ListEntitlementScopesByKeysRow
+		if err := rows.Scan(&i.Key, &i.Scope); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listEntitlements = `-- name: ListEntitlements :many
-SELECT id, key, description FROM entitlements
-ORDER BY key
+SELECT id, key, description, scope FROM entitlements
+ORDER BY scope, key
 `
 
 func (q *Queries) ListEntitlements(ctx context.Context) ([]Entitlement, error) {
@@ -270,7 +317,45 @@ func (q *Queries) ListEntitlements(ctx context.Context) ([]Entitlement, error) {
 	items := []Entitlement{}
 	for rows.Next() {
 		var i Entitlement
-		if err := rows.Scan(&i.ID, &i.Key, &i.Description); err != nil {
+		if err := rows.Scan(
+			&i.ID,
+			&i.Key,
+			&i.Description,
+			&i.Scope,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listEntitlementsByPlan = `-- name: ListEntitlementsByPlan :many
+SELECT e.key, e.scope
+FROM plan_entitlements pe
+JOIN entitlements e ON e.id = pe.entitlement_id
+WHERE pe.plan_id = $1
+ORDER BY e.scope, e.key
+`
+
+type ListEntitlementsByPlanRow struct {
+	Key   string `json:"key"`
+	Scope string `json:"scope"`
+}
+
+func (q *Queries) ListEntitlementsByPlan(ctx context.Context, planID string) ([]ListEntitlementsByPlanRow, error) {
+	rows, err := q.db.Query(ctx, listEntitlementsByPlan, planID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListEntitlementsByPlanRow{}
+	for rows.Next() {
+		var i ListEntitlementsByPlanRow
+		if err := rows.Scan(&i.Key, &i.Scope); err != nil {
 			return nil, err
 		}
 		items = append(items, i)

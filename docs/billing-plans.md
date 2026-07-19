@@ -122,8 +122,8 @@ Product checks → KYC entitlements only (never Stripe on hot path)
 | --- | --- |
 | Executor, not PSP | Call Stripe well; do not reimplement money movement, ledgers, or PCI. |
 | Org is the billable entity | One billing customer per organisation. |
-| Entitlements gate product | Handlers check entitlements, not Stripe. |
-| Catalog owns commercial intent | Plan key + entitlements in KYC; Price ID is a processor ref. |
+| Entitlements gate access | Handlers check platform capabilities / product features, not Stripe. |
+| Catalog owns commercial intent | Plan key + entitlements (`platform` / `product` scope) in KYC; Price ID is a processor ref. |
 | Processor owns money movement | Checkout, invoices, payment methods, dunning stay with Stripe. |
 | Idempotent sync | Webhooks map to KYC subscription state with idempotency keys. |
 | Soft coupling | Store opaque refs; core domain applies outcome commands, not raw Stripe enums. |
@@ -239,7 +239,7 @@ Public:
 
 | Surface | Behaviour |
 | --- | --- |
-| Merchant Billing | Plan, status, period end; **Upgrade** → Checkout; **Manage** → Portal |
+| Merchant Billing | Plan, status, period end; **Platform capabilities** vs **Product features**; **Upgrade** → Checkout; **Manage** → Portal |
 | Platform | Link Stripe price IDs; comps/overrides; reconcile stuck subs |
 | Runtime | `entitlements/check` only — no Stripe on hot path |
 

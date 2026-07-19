@@ -9,7 +9,19 @@ export type OrgSection =
   | 'branding'
   | 'billing'
 
-export const ORG_SECTIONS: { id: OrgSection; label: string; path: string }[] = [
+export type NavGroupId = 'platform' | 'product'
+
+export type OrgNavItem = { id: OrgSection; label: string; path: string }
+
+export type OrgNavGroup = {
+  id: NavGroupId
+  label: string
+  hint: string
+  items: OrgNavItem[]
+}
+
+/** Flat list kept for overview tiles and path helpers. */
+export const ORG_SECTIONS: OrgNavItem[] = [
   { id: 'overview', label: 'Overview', path: '' },
   { id: 'members', label: 'Members', path: 'members' },
   { id: 'roles', label: 'Roles', path: 'roles' },
@@ -19,6 +31,32 @@ export const ORG_SECTIONS: { id: OrgSection; label: string; path: string }[] = [
   { id: 'automations', label: 'Automations', path: 'automations' },
   { id: 'branding', label: 'Branding', path: 'branding' },
   { id: 'billing', label: 'Billing', path: 'billing' },
+]
+
+/** Sidebar groups: KYC platform vs customer product. */
+export const ORG_NAV_GROUPS: OrgNavGroup[] = [
+  {
+    id: 'platform',
+    label: 'Platform capabilities',
+    hint: 'What this organisation uses inside KYC',
+    items: [
+      { id: 'members', label: 'Members', path: 'members' },
+      { id: 'roles', label: 'Roles', path: 'roles' },
+      { id: 'branding', label: 'Branding', path: 'branding' },
+      { id: 'billing', label: 'Billing', path: 'billing' },
+    ],
+  },
+  {
+    id: 'product',
+    label: 'Product features',
+    hint: 'What this organisation runs for its own users',
+    items: [
+      { id: 'users', label: 'Users', path: 'users' },
+      { id: 'attributes', label: 'User Attributes', path: 'attributes' },
+      { id: 'email-templates', label: 'Email templates', path: 'email-templates' },
+      { id: 'automations', label: 'Automations', path: 'automations' },
+    ],
+  },
 ]
 
 export function sectionFromPathname(pathname: string, orgId: string): OrgSection {

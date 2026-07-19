@@ -90,7 +90,7 @@ Same data model as self-serve; different entrypoint.
 When a merchant uses the product:
 
 1. Resolve session → `user_id` + current `organisation_id`.
-2. `POST /v1/entitlements/check` — is the org allowed this feature?
+2. `POST /v1/entitlements/check` — is the org allowed this platform capability or product feature?
 3. `POST /v1/authz/check` — is this user allowed this action?
 
 Both must pass when a feature is gated by plan **and** role.

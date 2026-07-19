@@ -33,7 +33,11 @@ vi.mock('./api', () => ({
   listPlans: vi.fn(async () => ({ items: [] })),
   listEntitlementsCatalog: vi.fn(async () => ({ items: [] })),
   getSubscription: vi.fn(),
-  getOrgEntitlements: vi.fn(async () => ({ entitlements: [] })),
+  getOrgEntitlements: vi.fn(async () => ({
+    entitlements: [],
+    platform_capabilities: [],
+    product_features: [],
+  })),
   listAttributeDefinitions: vi.fn(async () => ({ items: [] })),
   createAttributeDefinition: vi.fn(),
   listAppUsers: vi.fn(async () => ({ items: [] })),
