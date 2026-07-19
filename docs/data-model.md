@@ -244,7 +244,7 @@ Billing catalog entry.
 
 ### Entitlement
 
-Global catalog of named capabilities an **organisation** may hold via its plan. Not the same as Permission.
+Catalog of named capabilities an **organisation** may hold. Global rows (`organisation_id` null) are platform-owned; org-owned rows are **product features**. Not the same as Permission.
 
 Each entitlement has a **scope**:
 
@@ -259,6 +259,34 @@ Each entitlement has a **scope**:
 | `key` | string | Unique, e.g. `sso`, `premium_reports` |
 | `description` | string | |
 | `scope` | enum | `platform` \| `product` |
+| `organisation_id` | string? | Null = global (platform) catalog; set = org-owned **product** feature |
+
+### ProductPlan
+
+Org-owned package of product features for end-user gating (separate from KYC billing `Plan`).
+
+| Field | Type | Notes |
+| --- | --- | --- |
+| `id` | string | PK |
+| `organisation_id` | string | FK → Organisation |
+| `key` | string | Unique per org |
+| `name` | string | |
+| `status` | enum | `active` \| `archived` |
+
+### ProductPlanFeature
+
+Join: ProductPlan ↔ Entitlement (org product features only).
+
+### OrganisationProductPlan
+
+Which product plan is active for the organisation’s end users.
+
+| Field | Type | Notes |
+| --- | --- | --- |
+| `organisation_id` | string | PK, FK → Organisation |
+| `product_plan_id` | string | FK → ProductPlan |
+
+**Effective entitlements** = KYC plan entitlements ∪ active product plan features ∪ grants − denies.
 
 ### PlanEntitlement
 
@@ -308,15 +336,13 @@ Attaches a plan to an organisation. One active subscription per organisation in 
 
 ### OrganisationEntitlement
 
-Per-org overrides on top of the plan.
+Per-org overrides on top of KYC plan + active product plan.
 
 | Field | Type | Notes |
 | --- | --- | --- |
 | `organisation_id` | string | FK → Organisation |
 | `entitlement_id` | string | FK → Entitlement |
 | `effect` | enum | `grant` \| `deny` |
-
-**Effective entitlements** = plan entitlements ∪ grants − denies.
 
 ---
 

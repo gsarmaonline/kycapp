@@ -165,6 +165,20 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /v1/automations/{id}", s.handleGetAutomation)
 	s.mux.HandleFunc("PATCH /v1/automations/{id}", s.handlePatchAutomation)
 	s.mux.HandleFunc("DELETE /v1/automations/{id}", s.handleDeleteAutomation)
+
+	s.mux.HandleFunc("POST /v1/organisations/{id}/product-features", s.handleCreateProductFeature)
+	s.mux.HandleFunc("GET /v1/organisations/{id}/product-features", s.handleListProductFeatures)
+	s.mux.HandleFunc("GET /v1/product-features/{id}", s.handleGetProductFeature)
+	s.mux.HandleFunc("PATCH /v1/product-features/{id}", s.handlePatchProductFeature)
+	s.mux.HandleFunc("DELETE /v1/product-features/{id}", s.handleDeleteProductFeature)
+	s.mux.HandleFunc("POST /v1/organisations/{id}/product-plans", s.handleCreateProductPlan)
+	s.mux.HandleFunc("GET /v1/organisations/{id}/product-plans", s.handleListProductPlans)
+	s.mux.HandleFunc("GET /v1/product-plans/{id}", s.handleGetProductPlan)
+	s.mux.HandleFunc("PATCH /v1/product-plans/{id}", s.handlePatchProductPlan)
+	s.mux.HandleFunc("PUT /v1/product-plans/{id}/features", s.handleSetProductPlanFeatures)
+	s.mux.HandleFunc("DELETE /v1/product-plans/{id}", s.handleDeleteProductPlan)
+	s.mux.HandleFunc("PUT /v1/organisations/{id}/product-plan", s.handleSetActiveProductPlan)
+	s.mux.HandleFunc("GET /v1/organisations/{id}/product-plan", s.handleGetActiveProductPlan)
 }
 
 // Handler returns the root handler with auth, audit, rate limit, and optional CORS.

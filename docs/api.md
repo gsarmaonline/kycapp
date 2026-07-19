@@ -264,8 +264,27 @@ See [billing-plans.md](./billing-plans.md) for the Stripe executor design.
 
 Each entitlement has `scope`: `platform` (KYC / platform capabilities) or `product` (customer product features).
 
-- `POST /v1/entitlements` — `{ "key", "description", "scope"? }` (`scope` defaults to `platform`)
-- `GET /v1/entitlements` — items include `scope`
+Global catalog (platform-owned, `organisation_id` null):
+
+- `POST /v1/entitlements` — `{ "key", "description", "scope"? }` (`scope` defaults to `platform`; platform auth)
+- `GET /v1/entitlements` — global items only; includes `scope`
+
+### Product features & plans (merchant)
+
+Org-owned product feature catalog and packaging for end-user gating. Requires `product_features:read` / `product_features:manage`.
+
+- `POST /v1/organisations/{id}/product-features` — `{ "key", "description"? }`
+- `GET /v1/organisations/{id}/product-features`
+- `GET|PATCH|DELETE /v1/product-features/{id}` — PATCH `{ "description" }`
+- `POST /v1/organisations/{id}/product-plans` — `{ "key", "name" }`
+- `GET /v1/organisations/{id}/product-plans`
+- `GET|PATCH|DELETE /v1/product-plans/{id}` — PATCH `{ "name"?, "status"? }`
+- `PUT /v1/product-plans/{id}/features` — `{ "feature_keys": string[] }` (org product features only)
+- `PUT /v1/organisations/{id}/product-plan` — `{ "product_plan_id" }` activate (empty clears)
+- `GET /v1/organisations/{id}/product-plan` — active product plan
+
+**Effective product features** = KYC plan product keys ∪ active product plan features ∪ grants − denies.  
+`POST /v1/entitlements/check` gates both platform capabilities and product features.
 
 ### Organisation subscription
 

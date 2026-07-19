@@ -46,6 +46,11 @@ vi.mock('./api', () => ({
   createEmailTemplate: vi.fn(),
   updateEmailTemplate: vi.fn(),
   listAutomations: vi.fn(async () => ({ items: [] })),
+  listProductFeatures: vi.fn(async () => ({ items: [] })),
+  listProductPlans: vi.fn(async () => ({ items: [] })),
+  getActiveProductPlan: vi.fn(async () => {
+    throw new Error('not found')
+  }),
 }))
 
 describe('App', () => {

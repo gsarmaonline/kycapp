@@ -30,6 +30,14 @@ import { MembersIndex } from './pages/members/members_index'
 import { MembersNew } from './pages/members/members_new'
 import { MembersShow } from './pages/members/members_show'
 import { OverviewPage } from './pages/overview_page'
+import { ProductFeaturesEdit } from './pages/product_features/product_features_edit'
+import { ProductFeaturesIndex } from './pages/product_features/product_features_index'
+import { ProductFeaturesNew } from './pages/product_features/product_features_new'
+import { ProductFeaturesShow } from './pages/product_features/product_features_show'
+import { ProductPlansEdit } from './pages/product_plans/product_plans_edit'
+import { ProductPlansIndex } from './pages/product_plans/product_plans_index'
+import { ProductPlansNew } from './pages/product_plans/product_plans_new'
+import { ProductPlansShow } from './pages/product_plans/product_plans_show'
 import { RolesEdit } from './pages/roles/roles_edit'
 import { RolesIndex } from './pages/roles/roles_index'
 import { RolesNew } from './pages/roles/roles_new'
@@ -143,6 +151,14 @@ export default function App() {
         <Route path="automations/new" element={<AutomationsNew />} />
         <Route path="automations/:id" element={<AutomationsShow />} />
         <Route path="automations/:id/edit" element={<AutomationsEdit />} />
+        <Route path="product-features" element={<ProductFeaturesIndex />} />
+        <Route path="product-features/new" element={<ProductFeaturesNew />} />
+        <Route path="product-features/:id" element={<ProductFeaturesShow />} />
+        <Route path="product-features/:id/edit" element={<ProductFeaturesEdit />} />
+        <Route path="product-plans" element={<ProductPlansIndex />} />
+        <Route path="product-plans/new" element={<ProductPlansNew />} />
+        <Route path="product-plans/:id" element={<ProductPlansShow />} />
+        <Route path="product-plans/:id/edit" element={<ProductPlansEdit />} />
         <Route path="branding" element={<BrandingPage />} />
         <Route path="billing" element={<BillingPage />} />
       </Route>

@@ -250,7 +250,10 @@ func (s *Service) SetOrganisationEntitlements(ctx context.Context, orgID string,
 		keys = append(keys, k)
 	}
 	uniq := uniqueStrings(keys)
-	rows, err := s.db.Q().ListEntitlementIDsByKeys(ctx, uniq)
+	rows, err := s.db.Q().ListEntitlementIDsByKeysForOrg(ctx, sqlc.ListEntitlementIDsByKeysForOrgParams{
+		Keys:           uniq,
+		OrganisationID: textArg(orgID),
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -300,16 +303,21 @@ func (s *Service) EffectiveEntitlementsView(ctx context.Context, orgID string) (
 		return EffectiveEntitlementsView{}, err
 	}
 
-	var planKeys []string
+	var baseKeys []string
 	sub, err := s.db.Q().GetSubscriptionByOrganisation(ctx, orgID)
 	if err == nil {
-		planKeys, err = s.db.Q().ListEntitlementKeysByPlan(ctx, sub.PlanID)
+		baseKeys, err = s.db.Q().ListEntitlementKeysByPlan(ctx, sub.PlanID)
 		if err != nil {
 			return EffectiveEntitlementsView{}, err
 		}
 	} else if !errors.Is(err, pgx.ErrNoRows) {
 		return EffectiveEntitlementsView{}, err
 	}
+	productPlanKeys, err := s.activeProductPlanFeatureKeys(ctx, orgID)
+	if err != nil {
+		return EffectiveEntitlementsView{}, err
+	}
+	baseKeys = append(baseKeys, productPlanKeys...)
 
 	overrideRows, err := s.db.Q().ListOrganisationEntitlementOverrides(ctx, orgID)
 	if err != nil {
@@ -319,8 +327,8 @@ func (s *Service) EffectiveEntitlementsView(ctx context.Context, orgID string) (
 	for _, row := range overrideRows {
 		overrides[row.Key] = row.Effect
 	}
-	keys := billing.EffectiveKeys(planKeys, overrides)
-	platform, product, err := s.splitEntitlementKeysByScope(ctx, keys)
+	keys := billing.EffectiveKeys(baseKeys, overrides)
+	platform, product, err := s.splitEntitlementKeysByScope(ctx, orgID, keys)
 	if err != nil {
 		return EffectiveEntitlementsView{}, err
 	}
@@ -331,13 +339,16 @@ func (s *Service) EffectiveEntitlementsView(ctx context.Context, orgID string) (
 	}, nil
 }
 
-func (s *Service) splitEntitlementKeysByScope(ctx context.Context, keys []string) (platform, product []string, err error) {
+func (s *Service) splitEntitlementKeysByScope(ctx context.Context, orgID string, keys []string) (platform, product []string, err error) {
 	platform = []string{}
 	product = []string{}
 	if len(keys) == 0 {
 		return platform, product, nil
 	}
-	rows, err := s.db.Q().ListEntitlementScopesByKeys(ctx, keys)
+	rows, err := s.db.Q().ListEntitlementScopesByKeysForOrg(ctx, sqlc.ListEntitlementScopesByKeysForOrgParams{
+		Keys:           keys,
+		OrganisationID: textArg(orgID),
+	})
 	if err != nil {
 		return nil, nil, err
 	}
@@ -368,7 +379,10 @@ func (s *Service) CheckEntitlement(ctx context.Context, orgID, entitlementKey st
 	if org.Status != "active" {
 		return false, nil
 	}
-	if _, err := s.db.Q().GetEntitlementByKey(ctx, entitlementKey); err != nil {
+	if _, err := s.db.Q().GetEntitlementForOrgCheck(ctx, sqlc.GetEntitlementForOrgCheckParams{
+		Key:            entitlementKey,
+		OrganisationID: textArg(orgID),
+	}); err != nil {
 		return false, mapNotFound(err, "entitlement not found")
 	}
 	effective, err := s.EffectiveEntitlements(ctx, orgID)

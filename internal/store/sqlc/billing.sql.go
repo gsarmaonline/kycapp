@@ -28,9 +28,9 @@ func (q *Queries) AddPlanEntitlement(ctx context.Context, arg AddPlanEntitlement
 }
 
 const createEntitlement = `-- name: CreateEntitlement :one
-INSERT INTO entitlements (id, key, description, scope)
-VALUES ($1, $2, $3, $4)
-RETURNING id, key, description, scope
+INSERT INTO entitlements (id, key, description, scope, organisation_id)
+VALUES ($1, $2, $3, $4, NULL)
+RETURNING id, key, description, scope, organisation_id
 `
 
 type CreateEntitlementParams struct {
@@ -53,6 +53,7 @@ func (q *Queries) CreateEntitlement(ctx context.Context, arg CreateEntitlementPa
 		&i.Key,
 		&i.Description,
 		&i.Scope,
+		&i.OrganisationID,
 	)
 	return i, err
 }
@@ -143,7 +144,7 @@ func (q *Queries) DeletePlanEntitlements(ctx context.Context, planID string) err
 }
 
 const getEntitlementByKey = `-- name: GetEntitlementByKey :one
-SELECT id, key, description, scope FROM entitlements
+SELECT id, key, description, scope, organisation_id FROM entitlements
 WHERE key = $1
 `
 
@@ -155,6 +156,7 @@ func (q *Queries) GetEntitlementByKey(ctx context.Context, key string) (Entitlem
 		&i.Key,
 		&i.Description,
 		&i.Scope,
+		&i.OrganisationID,
 	)
 	return i, err
 }
@@ -304,7 +306,8 @@ func (q *Queries) ListEntitlementScopesByKeys(ctx context.Context, keys []string
 }
 
 const listEntitlements = `-- name: ListEntitlements :many
-SELECT id, key, description, scope FROM entitlements
+SELECT id, key, description, scope, organisation_id FROM entitlements
+WHERE organisation_id IS NULL
 ORDER BY scope, key
 `
 
@@ -322,6 +325,7 @@ func (q *Queries) ListEntitlements(ctx context.Context) ([]Entitlement, error) {
 			&i.Key,
 			&i.Description,
 			&i.Scope,
+			&i.OrganisationID,
 		); err != nil {
 			return nil, err
 		}

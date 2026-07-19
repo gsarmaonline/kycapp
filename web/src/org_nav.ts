@@ -6,6 +6,8 @@ export type OrgSection =
   | 'attributes'
   | 'email-templates'
   | 'automations'
+  | 'product-features'
+  | 'product-plans'
   | 'branding'
   | 'billing'
 
@@ -29,6 +31,8 @@ export const ORG_SECTIONS: OrgNavItem[] = [
   { id: 'attributes', label: 'User Attributes', path: 'attributes' },
   { id: 'email-templates', label: 'Email templates', path: 'email-templates' },
   { id: 'automations', label: 'Automations', path: 'automations' },
+  { id: 'product-features', label: 'Features', path: 'product-features' },
+  { id: 'product-plans', label: 'Plans', path: 'product-plans' },
   { id: 'branding', label: 'Branding', path: 'branding' },
   { id: 'billing', label: 'Billing', path: 'billing' },
 ]
@@ -55,6 +59,8 @@ export const ORG_NAV_GROUPS: OrgNavGroup[] = [
       { id: 'attributes', label: 'User Attributes', path: 'attributes' },
       { id: 'email-templates', label: 'Email templates', path: 'email-templates' },
       { id: 'automations', label: 'Automations', path: 'automations' },
+      { id: 'product-features', label: 'Features', path: 'product-features' },
+      { id: 'product-plans', label: 'Plans', path: 'product-plans' },
     ],
   },
 ]
@@ -71,6 +77,8 @@ export function sectionFromPathname(pathname: string, orgId: string): OrgSection
     case 'attributes':
     case 'email-templates':
     case 'automations':
+    case 'product-features':
+    case 'product-plans':
     case 'branding':
     case 'billing':
       return head

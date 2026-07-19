@@ -179,12 +179,18 @@ func planJSON(p service.PlanView) map[string]any {
 }
 
 func entitlementJSON(e sqlc.Entitlement) map[string]any {
-	return map[string]any{
+	out := map[string]any{
 		"id":          e.ID,
 		"key":         e.Key,
 		"description": e.Description,
 		"scope":       e.Scope,
 	}
+	if e.OrganisationID.Valid {
+		out["organisation_id"] = e.OrganisationID.String
+	} else {
+		out["organisation_id"] = nil
+	}
+	return out
 }
 
 func effectiveEntitlementsJSON(v service.EffectiveEntitlementsView) map[string]any {

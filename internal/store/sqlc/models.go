@@ -109,10 +109,11 @@ type EmailTemplate struct {
 }
 
 type Entitlement struct {
-	ID          string `json:"id"`
-	Key         string `json:"key"`
-	Description string `json:"description"`
-	Scope       string `json:"scope"`
+	ID             string      `json:"id"`
+	Key            string      `json:"key"`
+	Description    string      `json:"description"`
+	Scope          string      `json:"scope"`
+	OrganisationID pgtype.Text `json:"organisation_id"`
 }
 
 type IdempotencyKey struct {
@@ -150,6 +151,12 @@ type OrganisationEntitlement struct {
 	OrganisationID string `json:"organisation_id"`
 	EntitlementID  string `json:"entitlement_id"`
 	Effect         string `json:"effect"`
+}
+
+type OrganisationProductPlan struct {
+	OrganisationID string    `json:"organisation_id"`
+	ProductPlanID  string    `json:"product_plan_id"`
+	UpdatedAt      time.Time `json:"updated_at"`
 }
 
 type Permission struct {
@@ -193,6 +200,21 @@ type ProcessorEvent struct {
 	Payload     json.RawMessage    `json:"payload"`
 	ProcessedAt pgtype.Timestamptz `json:"processed_at"`
 	CreatedAt   time.Time          `json:"created_at"`
+}
+
+type ProductPlan struct {
+	ID             string    `json:"id"`
+	OrganisationID string    `json:"organisation_id"`
+	Key            string    `json:"key"`
+	Name           string    `json:"name"`
+	Status         string    `json:"status"`
+	CreatedAt      time.Time `json:"created_at"`
+	UpdatedAt      time.Time `json:"updated_at"`
+}
+
+type ProductPlanFeature struct {
+	ProductPlanID string `json:"product_plan_id"`
+	EntitlementID string `json:"entitlement_id"`
 }
 
 type Role struct {

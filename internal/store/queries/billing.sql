@@ -16,8 +16,8 @@ SELECT * FROM plans
 ORDER BY key;
 
 -- name: CreateEntitlement :one
-INSERT INTO entitlements (id, key, description, scope)
-VALUES ($1, $2, $3, $4)
+INSERT INTO entitlements (id, key, description, scope, organisation_id)
+VALUES ($1, $2, $3, $4, NULL)
 RETURNING *;
 
 -- name: GetEntitlementByKey :one
@@ -26,6 +26,7 @@ WHERE key = $1;
 
 -- name: ListEntitlements :many
 SELECT * FROM entitlements
+WHERE organisation_id IS NULL
 ORDER BY scope, key;
 
 -- name: ListEntitlementKeysByPlan :many

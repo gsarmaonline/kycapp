@@ -1,15 +1,19 @@
 import { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 import {
   createBillingCheckout,
   createBillingPortal,
+  getActiveProductPlan,
   getOrgEntitlements,
   getSubscription,
   listPlanPrices,
   listPlans,
   type Plan,
   type PlanPrice,
+  type ProductPlan,
   type Subscription,
 } from '../api'
+import { resourcePath } from '../org_nav'
 
 function FeatureList({
   title,
@@ -51,6 +55,7 @@ export function BillingPanel({
   const [subscription, setSubscription] = useState<Subscription | null>(null)
   const [platformCapabilities, setPlatformCapabilities] = useState<string[]>([])
   const [productFeatures, setProductFeatures] = useState<string[]>([])
+  const [activeProductPlan, setActiveProductPlan] = useState<ProductPlan | null>(null)
   const [busy, setBusy] = useState(false)
 
   async function refresh() {
@@ -65,6 +70,11 @@ export function BillingPanel({
         setSubscription(sub)
       } catch {
         setSubscription(null)
+      }
+      try {
+        setActiveProductPlan(await getActiveProductPlan(orgId))
+      } catch {
+        setActiveProductPlan(null)
       }
       const priceEntries = await Promise.all(
         p.items.map(async (plan) => {
@@ -129,14 +139,37 @@ export function BillingPanel({
       <div className="billing-feature-grid">
         <FeatureList
           title="Platform capabilities"
-          hint="What this organisation may use inside KYC"
+          hint="What this organisation may use inside KYC (from KYC plan)"
           items={platformCapabilities}
         />
-        <FeatureList
-          title="Product features"
-          hint="What this organisation may unlock in its own product"
-          items={productFeatures}
-        />
+        <div className="billing-feature-group">
+          <h3>Product features</h3>
+          <p className="status">
+            What end users may use in your product
+            {activeProductPlan
+              ? ` · active plan ${activeProductPlan.name}`
+              : ' · no product plan activated'}
+          </p>
+          {productFeatures.length === 0 ? (
+            <p className="status">None effective yet</p>
+          ) : (
+            <ul className="billing-feature-list">
+              {productFeatures.map((key) => (
+                <li key={key}>
+                  <code>{key}</code>
+                </li>
+              ))}
+            </ul>
+          )}
+          <p className="row" style={{ gap: '0.75rem', flexWrap: 'wrap', marginTop: '0.75rem' }}>
+            <Link className="button ghost" to={resourcePath(orgId, 'product-features')}>
+              Manage features
+            </Link>
+            <Link className="button ghost" to={resourcePath(orgId, 'product-plans')}>
+              Manage plans
+            </Link>
+          </p>
+        </div>
       </div>
 
       <div className="row" style={{ gap: '0.75rem', flexWrap: 'wrap', marginTop: '1rem' }}>

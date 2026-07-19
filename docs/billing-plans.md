@@ -153,8 +153,10 @@ erDiagram
 Subscription gains processor refs (`subscription_ref`, optional period end sync from Stripe).
 
 ```text
-effective_entitlements = plan ∪ grants − denies
+effective_entitlements = kyc_plan ∪ active_product_plan ∪ grants − denies
 ```
+
+Merchant **product features** / **product plans** (org-owned) package what end users may use; activating a product plan feeds the product side of the effective set. KYC Stripe plans still drive **platform capabilities**.
 
 Failing payment → subscription status change → access policy. Never call Stripe inside entitlement checks.
 

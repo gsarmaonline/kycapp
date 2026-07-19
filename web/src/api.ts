@@ -332,6 +332,95 @@ export function getOrgEntitlements(orgId: string) {
   return request<OrgEntitlements>(`/v1/organisations/${orgId}/entitlements`)
 }
 
+export type ProductFeature = {
+  id: string
+  organisation_id?: string
+  key: string
+  description: string
+  scope: 'product'
+}
+
+export type ProductPlan = {
+  id: string
+  organisation_id: string
+  key: string
+  name: string
+  status: string
+  feature_keys: string[]
+  created_at?: string
+  updated_at?: string
+}
+
+export function listProductFeatures(orgId: string) {
+  return request<{ items: ProductFeature[] }>(`/v1/organisations/${orgId}/product-features`)
+}
+
+export function createProductFeature(orgId: string, input: { key: string; description?: string }) {
+  return request<ProductFeature>(`/v1/organisations/${orgId}/product-features`, {
+    method: 'POST',
+    body: JSON.stringify(input),
+  })
+}
+
+export function getProductFeature(id: string) {
+  return request<ProductFeature>(`/v1/product-features/${id}`)
+}
+
+export function updateProductFeature(id: string, input: { description: string }) {
+  return request<ProductFeature>(`/v1/product-features/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(input),
+  })
+}
+
+export function deleteProductFeature(id: string) {
+  return request<{ ok: boolean }>(`/v1/product-features/${id}`, { method: 'DELETE' })
+}
+
+export function listProductPlans(orgId: string) {
+  return request<{ items: ProductPlan[] }>(`/v1/organisations/${orgId}/product-plans`)
+}
+
+export function createProductPlan(orgId: string, input: { key: string; name: string }) {
+  return request<ProductPlan>(`/v1/organisations/${orgId}/product-plans`, {
+    method: 'POST',
+    body: JSON.stringify(input),
+  })
+}
+
+export function getProductPlan(id: string) {
+  return request<ProductPlan>(`/v1/product-plans/${id}`)
+}
+
+export function updateProductPlan(id: string, input: { name?: string; status?: string }) {
+  return request<ProductPlan>(`/v1/product-plans/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(input),
+  })
+}
+
+export function setProductPlanFeatures(id: string, feature_keys: string[]) {
+  return request<ProductPlan>(`/v1/product-plans/${id}/features`, {
+    method: 'PUT',
+    body: JSON.stringify({ feature_keys }),
+  })
+}
+
+export function deleteProductPlan(id: string) {
+  return request<{ ok: boolean }>(`/v1/product-plans/${id}`, { method: 'DELETE' })
+}
+
+export function getActiveProductPlan(orgId: string) {
+  return request<ProductPlan>(`/v1/organisations/${orgId}/product-plan`)
+}
+
+export function setActiveProductPlan(orgId: string, product_plan_id: string) {
+  return request<{ product_plan: ProductPlan | null }>(`/v1/organisations/${orgId}/product-plan`, {
+    method: 'PUT',
+    body: JSON.stringify({ product_plan_id }),
+  })
+}
+
 export function createBillingCheckout(
   orgId: string,
   input: { plan_id: string; interval?: string; success_url?: string; cancel_url?: string },
