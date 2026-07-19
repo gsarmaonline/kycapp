@@ -32,6 +32,10 @@ type Config struct {
 	StripeWebhookSecret string
 	StripeSuccessURL    string
 	StripeCancelURL     string
+
+	EmailProvider string
+	ResendAPIKey  string
+	EmailFrom     string
 }
 
 // Load reads configuration from environment variables.
@@ -57,6 +61,9 @@ func Load() (Config, error) {
 		StripeWebhookSecret:  os.Getenv("STRIPE_WEBHOOK_SECRET"),
 		StripeSuccessURL:     os.Getenv("STRIPE_SUCCESS_URL"),
 		StripeCancelURL:      os.Getenv("STRIPE_CANCEL_URL"),
+		EmailProvider:        envOr("EMAIL_PROVIDER", "noop"),
+		ResendAPIKey:         os.Getenv("RESEND_API_KEY"),
+		EmailFrom:            os.Getenv("EMAIL_FROM"),
 	}
 	if cfg.DatabaseURL == "" {
 		return Config{}, fmt.Errorf("DATABASE_URL is required")

@@ -61,7 +61,7 @@ flowchart TB
 | 5 | Real billing | **Partial** | Stripe executor (Checkout/Portal/webhooks → subscription). See [billing-plans.md](./billing-plans.md). Metering / Connect later. |
 | 6 | Invite email | **Partial** | Invite + accept-while-logged-in works; no email delivery or magic invite links. |
 | 7 | Platform admin | **Partial** | `platform_admin` flag + `PLATFORM_ADMIN_EMAILS`; no dedicated admin UI. |
-| 8 | Production essentials | **Partial** | Auth/check rate limits, mutation audit. Still missing: email provider, merchant-scoped API keys, GDPR export/delete, hardened cookie sessions, etc. |
+| 8 | Production essentials | **Partial** | Auth/check rate limits, mutation audit, email via Resend (`EMAIL_PROVIDER`). Still missing: invite emails, GDPR export/delete, hardened cookie sessions, etc. |
 | 9 | Name vs product | **Open** | Still “KYC” without ID verification — position as org/access/billing platform, or add real KYC later. |
 
 ---

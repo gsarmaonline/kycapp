@@ -106,6 +106,9 @@ cd web && npm run dev
 | `STRIPE_SECRET_KEY` | Stripe API secret (required when provider is `stripe`) |
 | `STRIPE_WEBHOOK_SECRET` | Webhook signing secret |
 | `STRIPE_SUCCESS_URL` / `STRIPE_CANCEL_URL` | Optional Checkout return URL defaults |
+| `EMAIL_PROVIDER` | `noop` (default, log only) or `resend` |
+| `RESEND_API_KEY` | Resend API key (required when provider is `resend`) |
+| `EMAIL_FROM` | From address, e.g. `KYC <mail@yourdomain.com>` (verified in Resend) |
 
 | Principal | Can do |
 | --- | --- |

@@ -255,7 +255,7 @@ Org-scoped rules: trigger → simple AND conditions → ordered actions. Execute
 - `GET /v1/organisations/{id}/automation-runs` — requires `automations:read`  
   Query: `automation_id`
 
-Email delivery is stubbed (logged) until an ESP is wired.
+Email delivery uses `EMAIL_PROVIDER` (`noop` logs; `resend` sends via Resend). Set `RESEND_API_KEY` and `EMAIL_FROM` when using Resend.
 
 ---
 

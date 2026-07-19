@@ -10,6 +10,7 @@ import (
 
 	"github.com/gsarmaonline/kyc/internal/config"
 	"github.com/gsarmaonline/kyc/internal/jobs"
+	"github.com/gsarmaonline/kyc/internal/mailer"
 	"github.com/gsarmaonline/kyc/internal/service"
 	"github.com/gsarmaonline/kyc/internal/store"
 )
@@ -32,6 +33,16 @@ func main() {
 	}
 
 	svc := service.New(db)
+	svc.ConfigureAssets(cfg.UploadDir, cfg.PublicBaseURL)
+	mail, err := mailer.NewFromConfig(mailer.Config{
+		Provider: cfg.EmailProvider,
+		APIKey:   cfg.ResendAPIKey,
+		From:     cfg.EmailFrom,
+	})
+	if err != nil {
+		log.Fatalf("mailer: %v", err)
+	}
+	svc.SetMailer(mail)
 	riverClient, err := jobs.NewWorkerClient(db.Pool(), svc.ProcessAutomationEvent)
 	if err != nil {
 		log.Fatalf("river: %v", err)
@@ -43,7 +54,7 @@ func main() {
 	if err := riverClient.Start(runCtx); err != nil {
 		log.Fatalf("river start: %v", err)
 	}
-	log.Printf("automation worker running (river)")
+	log.Printf("automation worker running (river, email=%s)", mail.Name())
 
 	stop := make(chan os.Signal, 1)
 	signal.Notify(stop, syscall.SIGINT, syscall.SIGTERM)

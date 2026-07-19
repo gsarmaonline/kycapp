@@ -7,6 +7,7 @@ import (
 
 	"github.com/gsarmaonline/kyc/internal/apperr"
 	"github.com/gsarmaonline/kyc/internal/ids"
+	"github.com/gsarmaonline/kyc/internal/mailer"
 	"github.com/gsarmaonline/kyc/internal/payments"
 	"github.com/gsarmaonline/kyc/internal/store"
 	"github.com/gsarmaonline/kyc/internal/store/sqlc"
@@ -21,6 +22,7 @@ type Service struct {
 	publicBaseURL      string
 	enqueue            Enqueuer
 	payments           payments.Processor
+	mailer             mailer.Mailer
 	checkoutSuccessURL string
 	checkoutCancelURL  string
 }
@@ -35,12 +37,22 @@ func New(db *store.Store) *Service {
 		db:            db,
 		uploadDir:     "data/uploads",
 		publicBaseURL: "http://localhost:8080",
+		mailer:        mailer.NewNoop(),
 	}
 }
 
 // SetEnqueuer attaches a job enqueue implementation (typically River).
 func (s *Service) SetEnqueuer(e Enqueuer) {
 	s.enqueue = e
+}
+
+// SetMailer configures transactional email delivery (default noop).
+func (s *Service) SetMailer(m mailer.Mailer) {
+	if m == nil {
+		s.mailer = mailer.NewNoop()
+		return
+	}
+	s.mailer = m
 }
 
 // ConfigureAssets sets local upload directory and public base URL for logos.

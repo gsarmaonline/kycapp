@@ -38,6 +38,9 @@ services:
       STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
       STRIPE_SUCCESS_URL: ${STRIPE_SUCCESS_URL:-}
       STRIPE_CANCEL_URL: ${STRIPE_CANCEL_URL:-}
+      EMAIL_PROVIDER: ${EMAIL_PROVIDER:-noop}
+      RESEND_API_KEY: ${RESEND_API_KEY:-}
+      EMAIL_FROM: ${EMAIL_FROM:-}
     volumes:
       - api_uploads:/data/uploads
     depends_on:
@@ -69,6 +72,11 @@ services:
       dockerfile: Dockerfile.worker
     environment:
       DATABASE_URL: postgres://kyc:kyc@postgres:5432/kyc?sslmode=disable
+      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-http://localhost:8080}
+      UPLOAD_DIR: ${UPLOAD_DIR:-/data/uploads}
+      EMAIL_PROVIDER: ${EMAIL_PROVIDER:-noop}
+      RESEND_API_KEY: ${RESEND_API_KEY:-}
+      EMAIL_FROM: ${EMAIL_FROM:-}
     depends_on:
       postgres:
         condition: service_healthy

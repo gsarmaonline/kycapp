@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"html"
 	"log/slog"
 	"strings"
 
@@ -11,6 +12,7 @@ import (
 	"github.com/gsarmaonline/kyc/core/emailtemplates"
 	"github.com/gsarmaonline/kyc/internal/apperr"
 	"github.com/gsarmaonline/kyc/internal/ids"
+	"github.com/gsarmaonline/kyc/internal/mailer"
 	"github.com/gsarmaonline/kyc/internal/store/sqlc"
 	"github.com/jackc/pgx/v5/pgtype"
 )
@@ -213,21 +215,44 @@ func (s *Service) executeAction(ctx context.Context, orgID string, a automations
 		if err != nil {
 			return "", err
 		}
+		to := stringifyPayload(payload["email"])
+		if to == "" {
+			return "", fmt.Errorf("send_email: payload email is required")
+		}
 		vars := map[string]string{
 			"display_name": stringifyPayload(payload["display_name"]),
 			"org_name":     org.Name,
-			"email":        stringifyPayload(payload["email"]),
+			"email":        to,
 		}
 		subject := emailtemplates.Render(tmpl.Subject, vars)
-		body := emailtemplates.Render(tmpl.BodyText, vars)
-		slog.Info("automation send_email (stub delivery)",
+		textBody := emailtemplates.Render(tmpl.BodyText, vars)
+		htmlInner := emailtemplates.Render(tmpl.BodyHtml, vars)
+		if strings.TrimSpace(htmlInner) == "" {
+			htmlInner = "<p>" + html.EscapeString(textBody) + "</p>"
+		}
+		htmlBody := emailtemplates.Wrap(htmlInner, BrandingFromOrg(org))
+		ref, err := s.mailer.Send(ctx, mailer.Message{
+			To:      []string{to},
+			Subject: subject,
+			HTML:    htmlBody,
+			Text:    textBody,
+			Tags: map[string]string{
+				"org_id":       orgID,
+				"template_key": a.TemplateKey,
+				"source":       "automation",
+			},
+		})
+		if err != nil {
+			return "", fmt.Errorf("send_email: %w", err)
+		}
+		slog.Info("automation send_email",
 			"org_id", orgID,
 			"template", a.TemplateKey,
-			"subject", subject,
-			"to", vars["email"],
-			"body_len", len(body),
+			"provider", s.mailer.Name(),
+			"provider_ref", ref,
+			"to", to,
 		)
-		return "send_email:" + a.TemplateKey + " → " + vars["email"], nil
+		return "send_email:" + a.TemplateKey + " → " + to + " (" + s.mailer.Name() + ":" + ref + ")", nil
 	default:
 		return "", fmt.Errorf("unsupported action %q", a.Type)
 	}

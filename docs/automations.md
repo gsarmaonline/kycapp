@@ -51,7 +51,7 @@ Add more later (`membership.invited`, `subscription.updated`, …) without chang
 
 | Type | Behavior |
 | --- | --- |
-| `send_email` | Render org email template + branding (delivery provider can be stub/log until SMTP/ESP exists) |
+| `send_email` | Render org email template + branding, deliver via Mailer (`EMAIL_PROVIDER=resend` or `noop`) |
 | `set_attribute` | Optional later |
 
 Unknown action types fail the run with a clear error (no silent skip).
@@ -80,8 +80,18 @@ Under `/orgs/:orgId/automations`:
 
 | Env | Pieces |
 | --- | --- |
-| Local | Existing Postgres + `api` + `worker` (River consumers) |
-| Railway | Same DB as API; add **worker** service when automations ship — no Temporal cluster |
+| Local | Existing Postgres + `api` + `worker` (River consumers); email defaults to `noop` |
+| Railway | Same DB as API + **worker**; set `EMAIL_PROVIDER=resend`, `RESEND_API_KEY`, `EMAIL_FROM` on **worker** (and api if it sends later) |
+
+### Email delivery
+
+```text
+EMAIL_PROVIDER=noop|resend   # default noop (log only)
+RESEND_API_KEY=re_...
+EMAIL_FROM=KYC <mail@yourdomain.com>   # verified domain in Resend
+```
+
+Automations run in the **worker**, so Resend env must be on that service.
 
 ## Out of scope (v1)
 

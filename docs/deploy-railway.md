@@ -39,6 +39,9 @@ For each service: **Settings → Config-as-code** → set the config file path t
 | `APP_ORIGIN` | same as public web URL |
 | `PUBLIC_BASE_URL` | same as public web URL (logos go through nginx `/v1/public/...`) |
 | `OAUTH_REDIRECT_URL` | `{APP_ORIGIN}/v1/auth/google/callback` |
+| `EMAIL_PROVIDER` | `noop` (default) or `resend` |
+| `RESEND_API_KEY` | Resend API key (required if `EMAIL_PROVIDER=resend`) |
+| `EMAIL_FROM` | e.g. `KYC <mail@yourdomain.com>` (verified domain in Resend) |
 
 `PORT` is set by Railway; the API listens on it automatically.
 
@@ -99,6 +102,7 @@ Point a Stripe webhook at `https://<api-or-web-domain>/v1/billing/webhooks/strip
 
 - Add a **worker** service; Config-as-code → `/railway.worker.toml`.
 - Set `DATABASE_URL=${{Postgres.DATABASE_URL}}` (same DB as API). No public domain.
+- For real email: `EMAIL_PROVIDER=resend`, `RESEND_API_KEY`, `EMAIL_FROM` (and `PUBLIC_BASE_URL` so branded logos resolve in HTML).
 
 ## Local compose vs Railway
 
