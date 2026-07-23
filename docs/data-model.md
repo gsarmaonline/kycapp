@@ -263,7 +263,7 @@ Each entitlement has a **scope**:
 
 ### ProductPlan
 
-Org-owned package of product features for end-user gating (separate from KYC billing `Plan`).
+Org-owned package of product features for end-user gating (separate from KYC billing `Plan`). Optional Stripe Product/Price sync via org integration keys.
 
 | Field | Type | Notes |
 | --- | --- | --- |
@@ -271,6 +271,22 @@ Org-owned package of product features for end-user gating (separate from KYC bil
 | `organisation_id` | string | FK → Organisation |
 | `key` | string | Unique per org |
 | `name` | string | |
+| `status` | enum | `active` \| `archived` |
+
+### ProductPlanPrice
+
+Flat recurring offer for a merchant product plan. KYC authors amount/interval; when Stripe is connected, Product/Price are created and refs stored.
+
+| Field | Type | Notes |
+| --- | --- | --- |
+| `id` | string | PK |
+| `product_plan_id` | string | FK → ProductPlan |
+| `interval` | enum | `month` \| `year` |
+| `currency` | string | e.g. `usd` |
+| `unit_amount` | int64 | Minor units (cents) |
+| `processor` | string | e.g. `stripe` |
+| `processor_product_ref` | string | Stripe Product id (empty until synced) |
+| `processor_price_ref` | string | Stripe Price id (empty until synced) |
 | `status` | enum | `active` \| `archived` |
 
 ### ProductPlanFeature

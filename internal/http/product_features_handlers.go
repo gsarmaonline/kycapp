@@ -22,7 +22,26 @@ func productFeatureJSON(e sqlc.Entitlement) map[string]any {
 	return out
 }
 
+func productPlanPriceJSON(p sqlc.ProductPlanPrice) map[string]any {
+	return map[string]any{
+		"id":                    p.ID,
+		"product_plan_id":       p.ProductPlanID,
+		"interval":              p.Interval,
+		"currency":              p.Currency,
+		"unit_amount":           p.UnitAmount,
+		"processor":             p.Processor,
+		"processor_product_ref": p.ProcessorProductRef,
+		"processor_price_ref":   p.ProcessorPriceRef,
+		"status":                p.Status,
+		"synced":                p.ProcessorPriceRef != "",
+	}
+}
+
 func productPlanJSON(v service.ProductPlanView) map[string]any {
+	prices := make([]map[string]any, 0, len(v.Prices))
+	for _, p := range v.Prices {
+		prices = append(prices, productPlanPriceJSON(p))
+	}
 	return map[string]any{
 		"id":              v.Plan.ID,
 		"organisation_id": v.Plan.OrganisationID,
@@ -30,6 +49,7 @@ func productPlanJSON(v service.ProductPlanView) map[string]any {
 		"name":            v.Plan.Name,
 		"status":          v.Plan.Status,
 		"feature_keys":    v.FeatureKeys,
+		"prices":          prices,
 		"created_at":      v.Plan.CreatedAt.UTC().Format(time.RFC3339Nano),
 		"updated_at":      v.Plan.UpdatedAt.UTC().Format(time.RFC3339Nano),
 	}
@@ -141,16 +161,29 @@ func (s *Server) handleCreateProductPlan(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	var body struct {
-		Key  string `json:"key"`
-		Name string `json:"name"`
+		Key   string `json:"key"`
+		Name  string `json:"name"`
+		Price *struct {
+			Interval   string `json:"interval"`
+			Currency   string `json:"currency"`
+			UnitAmount int64  `json:"unit_amount"`
+			Status     string `json:"status"`
+		} `json:"price"`
 	}
 	if err := decodeJSON(r, &body); err != nil {
 		writeError(w, apperr.Validation("invalid JSON body"))
 		return
 	}
-	plan, err := s.svc.CreateProductPlan(r.Context(), orgID, service.CreateProductPlanInput{
-		Key: body.Key, Name: body.Name,
-	})
+	in := service.CreateProductPlanInput{Key: body.Key, Name: body.Name}
+	if body.Price != nil {
+		in.Price = &service.ProductPlanPriceInput{
+			Interval:   body.Price.Interval,
+			Currency:   body.Price.Currency,
+			UnitAmount: body.Price.UnitAmount,
+			Status:     body.Price.Status,
+		}
+	}
+	plan, err := s.svc.CreateProductPlan(r.Context(), orgID, in)
 	if err != nil {
 		writeError(w, err)
 		return
@@ -242,6 +275,58 @@ func (s *Server) handleSetProductPlanFeatures(w http.ResponseWriter, r *http.Req
 		return
 	}
 	writeJSON(w, http.StatusOK, productPlanJSON(plan))
+}
+
+func (s *Server) handleUpsertProductPlanPrice(w http.ResponseWriter, r *http.Request) {
+	existing, err := s.svc.GetProductPlan(r.Context(), r.PathValue("id"))
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	if _, err := s.svc.RequireOrgPermission(r.Context(), existing.Plan.OrganisationID, "product_features:manage"); err != nil {
+		writeError(w, err)
+		return
+	}
+	var body struct {
+		Interval   string `json:"interval"`
+		Currency   string `json:"currency"`
+		UnitAmount int64  `json:"unit_amount"`
+		Status     string `json:"status"`
+	}
+	if err := decodeJSON(r, &body); err != nil {
+		writeError(w, apperr.Validation("invalid JSON body"))
+		return
+	}
+	price, err := s.svc.UpsertProductPlanPrice(r.Context(), r.PathValue("id"), service.ProductPlanPriceInput{
+		Interval: body.Interval, Currency: body.Currency, UnitAmount: body.UnitAmount, Status: body.Status,
+	})
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, productPlanPriceJSON(price))
+}
+
+func (s *Server) handleListProductPlanPrices(w http.ResponseWriter, r *http.Request) {
+	existing, err := s.svc.GetProductPlan(r.Context(), r.PathValue("id"))
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	if _, err := s.svc.RequireOrgPermission(r.Context(), existing.Plan.OrganisationID, "product_features:read"); err != nil {
+		writeError(w, err)
+		return
+	}
+	prices, err := s.svc.ListProductPlanPrices(r.Context(), r.PathValue("id"))
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	out := make([]map[string]any, 0, len(prices))
+	for _, p := range prices {
+		out = append(out, productPlanPriceJSON(p))
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"items": out})
 }
 
 func (s *Server) handleDeleteProductPlan(w http.ResponseWriter, r *http.Request) {

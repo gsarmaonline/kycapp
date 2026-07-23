@@ -1,21 +1,26 @@
 import { useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams } from 'react-router-dom'
 import {
   createOrgAPIKey,
   deleteOrganisation,
   deleteOrgIntegration,
   getOrganisation,
+  importStripeCatalog,
   listOrgAPIKeys,
   listOrgIntegrations,
+  listStripeCatalog,
   revokeAPIKey,
+  syncProductPlansToStripe,
   updateOrganisation,
   upsertStripeIntegration,
   type OrgAPIKey,
   type OrgIntegration,
   type Organisation,
+  type StripeCatalogItem,
 } from '../api'
 import { PageHeader } from '../crud/ui'
+import { resourcePath } from '../org_nav'
 
 export function SettingsPage() {
   const { orgId = '' } = useParams()
@@ -26,6 +31,8 @@ export function SettingsPage() {
   const [apiKeys, setApiKeys] = useState<OrgAPIKey[]>([])
   const [stripeSecret, setStripeSecret] = useState('')
   const [stripePublishable, setStripePublishable] = useState('')
+  const [catalog, setCatalog] = useState<StripeCatalogItem[] | null>(null)
+  const [selectedPrices, setSelectedPrices] = useState<Record<string, boolean>>({})
   const [newKeyName, setNewKeyName] = useState('Default')
   const [createdToken, setCreatedToken] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -75,6 +82,31 @@ export function SettingsPage() {
     }
   }
 
+  async function afterStripeConnected() {
+    try {
+      const pushed = await syncProductPlansToStripe(orgId)
+      const remote = await listStripeCatalog(orgId)
+      setCatalog(remote.items)
+      const sel: Record<string, boolean> = {}
+      for (const item of remote.items) sel[item.price_ref] = true
+      setSelectedPrices(sel)
+      const parts = [`Stripe connected`]
+      if (pushed.pushed.length) {
+        parts.push(`pushed ${pushed.pushed.length} local plan price(s)`)
+      }
+      if (remote.items.length) {
+        parts.push(`found ${remote.items.length} Stripe price(s) — import below if you want`)
+      }
+      setMessage(parts.join(' · '))
+    } catch (err) {
+      setMessage(
+        err instanceof Error
+          ? `Stripe connected · catalog: ${err.message}`
+          : 'Stripe connected · catalog unavailable',
+      )
+    }
+  }
+
   async function onSaveStripe(e: FormEvent) {
     e.preventDefault()
     setBusy(true)
@@ -91,7 +123,7 @@ export function SettingsPage() {
       })
       setStripeSecret('')
       setStripePublishable('')
-      setMessage('Stripe connected')
+      await afterStripeConnected()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Stripe save failed')
     } finally {
@@ -106,9 +138,68 @@ export function SettingsPage() {
     try {
       await deleteOrgIntegration(orgId, 'stripe')
       setIntegrations((prev) => prev.filter((i) => i.provider !== 'stripe'))
+      setCatalog(null)
+      setSelectedPrices({})
       setMessage('Stripe disconnected')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Disconnect failed')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function onLoadCatalog() {
+    setBusy(true)
+    setError(null)
+    try {
+      const remote = await listStripeCatalog(orgId)
+      setCatalog(remote.items)
+      const sel: Record<string, boolean> = {}
+      for (const item of remote.items) sel[item.price_ref] = true
+      setSelectedPrices(sel)
+      setMessage(`Loaded ${remote.items.length} Stripe price(s)`)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Catalog load failed')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function onImportSelected() {
+    const items = Object.entries(selectedPrices)
+      .filter(([, on]) => on)
+      .map(([price_ref]) => ({ price_ref }))
+    if (!items.length) {
+      setError('Select at least one Stripe price to import')
+      return
+    }
+    setBusy(true)
+    setError(null)
+    try {
+      const result = await importStripeCatalog(orgId, items)
+      setMessage(
+        `Imported ${result.imported.length} plan(s)` +
+          (result.skipped ? ` · skipped ${result.skipped} already linked` : ''),
+      )
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Import failed')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function onSyncOut() {
+    setBusy(true)
+    setError(null)
+    try {
+      const result = await syncProductPlansToStripe(orgId)
+      setMessage(
+        result.pushed.length
+          ? `Pushed ${result.pushed.length} plan price(s) to Stripe`
+          : 'All local plan prices already synced',
+      )
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Sync failed')
     } finally {
       setBusy(false)
     }
@@ -198,8 +289,8 @@ export function SettingsPage() {
       <section className="settings-block">
         <h3>Stripe</h3>
         <p className="status">
-          Connect your Stripe keys so KYC can run billing for your product. Keys are stored on this
-          organisation and never shown in full after save.
+          Connect your Stripe keys so KYC can sync product plan prices. KYC remains source of truth
+          for features; Stripe holds the charge objects. Keys are never shown in full after save.
         </p>
         {stripe?.has_secret ? (
           <p className="status">
@@ -233,12 +324,54 @@ export function SettingsPage() {
               {stripe?.has_secret ? 'Update Stripe' : 'Connect Stripe'}
             </button>
             {stripe?.has_secret && (
-              <button type="button" className="ghost" disabled={busy} onClick={() => void onDisconnectStripe()}>
-                Disconnect
-              </button>
+              <>
+                <button type="button" className="ghost" disabled={busy} onClick={() => void onLoadCatalog()}>
+                  Load catalog
+                </button>
+                <button type="button" className="ghost" disabled={busy} onClick={() => void onSyncOut()}>
+                  Push KYC plans
+                </button>
+                <button type="button" className="ghost" disabled={busy} onClick={() => void onDisconnectStripe()}>
+                  Disconnect
+                </button>
+              </>
             )}
           </div>
         </form>
+        {catalog && (
+          <div className="create stacked" style={{ marginTop: '1rem' }}>
+            <h4>Import from Stripe</h4>
+            <p className="status">
+              Creates product plans linked to these Prices. Attach features afterward in{' '}
+              <Link to={resourcePath(orgId, 'product-plans')}>Product plans</Link>.
+            </p>
+            {catalog.length === 0 ? (
+              <p className="status">No active recurring prices found.</p>
+            ) : (
+              catalog.map((item) => (
+                <label key={item.price_ref} className="perm">
+                  <input
+                    type="checkbox"
+                    checked={!!selectedPrices[item.price_ref]}
+                    onChange={(e) =>
+                      setSelectedPrices((prev) => ({ ...prev, [item.price_ref]: e.target.checked }))
+                    }
+                  />
+                  <span>
+                    {item.product_name || item.product_ref} ·{' '}
+                    {(item.unit_amount / 100).toFixed(2)} {item.currency.toUpperCase()}/
+                    {item.interval} · <code>{item.price_ref}</code>
+                  </span>
+                </label>
+              ))
+            )}
+            {catalog.length > 0 && (
+              <button type="button" disabled={busy} onClick={() => void onImportSelected()}>
+                Import selected
+              </button>
+            )}
+          </div>
+        )}
       </section>
 
       <section className="settings-block">

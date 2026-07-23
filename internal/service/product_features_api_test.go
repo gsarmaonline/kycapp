@@ -24,6 +24,7 @@ func TestProductFeaturesPlansAndCheck(t *testing.T) {
 
 	createPlan := doJSON(t, h, http.MethodPost, "/v1/organisations/"+orgID+"/product-plans", map[string]any{
 		"key": "pro", "name": "Pro",
+		"price": map[string]any{"interval": "month", "currency": "usd", "unit_amount": 2900},
 	}, auth)
 	if createPlan.Code != http.StatusCreated {
 		t.Fatalf("create plan: %s", createPlan.Body.String())
@@ -31,6 +32,17 @@ func TestProductFeaturesPlansAndCheck(t *testing.T) {
 	var plan map[string]any
 	decodeBody(t, createPlan, &plan)
 	planID := plan["id"].(string)
+	prices, _ := plan["prices"].([]any)
+	if len(prices) != 1 {
+		t.Fatalf("expected one local price before Stripe connect: %#v", plan["prices"])
+	}
+	priceRow := prices[0].(map[string]any)
+	if priceRow["synced"] != false {
+		t.Fatalf("expected unsynced price without Stripe keys: %#v", priceRow)
+	}
+	if int64(priceRow["unit_amount"].(float64)) != 2900 {
+		t.Fatalf("unit_amount: %#v", priceRow["unit_amount"])
+	}
 
 	setFeatures := doJSON(t, h, http.MethodPut, "/v1/product-plans/"+planID+"/features", map[string]any{
 		"feature_keys": []string{"premium_reports"},

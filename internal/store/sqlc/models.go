@@ -227,6 +227,18 @@ type ProductPlanFeature struct {
 	EntitlementID string `json:"entitlement_id"`
 }
 
+type ProductPlanPrice struct {
+	ID                  string `json:"id"`
+	ProductPlanID       string `json:"product_plan_id"`
+	Interval            string `json:"interval"`
+	Currency            string `json:"currency"`
+	UnitAmount          int64  `json:"unit_amount"`
+	Processor           string `json:"processor"`
+	ProcessorProductRef string `json:"processor_product_ref"`
+	ProcessorPriceRef   string `json:"processor_price_ref"`
+	Status              string `json:"status"`
+}
+
 type Role struct {
 	ID             string `json:"id"`
 	OrganisationID string `json:"organisation_id"`

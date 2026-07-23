@@ -57,21 +57,29 @@ export function ProductPlansIndex() {
         createLabel="Create plan"
       />
       <p className="lede">
-        Packages of product features. Activate one plan to control what your product users may use
-        (checked via entitlements).
+        Packages of product features with optional Stripe prices. Activate one plan to control what
+        your product users may use (checked via entitlements).
       </p>
       {error && <p className="error">{error}</p>}
       {loading ? (
         <p>Loading…</p>
       ) : (
         <ResourceTable
-          columns={['Name', 'Key', 'Status', 'Features', 'Active']}
+          columns={['Name', 'Key', 'Price', 'Status', 'Features', 'Active']}
           empty="No product plans yet."
           rows={items.map((p) => ({
             key: p.id,
             cells: [
               p.name,
               p.key,
+              p.prices?.length
+                ? p.prices
+                    .map(
+                      (pr) =>
+                        `${(pr.unit_amount / 100).toFixed(2)} ${pr.currency.toUpperCase()}/${pr.interval}`,
+                    )
+                    .join(', ')
+                : '—',
               p.status,
               p.feature_keys.length ? p.feature_keys.join(', ') : '—',
               p.id === activeId ? 'yes' : '—',

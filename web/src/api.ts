@@ -398,6 +398,19 @@ export type ProductFeature = {
   scope: 'product'
 }
 
+export type ProductPlanPrice = {
+  id: string
+  product_plan_id: string
+  interval: string
+  currency: string
+  unit_amount: number
+  processor: string
+  processor_product_ref: string
+  processor_price_ref: string
+  status: string
+  synced: boolean
+}
+
 export type ProductPlan = {
   id: string
   organisation_id: string
@@ -405,8 +418,25 @@ export type ProductPlan = {
   name: string
   status: string
   feature_keys: string[]
+  prices?: ProductPlanPrice[]
   created_at?: string
   updated_at?: string
+}
+
+export type StripeCatalogItem = {
+  product_ref: string
+  product_name: string
+  price_ref: string
+  interval: string
+  currency: string
+  unit_amount: number
+  active: boolean
+}
+
+export type StripeCatalogSyncResult = {
+  imported: ProductPlan[]
+  pushed: ProductPlan[]
+  skipped: number
 }
 
 export function listProductFeatures(orgId: string) {
@@ -439,7 +469,14 @@ export function listProductPlans(orgId: string) {
   return request<{ items: ProductPlan[] }>(`/v1/organisations/${orgId}/product-plans`)
 }
 
-export function createProductPlan(orgId: string, input: { key: string; name: string }) {
+export function createProductPlan(
+  orgId: string,
+  input: {
+    key: string
+    name: string
+    price?: { interval: string; currency?: string; unit_amount: number; status?: string }
+  },
+) {
   return request<ProductPlan>(`/v1/organisations/${orgId}/product-plans`, {
     method: 'POST',
     body: JSON.stringify(input),
@@ -464,6 +501,20 @@ export function setProductPlanFeatures(id: string, feature_keys: string[]) {
   })
 }
 
+export function upsertProductPlanPrice(
+  id: string,
+  input: { interval: string; currency?: string; unit_amount: number; status?: string },
+) {
+  return request<ProductPlanPrice>(`/v1/product-plans/${id}/price`, {
+    method: 'PUT',
+    body: JSON.stringify(input),
+  })
+}
+
+export function listProductPlanPrices(id: string) {
+  return request<{ items: ProductPlanPrice[] }>(`/v1/product-plans/${id}/prices`)
+}
+
 export function deleteProductPlan(id: string) {
   return request<{ ok: boolean }>(`/v1/product-plans/${id}`, { method: 'DELETE' })
 }
@@ -476,6 +527,28 @@ export function setActiveProductPlan(orgId: string, product_plan_id: string) {
   return request<{ product_plan: ProductPlan | null }>(`/v1/organisations/${orgId}/product-plan`, {
     method: 'PUT',
     body: JSON.stringify({ product_plan_id }),
+  })
+}
+
+export function listStripeCatalog(orgId: string) {
+  return request<{ items: StripeCatalogItem[] }>(
+    `/v1/organisations/${orgId}/integrations/stripe/catalog`,
+  )
+}
+
+export function importStripeCatalog(
+  orgId: string,
+  items: { price_ref: string; key?: string; name?: string }[],
+) {
+  return request<StripeCatalogSyncResult>(`/v1/organisations/${orgId}/integrations/stripe/import`, {
+    method: 'POST',
+    body: JSON.stringify({ items }),
+  })
+}
+
+export function syncProductPlansToStripe(orgId: string) {
+  return request<StripeCatalogSyncResult>(`/v1/organisations/${orgId}/integrations/stripe/sync`, {
+    method: 'POST',
   })
 }
 

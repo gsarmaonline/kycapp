@@ -42,7 +42,8 @@ KYC users are organisations (and the people who run them) that already rely on K
 
 **What users still do elsewhere**
 
-- Configure Products/Prices in Stripe (KYC stores the Price id on the plan).
+- Platform KYC plans: configure Products/Prices in Stripe Dashboard (or link via `PlanPrice.processor_price_ref`).
+- Merchant product plans: create in KYC (pushes to the org’s connected Stripe) or import Prices after connecting keys — features stay in KYC.
 - Handle refunds, disputes, and tax filings in Stripe Dashboard (or later Stripe features) — KYC does not replace those tools.
 
 ---
@@ -156,7 +157,7 @@ Subscription gains processor refs (`subscription_ref`, optional period end sync 
 effective_entitlements = kyc_plan ∪ active_product_plan ∪ grants − denies
 ```
 
-Merchant **product features** / **product plans** (org-owned) package what end users may use; activating a product plan feeds the product side of the effective set. KYC Stripe plans still drive **platform capabilities**.
+Merchant **product features** / **product plans** (org-owned) package what end users may use; activating a product plan feeds the product side of the effective set. Optional `ProductPlanPrice` rows sync to the org’s Stripe account (create Product/Price on save; import on connect). KYC Stripe **platform** plans still drive **platform capabilities**.
 
 Failing payment → subscription status change → access policy. Never call Stripe inside entitlement checks.
 

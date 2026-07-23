@@ -16,6 +16,7 @@ import (
 type ProductPlanView struct {
 	Plan        sqlc.ProductPlan
 	FeatureKeys []string
+	Prices      []sqlc.ProductPlanPrice
 }
 
 type CreateProductFeatureInput struct {
@@ -28,8 +29,9 @@ type UpdateProductFeatureInput struct {
 }
 
 type CreateProductPlanInput struct {
-	Key  string
-	Name string
+	Key   string
+	Name  string
+	Price *ProductPlanPriceInput
 }
 
 type UpdateProductPlanInput struct {
@@ -131,7 +133,16 @@ func (s *Service) CreateProductPlan(ctx context.Context, orgID string, in Create
 		}
 		return ProductPlanView{}, err
 	}
-	return ProductPlanView{Plan: plan, FeatureKeys: []string{}}, nil
+	if in.Price != nil {
+		if _, err := s.UpsertProductPlanPrice(ctx, plan.ID, *in.Price); err != nil {
+			_ = s.db.Q().DeleteProductPlan(ctx, sqlc.DeleteProductPlanParams{
+				ID:             plan.ID,
+				OrganisationID: orgID,
+			})
+			return ProductPlanView{}, err
+		}
+	}
+	return s.productPlanView(ctx, plan)
 }
 
 func (s *Service) productPlanView(ctx context.Context, plan sqlc.ProductPlan) (ProductPlanView, error) {
@@ -139,7 +150,11 @@ func (s *Service) productPlanView(ctx context.Context, plan sqlc.ProductPlan) (P
 	if err != nil {
 		return ProductPlanView{}, err
 	}
-	return ProductPlanView{Plan: plan, FeatureKeys: keys}, nil
+	prices, err := s.db.Q().ListProductPlanPricesByPlan(ctx, plan.ID)
+	if err != nil {
+		return ProductPlanView{}, err
+	}
+	return ProductPlanView{Plan: plan, FeatureKeys: keys, Prices: prices}, nil
 }
 
 func (s *Service) GetProductPlan(ctx context.Context, id string) (ProductPlanView, error) {
@@ -193,6 +208,11 @@ func (s *Service) UpdateProductPlan(ctx context.Context, id string, in UpdatePro
 	plan, err := s.db.Q().UpdateProductPlan(ctx, params)
 	if err != nil {
 		return ProductPlanView{}, err
+	}
+	if in.Name != nil {
+		if err := s.syncProductPlanNameToStripe(ctx, plan); err != nil {
+			return ProductPlanView{}, err
+		}
 	}
 	return s.productPlanView(ctx, plan)
 }

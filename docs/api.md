@@ -81,6 +81,9 @@ Requires `organisation:update`.
 
 - `GET /v1/organisations/{id}/integrations` — connected tools (secrets masked as hints)
 - `PUT /v1/organisations/{id}/integrations/stripe` — `{ "secret_key"?, "publishable_key"? }` (omit a field to keep the current value)
+- `GET /v1/organisations/{id}/integrations/stripe/catalog` — list active recurring Stripe Prices (requires connected secret)
+- `POST /v1/organisations/{id}/integrations/stripe/import` — `{ "items": [{ "price_ref", "key"?, "name"? }] }` create product plans linked to those Prices
+- `POST /v1/organisations/{id}/integrations/stripe/sync` — push local product plan prices missing Stripe refs
 - `DELETE /v1/organisations/{id}/integrations/{provider}` — disconnect
 - `POST /v1/organisations/{id}/api-keys` — `{ "name" }` → includes `token` once
 - `GET /v1/organisations/{id}/api-keys`
@@ -291,12 +294,16 @@ Org-owned product feature catalog and packaging for end-user gating. Requires `p
 - `POST /v1/organisations/{id}/product-features` — `{ "key", "description"? }`
 - `GET /v1/organisations/{id}/product-features`
 - `GET|PATCH|DELETE /v1/product-features/{id}` — PATCH `{ "description" }`
-- `POST /v1/organisations/{id}/product-plans` — `{ "key", "name" }`
+- `POST /v1/organisations/{id}/product-plans` — `{ "key", "name", "price"? }` where `price` is `{ "interval", "currency"?, "unit_amount", "status"? }` (pushes to Stripe when connected)
 - `GET /v1/organisations/{id}/product-plans`
-- `GET|PATCH|DELETE /v1/product-plans/{id}` — PATCH `{ "name"?, "status"? }`
+- `GET|PATCH|DELETE /v1/product-plans/{id}` — PATCH `{ "name"?, "status"? }` (name syncs to Stripe Product when linked)
 - `PUT /v1/product-plans/{id}/features` — `{ "feature_keys": string[] }` (org product features only)
+- `PUT /v1/product-plans/{id}/price` — `{ "interval", "currency"?, "unit_amount", "status"? }` create/update price; pushes Product/Price to Stripe when connected
+- `GET /v1/product-plans/{id}/prices`
 - `PUT /v1/organisations/{id}/product-plan` — `{ "product_plan_id" }` activate (empty clears)
 - `GET /v1/organisations/{id}/product-plan` — active product plan
+
+Product plan JSON includes `prices[]` with `processor_product_ref`, `processor_price_ref`, and `synced`.
 
 **Effective product features** = KYC plan product keys ∪ active product plan features ∪ grants − denies.  
 `POST /v1/entitlements/check` gates both platform capabilities and product features.

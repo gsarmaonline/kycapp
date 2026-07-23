@@ -71,6 +71,19 @@ export function ProductPlansShow() {
           { label: 'Status', value: item.status },
           { label: 'Active', value: isActive ? 'yes' : 'no' },
           {
+            label: 'Price',
+            value: item.prices?.length
+              ? item.prices
+                  .map(
+                    (p) =>
+                      `${(p.unit_amount / 100).toFixed(2)} ${p.currency.toUpperCase()}/${p.interval}${
+                        p.synced ? '' : ' (not synced)'
+                      }`,
+                  )
+                  .join(', ')
+              : 'none',
+          },
+          {
             label: 'Features',
             value: item.feature_keys.length ? item.feature_keys.join(', ') : 'none',
           },
