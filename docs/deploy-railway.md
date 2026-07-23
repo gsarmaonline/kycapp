@@ -1,8 +1,31 @@
 # Deploy on Railway
 
-Recommended layout: **Postgres** + **api** + **web** (web is the public URL; it proxies `/v1` to the API).
+Recommended layout: **Postgres** + **api** (`kycapp`) + **web** (`kycweb`) (web is the public URL; it proxies `/v1` to the API).
 
-Merchant automations use a **worker** on the same Postgres (River) — see [automations.md](automations.md).
+Merchant automations use a **worker** (`kycworker`) on the same Postgres (River) — see [automations.md](automations.md).
+
+## Auto-deploy from GitHub
+
+`kycapp`, `kycweb`, and `kycworker` deploy from **`gsarmaonline/kycapp` `main`**. A push to `main` triggers a new deployment for each connected service.
+
+Each service needs a distinct Dockerfile. Prefer **Settings → Config-as-code** paths (below). As a fallback, these variables are also set:
+
+| Service | `RAILWAY_DOCKERFILE_PATH` |
+| --- | --- |
+| `kycapp` | `Dockerfile.api` |
+| `kycweb` | `Dockerfile.web` |
+| `kycworker` | `Dockerfile.worker` |
+
+Reconnect later with:
+
+```bash
+railway link   # project kycapp / production
+railway service source connect --repo gsarmaonline/kycapp --branch main --service kycapp
+railway service source connect --repo gsarmaonline/kycapp --branch main --service kycweb
+railway service source connect --repo gsarmaonline/kycapp --branch main --service kycworker
+```
+
+Manual upload (`railway up`) still works and does **not** require a git push.
 
 ## Config as code
 
@@ -10,11 +33,11 @@ There is **no** single root `railway.toml` on purpose: Railway applies that file
 
 | Service | Config file |
 | --- | --- |
-| api | [`railway.api.toml`](../railway.api.toml) → `Dockerfile.api` |
-| web | [`railway.web.toml`](../railway.web.toml) → `Dockerfile.web` |
-| worker | [`railway.worker.toml`](../railway.worker.toml) → `Dockerfile.worker` |
+| api (`kycapp`) | [`railway.api.toml`](../railway.api.toml) → `Dockerfile.api` |
+| web (`kycweb`) | [`railway.web.toml`](../railway.web.toml) → `Dockerfile.web` |
+| worker (`kycworker`) | [`railway.worker.toml`](../railway.worker.toml) → `Dockerfile.worker` |
 
-For each service: **Settings → Config-as-code** → set the config file path to `/railway.api.toml` or `/railway.web.toml`. Leave **Root Directory** empty so the Docker build context stays the repo root.
+For each service: **Settings → Config-as-code** → set the config file path to `/railway.api.toml`, `/railway.web.toml`, or `/railway.worker.toml`. Leave **Root Directory** empty so the Docker build context stays the repo root. That also enables `watchPatterns` so unrelated paths do not rebuild every service.
 
 ## 1. Create a project
 
