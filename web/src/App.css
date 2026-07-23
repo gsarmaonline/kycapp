@@ -50,6 +50,12 @@ body {
   border-right: 1px solid #e7e5e4;
   background: rgba(255, 253, 248, 0.92);
   font-size: 0.82rem;
+  position: sticky;
+  top: 0;
+  align-self: start;
+  height: 100vh;
+  max-height: 100dvh;
+  overflow-y: auto;
 }
 
 .sidebar-brand {
@@ -990,6 +996,10 @@ button.link-btn.danger:hover {
   }
 
   .sidebar {
+    position: static;
+    height: auto;
+    max-height: none;
+    overflow: visible;
     border-right: 0;
     border-bottom: 1px solid #e7e5e4;
   }
