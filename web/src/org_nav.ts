@@ -27,7 +27,7 @@ export type OrgNavGroup = {
 export const ORG_SECTIONS: OrgNavItem[] = [
   { id: 'overview', label: 'Overview', path: '' },
   { id: 'members', label: 'Members', path: 'members' },
-  { id: 'roles', label: 'Roles', path: 'roles' },
+  // Operator roles UI is hidden for now (API + seeded roles still used when inviting members).
   { id: 'users', label: 'Users', path: 'users' },
   { id: 'attributes', label: 'User Attributes', path: 'attributes' },
   { id: 'email-templates', label: 'Email templates', path: 'email-templates' },
@@ -62,7 +62,6 @@ export const ORG_NAV_GROUPS: OrgNavGroup[] = [
     hint: 'What this organisation uses inside KYC',
     items: [
       { id: 'members', label: 'Members', path: 'members' },
-      { id: 'roles', label: 'Roles', path: 'roles' },
       { id: 'settings', label: 'Settings', path: 'settings' },
     ],
   },

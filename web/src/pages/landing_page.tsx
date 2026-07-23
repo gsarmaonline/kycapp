@@ -28,7 +28,7 @@ export function LandingPage({ user }: { user: User | null }) {
           <p className="landing-brand">KYC</p>
           <h1 className="landing-headline">The system of record for organisations.</h1>
           <p className="landing-support">
-            Members, roles, end users, messaging, and billing — one place, not five dashboards.
+            Members, end users, messaging, and billing — one place, not five dashboards.
           </p>
           <div className="landing-cta">
             <Link className="landing-cta-primary" to={primaryTo}>
@@ -52,8 +52,8 @@ export function LandingPage({ user }: { user: User | null }) {
       <section className="landing-section landing-section-alt">
         <h2>Access that matches how you work</h2>
         <p>
-          Roles and permissions decide what people may do. Platform capabilities gate KYC
-          itself; product features gate what the organisation unlocks in its own app.
+          Platform capabilities gate KYC itself; product features gate what the organisation
+          unlocks in its own app.
         </p>
       </section>
 

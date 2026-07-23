@@ -8,7 +8,8 @@ KYC is a **system of record for organisations**: orgs, users, memberships, RBAC,
 | --- | --- |
 | **Login to KYC** — humans authenticate to use *this* app | **Auth-as-a-service for customers** — selling login/SSO for *their* apps |
 | Sessions + membership tenancy + org RBAC | Being Auth0/Clerk for third parties |
-| Service/API keys for platform & integrations | Payment processing (Stripe is next) |
+| Org API keys + (planned) headless SDK / settings embed for merchant apps | Payment processing as PSP (Stripe is executor) |
+| App users, product features, automations, email | — |
 
 ## What we keep (core that still holds)
 

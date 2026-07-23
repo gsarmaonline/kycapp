@@ -8,7 +8,6 @@ import {
   listMemberships,
   listProductFeatures,
   listProductPlans,
-  listRoles,
 } from '../api'
 import { OverviewPanel } from '../panels/overview_panel'
 
@@ -16,7 +15,6 @@ export function OverviewPage() {
   const { orgId = '' } = useParams()
   const [ready, setReady] = useState(false)
   const [memberCount, setMemberCount] = useState(0)
-  const [roleCount, setRoleCount] = useState(0)
   const [userCount, setUserCount] = useState(0)
   const [attributeCount, setAttributeCount] = useState(0)
   const [templateCount, setTemplateCount] = useState(0)
@@ -28,19 +26,16 @@ export function OverviewPage() {
   useEffect(() => {
     void (async () => {
       try {
-        const [m, r, users, attrs, templates, automations, features, productPlans] =
-          await Promise.all([
-            listMemberships(orgId),
-            listRoles(orgId),
-            listAppUsers(orgId),
-            listAttributeDefinitions(orgId),
-            listEmailTemplates(orgId),
-            listAutomations(orgId),
-            listProductFeatures(orgId),
-            listProductPlans(orgId),
-          ])
+        const [m, users, attrs, templates, automations, features, productPlans] = await Promise.all([
+          listMemberships(orgId),
+          listAppUsers(orgId),
+          listAttributeDefinitions(orgId),
+          listEmailTemplates(orgId),
+          listAutomations(orgId),
+          listProductFeatures(orgId),
+          listProductPlans(orgId),
+        ])
         setMemberCount(m.items.length)
-        setRoleCount(r.items.length)
         setUserCount(users.items.length)
         setAttributeCount(attrs.items.length)
         setTemplateCount(templates.items.length)
@@ -62,7 +57,6 @@ export function OverviewPage() {
       orgId={orgId}
       tiles={[
         { label: 'Members', value: memberCount, to: 'members' },
-        { label: 'Roles', value: roleCount, to: 'roles' },
         { label: 'Users', value: userCount, to: 'users' },
         { label: 'User Attributes', value: attributeCount, to: 'attributes' },
         { label: 'Email templates', value: templateCount, to: 'email-templates' },

@@ -39,10 +39,6 @@ import { ProductPlansEdit } from './pages/product_plans/product_plans_edit'
 import { ProductPlansIndex } from './pages/product_plans/product_plans_index'
 import { ProductPlansNew } from './pages/product_plans/product_plans_new'
 import { ProductPlansShow } from './pages/product_plans/product_plans_show'
-import { RolesEdit } from './pages/roles/roles_edit'
-import { RolesIndex } from './pages/roles/roles_index'
-import { RolesNew } from './pages/roles/roles_new'
-import { RolesShow } from './pages/roles/roles_show'
 import { UsersEdit } from './pages/users/users_edit'
 import { UsersIndex } from './pages/users/users_index'
 import { UsersNew } from './pages/users/users_new'
@@ -132,10 +128,8 @@ export default function App() {
         <Route path="members/new" element={<MembersNew />} />
         <Route path="members/:id" element={<MembersShow />} />
         <Route path="members/:id/edit" element={<MembersEdit />} />
-        <Route path="roles" element={<RolesIndex />} />
-        <Route path="roles/new" element={<RolesNew />} />
-        <Route path="roles/:id" element={<RolesShow />} />
-        <Route path="roles/:id/edit" element={<RolesEdit />} />
+        {/* Operator roles UI hidden; seeded roles still used when inviting members. */}
+        <Route path="roles/*" element={<Navigate to="../members" replace />} />
         <Route path="users" element={<UsersIndex />} />
         <Route path="users/new" element={<UsersNew />} />
         <Route path="users/:id" element={<UsersShow />} />

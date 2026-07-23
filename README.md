@@ -4,6 +4,8 @@
 
 One place to create and manage organisations, their users, authorisation, and billing — so tenant state lives here, not scattered across auth providers, Stripe dashboards, and spreadsheets.
 
+**For merchants:** configure in KYC, enforce in your backend, collect customer profile data with your UI or ours — we store the record. See [How merchants integrate](#how-merchants-integrate).
+
 ## What this is
 
 KYC owns the organisation lifecycle:
@@ -14,16 +16,75 @@ KYC owns the organisation lifecycle:
 | **Users / Members** | People who log into KYC and belong to orgs via membership + RBAC |
 | **App users** | Org-scoped end users of the merchant product; profile schema with sections |
 | **Authorisation** | Roles and permissions scoped to the organisation |
-| **Billing** | Plans, entitlements, and subscription state tied to the organisation |
+| **Billing / entitlements** | KYC plans (platform capabilities) + merchant product features/plans for their customers |
 
 To **use this app**, people must log in. Whether KYC later sells auth services to customers is a separate product question.
 
+## How merchants integrate
+
+How **merchants** (KYC customers) use KYC to deliver features to **their customers** (app users).
+
+### Positioning
+
+> **Configure in KYC. Enforce in your backend. Collect customer profile data with our form (or yours). We store the record.**
+
+KYC is **not** their login provider (not Clerk/Auth0 for their app). KYC is the **system of record** for org config, customer profiles, product packaging, and lifecycle automation.
+
+### Actors
+
+| Who | Who they are | Where they work |
+| --- | --- | --- |
+| **KYC** | This platform | KYC product |
+| **Merchant** | Your customer (the organisation) | KYC admin + their backend |
+| **Operator** | Merchant teammate (member + role) | KYC UI |
+| **Customer** | Merchant’s end user | Merchant’s app → stored as **app user** in KYC |
+
+| Concept | Gates |
+| --- | --- |
+| **Permissions** | What an *operator* may do inside KYC |
+| **Platform capabilities** | What the *org* may use inside KYC (from KYC plan) |
+| **Product features** | What the org may unlock for *their customers* (from product plan + KYC plan product keys) |
+
+### North-star journey
+
+```text
+1. Merchant joins KYC
+2. Configures product surface (schema, features, messages, rules)
+3. Connects their app (org API key + optional SDK)
+4. Customers use the merchant app
+5. Merchant app reads/writes KYC and gates features
+6. KYC runs automations / email on those events
+```
+
+```mermaid
+sequenceDiagram
+  participant Op as Merchant operator
+  participant KYC as KYC admin/API
+  participant App as Merchant backend
+  participant Cust as Customer
+
+  Op->>KYC: Create org, attributes, features, plan, automation
+  Op->>KYC: Create org API key (Settings)
+  App->>KYC: Integrate with key / SDK
+
+  Cust->>App: Sign up (merchant auth)
+  App->>KYC: Create app_user (+ attributes)
+  KYC->>KYC: Automation e.g. welcome email
+
+  Cust->>App: Open settings
+  App->>KYC: Load schema / save profile (API, headless SDK, or embed)
+  Cust->>App: Use premium feature
+  App->>KYC: entitlements.check
+  KYC-->>App: allowed / denied
+```
+
 ## Design principles
 
-- **Organisation is the hub.** Users, authz, and billing hang off the organisation record.
-- **Login required.** Session tokens authenticate humans; service API keys are for platform/integrations only.
+- **Organisation is the hub.** Users, authz, billing, and product packaging hang off the organisation record.
+- **Login required (to KYC).** Session tokens authenticate operators; **org API keys** authenticate the merchant backend; platform tokens are for ops.
 - **Tenancy by membership.** Normal users can only access organisations they belong to.
-- **Permissions ≠ entitlements.** Permissions gate what a *user* may do; entitlements gate what an *organisation* may use on its plan.
+- **Permissions ≠ entitlements.** Permissions gate what an *operator* may do in KYC; entitlements gate what the *organisation* may use — **platform capabilities** (KYC itself) vs **product features** (their customers).
+- **Configure in KYC, enforce in their API.** Never trust the browser alone for feature gates.
 
 ## Specs
 
@@ -33,9 +94,10 @@ To **use this app**, people must log in. Whether KYC later sells auth services t
 | [docs/data-model.md](docs/data-model.md) | Objects, relationships, permission catalog |
 | [docs/api.md](docs/api.md) | REST `/v1` surface |
 | [docs/flows.md](docs/flows.md) | Signup, invite, ops-provision, runtime checks |
+| [docs/billing-plans.md](docs/billing-plans.md) | Stripe executor / KYC billing |
+| [docs/automations.md](docs/automations.md) | Merchant automations (rules UI + River + Resend) |
 | [docs/testing.md](docs/testing.md) | Testing expectations |
-| [docs/deploy-railway.md](docs/deploy-railway.md) | Deploy Postgres + API + web on Railway |
-| [docs/automations.md](docs/automations.md) | Merchant automations (rules UI + River) |
+| [docs/deploy-railway.md](docs/deploy-railway.md) | Deploy Postgres + API + web + worker on Railway |
 
 ## Deploy
 
@@ -43,9 +105,11 @@ To **use this app**, people must log in. Whether KYC later sells auth services t
 
 ## Status
 
-**App login + API tenancy complete:** Google OAuth (passwordless), sessions, `GET /v1/me`, membership-scoped org APIs, platform-only catalog/API-key routes, login-gated UI.
+**App login + API tenancy complete:** Google OAuth, sessions, membership-scoped org APIs, org-scoped API keys (Settings), login-gated UI.
 
-Billing v1: Stripe executor (Checkout / Portal / webhooks) behind KYC APIs — see [docs/billing-plans.md](docs/billing-plans.md). Still later: invite email delivery, full platform-admin UI.
+**Merchant product surface:** app users, attributes, product features/plans, branding, email templates, automations (River + Resend), KYC billing via Stripe executor.
+
+Still later: headless SDK + settings embed, invite email polish, full platform-admin UI.
 
 ## Run locally
 
@@ -113,7 +177,8 @@ cd web && npm run dev
 | Principal | Can do |
 | --- | --- |
 | User session (Google or dev-login) | Own profile, orgs they belong to, RBAC-gated mutations |
-| Platform admin / service token | All orgs, plan catalog, API keys, audit, entitlement overrides |
+| Org API key (Settings) | That organisation only — app users, checks, integrations |
+| Platform admin / unscoped service token | All orgs, plan catalog, platform API keys, audit, entitlement overrides |
 
 Public (no Bearer): `GET /v1/auth/providers`, `GET /v1/auth/google`, `GET /v1/auth/google/callback`, `POST /v1/auth/dev-login` (if enabled), `GET /v1/public/organisations/{id}/branding/logo`, health endpoints.
 
@@ -136,8 +201,8 @@ make sqlc
 ## Non-goals (v1)
 
 - Not a full CRM
-- Not Auth0-for-your-customers (auth-as-a-service)
-- Not a payment processor (Stripe later)
+- Not Auth0/Clerk-for-your-customers (auth-as-a-service)
+- Not a payment processor (Stripe is the executor; KYC owns access state)
 - No separate Account entity yet
 
 ## Layout

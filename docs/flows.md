@@ -1,6 +1,6 @@
 # Flows
 
-Related: [data model](data-model.md) · [api](api.md)
+Related: [data model](data-model.md) · [api](api.md) · [README — How merchants integrate](../README.md#how-merchants-integrate)
 
 ## What “create an account” means
 
