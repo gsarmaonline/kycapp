@@ -11,6 +11,9 @@ export type Organisation = {
   accent_color?: string
   email_footer?: string
   email_font?: string
+  app_user_authority?: 'kyc' | 'external'
+  app_user_ingest_upsert_key?: 'external_id' | 'email'
+  app_user_attributes_mode?: 'strict' | 'discover'
 }
 
 export type User = {
@@ -169,6 +172,9 @@ export function updateOrganisation(
     accent_color?: string
     email_footer?: string
     email_font?: string
+    app_user_authority?: 'kyc' | 'external'
+    app_user_ingest_upsert_key?: 'external_id' | 'email'
+    app_user_attributes_mode?: 'strict' | 'discover'
   },
 ) {
   return request<Organisation>(`/v1/organisations/${id}`, {

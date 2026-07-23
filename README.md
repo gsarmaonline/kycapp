@@ -26,9 +26,9 @@ How **merchants** (KYC customers) use KYC to deliver features to **their custome
 
 ### Positioning
 
-> **Configure in KYC. Enforce in your backend. Collect customer profile data with our form (or yours). We store the record.**
+> **Configure in KYC. Enforce in your backend. Collect customer profile data with our form (or yours). We store the record — or project it from yours.**
 
-KYC is **not** their login provider (not Clerk/Auth0 for their app). KYC is the **system of record** for org config, customer profiles, product packaging, and lifecycle automation.
+KYC is **not** their login provider (not Clerk/Auth0 for their app). KYC is the **system of record** for org config, product packaging, and lifecycle automation. Customer profiles default to KYC-owned, but an org can set **external** authority and ingest users/attributes via API (`PUT …/app-users/ingest`), with optional schema discovery.
 
 ### Actors
 

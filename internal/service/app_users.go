@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"regexp"
 	"strings"
@@ -13,6 +14,7 @@ import (
 	"github.com/gsarmaonline/kyc/internal/ids"
 	"github.com/gsarmaonline/kyc/internal/store"
 	"github.com/gsarmaonline/kyc/internal/store/sqlc"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
@@ -47,19 +49,31 @@ type UpdateAttributeDefinitionInput struct {
 }
 
 type CreateAppUserInput struct {
-	ExternalID  string
-	Email       string
-	DisplayName string
-	Status      string
-	Attributes  map[string]any
+	ExternalID     string
+	Email          string
+	DisplayName    string
+	Status         string
+	Attributes     map[string]any
+	SkipRequired   bool // ingest / partial writes
 }
 
 type UpdateAppUserInput struct {
-	ExternalID  *string
-	Email       *string
+	ExternalID   *string
+	Email        *string
+	DisplayName  *string
+	Status       *string
+	Attributes   map[string]any // nil = leave unchanged; empty map clears
+	SkipRequired bool           // ingest / partial writes
+}
+
+// IngestAppUserInput upserts an app user from an external system.
+// Attributes are merged into the existing map (keys omitted are left unchanged).
+type IngestAppUserInput struct {
+	ExternalID  string
+	Email       string
 	DisplayName *string
-	Status      *string
-	Attributes  map[string]any // nil = leave unchanged; empty map clears
+	Status      string
+	Attributes  map[string]any
 }
 
 func (s *Service) CreateAttributeDefinition(ctx context.Context, orgID string, in CreateAttributeDefinitionInput) (sqlc.AttributeDefinition, error) {
@@ -198,7 +212,7 @@ func (s *Service) CreateAppUser(ctx context.Context, orgID string, in CreateAppU
 	if attrs == nil {
 		attrs = map[string]any{}
 	}
-	if err := s.validateAttributes(ctx, orgID, attrs, true); err != nil {
+	if err := s.validateAttributes(ctx, orgID, attrs, !in.SkipRequired); err != nil {
 		return sqlc.AppUser{}, err
 	}
 	raw, err := json.Marshal(attrs)
@@ -263,7 +277,7 @@ func (s *Service) UpdateAppUser(ctx context.Context, id string, in UpdateAppUser
 		params.Status = pgtype.Text{String: status, Valid: true}
 	}
 	if in.Attributes != nil {
-		if err := s.validateAttributes(ctx, existing.OrganisationID, in.Attributes, true); err != nil {
+		if err := s.validateAttributes(ctx, existing.OrganisationID, in.Attributes, !in.SkipRequired); err != nil {
 			return sqlc.AppUser{}, err
 		}
 		raw, err := json.Marshal(in.Attributes)
@@ -294,6 +308,195 @@ func (s *Service) DeleteAppUser(ctx context.Context, id string) (sqlc.AppUser, e
 func (s *Service) DeleteAttributeDefinition(ctx context.Context, id string) (sqlc.AttributeDefinition, error) {
 	row, err := s.db.Q().ArchiveAttributeDefinition(ctx, id)
 	return row, mapNotFound(err, "attribute definition not found")
+}
+
+// IngestAppUser upserts by the org's configured ingest key, merges attributes,
+// and discovers unknown attribute definitions when mode is discover.
+func (s *Service) IngestAppUser(ctx context.Context, orgID string, in IngestAppUserInput) (sqlc.AppUser, bool, error) {
+	org, err := s.GetOrganisation(ctx, orgID)
+	if err != nil {
+		return sqlc.AppUser{}, false, err
+	}
+
+	externalID := strings.TrimSpace(in.ExternalID)
+	email := strings.ToLower(strings.TrimSpace(in.Email))
+	upsertKey := org.AppUserIngestUpsertKey
+	if upsertKey == "" {
+		upsertKey = "external_id"
+	}
+
+	var existing sqlc.AppUser
+	var found bool
+	switch upsertKey {
+	case "email":
+		if email == "" {
+			return sqlc.AppUser{}, false, apperr.Validation("email is required for ingest when upsert key is email")
+		}
+		row, err := s.db.Q().GetAppUserByOrgEmail(ctx, sqlc.GetAppUserByOrgEmailParams{
+			OrganisationID: orgID,
+			Email:          email,
+		})
+		if err == nil {
+			existing, found = row, true
+		} else if !errors.Is(err, pgx.ErrNoRows) {
+			return sqlc.AppUser{}, false, err
+		}
+	default: // external_id
+		if externalID == "" {
+			return sqlc.AppUser{}, false, apperr.Validation("external_id is required for ingest when upsert key is external_id")
+		}
+		row, err := s.db.Q().GetAppUserByOrgExternalID(ctx, sqlc.GetAppUserByOrgExternalIDParams{
+			OrganisationID: orgID,
+			ExternalID:     textArg(externalID),
+		})
+		if err == nil {
+			existing, found = row, true
+		} else if !errors.Is(err, pgx.ErrNoRows) {
+			return sqlc.AppUser{}, false, err
+		}
+	}
+
+	patch := in.Attributes
+	if patch == nil {
+		patch = map[string]any{}
+	}
+	mode := org.AppUserAttributesMode
+	if mode == "" {
+		mode = "discover"
+	}
+	if mode == "discover" {
+		if err := s.ensureDiscoveredAttributes(ctx, orgID, patch); err != nil {
+			return sqlc.AppUser{}, false, err
+		}
+	}
+
+	merged := map[string]any{}
+	if found {
+		if err := json.Unmarshal(existing.Attributes, &merged); err != nil {
+			return sqlc.AppUser{}, false, apperr.Validation("invalid existing attributes")
+		}
+		if merged == nil {
+			merged = map[string]any{}
+		}
+	}
+	for k, v := range patch {
+		merged[k] = v
+	}
+	status := strings.TrimSpace(in.Status)
+	if status == "" {
+		if found {
+			status = existing.Status
+		} else {
+			status = "active"
+		}
+	}
+	if status != "active" && status != "disabled" && status != "archived" {
+		return sqlc.AppUser{}, false, apperr.Validation("status must be active, disabled, or archived")
+	}
+
+	displayName := ""
+	if in.DisplayName != nil {
+		displayName = strings.TrimSpace(*in.DisplayName)
+	} else if found {
+		displayName = existing.DisplayName
+	}
+
+	if !found {
+		created, err := s.CreateAppUser(ctx, orgID, CreateAppUserInput{
+			ExternalID:   externalID,
+			Email:        email,
+			DisplayName:  displayName,
+			Status:       status,
+			Attributes:   merged,
+			SkipRequired: true,
+		})
+		return created, true, err
+	}
+
+	update := UpdateAppUserInput{
+		Status:       &status,
+		Attributes:   merged,
+		SkipRequired: true,
+	}
+	if externalID != "" {
+		update.ExternalID = &externalID
+	}
+	if email != "" {
+		update.Email = &email
+	}
+	if in.DisplayName != nil {
+		update.DisplayName = &displayName
+	}
+	updated, err := s.UpdateAppUser(ctx, existing.ID, update)
+	return updated, false, err
+}
+
+func (s *Service) ensureDiscoveredAttributes(ctx context.Context, orgID string, attrs map[string]any) error {
+	if err := s.EnsureDefaultAttributeDefinitions(ctx, orgID); err != nil {
+		return err
+	}
+	for key, val := range attrs {
+		if !attrKeyRE.MatchString(key) {
+			return apperr.Validation(fmt.Sprintf("attribute key %q must be lowercase snake_case (a-z, 0-9, _)", key))
+		}
+		existing, err := s.db.Q().GetAttributeDefinitionByOrgKey(ctx, sqlc.GetAttributeDefinitionByOrgKeyParams{
+			OrganisationID: orgID,
+			Key:            key,
+		})
+		if err == nil {
+			if existing.Status == "archived" {
+				active := "active"
+				if _, err := s.UpdateAttributeDefinition(ctx, existing.ID, UpdateAttributeDefinitionInput{
+					Status: &active,
+				}); err != nil {
+					return err
+				}
+			}
+			continue
+		}
+		if !errors.Is(err, pgx.ErrNoRows) {
+			return err
+		}
+		valueType := inferAttributeValueType(val)
+		label := humanizeAttrKey(key)
+		_, err = s.CreateAttributeDefinition(ctx, orgID, CreateAttributeDefinitionInput{
+			Key:       key,
+			Label:     label,
+			ValueType: valueType,
+			Section:   "ingested",
+			Required:  false,
+			IsPII:     true,
+		})
+		if err != nil {
+			if errors.Is(err, apperr.ErrConflict) {
+				continue
+			}
+			return err
+		}
+	}
+	return nil
+}
+
+func inferAttributeValueType(val any) string {
+	switch val.(type) {
+	case bool:
+		return "boolean"
+	case float64, json.Number, int, int32, int64:
+		return "number"
+	default:
+		return "string"
+	}
+}
+
+func humanizeAttrKey(key string) string {
+	parts := strings.Split(key, "_")
+	for i, p := range parts {
+		if p == "" {
+			continue
+		}
+		parts[i] = strings.ToUpper(p[:1]) + p[1:]
+	}
+	return strings.Join(parts, " ")
 }
 
 func (s *Service) validateAttributes(ctx context.Context, orgID string, attrs map[string]any, enforceRequired bool) error {

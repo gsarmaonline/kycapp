@@ -27,6 +27,11 @@ export function SettingsPage() {
   const navigate = useNavigate()
   const [org, setOrg] = useState<Organisation | null>(null)
   const [name, setName] = useState('')
+  const [appUserAuthority, setAppUserAuthority] = useState<'kyc' | 'external'>('kyc')
+  const [appUserUpsertKey, setAppUserUpsertKey] = useState<'external_id' | 'email'>('external_id')
+  const [appUserAttributesMode, setAppUserAttributesMode] = useState<'strict' | 'discover'>(
+    'discover',
+  )
   const [integrations, setIntegrations] = useState<OrgIntegration[]>([])
   const [apiKeys, setApiKeys] = useState<OrgAPIKey[]>([])
   const [stripeSecret, setStripeSecret] = useState('')
@@ -53,6 +58,9 @@ export function SettingsPage() {
       ])
       setOrg(o)
       setName(o.name)
+      setAppUserAuthority(o.app_user_authority ?? 'kyc')
+      setAppUserUpsertKey(o.app_user_ingest_upsert_key ?? 'external_id')
+      setAppUserAttributesMode(o.app_user_attributes_mode ?? 'discover')
       setIntegrations(ints.items)
       setApiKeys(keys.items)
     } catch (e) {
@@ -75,6 +83,29 @@ export function SettingsPage() {
       const o = await updateOrganisation(orgId, { name })
       setOrg(o)
       setMessage('Organisation name saved')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Save failed')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function onSaveAppUsers(e: FormEvent) {
+    e.preventDefault()
+    setBusy(true)
+    setError(null)
+    setMessage(null)
+    try {
+      const o = await updateOrganisation(orgId, {
+        app_user_authority: appUserAuthority,
+        app_user_ingest_upsert_key: appUserUpsertKey,
+        app_user_attributes_mode: appUserAttributesMode,
+      })
+      setOrg(o)
+      setAppUserAuthority(o.app_user_authority ?? 'kyc')
+      setAppUserUpsertKey(o.app_user_ingest_upsert_key ?? 'external_id')
+      setAppUserAttributesMode(o.app_user_attributes_mode ?? 'discover')
+      setMessage('App user settings saved')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Save failed')
     } finally {
@@ -282,6 +313,50 @@ export function SettingsPage() {
           <p className="status">Slug: {org?.slug}</p>
           <button type="submit" disabled={busy}>
             Save name
+          </button>
+        </form>
+      </section>
+
+      <section className="settings-block">
+        <h3>App users</h3>
+        <p className="status">
+          Choose whether KYC or your own system is the primary source for customer profiles. Manual
+          create/edit in KYC stays available either way. Ingest uses{' '}
+          <code>PUT /v1/organisations/:id/app-users/ingest</code>.
+        </p>
+        <form className="create stacked" onSubmit={onSaveAppUsers}>
+          <label>
+            Profile authority
+            <select
+              value={appUserAuthority}
+              onChange={(e) => setAppUserAuthority(e.target.value as 'kyc' | 'external')}
+            >
+              <option value="kyc">KYC (system of record)</option>
+              <option value="external">External (KYC is a projection)</option>
+            </select>
+          </label>
+          <label>
+            Ingest upsert key
+            <select
+              value={appUserUpsertKey}
+              onChange={(e) => setAppUserUpsertKey(e.target.value as 'external_id' | 'email')}
+            >
+              <option value="external_id">external_id</option>
+              <option value="email">email</option>
+            </select>
+          </label>
+          <label>
+            Attribute schema on ingest
+            <select
+              value={appUserAttributesMode}
+              onChange={(e) => setAppUserAttributesMode(e.target.value as 'strict' | 'discover')}
+            >
+              <option value="discover">Discover — create definitions for unknown keys</option>
+              <option value="strict">Strict — reject unknown keys</option>
+            </select>
+          </label>
+          <button type="submit" disabled={busy}>
+            Save app user settings
           </button>
         </form>
       </section>

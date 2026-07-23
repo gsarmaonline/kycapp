@@ -63,11 +63,19 @@ Get one.
 
 ### `PATCH /v1/organisations/{id}`
 
-Update `{ "name"?, "status"?, "primary_color"?, "accent_color"?, "email_footer"?, "email_font"? }`.  
+Update `{ "name"?, "status"?, "primary_color"?, "accent_color"?, "email_footer"?, "email_font"?, "app_user_authority"?, "app_user_ingest_upsert_key"?, "app_user_attributes_mode"? }`.  
 Colors must be `#RGB` or `#RRGGBB`.  
 `email_font` is one of: `arial`, `helvetica`, `verdana`, `trebuchet`, `georgia`, `times`, `courier` (email-safe stacks). Requires `organisation:update`.
 
-Organisation JSON also includes `logo_url` (read-only; set via logo upload) and `email_font`.
+App user profile settings:
+
+| Field | Values | Default |
+| --- | --- | --- |
+| `app_user_authority` | `kyc` \| `external` | `kyc` |
+| `app_user_ingest_upsert_key` | `external_id` \| `email` | `external_id` |
+| `app_user_attributes_mode` | `discover` \| `strict` | `discover` |
+
+Organisation JSON also includes `logo_url` (read-only; set via logo upload), `email_font`, and the app user settings above.
 
 ### `DELETE /v1/organisations/{id}`
 
@@ -221,10 +229,18 @@ System defaults (`phone`, `location`, `country`, …) are seeded per org on crea
 - `POST /v1/organisations/{id}/app-users` — requires `app_users:write`  
   `{ "email"?, "external_id"?, "display_name"?, "status"?, "attributes"? }`  
   `attributes` keys must match active definitions; types and required fields are validated.
+- `PUT /v1/organisations/{id}/app-users/ingest` — requires `app_users:write`  
+  Upsert from an external system. Body: `{ "external_id"?, "email"?, "display_name"?, "status"?, "attributes"? }`.  
+  Lookup uses the org’s `app_user_ingest_upsert_key` (`external_id` or `email`); that field is required.  
+  `attributes` are **merged** into the existing map (omitted keys are kept).  
+  When `app_user_attributes_mode=discover`, unknown keys create definitions under section `ingested` (inferred type; `is_pii=true`).  
+  When `strict`, unknown keys are rejected. Required attributes are not enforced on ingest.  
+  Response `201` with `"created": true` on insert; `200` with `"created": false` on update. Enqueues the same automation triggers as create/update.
 - `GET /v1/organisations/{id}/app-users` — requires `app_users:read`  
   Query: `status`
 - `GET /v1/app-users/{id}` — requires `app_users:read`
-- `PATCH /v1/app-users/{id}` — requires `app_users:write`
+- `PATCH /v1/app-users/{id}` — requires `app_users:write`  
+  When `attributes` is sent, the map **replaces** the whole attributes blob (unlike ingest merge).
 
 ---
 

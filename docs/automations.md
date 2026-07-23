@@ -36,10 +36,10 @@ Org-scoped **Automation** (name optional):
 
 | Trigger | When |
 | --- | --- |
-| `app_user.created` | After app user create |
-| `app_user.updated` | After app user update (optional; can wait) |
+| `app_user.created` | After app user create (including ingest insert) |
+| `app_user.updated` | After app user update (including ingest upsert) |
 
-Add more later (`membership.invited`, `subscription.updated`, …) without changing the DSL shape.
+Ingest (`PUT …/app-users/ingest`) merges attributes and enqueues the same triggers, so conditions on `attributes.*` work for externally authored profiles. Add more later (`membership.invited`, `subscription.updated`, …) without changing the DSL shape.
 
 ### Conditions
 

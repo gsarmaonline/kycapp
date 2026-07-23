@@ -127,12 +127,15 @@ func (s *Service) ListOrganisationsForUser(ctx context.Context, userID, status, 
 }
 
 type UpdateOrganisationInput struct {
-	Name          *string
-	Status        *string
-	PrimaryColor  *string
-	AccentColor   *string
-	EmailFooter   *string
-	EmailFont     *string
+	Name                   *string
+	Status                 *string
+	PrimaryColor           *string
+	AccentColor            *string
+	EmailFooter            *string
+	EmailFont              *string
+	AppUserAuthority       *string
+	AppUserIngestUpsertKey *string
+	AppUserAttributesMode  *string
 }
 
 func (s *Service) UpdateOrganisation(ctx context.Context, id string, in UpdateOrganisationInput) (sqlc.Organisation, error) {

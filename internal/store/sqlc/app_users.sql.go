@@ -195,6 +195,66 @@ func (q *Queries) GetAppUser(ctx context.Context, id string) (AppUser, error) {
 	return i, err
 }
 
+const getAppUserByOrgEmail = `-- name: GetAppUserByOrgEmail :one
+SELECT id, organisation_id, external_id, email, display_name, status, attributes, created_at, updated_at FROM app_users
+WHERE organisation_id = $1
+  AND lower(email) = lower($2)
+  AND email IS NOT NULL
+  AND email <> ''
+`
+
+type GetAppUserByOrgEmailParams struct {
+	OrganisationID string `json:"organisation_id"`
+	Email          string `json:"email"`
+}
+
+func (q *Queries) GetAppUserByOrgEmail(ctx context.Context, arg GetAppUserByOrgEmailParams) (AppUser, error) {
+	row := q.db.QueryRow(ctx, getAppUserByOrgEmail, arg.OrganisationID, arg.Email)
+	var i AppUser
+	err := row.Scan(
+		&i.ID,
+		&i.OrganisationID,
+		&i.ExternalID,
+		&i.Email,
+		&i.DisplayName,
+		&i.Status,
+		&i.Attributes,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const getAppUserByOrgExternalID = `-- name: GetAppUserByOrgExternalID :one
+SELECT id, organisation_id, external_id, email, display_name, status, attributes, created_at, updated_at FROM app_users
+WHERE organisation_id = $1
+  AND external_id = $2
+  AND external_id IS NOT NULL
+  AND external_id <> ''
+`
+
+type GetAppUserByOrgExternalIDParams struct {
+	OrganisationID string      `json:"organisation_id"`
+	ExternalID     pgtype.Text `json:"external_id"`
+}
+
+func (q *Queries) GetAppUserByOrgExternalID(ctx context.Context, arg GetAppUserByOrgExternalIDParams) (AppUser, error) {
+	row := q.db.QueryRow(ctx, getAppUserByOrgExternalID, arg.OrganisationID, arg.ExternalID)
+	var i AppUser
+	err := row.Scan(
+		&i.ID,
+		&i.OrganisationID,
+		&i.ExternalID,
+		&i.Email,
+		&i.DisplayName,
+		&i.Status,
+		&i.Attributes,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
 const getAttributeDefinition = `-- name: GetAttributeDefinition :one
 SELECT id, organisation_id, key, label, description, value_type, section, sort_order, required, enum_values, is_pii, status, created_at, updated_at, is_system FROM attribute_definitions WHERE id = $1
 `

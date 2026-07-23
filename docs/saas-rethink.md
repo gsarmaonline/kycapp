@@ -81,6 +81,7 @@ flowchart TB
 - Org switcher UX
 - Team / roles / billing screens refined for merchants (not ops)
 - **App users + attribute schema** (org-scoped end users; definitions with `section` grouping) — **done (v1)**
+- **App user ingest / authority** (typed org settings; upsert by `external_id`\|`email`; discover attributes on ingest) — **done (v1)**
 - **Email templates** (org-scoped catalog + `core/emailtemplates`; no send yet) — **done (v1)**
 - **Org email branding** (logo upload, colors, footer chrome at render time; visual builder deferred) — **done (v1)**
 - **Automations** (org rules UI: simple conditions + action list; River on Postgres) — **done (v1)**; see [automations.md](automations.md)

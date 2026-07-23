@@ -71,6 +71,33 @@ func (s *Service) UpdateOrganisationBranding(ctx context.Context, id string, in 
 		}
 		params.EmailFont = pgtype.Text{String: font, Valid: true}
 	}
+	if in.AppUserAuthority != nil {
+		v := strings.TrimSpace(*in.AppUserAuthority)
+		switch v {
+		case "kyc", "external":
+			params.AppUserAuthority = pgtype.Text{String: v, Valid: true}
+		default:
+			return sqlc.Organisation{}, apperr.Validation("app_user_authority must be kyc or external")
+		}
+	}
+	if in.AppUserIngestUpsertKey != nil {
+		v := strings.TrimSpace(*in.AppUserIngestUpsertKey)
+		switch v {
+		case "external_id", "email":
+			params.AppUserIngestUpsertKey = pgtype.Text{String: v, Valid: true}
+		default:
+			return sqlc.Organisation{}, apperr.Validation("app_user_ingest_upsert_key must be external_id or email")
+		}
+	}
+	if in.AppUserAttributesMode != nil {
+		v := strings.TrimSpace(*in.AppUserAttributesMode)
+		switch v {
+		case "strict", "discover":
+			params.AppUserAttributesMode = pgtype.Text{String: v, Valid: true}
+		default:
+			return sqlc.Organisation{}, apperr.Validation("app_user_attributes_mode must be strict or discover")
+		}
+	}
 	org, err := s.db.Q().UpdateOrganisation(ctx, params)
 	return org, mapNotFound(err, "organisation not found")
 }

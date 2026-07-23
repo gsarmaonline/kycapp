@@ -154,6 +154,40 @@ func (s *Server) handleCreateAppUser(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusCreated, appUserJSON(row))
 }
 
+func (s *Server) handleIngestAppUser(w http.ResponseWriter, r *http.Request) {
+	orgID := r.PathValue("id")
+	if _, err := s.svc.RequireOrgPermission(r.Context(), orgID, "app_users:write"); err != nil {
+		writeError(w, err)
+		return
+	}
+	var body struct {
+		ExternalID  string         `json:"external_id"`
+		Email       string         `json:"email"`
+		DisplayName *string        `json:"display_name"`
+		Status      string         `json:"status"`
+		Attributes  map[string]any `json:"attributes"`
+	}
+	if err := decodeJSON(r, &body); err != nil {
+		writeError(w, apperr.Validation("invalid JSON body"))
+		return
+	}
+	row, created, err := s.svc.IngestAppUser(r.Context(), orgID, service.IngestAppUserInput{
+		ExternalID: body.ExternalID, Email: body.Email, DisplayName: body.DisplayName,
+		Status: body.Status, Attributes: body.Attributes,
+	})
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	status := http.StatusOK
+	if created {
+		status = http.StatusCreated
+	}
+	out := appUserJSON(row)
+	out["created"] = created
+	writeJSON(w, status, out)
+}
+
 func (s *Server) handleListAppUsers(w http.ResponseWriter, r *http.Request) {
 	orgID := r.PathValue("id")
 	if _, err := s.svc.RequireOrgPermission(r.Context(), orgID, "app_users:read"); err != nil {

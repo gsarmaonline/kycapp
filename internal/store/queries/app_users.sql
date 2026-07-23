@@ -47,6 +47,20 @@ RETURNING *;
 -- name: GetAppUser :one
 SELECT * FROM app_users WHERE id = $1;
 
+-- name: GetAppUserByOrgExternalID :one
+SELECT * FROM app_users
+WHERE organisation_id = sqlc.arg('organisation_id')
+  AND external_id = sqlc.arg('external_id')
+  AND external_id IS NOT NULL
+  AND external_id <> '';
+
+-- name: GetAppUserByOrgEmail :one
+SELECT * FROM app_users
+WHERE organisation_id = sqlc.arg('organisation_id')
+  AND lower(email) = lower(sqlc.arg('email'))
+  AND email IS NOT NULL
+  AND email <> '';
+
 -- name: ListAppUsers :many
 SELECT * FROM app_users
 WHERE organisation_id = $1

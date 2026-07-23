@@ -44,6 +44,9 @@ SET
   accent_color = COALESCE(sqlc.narg('accent_color'), accent_color),
   email_footer = COALESCE(sqlc.narg('email_footer'), email_footer),
   email_font = COALESCE(sqlc.narg('email_font'), email_font),
+  app_user_authority = COALESCE(sqlc.narg('app_user_authority'), app_user_authority),
+  app_user_ingest_upsert_key = COALESCE(sqlc.narg('app_user_ingest_upsert_key'), app_user_ingest_upsert_key),
+  app_user_attributes_mode = COALESCE(sqlc.narg('app_user_attributes_mode'), app_user_attributes_mode),
   updated_at = now()
 WHERE id = sqlc.arg('id')
 RETURNING *;

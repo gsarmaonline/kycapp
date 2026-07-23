@@ -54,10 +54,15 @@ Tenant hub. Everything else hangs off this record.
 | `accent_color` | string | Optional hex for header title |
 | `email_footer` | string | Footer text for branded email chrome |
 | `email_font` | string | Font key: `arial`, `helvetica`, `verdana`, `trebuchet`, `georgia`, `times`, `courier` |
+| `app_user_authority` | enum | `kyc` (default) \| `external` — primary source for customer profiles; KYC UI create stays allowed either way |
+| `app_user_ingest_upsert_key` | enum | `external_id` (default) \| `email` — which field ingest matches on |
+| `app_user_attributes_mode` | enum | `discover` (default) \| `strict` — whether ingest auto-creates attribute definitions for unknown keys |
 | `created_at` | timestamptz | |
 | `updated_at` | timestamptz | |
 
 Branding is applied at email **render/preview** time (`core/emailtemplates.Wrap`), not baked into each template body. A visual drag-and-drop builder is deferred.
+
+When `app_user_authority=external`, KYC is a **projection** of merchant customers (ingest is the happy path). Manual create/edit in KYC remains available as an override.
 
 ### User
 

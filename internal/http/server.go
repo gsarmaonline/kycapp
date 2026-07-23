@@ -157,6 +157,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("PATCH /v1/attribute-definitions/{id}", s.handlePatchAttributeDefinition)
 	s.mux.HandleFunc("DELETE /v1/attribute-definitions/{id}", s.handleDeleteAttributeDefinition)
 	s.mux.HandleFunc("POST /v1/organisations/{id}/app-users", s.handleCreateAppUser)
+	s.mux.HandleFunc("PUT /v1/organisations/{id}/app-users/ingest", s.handleIngestAppUser)
 	s.mux.HandleFunc("GET /v1/organisations/{id}/app-users", s.handleListAppUsers)
 	s.mux.HandleFunc("GET /v1/app-users/{id}", s.handleGetAppUser)
 	s.mux.HandleFunc("PATCH /v1/app-users/{id}", s.handlePatchAppUser)

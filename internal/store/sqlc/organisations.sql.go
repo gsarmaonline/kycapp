@@ -15,7 +15,7 @@ const archiveOrganisation = `-- name: ArchiveOrganisation :one
 UPDATE organisations
 SET status = 'archived', updated_at = now()
 WHERE id = $1
-RETURNING id, name, slug, status, created_at, updated_at, logo_url, primary_color, accent_color, email_footer, email_font
+RETURNING id, name, slug, status, created_at, updated_at, logo_url, primary_color, accent_color, email_footer, email_font, app_user_authority, app_user_ingest_upsert_key, app_user_attributes_mode
 `
 
 func (q *Queries) ArchiveOrganisation(ctx context.Context, id string) (Organisation, error) {
@@ -33,6 +33,9 @@ func (q *Queries) ArchiveOrganisation(ctx context.Context, id string) (Organisat
 		&i.AccentColor,
 		&i.EmailFooter,
 		&i.EmailFont,
+		&i.AppUserAuthority,
+		&i.AppUserIngestUpsertKey,
+		&i.AppUserAttributesMode,
 	)
 	return i, err
 }
@@ -40,7 +43,7 @@ func (q *Queries) ArchiveOrganisation(ctx context.Context, id string) (Organisat
 const createOrganisation = `-- name: CreateOrganisation :one
 INSERT INTO organisations (id, name, slug, status)
 VALUES ($1, $2, $3, $4)
-RETURNING id, name, slug, status, created_at, updated_at, logo_url, primary_color, accent_color, email_footer, email_font
+RETURNING id, name, slug, status, created_at, updated_at, logo_url, primary_color, accent_color, email_footer, email_font, app_user_authority, app_user_ingest_upsert_key, app_user_attributes_mode
 `
 
 type CreateOrganisationParams struct {
@@ -70,6 +73,9 @@ func (q *Queries) CreateOrganisation(ctx context.Context, arg CreateOrganisation
 		&i.AccentColor,
 		&i.EmailFooter,
 		&i.EmailFont,
+		&i.AppUserAuthority,
+		&i.AppUserIngestUpsertKey,
+		&i.AppUserAttributesMode,
 	)
 	return i, err
 }
@@ -85,7 +91,7 @@ func (q *Queries) DeleteOrganisation(ctx context.Context, id string) error {
 }
 
 const getOrganisation = `-- name: GetOrganisation :one
-SELECT id, name, slug, status, created_at, updated_at, logo_url, primary_color, accent_color, email_footer, email_font FROM organisations
+SELECT id, name, slug, status, created_at, updated_at, logo_url, primary_color, accent_color, email_footer, email_font, app_user_authority, app_user_ingest_upsert_key, app_user_attributes_mode FROM organisations
 WHERE id = $1
 `
 
@@ -104,12 +110,15 @@ func (q *Queries) GetOrganisation(ctx context.Context, id string) (Organisation,
 		&i.AccentColor,
 		&i.EmailFooter,
 		&i.EmailFont,
+		&i.AppUserAuthority,
+		&i.AppUserIngestUpsertKey,
+		&i.AppUserAttributesMode,
 	)
 	return i, err
 }
 
 const listOrganisations = `-- name: ListOrganisations :many
-SELECT id, name, slug, status, created_at, updated_at, logo_url, primary_color, accent_color, email_footer, email_font FROM organisations
+SELECT id, name, slug, status, created_at, updated_at, logo_url, primary_color, accent_color, email_footer, email_font, app_user_authority, app_user_ingest_upsert_key, app_user_attributes_mode FROM organisations
 WHERE ($1::text IS NULL OR status = $1)
   AND (
     $2::text IS NULL
@@ -154,6 +163,9 @@ func (q *Queries) ListOrganisations(ctx context.Context, arg ListOrganisationsPa
 			&i.AccentColor,
 			&i.EmailFooter,
 			&i.EmailFont,
+			&i.AppUserAuthority,
+			&i.AppUserIngestUpsertKey,
+			&i.AppUserAttributesMode,
 		); err != nil {
 			return nil, err
 		}
@@ -166,7 +178,7 @@ func (q *Queries) ListOrganisations(ctx context.Context, arg ListOrganisationsPa
 }
 
 const listOrganisationsForUser = `-- name: ListOrganisationsForUser :many
-SELECT o.id, o.name, o.slug, o.status, o.created_at, o.updated_at, o.logo_url, o.primary_color, o.accent_color, o.email_footer, o.email_font
+SELECT o.id, o.name, o.slug, o.status, o.created_at, o.updated_at, o.logo_url, o.primary_color, o.accent_color, o.email_footer, o.email_font, o.app_user_authority, o.app_user_ingest_upsert_key, o.app_user_attributes_mode
 FROM organisations o
 JOIN memberships m ON m.organisation_id = o.id
 WHERE m.user_id = $1
@@ -217,6 +229,9 @@ func (q *Queries) ListOrganisationsForUser(ctx context.Context, arg ListOrganisa
 			&i.AccentColor,
 			&i.EmailFooter,
 			&i.EmailFont,
+			&i.AppUserAuthority,
+			&i.AppUserIngestUpsertKey,
+			&i.AppUserAttributesMode,
 		); err != nil {
 			return nil, err
 		}
@@ -232,7 +247,7 @@ const setOrganisationLogoURL = `-- name: SetOrganisationLogoURL :one
 UPDATE organisations
 SET logo_url = $2, updated_at = now()
 WHERE id = $1
-RETURNING id, name, slug, status, created_at, updated_at, logo_url, primary_color, accent_color, email_footer, email_font
+RETURNING id, name, slug, status, created_at, updated_at, logo_url, primary_color, accent_color, email_footer, email_font, app_user_authority, app_user_ingest_upsert_key, app_user_attributes_mode
 `
 
 type SetOrganisationLogoURLParams struct {
@@ -255,6 +270,9 @@ func (q *Queries) SetOrganisationLogoURL(ctx context.Context, arg SetOrganisatio
 		&i.AccentColor,
 		&i.EmailFooter,
 		&i.EmailFont,
+		&i.AppUserAuthority,
+		&i.AppUserIngestUpsertKey,
+		&i.AppUserAttributesMode,
 	)
 	return i, err
 }
@@ -268,19 +286,25 @@ SET
   accent_color = COALESCE($4, accent_color),
   email_footer = COALESCE($5, email_footer),
   email_font = COALESCE($6, email_font),
+  app_user_authority = COALESCE($7, app_user_authority),
+  app_user_ingest_upsert_key = COALESCE($8, app_user_ingest_upsert_key),
+  app_user_attributes_mode = COALESCE($9, app_user_attributes_mode),
   updated_at = now()
-WHERE id = $7
-RETURNING id, name, slug, status, created_at, updated_at, logo_url, primary_color, accent_color, email_footer, email_font
+WHERE id = $10
+RETURNING id, name, slug, status, created_at, updated_at, logo_url, primary_color, accent_color, email_footer, email_font, app_user_authority, app_user_ingest_upsert_key, app_user_attributes_mode
 `
 
 type UpdateOrganisationParams struct {
-	Name         pgtype.Text `json:"name"`
-	Status       pgtype.Text `json:"status"`
-	PrimaryColor pgtype.Text `json:"primary_color"`
-	AccentColor  pgtype.Text `json:"accent_color"`
-	EmailFooter  pgtype.Text `json:"email_footer"`
-	EmailFont    pgtype.Text `json:"email_font"`
-	ID           string      `json:"id"`
+	Name                   pgtype.Text `json:"name"`
+	Status                 pgtype.Text `json:"status"`
+	PrimaryColor           pgtype.Text `json:"primary_color"`
+	AccentColor            pgtype.Text `json:"accent_color"`
+	EmailFooter            pgtype.Text `json:"email_footer"`
+	EmailFont              pgtype.Text `json:"email_font"`
+	AppUserAuthority       pgtype.Text `json:"app_user_authority"`
+	AppUserIngestUpsertKey pgtype.Text `json:"app_user_ingest_upsert_key"`
+	AppUserAttributesMode  pgtype.Text `json:"app_user_attributes_mode"`
+	ID                     string      `json:"id"`
 }
 
 func (q *Queries) UpdateOrganisation(ctx context.Context, arg UpdateOrganisationParams) (Organisation, error) {
@@ -291,6 +315,9 @@ func (q *Queries) UpdateOrganisation(ctx context.Context, arg UpdateOrganisation
 		arg.AccentColor,
 		arg.EmailFooter,
 		arg.EmailFont,
+		arg.AppUserAuthority,
+		arg.AppUserIngestUpsertKey,
+		arg.AppUserAttributesMode,
 		arg.ID,
 	)
 	var i Organisation
@@ -306,6 +333,9 @@ func (q *Queries) UpdateOrganisation(ctx context.Context, arg UpdateOrganisation
 		&i.AccentColor,
 		&i.EmailFooter,
 		&i.EmailFont,
+		&i.AppUserAuthority,
+		&i.AppUserIngestUpsertKey,
+		&i.AppUserAttributesMode,
 	)
 	return i, err
 }
