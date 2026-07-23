@@ -530,13 +530,14 @@ button:disabled {
   border-top-color: #fecaca;
 }
 
-button.danger {
+/* Solid danger CTAs only — not table row link-buttons. */
+button.danger:not(.link-btn) {
   background: #991b1b;
   color: #fef2f2;
   border-color: #991b1b;
 }
 
-button.danger:hover {
+button.danger:not(.link-btn):hover {
   background: #7f1d1d;
 }
 
@@ -680,14 +681,26 @@ a.button:hover,
   background: none;
   border: 0;
   padding: 0;
+  border-radius: 0;
   color: #1f4d3a;
   font: inherit;
   text-decoration: underline;
   cursor: pointer;
 }
 
+button.link-btn:hover {
+  background: none;
+  color: #16382a;
+}
+
 .link-btn.danger {
   color: #9f1239;
+  background: none;
+}
+
+button.link-btn.danger:hover {
+  background: none;
+  color: #881337;
 }
 
 .link-btn:disabled {
