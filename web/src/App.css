@@ -87,10 +87,49 @@ body {
   color: #57534e;
 }
 
+.org-switcher-row {
+  display: flex;
+  gap: 0.35rem;
+  align-items: stretch;
+}
+
 .org-switcher select {
-  width: 100%;
+  flex: 1;
+  min-width: 0;
+  width: auto;
   font-size: 0.8rem;
   padding: 0.3rem 0.4rem;
+}
+
+.org-add-btn {
+  flex: 0 0 auto;
+  width: 2rem;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #fffdf8;
+  color: #1f4d3a;
+  border: 1px solid #d6d3d1;
+  border-radius: 4px;
+  font-size: 1.1rem;
+  line-height: 1;
+  font-weight: 500;
+}
+
+.org-add-btn:hover {
+  background: #e7efe4;
+  color: #16382a;
+}
+
+.org-add-btn[aria-pressed='true'] {
+  background: #1f4d3a;
+  border-color: #1f4d3a;
+  color: #f8faf8;
+}
+
+.org-switcher .create-org {
+  margin-top: 0.35rem;
 }
 
 .sidebar-nav {
@@ -149,14 +188,12 @@ body {
   background: #16382a;
 }
 
-.sidebar-actions,
 .sidebar-footer {
   display: grid;
   gap: 0.4rem;
   margin-top: auto;
 }
 
-.sidebar-actions .ghost,
 .sidebar-footer .ghost {
   font-size: 0.78rem;
   padding: 0.35rem 0.5rem;
@@ -246,6 +283,26 @@ body {
 
 .empty-state h1 {
   margin-bottom: 0.5rem;
+}
+
+.empty-state .lede {
+  max-width: 36rem;
+  margin-bottom: 1.25rem;
+}
+
+.create-org-main {
+  max-width: 22rem;
+  margin-top: 0.5rem;
+}
+
+.create-org-main label {
+  display: grid;
+  gap: 0.35rem;
+  font-size: 0.9rem;
+}
+
+.create-org-main button {
+  justify-self: start;
 }
 
 .overview-stats {

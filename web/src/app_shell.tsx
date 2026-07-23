@@ -63,8 +63,8 @@ export function AppShell({ user, onLogout }: { user: User | null; onLogout: () =
         navigate(orgPath(items[0].id, 'overview'), { replace: true })
         return
       }
-      if (routeOrgId && items.length > 0 && !items.some((o) => o.id === routeOrgId)) {
-        navigate(items[0] ? orgPath(items[0].id) : '/', { replace: true })
+      if (routeOrgId && !items.some((o) => o.id === routeOrgId)) {
+        navigate(items[0] ? orgPath(items[0].id) : '/app', { replace: true })
       }
     })()
   }, [routeOrgId])
@@ -97,6 +97,9 @@ export function AppShell({ user, onLogout }: { user: User | null; onLogout: () =
     }
   }
 
+  const noOrgs = !orgsLoading && orgs.length === 0
+  const showCreateInMain = noOrgs || creating
+
   return (
     <div className="shell">
       <aside className="sidebar" aria-label="Organisation navigation">
@@ -107,24 +110,48 @@ export function AppShell({ user, onLogout }: { user: User | null; onLogout: () =
           <strong>Organisations</strong>
         </div>
 
-        <label className="org-switcher">
+        <div className="org-switcher">
           <span>Current organisation</span>
-          <select
-            value={routeOrgId ?? ''}
-            disabled={orgsLoading || orgs.length === 0}
-            onChange={(e) => switchOrg(e.target.value)}
-            aria-label="Switch organisation"
-          >
-            {orgs.length === 0 && <option value="">No organisations</option>}
-            {orgs.map((o) => (
-              <option key={o.id} value={o.id}>
-                {o.name}
-              </option>
-            ))}
-          </select>
-        </label>
+          <div className="org-switcher-row">
+            <select
+              value={routeOrgId ?? ''}
+              disabled={orgsLoading || orgs.length === 0}
+              onChange={(e) => switchOrg(e.target.value)}
+              aria-label="Switch organisation"
+            >
+              {orgs.length === 0 && <option value="">No organisations</option>}
+              {orgs.map((o) => (
+                <option key={o.id} value={o.id}>
+                  {o.name}
+                </option>
+              ))}
+            </select>
+            <button
+              type="button"
+              className="org-add-btn"
+              aria-label={creating ? 'Cancel new organisation' : 'New organisation'}
+              title={creating ? 'Cancel' : 'New organisation'}
+              aria-pressed={creating}
+              onClick={() => setCreating((v) => !v)}
+            >
+              {creating ? '×' : '+'}
+            </button>
+          </div>
+          {creating && !noOrgs && (
+            <form className="create-org" onSubmit={onCreateOrg}>
+              <input
+                value={newOrgName}
+                onChange={(e) => setNewOrgName(e.target.value)}
+                placeholder="Organisation name"
+                required
+                autoFocus
+              />
+              <button type="submit">Create</button>
+            </form>
+          )}
+        </div>
 
-        {routeOrgId && (
+        {routeOrgId && selected && (
           <nav className="sidebar-nav" aria-label="Organisation sections">
             <NavLink
               to={orgPath(routeOrgId, 'overview')}
@@ -151,23 +178,6 @@ export function AppShell({ user, onLogout }: { user: User | null; onLogout: () =
             ))}
           </nav>
         )}
-
-        <div className="sidebar-actions">
-          <button type="button" className="ghost full" onClick={() => setCreating((v) => !v)}>
-            {creating ? 'Cancel' : 'New organisation'}
-          </button>
-          {creating && (
-            <form className="create-org" onSubmit={onCreateOrg}>
-              <input
-                value={newOrgName}
-                onChange={(e) => setNewOrgName(e.target.value)}
-                placeholder="Organisation name"
-                required
-              />
-              <button type="submit">Create</button>
-            </form>
-          )}
-        </div>
 
         <div className="sidebar-footer">
           {user && (
@@ -205,12 +215,27 @@ export function AppShell({ user, onLogout }: { user: User | null; onLogout: () =
         {orgsLoading && <p>Loading organisations…</p>}
         {!orgsLoading && !selected && (
           <div className="empty-state">
-            <h1>Your organisations</h1>
+            <h1>{noOrgs ? 'Create your organisation' : 'Your organisations'}</h1>
             <p className="lede">
-              {routeOrgId
-                ? 'This organisation is unavailable (it may have been deleted). Create or select another organisation.'
-                : 'Create an organisation to invite teammates and manage access.'}
+              {noOrgs
+                ? 'Organisations are the hub for members, end users, billing, and product features.'
+                : 'This organisation is unavailable (it may have been deleted). Select another from the sidebar or create a new one.'}
             </p>
+            {showCreateInMain && (
+              <form className="create-org create-org-main" onSubmit={onCreateOrg}>
+                <label>
+                  Organisation name
+                  <input
+                    value={newOrgName}
+                    onChange={(e) => setNewOrgName(e.target.value)}
+                    placeholder="Acme"
+                    required
+                    autoFocus={noOrgs}
+                  />
+                </label>
+                <button type="submit">Create organisation</button>
+              </form>
+            )}
           </div>
         )}
         {selected && (
