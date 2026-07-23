@@ -146,7 +146,7 @@ export function me() {
 }
 
 export function listOrganisations() {
-  return request<{ items: Organisation[] }>('/v1/organisations')
+  return request<{ items: Organisation[] }>('/v1/organisations?status=active')
 }
 
 export function createOrganisation(name: string, slug?: string) {
@@ -177,8 +177,8 @@ export function updateOrganisation(
   })
 }
 
-export function archiveOrganisation(id: string) {
-  return request<Organisation>(`/v1/organisations/${id}/archive`, { method: 'POST' })
+export function deleteOrganisation(id: string) {
+  return request<{ ok: boolean; id: string }>(`/v1/organisations/${id}`, { method: 'DELETE' })
 }
 
 export type OrgIntegration = {

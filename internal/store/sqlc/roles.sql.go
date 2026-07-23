@@ -31,13 +31,11 @@ const checkUserPermission = `-- name: CheckUserPermission :one
 SELECT EXISTS (
     SELECT 1
     FROM memberships m
-    JOIN organisations o ON o.id = m.organisation_id
     JOIN role_permissions rp ON rp.role_id = m.role_id
     JOIN permissions p ON p.id = rp.permission_id
     WHERE m.organisation_id = $1
       AND m.user_id = $2
       AND m.status = 'active'
-      AND o.status = 'active'
       AND p.key = $3
 ) AS allowed
 `

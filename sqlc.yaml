@@ -22,6 +22,7 @@ sql:
       - "internal/store/migrations/000017_entitlement_scope.up.sql"
       - "internal/store/migrations/000018_product_features.up.sql"
       - "internal/store/migrations/000019_org_settings.up.sql"
+      - "internal/store/migrations/000020_org_hard_delete.up.sql"
     gen:
       go:
         package: "sqlc"

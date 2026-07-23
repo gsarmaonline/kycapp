@@ -2,8 +2,8 @@ import { useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import {
-  archiveOrganisation,
   createOrgAPIKey,
+  deleteOrganisation,
   deleteOrgIntegration,
   getOrganisation,
   listOrgAPIKeys,
@@ -148,9 +148,11 @@ export function SettingsPage() {
     }
   }
 
-  async function onArchive() {
+  async function onDelete() {
     if (!org) return
-    const typed = window.prompt(`Type ${org.slug} to delete (archive) this organisation`)
+    const typed = window.prompt(
+      `Type ${org.slug} to permanently delete this organisation and all of its data`,
+    )
     if (typed !== org.slug) {
       if (typed != null) setError('Slug did not match — organisation not deleted')
       return
@@ -158,7 +160,7 @@ export function SettingsPage() {
     setBusy(true)
     setError(null)
     try {
-      await archiveOrganisation(orgId)
+      await deleteOrganisation(orgId)
       navigate('/app', { replace: true })
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Delete failed')
@@ -279,10 +281,10 @@ export function SettingsPage() {
       <section className="settings-block settings-danger">
         <h3>Delete organisation</h3>
         <p className="status">
-          Archives this organisation. Members lose access; data is retained for recovery. This cannot
-          be undone from the UI.
+          Permanently deletes this organisation and all related data (members, users, plans,
+          automations, API keys). This cannot be undone.
         </p>
-        <button type="button" className="danger" disabled={busy} onClick={() => void onArchive()}>
+        <button type="button" className="danger" disabled={busy} onClick={() => void onDelete()}>
           Delete organisation
         </button>
       </section>

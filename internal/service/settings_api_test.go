@@ -54,8 +54,32 @@ func TestOrgSettingsStripeAndAPIKeys(t *testing.T) {
 		t.Fatalf("org api key must not be platform: %d %s", plans.Code, plans.Body.String())
 	}
 
-	arch := doJSON(t, h, http.MethodPost, "/v1/organisations/"+orgID+"/archive", nil, auth)
+	arch := doJSON(t, h, http.MethodDelete, "/v1/organisations/"+orgID, nil, auth)
 	if arch.Code != http.StatusOK {
-		t.Fatalf("archive: %s", arch.Body.String())
+		t.Fatalf("delete: %s", arch.Body.String())
+	}
+
+	listed := doJSON(t, h, http.MethodGet, "/v1/organisations", nil, auth)
+	if listed.Code != http.StatusOK {
+		t.Fatalf("list after delete: %s", listed.Body.String())
+	}
+	var listBody map[string]any
+	decodeBody(t, listed, &listBody)
+	items, _ := listBody["items"].([]any)
+	for _, it := range items {
+		row, _ := it.(map[string]any)
+		if row["id"] == orgID {
+			t.Fatalf("deleted org still listed: %#v", row)
+		}
+	}
+
+	users := doJSON(t, h, http.MethodGet, "/v1/organisations/"+orgID+"/app-users", nil, auth)
+	if users.Code != http.StatusNotFound {
+		t.Fatalf("deleted org access want 404 got %d %s", users.Code, users.Body.String())
+	}
+
+	get := doJSON(t, h, http.MethodGet, "/v1/organisations/"+orgID, nil, auth)
+	if get.Code != http.StatusNotFound && get.Code != http.StatusForbidden {
+		t.Fatalf("get deleted org want 404/403 got %d %s", get.Code, get.Body.String())
 	}
 }

@@ -75,12 +75,10 @@ ORDER BY key;
 SELECT EXISTS (
     SELECT 1
     FROM memberships m
-    JOIN organisations o ON o.id = m.organisation_id
     JOIN role_permissions rp ON rp.role_id = m.role_id
     JOIN permissions p ON p.id = rp.permission_id
     WHERE m.organisation_id = sqlc.arg('organisation_id')
       AND m.user_id = sqlc.arg('user_id')
       AND m.status = 'active'
-      AND o.status = 'active'
       AND p.key = sqlc.arg('permission_key')
 ) AS allowed;

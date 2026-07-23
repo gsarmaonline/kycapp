@@ -175,15 +175,19 @@ func (s *Server) handlePublicOrganisationLogo(w http.ResponseWriter, r *http.Req
 }
 
 func (s *Server) handleArchiveOrganisation(w http.ResponseWriter, r *http.Request) {
+	// Legacy path: hard-delete (same as DELETE /v1/organisations/{id}).
+	s.handleDeleteOrganisation(w, r)
+}
+
+func (s *Server) handleDeleteOrganisation(w http.ResponseWriter, r *http.Request) {
 	orgID := r.PathValue("id")
-	if _, err := s.svc.RequireOrgPermission(r.Context(), orgID, "organisation:update"); err != nil {
+	if _, err := s.svc.RequireOrgPermissionAnyStatus(r.Context(), orgID, "organisation:update"); err != nil {
 		writeError(w, err)
 		return
 	}
-	org, err := s.svc.ArchiveOrganisation(r.Context(), orgID)
-	if err != nil {
+	if err := s.svc.DeleteOrganisation(r.Context(), orgID); err != nil {
 		writeError(w, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, orgJSON(org))
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "id": orgID})
 }

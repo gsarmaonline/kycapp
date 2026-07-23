@@ -43,14 +43,34 @@ func RequirePlatform(ctx context.Context) (authn.Principal, error) {
 	return p, nil
 }
 
-// RequireOrgMember requires active membership in org, platform privilege, or an org-scoped API key.
+// RequireOrgMember requires active membership in an *active* org, platform privilege, or an org-scoped API key.
 func (s *Service) RequireOrgMember(ctx context.Context, orgID string) (authn.Principal, error) {
+	p, err := s.requireOrgMember(ctx, orgID, true)
+	return p, err
+}
+
+// RequireOrgMemberAnyStatus is like RequireOrgMember but allows archived/suspended orgs (e.g. hard delete).
+func (s *Service) RequireOrgMemberAnyStatus(ctx context.Context, orgID string) (authn.Principal, error) {
+	return s.requireOrgMember(ctx, orgID, false)
+}
+
+func (s *Service) requireOrgMember(ctx context.Context, orgID string, requireActiveOrg bool) (authn.Principal, error) {
 	p, err := RequirePrincipal(ctx)
 	if err != nil {
 		return authn.Principal{}, err
 	}
 	if p.IsPlatform() {
 		return p, nil
+	}
+	org, err := s.db.Q().GetOrganisation(ctx, orgID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return authn.Principal{}, apperr.NotFound("organisation not found")
+	}
+	if err != nil {
+		return authn.Principal{}, err
+	}
+	if requireActiveOrg && org.Status != "active" {
+		return authn.Principal{}, apperr.NotFound("organisation not found")
 	}
 	if p.Kind == authn.KindService && p.OrganisationID == orgID {
 		return p, nil
@@ -73,7 +93,16 @@ func (s *Service) RequireOrgMember(ctx context.Context, orgID string) (authn.Pri
 
 // RequireOrgPermission requires org membership plus an RBAC permission (platform and org API keys bypass).
 func (s *Service) RequireOrgPermission(ctx context.Context, orgID, permissionKey string) (authn.Principal, error) {
-	p, err := s.RequireOrgMember(ctx, orgID)
+	return s.requireOrgPermission(ctx, orgID, permissionKey, true)
+}
+
+// RequireOrgPermissionAnyStatus allows permissions on archived orgs (hard delete).
+func (s *Service) RequireOrgPermissionAnyStatus(ctx context.Context, orgID, permissionKey string) (authn.Principal, error) {
+	return s.requireOrgPermission(ctx, orgID, permissionKey, false)
+}
+
+func (s *Service) requireOrgPermission(ctx context.Context, orgID, permissionKey string, requireActiveOrg bool) (authn.Principal, error) {
+	p, err := s.requireOrgMember(ctx, orgID, requireActiveOrg)
 	if err != nil {
 		return authn.Principal{}, err
 	}

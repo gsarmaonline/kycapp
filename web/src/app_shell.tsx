@@ -206,7 +206,11 @@ export function AppShell({ user, onLogout }: { user: User | null; onLogout: () =
         {!orgsLoading && !selected && (
           <div className="empty-state">
             <h1>Your organisations</h1>
-            <p className="lede">Create an organisation to invite teammates and manage access.</p>
+            <p className="lede">
+              {routeOrgId
+                ? 'This organisation is unavailable (it may have been deleted). Create or select another organisation.'
+                : 'Create an organisation to invite teammates and manage access.'}
+            </p>
           </div>
         )}
         {selected && (

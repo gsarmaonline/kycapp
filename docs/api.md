@@ -69,9 +69,11 @@ Colors must be `#RGB` or `#RRGGBB`.
 
 Organisation JSON also includes `logo_url` (read-only; set via logo upload) and `email_font`.
 
-### `POST /v1/organisations/{id}/archive`
+### `DELETE /v1/organisations/{id}`
 
-Soft-archive (`status=archived`). Requires `organisation:update`.
+Hard-deletes the organisation and cascaded tenant data (members, roles, app users, plans, automations, API keys, etc.). Requires `organisation:update`.
+
+`POST /v1/organisations/{id}/archive` remains as a legacy alias for the same hard delete.
 
 ### Settings / integrations / org API keys
 

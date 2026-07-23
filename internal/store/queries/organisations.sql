@@ -59,3 +59,7 @@ UPDATE organisations
 SET status = 'archived', updated_at = now()
 WHERE id = $1
 RETURNING *;
+
+-- name: DeleteOrganisation :exec
+DELETE FROM organisations
+WHERE id = $1;

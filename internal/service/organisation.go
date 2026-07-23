@@ -2,6 +2,8 @@ package service
 
 import (
 	"context"
+	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/gsarmaonline/kyc/core/organisation"
@@ -111,6 +113,10 @@ func (s *Service) ListOrganisationsForUser(ctx context.Context, userID, status, 
 	if limit <= 0 || limit > 100 {
 		limit = 50
 	}
+	// Merchants only see active orgs by default (archived stay in DB for ops).
+	if status == "" {
+		status = "active"
+	}
 	return s.db.Q().ListOrganisationsForUser(ctx, sqlc.ListOrganisationsForUserParams{
 		UserID: userID,
 		Status: textArg(status),
@@ -136,4 +142,19 @@ func (s *Service) UpdateOrganisation(ctx context.Context, id string, in UpdateOr
 func (s *Service) ArchiveOrganisation(ctx context.Context, id string) (sqlc.Organisation, error) {
 	org, err := s.db.Q().ArchiveOrganisation(ctx, id)
 	return org, mapNotFound(err, "organisation not found")
+}
+
+// DeleteOrganisation permanently removes the organisation and cascaded tenant data.
+func (s *Service) DeleteOrganisation(ctx context.Context, id string) error {
+	_, err := s.db.Q().GetOrganisation(ctx, id)
+	if err != nil {
+		return mapNotFound(err, "organisation not found")
+	}
+	if s.uploadDir != "" {
+		_ = os.RemoveAll(filepath.Join(s.uploadDir, id))
+	}
+	if err := s.db.Q().DeleteOrganisation(ctx, id); err != nil {
+		return err
+	}
+	return nil
 }

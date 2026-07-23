@@ -74,6 +74,16 @@ func (q *Queries) CreateOrganisation(ctx context.Context, arg CreateOrganisation
 	return i, err
 }
 
+const deleteOrganisation = `-- name: DeleteOrganisation :exec
+DELETE FROM organisations
+WHERE id = $1
+`
+
+func (q *Queries) DeleteOrganisation(ctx context.Context, id string) error {
+	_, err := q.db.Exec(ctx, deleteOrganisation, id)
+	return err
+}
+
 const getOrganisation = `-- name: GetOrganisation :one
 SELECT id, name, slug, status, created_at, updated_at, logo_url, primary_color, accent_color, email_footer, email_font FROM organisations
 WHERE id = $1
