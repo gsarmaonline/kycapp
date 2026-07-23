@@ -1,5 +1,5 @@
 import type { Edge } from '@xyflow/react'
-import type { AutomationAction, AutomationCondition } from '../../../api'
+import type { AutomationAction, AutomationCatalog, AutomationCondition } from '../../../api'
 import type { AutomationFlowNode } from './nodes'
 
 const X_TRIGGER = 40
@@ -7,15 +7,15 @@ const X_CONDITION = 300
 const X_ACTION = 620
 const Y_STEP = 150
 
-const defaultCondition = (): AutomationCondition => ({
-  field: 'attributes.country',
+const defaultCondition = (preferredField = 'status'): AutomationCondition => ({
+  field: preferredField,
   op: 'eq',
   value: '',
 })
 
-const defaultAction = (): AutomationAction => ({
-  type: 'send_email',
-  template_key: 'welcome',
+const defaultAction = (preferredType = 'send_email'): AutomationAction => ({
+  type: preferredType,
+  template_key: preferredType === 'send_email' ? 'welcome' : '',
 })
 
 export function normalizeGraph(
@@ -44,6 +44,7 @@ export function buildFlowElements(
   },
   opts: {
     readOnly: boolean
+    catalog?: AutomationCatalog | null
     onTriggerChange?: (trigger: string) => void
     onConditionChange?: (index: number, condition: AutomationCondition) => void
     onConditionRemove?: (index: number) => void
@@ -64,6 +65,7 @@ export function buildFlowElements(
       data: {
         trigger: graph.trigger,
         readOnly: opts.readOnly,
+        triggers: opts.catalog?.triggers,
         onTriggerChange: opts.onTriggerChange,
       },
       draggable: false,
@@ -79,6 +81,8 @@ export function buildFlowElements(
       data: {
         condition,
         readOnly: opts.readOnly,
+        conditionFields: opts.catalog?.condition_fields,
+        ops: opts.catalog?.ops,
         canRemove: graph.conditions.length > 1,
         onChange: (next) => opts.onConditionChange?.(i, next),
         onRemove: () => opts.onConditionRemove?.(i),
@@ -96,6 +100,7 @@ export function buildFlowElements(
       data: {
         action,
         readOnly: opts.readOnly,
+        actions: opts.catalog?.actions,
         canRemove: graph.actions.length > 1,
         onChange: (next) => opts.onActionChange?.(i, next),
         onRemove: () => opts.onActionRemove?.(i),

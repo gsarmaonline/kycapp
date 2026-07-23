@@ -774,6 +774,23 @@ export type AutomationAction = {
   template_key?: string
 }
 
+export type AutomationCatalog = {
+  triggers: { id: string; label: string; description: string }[]
+  actions: {
+    type: string
+    label: string
+    description: string
+    params: { key: string; label: string; required: boolean }[]
+  }[]
+  ops: { op: string; label: string; needs_value: boolean }[]
+  condition_fields: {
+    field: string
+    label: string
+    value_type: string
+    group: string
+  }[]
+}
+
 export type Automation = {
   id: string
   organisation_id: string
@@ -798,6 +815,10 @@ export function listAutomations(orgId: string) {
   return request<{ items: Automation[] }>(`/v1/organisations/${orgId}/automations`)
 }
 
+export function getAutomationCatalog(orgId: string) {
+  return request<AutomationCatalog>(`/v1/organisations/${orgId}/automations/catalog`)
+}
+
 export function getAutomation(id: string) {
   return request<Automation>(`/v1/automations/${id}`)
 }
@@ -805,7 +826,7 @@ export function getAutomation(id: string) {
 export function createAutomation(
   orgId: string,
   input: {
-    name?: string
+    name: string
     trigger: string
     enabled?: boolean
     conditions: { all: AutomationCondition[] }

@@ -266,10 +266,12 @@ Org-scoped message copy for **app users** (not KYC member invites). Domain helpe
 
 Org-scoped rules: trigger → simple AND conditions → ordered actions. Executed by the River worker (`cmd/worker`). Domain: `core/automations`. See [automations.md](automations.md).
 
+- `GET /v1/organisations/{id}/automations/catalog` — requires `automations:read`  
+  Returns registered `triggers`, `actions` (+ params), `ops`, and `condition_fields` (base user fields + all active attribute definitions as `attributes.<key>`).
 - `GET /v1/organisations/{id}/automations` — requires `automations:read`
 - `POST /v1/organisations/{id}/automations` — requires `automations:manage`  
-  `{ "name"?, "trigger", "enabled"?, "conditions": { "all": [{ "field", "op", "value"? }] }, "actions": [{ "type": "send_email", "template_key" }] }`  
-  Triggers: `app_user.created`, `app_user.updated`. Ops: `eq`, `neq`, `exists`, `not_exists`.
+  `{ "name", "trigger", "enabled"?, "conditions": { "all": [{ "field", "op", "value"? }] }, "actions": [{ "type": "send_email", "template_key" }] }`  
+  `name` is required. Condition `field` values must appear in the org catalog.
 - `GET /v1/automations/{id}` — requires `automations:read`
 - `PATCH /v1/automations/{id}` — requires `automations:manage`
 - `DELETE /v1/automations/{id}` — requires `automations:manage`

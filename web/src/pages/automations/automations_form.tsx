@@ -1,7 +1,12 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
-import { Link } from 'react-router-dom'
-import type { AutomationAction, AutomationCondition } from '../../api'
+import { Link, useParams } from 'react-router-dom'
+import {
+  getAutomationCatalog,
+  type AutomationAction,
+  type AutomationCatalog,
+  type AutomationCondition,
+} from '../../api'
 import { AutomationDag } from './dag/AutomationDag'
 import { normalizeGraph } from './dag/build_graph'
 
@@ -25,6 +30,7 @@ type Props = {
 }
 
 export function AutomationsForm({ submitLabel, cancelTo, initial, onSubmit }: Props) {
+  const { orgId = '' } = useParams()
   const initialGraph = normalizeGraph(
     {
       trigger: initial?.trigger,
@@ -38,12 +44,31 @@ export function AutomationsForm({ submitLabel, cancelTo, initial, onSubmit }: Pr
   const [trigger, setTrigger] = useState(initialGraph.trigger)
   const [conditions, setConditions] = useState(initialGraph.conditions)
   const [actions, setActions] = useState(initialGraph.actions)
+  const [catalog, setCatalog] = useState<AutomationCatalog | null>(null)
   const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (!orgId) return
+    void getAutomationCatalog(orgId)
+      .then((c) => {
+        setCatalog(c)
+        if (!initial?.trigger && c.triggers[0]) {
+          setTrigger(c.triggers[0].id)
+        }
+      })
+      .catch((err) => {
+        setError(err instanceof Error ? err.message : 'Failed to load automation catalog')
+      })
+  }, [orgId, initial?.trigger])
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
     setError(null)
     try {
+      const trimmedName = name.trim()
+      if (!trimmedName) {
+        throw new Error('Name is required')
+      }
       const cleanedConditions = conditions
         .map((c) => ({
           field: c.field.trim(),
@@ -69,7 +94,7 @@ export function AutomationsForm({ submitLabel, cancelTo, initial, onSubmit }: Pr
         }
       }
       await onSubmit({
-        name,
+        name: trimmedName,
         trigger,
         enabled,
         conditions: { all: cleanedConditions },
@@ -86,7 +111,12 @@ export function AutomationsForm({ submitLabel, cancelTo, initial, onSubmit }: Pr
       <div className="automation-meta">
         <label>
           Name
-          <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Optional" />
+          <input
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="e.g. Welcome AU users"
+            required
+          />
         </label>
         <label className="perm">
           <input
@@ -99,6 +129,7 @@ export function AutomationsForm({ submitLabel, cancelTo, initial, onSubmit }: Pr
       </div>
 
       <AutomationDag
+        catalog={catalog}
         trigger={trigger}
         conditions={conditions}
         actions={actions}

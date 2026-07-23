@@ -15,10 +15,11 @@ Temporal / Restate / Hatchet are deferred until we need long-running waits, huma
 
 ## V1 model
 
-Org-scoped **Automation** (name optional):
+Org-scoped **Automation** (**name required**):
 
 ```json
 {
+  "name": "Welcome AU users",
   "trigger": "app_user.created",
   "enabled": true,
   "conditions": {
@@ -32,6 +33,21 @@ Org-scoped **Automation** (name optional):
 }
 ```
 
+### Catalog (single source of truth)
+
+Triggers, actions, ops, and condition fields are defined in `core/automations` (registry) and exposed per org as:
+
+`GET /v1/organisations/{id}/automations/catalog`
+
+| Key | Source |
+| --- | --- |
+| `triggers` | Registered trigger descriptors |
+| `actions` | Registered action types + params |
+| `ops` | Condition operators |
+| `condition_fields` | Base app-user payload fields + **all active org attribute definitions** as `attributes.<key>` |
+
+The merchant UI loads this catalog for dropdowns. Create/update validates condition fields against the same set.
+
 ### Triggers (v1)
 
 | Trigger | When |
@@ -39,13 +55,13 @@ Org-scoped **Automation** (name optional):
 | `app_user.created` | After app user create (including ingest insert) |
 | `app_user.updated` | After app user update (including ingest upsert) |
 
-Ingest (`PUT …/app-users/ingest`) merges attributes and enqueues the same triggers, so conditions on `attributes.*` work for externally authored profiles. Add more later (`membership.invited`, `subscription.updated`, …) without changing the DSL shape.
+Ingest (`PUT …/app-users/ingest`) merges attributes and enqueues the same triggers, so conditions on `attributes.*` work for externally authored profiles. Add more later (`membership.invited`, `subscription.updated`, …) by registering them in `core/automations`.
 
 ### Conditions
 
 - Combinator: `all` (AND) only in v1; `any` (OR) later if needed.
 - Ops: `eq`, `neq`, `exists`, `not_exists` (enough for attributes / status).
-- Fields: dotted paths on a small event payload (`status`, `attributes.<key>`, …).
+- Fields: base user fields (`id`, `email`, `display_name`, `status`, `external_id`) plus every active attribute definition.
 
 ### Actions (v1)
 
@@ -54,7 +70,7 @@ Ingest (`PUT …/app-users/ingest`) merges attributes and enqueues the same trig
 | `send_email` | Render org email template + branding, deliver via Mailer (`EMAIL_PROVIDER=resend` or `noop`) |
 | `set_attribute` | Optional later |
 
-Unknown action types fail the run with a clear error (no silent skip).
+Unknown action types fail the run with a clear error (no silent skip). Register new actions in `core/automations` and implement execute in the service worker path.
 
 **Topology is fixed for v1:** one trigger → AND conditions → **all** actions in the list (in order). There is no “this condition → only these actions” branching. Add multiple actions with **Add action**; they all run when the conditions match. Per-path branches would need a richer DSL later.
 

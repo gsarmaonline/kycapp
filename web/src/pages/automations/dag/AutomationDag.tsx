@@ -7,12 +7,13 @@ import {
   ReactFlowProvider,
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
-import type { AutomationAction, AutomationCondition } from '../../../api'
+import type { AutomationAction, AutomationCatalog, AutomationCondition } from '../../../api'
 import { buildFlowElements, defaultAction, defaultCondition, normalizeGraph } from './build_graph'
 import { automationNodeTypes } from './nodes'
 
 type Props = {
   readOnly?: boolean
+  catalog?: AutomationCatalog | null
   trigger: string
   conditions: AutomationCondition[]
   actions: AutomationAction[]
@@ -21,8 +22,18 @@ type Props = {
   onActionsChange?: (actions: AutomationAction[]) => void
 }
 
+function preferredConditionField(catalog?: AutomationCatalog | null) {
+  const attrs = catalog?.condition_fields?.find((f) => f.group === 'attributes')
+  return attrs?.field ?? catalog?.condition_fields?.[0]?.field ?? 'status'
+}
+
+function preferredActionType(catalog?: AutomationCatalog | null) {
+  return catalog?.actions?.[0]?.type ?? 'send_email'
+}
+
 function AutomationDagInner({
   readOnly = false,
+  catalog,
   trigger,
   conditions,
   actions,
@@ -77,6 +88,7 @@ function AutomationDagInner({
     () =>
       buildFlowElements(graph, {
         readOnly,
+        catalog,
         onTriggerChange,
         onConditionChange,
         onConditionRemove,
@@ -86,6 +98,7 @@ function AutomationDagInner({
     [
       graph,
       readOnly,
+      catalog,
       onTriggerChange,
       onConditionChange,
       onConditionRemove,
@@ -101,20 +114,27 @@ function AutomationDagInner({
           <button
             type="button"
             className="ghost"
-            onClick={() => onConditionsChange?.([...graph.conditions, defaultCondition()])}
+            onClick={() =>
+              onConditionsChange?.([
+                ...graph.conditions,
+                defaultCondition(preferredConditionField(catalog)),
+              ])
+            }
           >
             Add condition
           </button>
           <button
             type="button"
             className="ghost"
-            onClick={() => onActionsChange?.([...graph.actions, defaultAction()])}
+            onClick={() =>
+              onActionsChange?.([...graph.actions, defaultAction(preferredActionType(catalog))])
+            }
           >
             Add action
           </button>
           <span className="field-hint">
-            All conditions must match (AND), then every action runs. Use Add action for a
-            second email/step — not separate branches per condition.
+            All conditions must match (AND), then every action runs. Condition fields include all
+            active user attributes.
           </span>
         </div>
       )}

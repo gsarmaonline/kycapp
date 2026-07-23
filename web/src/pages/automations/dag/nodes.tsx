@@ -8,6 +8,12 @@ export type ActionFlowNode = Node<ActionNodeData, 'action'>
 export type AutomationFlowNode = TriggerFlowNode | ConditionFlowNode | ActionFlowNode
 
 export function TriggerNode({ data }: NodeProps<TriggerFlowNode>) {
+  const triggers = data.triggers?.length
+    ? data.triggers
+    : [
+        { id: 'app_user.created', label: 'App user created', description: '' },
+        { id: 'app_user.updated', label: 'App user updated', description: '' },
+      ]
   return (
     <div className={`dag-node dag-node-trigger${data.readOnly ? ' is-readonly' : ''}`}>
       <div className="dag-node-kind">Trigger</div>
@@ -19,8 +25,11 @@ export function TriggerNode({ data }: NodeProps<TriggerFlowNode>) {
           value={data.trigger}
           onChange={(e) => data.onTriggerChange?.(e.target.value)}
         >
-          <option value="app_user.created">app_user.created</option>
-          <option value="app_user.updated">app_user.updated</option>
+          {triggers.map((t) => (
+            <option key={t.id} value={t.id}>
+              {t.label}
+            </option>
+          ))}
         </select>
       )}
       <Handle type="source" position={Position.Right} />
@@ -30,6 +39,20 @@ export function TriggerNode({ data }: NodeProps<TriggerFlowNode>) {
 
 export function ConditionNode({ data }: NodeProps<ConditionFlowNode>) {
   const c = data.condition
+  const fields = data.conditionFields ?? []
+  const ops = data.ops?.length
+    ? data.ops
+    : [
+        { op: 'eq', label: 'equals', needs_value: true },
+        { op: 'neq', label: 'not equals', needs_value: true },
+        { op: 'exists', label: 'exists', needs_value: false },
+        { op: 'not_exists', label: 'does not exist', needs_value: false },
+      ]
+  const fieldOptions = fields.length
+    ? fields
+    : [{ field: c.field || 'status', label: c.field || 'status', value_type: 'string', group: 'user' }]
+  const knownField = fieldOptions.some((f) => f.field === c.field)
+
   return (
     <div className={`dag-node dag-node-condition${data.readOnly ? ' is-readonly' : ''}`}>
       <Handle type="target" position={Position.Left} />
@@ -47,11 +70,19 @@ export function ConditionNode({ data }: NodeProps<ConditionFlowNode>) {
         </strong>
       ) : (
         <div className="dag-node-fields">
-          <input
-            value={c.field}
+          <select
+            value={knownField ? c.field : c.field}
             onChange={(e) => data.onChange?.({ ...c, field: e.target.value })}
-            placeholder="field"
-          />
+          >
+            {!knownField && c.field && (
+              <option value={c.field}>{c.field} (unavailable)</option>
+            )}
+            {fieldOptions.map((f) => (
+              <option key={f.field} value={f.field}>
+                {f.group === 'attributes' ? `Attribute · ${f.label}` : f.label}
+              </option>
+            ))}
+          </select>
           <select
             value={c.op}
             onChange={(e) =>
@@ -61,10 +92,11 @@ export function ConditionNode({ data }: NodeProps<ConditionFlowNode>) {
               })
             }
           >
-            <option value="eq">eq</option>
-            <option value="neq">neq</option>
-            <option value="exists">exists</option>
-            <option value="not_exists">not_exists</option>
+            {ops.map((o) => (
+              <option key={o.op} value={o.op}>
+                {o.label}
+              </option>
+            ))}
           </select>
           {c.op !== 'exists' && c.op !== 'not_exists' && (
             <input
@@ -82,6 +114,9 @@ export function ConditionNode({ data }: NodeProps<ConditionFlowNode>) {
 
 export function ActionNode({ data }: NodeProps<ActionFlowNode>) {
   const a = data.action
+  const actions = data.actions?.length
+    ? data.actions
+    : [{ type: 'send_email', label: 'Send email', description: '', params: [] }]
   return (
     <div className={`dag-node dag-node-action${data.readOnly ? ' is-readonly' : ''}`}>
       <Handle type="target" position={Position.Left} />
@@ -104,7 +139,11 @@ export function ActionNode({ data }: NodeProps<ActionFlowNode>) {
             value={a.type}
             onChange={(e) => data.onChange?.({ ...a, type: e.target.value })}
           >
-            <option value="send_email">send_email</option>
+            {actions.map((act) => (
+              <option key={act.type} value={act.type}>
+                {act.label}
+              </option>
+            ))}
           </select>
           <input
             value={a.template_key ?? ''}

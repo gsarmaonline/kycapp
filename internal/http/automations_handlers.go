@@ -38,6 +38,20 @@ func (s *Server) handleCreateAutomation(w http.ResponseWriter, r *http.Request) 
 	writeJSON(w, http.StatusCreated, automationJSON(row))
 }
 
+func (s *Server) handleAutomationCatalog(w http.ResponseWriter, r *http.Request) {
+	orgID := r.PathValue("id")
+	if _, err := s.svc.RequireOrgPermission(r.Context(), orgID, "automations:read"); err != nil {
+		writeError(w, err)
+		return
+	}
+	catalog, err := s.svc.AutomationCatalog(r.Context(), orgID)
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, catalog)
+}
+
 func (s *Server) handleListAutomations(w http.ResponseWriter, r *http.Request) {
 	orgID := r.PathValue("id")
 	if _, err := s.svc.RequireOrgPermission(r.Context(), orgID, "automations:read"); err != nil {

@@ -33,10 +33,62 @@ type UpdateAutomationInput struct {
 	Actions    json.RawMessage
 }
 
-func (s *Service) CreateAutomation(ctx context.Context, orgID string, in CreateAutomationInput) (sqlc.Automation, error) {
-	spec, err := automations.ValidateCreate(in.Trigger, in.Conditions, in.Actions)
+// AutomationCatalog is the editor/runtime surface for triggers, actions, and condition fields.
+type AutomationCatalog struct {
+	Triggers        []automations.TriggerInfo        `json:"triggers"`
+	Actions         []automations.ActionInfo         `json:"actions"`
+	Ops             []automations.ConditionOpInfo    `json:"ops"`
+	ConditionFields []automations.ConditionFieldInfo `json:"condition_fields"`
+}
+
+func (s *Service) AutomationCatalog(ctx context.Context, orgID string) (AutomationCatalog, error) {
+	fields, err := s.automationConditionFields(ctx, orgID)
 	if err != nil {
-		return sqlc.Automation{}, apperr.Validation(err.Error())
+		return AutomationCatalog{}, err
+	}
+	return AutomationCatalog{
+		Triggers:        automations.Triggers(),
+		Actions:         automations.Actions(),
+		Ops:             automations.ConditionOps(),
+		ConditionFields: fields,
+	}, nil
+}
+
+func (s *Service) automationConditionFields(ctx context.Context, orgID string) ([]automations.ConditionFieldInfo, error) {
+	fields := automations.BaseConditionFields()
+	defs, err := s.ListAttributeDefinitions(ctx, orgID, "active")
+	if err != nil {
+		return nil, err
+	}
+	for _, d := range defs {
+		fields = append(fields, automations.AttributeConditionField(d.Key, d.Label, d.ValueType))
+	}
+	return fields, nil
+}
+
+func (s *Service) validateAutomationSpec(ctx context.Context, orgID, trigger string, conditionsJSON, actionsJSON json.RawMessage) (automations.Spec, error) {
+	spec, err := automations.ValidateCreate(trigger, conditionsJSON, actionsJSON)
+	if err != nil {
+		return automations.Spec{}, apperr.Validation(err.Error())
+	}
+	fields, err := s.automationConditionFields(ctx, orgID)
+	if err != nil {
+		return automations.Spec{}, err
+	}
+	if err := automations.ValidateConditionFields(spec.Conditions, automations.AllowedConditionFieldSet(fields)); err != nil {
+		return automations.Spec{}, apperr.Validation(err.Error())
+	}
+	return spec, nil
+}
+
+func (s *Service) CreateAutomation(ctx context.Context, orgID string, in CreateAutomationInput) (sqlc.Automation, error) {
+	name := strings.TrimSpace(in.Name)
+	if name == "" {
+		return sqlc.Automation{}, apperr.Validation("name is required")
+	}
+	spec, err := s.validateAutomationSpec(ctx, orgID, in.Trigger, in.Conditions, in.Actions)
+	if err != nil {
+		return sqlc.Automation{}, err
 	}
 	condRaw, err := automations.MarshalConditions(spec.Conditions)
 	if err != nil {
@@ -53,7 +105,7 @@ func (s *Service) CreateAutomation(ctx context.Context, orgID string, in CreateA
 	return s.db.Q().CreateAutomation(ctx, sqlc.CreateAutomationParams{
 		ID:             ids.New(),
 		OrganisationID: orgID,
-		Name:           strings.TrimSpace(in.Name),
+		Name:           name,
 		Trigger:        spec.Trigger,
 		Enabled:        enabled,
 		Conditions:     condRaw,
@@ -88,9 +140,9 @@ func (s *Service) UpdateAutomation(ctx context.Context, id string, in UpdateAuto
 	if len(in.Actions) > 0 {
 		actRaw = in.Actions
 	}
-	spec, err := automations.ValidateCreate(trigger, condRaw, actRaw)
+	spec, err := s.validateAutomationSpec(ctx, existing.OrganisationID, trigger, condRaw, actRaw)
 	if err != nil {
-		return sqlc.Automation{}, apperr.Validation(err.Error())
+		return sqlc.Automation{}, err
 	}
 	condRaw, err = automations.MarshalConditions(spec.Conditions)
 	if err != nil {
@@ -108,7 +160,11 @@ func (s *Service) UpdateAutomation(ctx context.Context, id string, in UpdateAuto
 		Actions:    actRaw,
 	}
 	if in.Name != nil {
-		params.Name = pgtype.Text{String: strings.TrimSpace(*in.Name), Valid: true}
+		name := strings.TrimSpace(*in.Name)
+		if name == "" {
+			return sqlc.Automation{}, apperr.Validation("name is required")
+		}
+		params.Name = pgtype.Text{String: name, Valid: true}
 	}
 	if in.Enabled != nil {
 		params.Enabled = pgtype.Bool{Bool: *in.Enabled, Valid: true}

@@ -40,20 +40,12 @@ type Action struct {
 	TemplateKey string `json:"template_key,omitempty"`
 }
 
-var allowedTriggers = map[string]bool{
-	TriggerAppUserCreated: true,
-	TriggerAppUserUpdated: true,
-}
-
-var allowedOps = map[string]bool{
-	OpEq: true, OpNeq: true, OpExists: true, OpNotExists: true,
-}
-
-// ValidateCreate checks trigger, conditions, and actions for create/update.
+// ValidateCreate checks trigger, conditions, and actions for create/update
+// against the registered catalogs in registry.go.
 func ValidateCreate(trigger string, conditionsJSON, actionsJSON json.RawMessage) (Spec, error) {
 	trigger = strings.TrimSpace(trigger)
-	if !allowedTriggers[trigger] {
-		return Spec{}, fmt.Errorf("trigger must be app_user.created or app_user.updated")
+	if !KnownTrigger(trigger) {
+		return Spec{}, fmt.Errorf("unknown trigger %q", trigger)
 	}
 
 	var cond Conditions
@@ -71,7 +63,7 @@ func ValidateCreate(trigger string, conditionsJSON, actionsJSON json.RawMessage)
 		if c.Field == "" {
 			return Spec{}, fmt.Errorf("conditions.all[%d].field is required", i)
 		}
-		if !allowedOps[c.Op] {
+		if !KnownOp(c.Op) {
 			return Spec{}, fmt.Errorf("conditions.all[%d].op must be eq, neq, exists, or not_exists", i)
 		}
 		if (c.Op == OpEq || c.Op == OpNeq) && c.Value == nil {
@@ -93,18 +85,33 @@ func ValidateCreate(trigger string, conditionsJSON, actionsJSON json.RawMessage)
 	for i, a := range actions {
 		a.Type = strings.TrimSpace(a.Type)
 		a.TemplateKey = strings.TrimSpace(a.TemplateKey)
-		switch a.Type {
-		case ActionSendEmail:
-			if a.TemplateKey == "" {
-				return Spec{}, fmt.Errorf("actions[%d].template_key is required for send_email", i)
-			}
-		default:
-			return Spec{}, fmt.Errorf("actions[%d].type %q is not supported", i, a.Type)
+		if err := ValidateAction(a); err != nil {
+			return Spec{}, fmt.Errorf("actions[%d]: %w", i, err)
 		}
 		actions[i] = a
 	}
 
 	return Spec{Trigger: trigger, Conditions: cond, Actions: actions}, nil
+}
+
+// ValidateConditionFields ensures each condition field is in the allowed set
+// (base payload fields + org attribute definitions).
+func ValidateConditionFields(cond Conditions, allowed map[string]bool) error {
+	for i, c := range cond.All {
+		if !allowed[c.Field] {
+			return fmt.Errorf("conditions.all[%d].field %q is not an available condition field", i, c.Field)
+		}
+	}
+	return nil
+}
+
+// AllowedConditionFieldSet builds a lookup from catalog fields.
+func AllowedConditionFieldSet(fields []ConditionFieldInfo) map[string]bool {
+	out := make(map[string]bool, len(fields))
+	for _, f := range fields {
+		out[f.Field] = true
+	}
+	return out
 }
 
 // Match reports whether all conditions pass against payload.

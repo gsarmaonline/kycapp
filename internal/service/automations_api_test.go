@@ -18,6 +18,45 @@ func TestAutomationsCRUDAndProcess(t *testing.T) {
 
 	first, token, _ := doBootstrapOrg(t, h, "owner@auto.com", "Owner", "AutoCo", "autoco")
 	orgID := first["organisation"].(map[string]any)["id"].(string)
+	auth := userAuth(token)
+
+	missingName := doJSON(t, h, http.MethodPost, "/v1/organisations/"+orgID+"/automations", map[string]any{
+		"trigger": "app_user.created",
+		"conditions": map[string]any{
+			"all": []map[string]any{
+				{"field": "status", "op": "eq", "value": "active"},
+			},
+		},
+		"actions": []map[string]any{
+			{"type": "send_email", "template_key": "welcome"},
+		},
+	}, auth)
+	if missingName.Code != http.StatusBadRequest {
+		t.Fatalf("missing name want 400 got %d %s", missingName.Code, missingName.Body.String())
+	}
+
+	catalog := doJSON(t, h, http.MethodGet, "/v1/organisations/"+orgID+"/automations/catalog", nil, auth)
+	if catalog.Code != http.StatusOK {
+		t.Fatalf("catalog status=%d body=%s", catalog.Code, catalog.Body.String())
+	}
+	var cat struct {
+		Triggers        []map[string]any `json:"triggers"`
+		Actions         []map[string]any `json:"actions"`
+		ConditionFields []map[string]any `json:"condition_fields"`
+	}
+	decodeBody(t, catalog, &cat)
+	if len(cat.Triggers) < 2 || len(cat.Actions) < 1 {
+		t.Fatalf("catalog incomplete: %#v", cat)
+	}
+	foundCountry := false
+	for _, f := range cat.ConditionFields {
+		if f["field"] == "attributes.country" {
+			foundCountry = true
+		}
+	}
+	if !foundCountry {
+		t.Fatalf("catalog missing attributes.country: %#v", cat.ConditionFields)
+	}
 
 	created := doJSON(t, h, http.MethodPost, "/v1/organisations/"+orgID+"/automations", map[string]any{
 		"name":    "AU welcome",
@@ -30,7 +69,7 @@ func TestAutomationsCRUDAndProcess(t *testing.T) {
 		"actions": []map[string]any{
 			{"type": "send_email", "template_key": "welcome"},
 		},
-	}, userAuth(token))
+	}, auth)
 	if created.Code != http.StatusCreated {
 		t.Fatalf("create status=%d body=%s", created.Code, created.Body.String())
 	}
