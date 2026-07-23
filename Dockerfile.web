@@ -5,8 +5,13 @@ WORKDIR /src
 COPY web/package.json web/package-lock.json ./
 RUN npm ci
 COPY web/ ./
+# Bake commit into the SPA. Railway sets RAILWAY_GIT_COMMIT_SHA on GitHub builds;
+# override with --build-arg VITE_GIT_SHA=… locally if needed.
+ARG VITE_GIT_SHA=
+ARG RAILWAY_GIT_COMMIT_SHA=
 ENV VITE_API_BASE=
-RUN npm run build
+RUN SHA="${VITE_GIT_SHA:-$RAILWAY_GIT_COMMIT_SHA}"; \
+    VITE_GIT_SHA="$SHA" npm run build
 
 FROM nginx:1.27-alpine
 # Template + entrypoint so Railway can set PORT and API_UPSTREAM.

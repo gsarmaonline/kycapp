@@ -260,6 +260,14 @@ body {
   white-space: nowrap;
 }
 
+.sidebar-build {
+  margin: 0.15rem 0 0;
+  font-size: 0.65rem;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  color: #a8a29e;
+  letter-spacing: 0.02em;
+}
+
 .create-org {
   display: grid;
   gap: 0.5rem;

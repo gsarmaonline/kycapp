@@ -15,6 +15,7 @@ import {
   type Organisation,
   type User,
 } from './api'
+import { GIT_SHA, GIT_SHA_SHORT } from './build_info'
 import { ORG_NAV_GROUPS, orgPath, sectionFromPathname } from './org_nav'
 
 function userInitials(label: string): string {
@@ -196,6 +197,9 @@ export function AppShell({ user, onLogout }: { user: User | null; onLogout: () =
               <div className="sidebar-account-text">
                 <strong className="sidebar-user-name">{user.name || user.email}</strong>
                 <p className="sidebar-user">{user.email}</p>
+                <p className="sidebar-build" title={GIT_SHA}>
+                  build {GIT_SHA_SHORT}
+                </p>
               </div>
             </div>
           )}

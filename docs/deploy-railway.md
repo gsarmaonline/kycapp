@@ -27,6 +27,8 @@ railway service source connect --repo gsarmaonline/kycapp --branch main --servic
 
 Manual upload (`railway up`) still works and does **not** require a git push.
 
+The web UI shows a short git SHA under the signed-in user (`build <sha>`). Railway injects `RAILWAY_GIT_COMMIT_SHA` at image build time into `VITE_GIT_SHA` (see `Dockerfile.web`). Local Vite shows `build dev`.
+
 ## Config as code
 
 There is **no** single root `railway.toml` on purpose: Railway applies that file to every service, and this repo has multiple Dockerfiles.
