@@ -107,48 +107,6 @@ export function AppShell({ user, onLogout }: { user: User | null; onLogout: () =
           <Link to="/" className="sidebar-brand-link eyebrow">
             KYC
           </Link>
-          <strong>Organisations</strong>
-        </div>
-
-        <div className="org-switcher">
-          <span>Current organisation</span>
-          <div className="org-switcher-row">
-            <select
-              value={routeOrgId ?? ''}
-              disabled={orgsLoading || orgs.length === 0}
-              onChange={(e) => switchOrg(e.target.value)}
-              aria-label="Switch organisation"
-            >
-              {orgs.length === 0 && <option value="">No organisations</option>}
-              {orgs.map((o) => (
-                <option key={o.id} value={o.id}>
-                  {o.name}
-                </option>
-              ))}
-            </select>
-            <button
-              type="button"
-              className="org-add-btn"
-              aria-label={creating ? 'Cancel new organisation' : 'New organisation'}
-              title={creating ? 'Cancel' : 'New organisation'}
-              aria-pressed={creating}
-              onClick={() => setCreating((v) => !v)}
-            >
-              {creating ? '×' : '+'}
-            </button>
-          </div>
-          {creating && !noOrgs && (
-            <form className="create-org" onSubmit={onCreateOrg}>
-              <input
-                value={newOrgName}
-                onChange={(e) => setNewOrgName(e.target.value)}
-                placeholder="Organisation name"
-                required
-                autoFocus
-              />
-              <button type="submit">Create</button>
-            </form>
-          )}
         </div>
 
         {routeOrgId && selected && (
@@ -180,6 +138,47 @@ export function AppShell({ user, onLogout }: { user: User | null; onLogout: () =
         )}
 
         <div className="sidebar-footer">
+          <div className="org-switcher">
+            <span>Current organisation</span>
+            <div className="org-switcher-row">
+              <select
+                value={routeOrgId ?? ''}
+                disabled={orgsLoading || orgs.length === 0}
+                onChange={(e) => switchOrg(e.target.value)}
+                aria-label="Switch organisation"
+              >
+                {orgs.length === 0 && <option value="">No organisations</option>}
+                {orgs.map((o) => (
+                  <option key={o.id} value={o.id}>
+                    {o.name}
+                  </option>
+                ))}
+              </select>
+              <button
+                type="button"
+                className="org-add-btn"
+                aria-label={creating ? 'Cancel new organisation' : 'New organisation'}
+                title={creating ? 'Cancel' : 'New organisation'}
+                aria-pressed={creating}
+                onClick={() => setCreating((v) => !v)}
+              >
+                {creating ? '×' : '+'}
+              </button>
+            </div>
+            {creating && !noOrgs && (
+              <form className="create-org" onSubmit={onCreateOrg}>
+                <input
+                  value={newOrgName}
+                  onChange={(e) => setNewOrgName(e.target.value)}
+                  placeholder="Organisation name"
+                  required
+                  autoFocus
+                />
+                <button type="submit">Create</button>
+              </form>
+            )}
+          </div>
+
           {user && (
             <div className="sidebar-account">
               {user.avatar_url ? (
