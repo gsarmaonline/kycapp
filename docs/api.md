@@ -98,6 +98,11 @@ Requires `organisation:update`.
 - `GET /v1/organisations/{id}/databases/{dbId}`
 - `PATCH /v1/organisations/{id}/databases/{dbId}` — omit/`""` password to keep current
 - `DELETE /v1/organisations/{id}/databases/{dbId}`
+- `GET /v1/organisations/{id}/webhooks` — outbound webhook endpoints for `call_webhook` (secret masked)
+- `POST /v1/organisations/{id}/webhooks` — `{ "name", "url", "secret"? }`
+- `GET /v1/organisations/{id}/webhooks/{webhookId}`
+- `PATCH /v1/organisations/{id}/webhooks/{webhookId}` — omit/`""` secret to keep current
+- `DELETE /v1/organisations/{id}/webhooks/{webhookId}`
 - `POST /v1/organisations/{id}/api-keys` — `{ "name" }` → includes `token` once
 - `GET /v1/organisations/{id}/api-keys`
 - `DELETE /v1/api-keys/{id}` — revoke (org keys: org admin; platform keys: platform)
@@ -272,11 +277,11 @@ Org-scoped message copy for **app users** (not KYC member invites). Domain helpe
 Org-scoped rules: trigger → AND/OR conditions → ordered actions. Executed by the River worker (`cmd/worker`). Domain: `core/automations`. See [automations.md](automations.md).
 
 - `GET /v1/organisations/{id}/automations/catalog` — requires `automations:read`  
-  Returns `triggers`, `actions` (+ params), `ops`, `condition_fields`, and connected `databases` (for `db_insert`).
+  Returns `triggers`, `actions` (+ params), `ops`, `condition_fields`, connected `databases` (for `db_insert`), and connected `webhooks` (for `call_webhook`).
 - `GET /v1/organisations/{id}/automations` — requires `automations:read`
 - `POST /v1/organisations/{id}/automations` — requires `automations:manage`  
   `{ "name", "trigger", "enabled"?, "conditions": { "mode": "all"|"any", "items": [{ "field", "op", "value"? }] }, "actions": [{ "type", "params" }] }`  
-  Action types: `send_email` (`template_key`), `call_webhook` (`url`, optional `secret`), `db_insert` (`database_id`, `table`, optional `mapping`). Legacy `{ "all": [...] }` / `{ "any": [...] }` also accepted.
+  Action types: `send_email` (`template_key`), `call_webhook` (`webhook_id`), `db_insert` (`database_id`, `table`, optional `mapping`). Legacy `{ "all": [...] }` / `{ "any": [...] }` also accepted.
 - `GET /v1/automations/{id}` — requires `automations:read`
 - `PATCH /v1/automations/{id}` — requires `automations:manage`
 - `DELETE /v1/automations/{id}` — requires `automations:manage`

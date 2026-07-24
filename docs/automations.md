@@ -118,12 +118,22 @@ Legacy `{ "type": "send_email", "template_key": "welcome" }` is still accepted o
 | Type | Behavior |
 | --- | --- |
 | `send_email` | Render org email template + branding, deliver via Mailer |
-| `call_webhook` | POST `{ organisation_id, payload }` JSON to a URL; optional `secret` → `X-KYC-Webhook-Secret`. Blocks private/loopback hosts. |
+| `call_webhook` | POST `{ organisation_id, payload }` JSON to a configured org **webhook** (`webhook_id`). Optional secret → `X-KYC-Webhook-Secret`. Blocks private/loopback hosts. |
 | `db_insert` | Insert into an org **database** connection (Postgres). Default: `INSERT (trigger, payload)`. Optional `mapping` JSON maps columns → payload paths. |
+
+### Action destinations (UI)
+
+Sidebar **Actions**:
+
+| Page | Used by |
+| --- | --- |
+| Emails | `send_email` templates |
+| Databases | `db_insert` |
+| Webhooks | `call_webhook` |
 
 ### Databases (for `db_insert`)
 
-Org-scoped connection objects under Settings → Databases (`/v1/organisations/{id}/databases`).
+Org-scoped connection objects under **Actions → Databases** (`/v1/organisations/{id}/databases`).
 
 Landing table for default dump mode:
 
@@ -136,6 +146,10 @@ CREATE TABLE kyc_events (
 ```
 
 Or map columns: `"mapping": { "email": "email", "country": "attributes.country" }`.
+
+### Webhooks (for `call_webhook`)
+
+Org-scoped endpoints under **Actions → Webhooks** (`/v1/organisations/{id}/webhooks`). Automations select a `webhook_id`; URL/secret are not stored on the automation itself.
 
 Unknown action types fail validation / the run with a clear error (no silent skip).
 

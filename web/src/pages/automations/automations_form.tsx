@@ -164,8 +164,8 @@ export function AutomationsForm({ submitLabel, cancelTo, initial, onSubmit }: Pr
         if (a.type === 'send_email' && !a.params.template_key) {
           throw new Error('Each send_email action needs a template_key')
         }
-        if (a.type === 'call_webhook' && !a.params.url) {
-          throw new Error('Each call_webhook action needs a url')
+        if (a.type === 'call_webhook' && !a.params.webhook_id) {
+          throw new Error('Each call_webhook action needs a webhook')
         }
         if (a.type === 'db_insert') {
           if (!a.params.database_id) throw new Error('Each db_insert action needs a database')

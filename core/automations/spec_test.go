@@ -153,7 +153,7 @@ func TestValidateWebhookAndDBInsert(t *testing.T) {
 	_, err := ValidateCreate(
 		"subscription.created",
 		json.RawMessage(`{"all":[]}`),
-		json.RawMessage(`[{"type":"call_webhook","params":{"url":"https://example.com/hooks/kyc"}}]`),
+		json.RawMessage(`[{"type":"call_webhook","params":{"webhook_id":"wh1"}}]`),
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -161,10 +161,10 @@ func TestValidateWebhookAndDBInsert(t *testing.T) {
 	_, err = ValidateCreate(
 		"app_user.created",
 		json.RawMessage(`{"all":[]}`),
-		json.RawMessage(`[{"type":"call_webhook","params":{"url":"ftp://example.com"}}]`),
+		json.RawMessage(`[{"type":"call_webhook","params":{}}]`),
 	)
 	if err == nil {
-		t.Fatal("want invalid scheme")
+		t.Fatal("want webhook_id required")
 	}
 	_, err = ValidateCreate(
 		"app_user.created",

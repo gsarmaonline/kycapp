@@ -5,6 +5,8 @@ export type OrgSection =
   | 'users'
   | 'attributes'
   | 'email-templates'
+  | 'databases'
+  | 'webhooks'
   | 'automations'
   | 'product-features'
   | 'product-plans'
@@ -12,7 +14,7 @@ export type OrgSection =
   | 'billing'
   | 'settings'
 
-export type NavGroupId = 'platform' | 'product'
+export type NavGroupId = 'product' | 'actions' | 'platform'
 
 export type OrgNavItem = { id: OrgSection; label: string; path: string }
 
@@ -27,10 +29,11 @@ export type OrgNavGroup = {
 export const ORG_SECTIONS: OrgNavItem[] = [
   { id: 'overview', label: 'Overview', path: '' },
   { id: 'members', label: 'Members', path: 'members' },
-  // Operator roles UI is hidden for now (API + seeded roles still used when inviting members).
   { id: 'users', label: 'Users', path: 'users' },
   { id: 'attributes', label: 'User Attributes', path: 'attributes' },
-  { id: 'email-templates', label: 'Email templates', path: 'email-templates' },
+  { id: 'email-templates', label: 'Emails', path: 'email-templates' },
+  { id: 'databases', label: 'Databases', path: 'databases' },
+  { id: 'webhooks', label: 'Webhooks', path: 'webhooks' },
   { id: 'automations', label: 'Automations', path: 'automations' },
   { id: 'product-features', label: 'Features', path: 'product-features' },
   { id: 'product-plans', label: 'Plans', path: 'product-plans' },
@@ -39,7 +42,7 @@ export const ORG_SECTIONS: OrgNavItem[] = [
   { id: 'settings', label: 'Settings', path: 'settings' },
 ]
 
-/** Sidebar groups: customer product first, then KYC platform. */
+/** Sidebar groups: product, action destinations, then KYC platform. */
 export const ORG_NAV_GROUPS: OrgNavGroup[] = [
   {
     id: 'product',
@@ -48,12 +51,21 @@ export const ORG_NAV_GROUPS: OrgNavGroup[] = [
     items: [
       { id: 'users', label: 'Users', path: 'users' },
       { id: 'attributes', label: 'User Attributes', path: 'attributes' },
-      { id: 'email-templates', label: 'Email templates', path: 'email-templates' },
       { id: 'automations', label: 'Automations', path: 'automations' },
       { id: 'branding', label: 'Branding', path: 'branding' },
       { id: 'product-features', label: 'Features', path: 'product-features' },
       { id: 'product-plans', label: 'Plans', path: 'product-plans' },
       { id: 'billing', label: 'Billing', path: 'billing' },
+    ],
+  },
+  {
+    id: 'actions',
+    label: 'Actions',
+    hint: 'Destinations used by automation actions',
+    items: [
+      { id: 'email-templates', label: 'Emails', path: 'email-templates' },
+      { id: 'databases', label: 'Databases', path: 'databases' },
+      { id: 'webhooks', label: 'Webhooks', path: 'webhooks' },
     ],
   },
   {
@@ -78,6 +90,8 @@ export function sectionFromPathname(pathname: string, orgId: string): OrgSection
     case 'users':
     case 'attributes':
     case 'email-templates':
+    case 'databases':
+    case 'webhooks':
     case 'automations':
     case 'product-features':
     case 'product-plans':

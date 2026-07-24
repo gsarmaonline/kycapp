@@ -252,8 +252,10 @@ export function ActionNode({ data }: NodeProps<ActionFlowNode>) {
     : Object.keys(params).map((key) => ({ key, label: key, required: false }))
   const templates = data.emailTemplates ?? []
   const databases = data.databases ?? []
+  const webhooks = data.webhooks ?? []
   const defaultTemplateKey = templates[0]?.key ?? ''
   const defaultDatabaseId = databases[0]?.id ?? ''
+  const defaultWebhookId = webhooks[0]?.id ?? ''
 
   const summary = paramDefs
     .map((p) => {
@@ -265,8 +267,9 @@ export function ActionNode({ data }: NodeProps<ActionFlowNode>) {
         const d = databases.find((x) => x.id === params[p.key])
         return d ? d.name : params[p.key]
       }
-      if (p.key === 'secret') {
-        return params[p.key] ? 'secret set' : ''
+      if (p.key === 'webhook_id') {
+        const w = webhooks.find((x) => x.id === params[p.key])
+        return w ? w.name : params[p.key]
       }
       return params[p.key]
     })
@@ -302,6 +305,8 @@ export function ActionNode({ data }: NodeProps<ActionFlowNode>) {
                   nextParams[p.key] = params[p.key] || defaultTemplateKey
                 } else if (p.key === 'database_id') {
                   nextParams[p.key] = params[p.key] || defaultDatabaseId
+                } else if (p.key === 'webhook_id') {
+                  nextParams[p.key] = params[p.key] || defaultWebhookId
                 } else {
                   nextParams[p.key] = params[p.key] ?? ''
                 }
@@ -363,6 +368,32 @@ export function ActionNode({ data }: NodeProps<ActionFlowNode>) {
                   {databases.map((d) => (
                     <option key={d.id} value={d.id}>
                       {d.name}
+                    </option>
+                  ))}
+                </select>
+              )
+            }
+            if (p.key === 'webhook_id') {
+              return (
+                <select
+                  key={p.key}
+                  value={params[p.key] || defaultWebhookId}
+                  onChange={(e) =>
+                    data.onChange?.({
+                      type: a.type,
+                      params: { ...params, [p.key]: e.target.value },
+                    })
+                  }
+                  required={p.required}
+                >
+                  {!webhooks.length && <option value="">No webhooks</option>}
+                  {params[p.key] &&
+                    !webhooks.some((w) => w.id === params[p.key]) && (
+                      <option value={params[p.key]}>{params[p.key]} (missing)</option>
+                    )}
+                  {webhooks.map((w) => (
+                    <option key={w.id} value={w.id}>
+                      {w.name}
                     </option>
                   ))}
                 </select>

@@ -289,6 +289,47 @@ export function deleteOrgDatabase(orgId: string, dbId: string) {
   })
 }
 
+export type OrgWebhook = {
+  id: string
+  organisation_id: string
+  name: string
+  url: string
+  secret_hint?: string
+  has_secret: boolean
+  status: string
+}
+
+export function listOrgWebhooks(orgId: string) {
+  return request<{ items: OrgWebhook[] }>(`/v1/organisations/${orgId}/webhooks`)
+}
+
+export function createOrgWebhook(
+  orgId: string,
+  input: { name: string; url: string; secret?: string },
+) {
+  return request<OrgWebhook>(`/v1/organisations/${orgId}/webhooks`, {
+    method: 'POST',
+    body: JSON.stringify(input),
+  })
+}
+
+export function updateOrgWebhook(
+  orgId: string,
+  webhookId: string,
+  input: { name?: string; url?: string; secret?: string; status?: string },
+) {
+  return request<OrgWebhook>(`/v1/organisations/${orgId}/webhooks/${webhookId}`, {
+    method: 'PATCH',
+    body: JSON.stringify(input),
+  })
+}
+
+export function deleteOrgWebhook(orgId: string, webhookId: string) {
+  return request<{ ok: boolean }>(`/v1/organisations/${orgId}/webhooks/${webhookId}`, {
+    method: 'DELETE',
+  })
+}
+
 export function listOrgAPIKeys(orgId: string) {
   return request<{ items: OrgAPIKey[] }>(`/v1/organisations/${orgId}/api-keys`)
 }
@@ -907,6 +948,7 @@ export type AutomationCatalog = {
     allowed_ops?: string[]
   }[]
   databases?: { id: string; name: string }[]
+  webhooks?: { id: string; name: string }[]
 }
 
 export type Automation = {

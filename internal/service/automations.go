@@ -38,9 +38,15 @@ type AutomationCatalog struct {
 	Ops             []automations.ConditionOpInfo    `json:"ops"`
 	ConditionFields []automations.ConditionFieldInfo `json:"condition_fields"`
 	Databases       []AutomationDatabaseOption       `json:"databases"`
+	Webhooks        []AutomationWebhookOption        `json:"webhooks"`
 }
 
 type AutomationDatabaseOption struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+}
+
+type AutomationWebhookOption struct {
 	ID   string `json:"id"`
 	Name string `json:"name"`
 }
@@ -65,12 +71,24 @@ func (s *Service) AutomationCatalog(ctx context.Context, orgID string) (Automati
 		}
 		dbOpts = append(dbOpts, AutomationDatabaseOption{ID: d.ID, Name: d.Name})
 	}
+	hooks, err := s.ListOrganisationWebhooks(ctx, orgID)
+	if err != nil {
+		return AutomationCatalog{}, err
+	}
+	whOpts := make([]AutomationWebhookOption, 0, len(hooks))
+	for _, h := range hooks {
+		if h.Status != "connected" {
+			continue
+		}
+		whOpts = append(whOpts, AutomationWebhookOption{ID: h.ID, Name: h.Name})
+	}
 	return AutomationCatalog{
 		Triggers:        automations.ExpandTriggers(attrs),
 		Actions:         automations.Actions(),
 		Ops:             automations.ConditionOps(),
 		ConditionFields: fields,
 		Databases:       dbOpts,
+		Webhooks:        whOpts,
 	}, nil
 }
 

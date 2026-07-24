@@ -23,6 +23,7 @@ export type ActionNodeData = {
   actions?: AutomationCatalog['actions']
   emailTemplates?: { key: string; name: string }[]
   databases?: { id: string; name: string }[]
+  webhooks?: { id: string; name: string }[]
   onChange?: (action: AutomationAction) => void
   onRemove?: () => void
   canRemove: boolean

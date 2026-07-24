@@ -135,17 +135,19 @@ func execCallWebhook(
 	payload map[string]any,
 	_ map[string]map[string]any,
 ) (string, error) {
-	rawURL, err := automations.RequireStringParam(params, "url")
+	webhookID, err := automations.RequireStringParam(params, "webhook_id")
 	if err != nil {
 		return "", err
 	}
+	wh, err := s.organisationWebhookRow(ctx, orgID, webhookID)
+	if err != nil {
+		return "", fmt.Errorf("call_webhook: %w", err)
+	}
+	rawURL := strings.TrimSpace(wh.Url)
 	if err := assertPublicHTTPURL(rawURL); err != nil {
 		return "", fmt.Errorf("call_webhook: %w", err)
 	}
-	secret := ""
-	if v, ok := params["secret"]; ok && v != nil {
-		secret = strings.TrimSpace(fmt.Sprint(v))
-	}
+	secret := strings.TrimSpace(wh.Secret)
 	bodyObj := map[string]any{
 		"organisation_id": orgID,
 		"payload":         payload,
@@ -182,8 +184,8 @@ func execCallWebhook(
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		return "", fmt.Errorf("call_webhook: remote status %d", resp.StatusCode)
 	}
-	slog.Info("automation call_webhook", "org_id", orgID, "url", rawURL, "status", resp.StatusCode)
-	return fmt.Sprintf("call_webhook:%s → %d", rawURL, resp.StatusCode), nil
+	slog.Info("automation call_webhook", "org_id", orgID, "webhook_id", webhookID, "url", rawURL, "status", resp.StatusCode)
+	return fmt.Sprintf("call_webhook:%s → %d", wh.Name, resp.StatusCode), nil
 }
 
 func execDBInsert(

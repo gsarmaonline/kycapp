@@ -110,6 +110,7 @@ export function buildFlowElements(
         actions: opts.catalog?.actions,
         emailTemplates: opts.emailTemplates,
         databases: opts.catalog?.databases,
+        webhooks: opts.catalog?.webhooks,
         canRemove: graph.actions.length > 1,
         onChange: (next) => opts.onActionChange?.(i, next),
         onRemove: () => opts.onActionRemove?.(i),

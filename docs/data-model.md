@@ -266,6 +266,19 @@ Each entitlement has a **scope**:
 | `scope` | enum | `platform` \| `product` |
 | `organisation_id` | string? | Null = global (platform) catalog; set = org-owned **product** feature |
 
+### OrganisationWebhook
+
+Outbound HTTP endpoint used by the `call_webhook` automation action. Secret is stored server-side and returned only as a hint.
+
+| Field | Type | Notes |
+| --- | --- | --- |
+| `id` | string | PK |
+| `organisation_id` | string | FK → Organisation |
+| `name` | string | Display label |
+| `url` | string | http(s) endpoint |
+| `secret` | string | Optional shared secret header value |
+| `status` | enum | `connected` \| `disconnected` |
+
 ### OrganisationDatabase
 
 Postgres connection used by the `db_insert` automation action. Password is stored server-side and returned only as a hint.

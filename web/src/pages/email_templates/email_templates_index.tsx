@@ -39,7 +39,7 @@ export function EmailTemplatesIndex() {
   return (
     <section>
       <PageHeader
-        title="Email templates"
+        title="Emails"
         createTo={resourcePath(orgId, 'email-templates', 'new')}
         createLabel="Create email template"
       />

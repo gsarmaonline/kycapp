@@ -1,10 +1,6 @@
 package automations
 
-import (
-	"fmt"
-	"net/url"
-	"strings"
-)
+import "fmt"
 
 func init() {
 	RegisterActionHandler(callWebhookHandler{})
@@ -20,10 +16,9 @@ func (callWebhookHandler) Info() ActionInfo {
 	return ActionInfo{
 		Type:        ActionCallWebhook,
 		Label:       "Call webhook",
-		Description: "POST the event payload as JSON to an HTTPS URL. Optional secret is sent as X-KYC-Webhook-Secret.",
+		Description: "POST the event payload as JSON to a configured org webhook endpoint.",
 		Params: []ActionParam{
-			{Key: "url", Label: "URL", Required: true},
-			{Key: "secret", Label: "Shared secret (optional)", Required: false},
+			{Key: "webhook_id", Label: "Webhook", Required: true},
 		},
 		Requires: nil,
 	}
@@ -32,17 +27,9 @@ func (callWebhookHandler) Info() ActionInfo {
 func (callWebhookHandler) Requires() []string { return nil }
 
 func (callWebhookHandler) Validate(params map[string]any) error {
-	raw, err := RequireStringParam(params, "url")
+	_, err := RequireStringParam(params, "webhook_id")
 	if err != nil {
-		return err
-	}
-	u, err := url.Parse(raw)
-	if err != nil || u.Host == "" {
-		return fmt.Errorf("url is invalid")
-	}
-	scheme := strings.ToLower(u.Scheme)
-	if scheme != "https" && scheme != "http" {
-		return fmt.Errorf("url must be http or https")
+		return fmt.Errorf("%w", err)
 	}
 	return nil
 }

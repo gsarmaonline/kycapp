@@ -59,7 +59,7 @@ export function OverviewPage() {
         { label: 'Members', value: memberCount, to: 'members' },
         { label: 'Users', value: userCount, to: 'users' },
         { label: 'User Attributes', value: attributeCount, to: 'attributes' },
-        { label: 'Email templates', value: templateCount, to: 'email-templates' },
+        { label: 'Emails', value: templateCount, to: 'email-templates' },
         { label: 'Automations', value: automationCount, to: 'automations' },
         { label: 'Features', value: featureCount, to: 'product-features' },
         { label: 'Plans', value: productPlanCount, to: 'product-plans' },

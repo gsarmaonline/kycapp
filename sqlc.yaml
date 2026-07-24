@@ -26,6 +26,7 @@ sql:
       - "internal/store/migrations/000021_product_plan_prices.up.sql"
       - "internal/store/migrations/000022_app_user_settings.up.sql"
       - "internal/store/migrations/000023_organisation_databases.up.sql"
+      - "internal/store/migrations/000024_organisation_webhooks.up.sql"
     gen:
       go:
         package: "sqlc"
