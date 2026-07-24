@@ -1,11 +1,16 @@
 package automations
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 )
 
 const maxWorkflowSteps = 64
+
+// ErrActionPaused means the workflow intentionally stopped to resume later
+// (e.g. delay). It is not a failure — do not follow on_error.
+var ErrActionPaused = errors.New("action paused")
 
 // NormalizeActions assigns stable ids and chains on_success linearly when no
 // explicit edges are present (legacy flat lists become a success path).
@@ -145,11 +150,26 @@ func RunActionGraph(actions []Action, run ActionRunner) (details []string, err e
 	if len(actions) == 0 {
 		return nil, fmt.Errorf("no actions")
 	}
+	return RunActionGraphFrom(actions, actions[0].ID, run)
+}
+
+// RunActionGraphFrom walks starting at startID (for resume after delay).
+func RunActionGraphFrom(actions []Action, startID string, run ActionRunner) (details []string, err error) {
+	if len(actions) == 0 {
+		return nil, fmt.Errorf("no actions")
+	}
+	startID = strings.TrimSpace(startID)
+	if startID == "" {
+		startID = actions[0].ID
+	}
 	byID := make(map[string]Action, len(actions))
 	for _, a := range actions {
 		byID[a.ID] = a
 	}
-	cur := actions[0].ID
+	if _, ok := byID[startID]; !ok {
+		return nil, fmt.Errorf("unknown start action id %q", startID)
+	}
+	cur := startID
 	visited := map[string]int{}
 	for steps := 0; cur != "" && steps < maxWorkflowSteps; steps++ {
 		if visited[cur] > 0 {
@@ -165,6 +185,9 @@ func RunActionGraph(actions []Action, run ActionRunner) (details []string, err e
 			details = append(details, detail)
 		}
 		if runErr != nil {
+			if errors.Is(runErr, ErrActionPaused) {
+				return details, ErrActionPaused
+			}
 			if a.OnError == "" {
 				return details, runErr
 			}

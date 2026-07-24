@@ -14,6 +14,14 @@ const (
 	AppUser      = "app_user"
 	Membership   = "membership"
 	Subscription = "subscription"
+	Schedule     = "schedule" // org-scoped time triggers (not per app_user)
+)
+
+// Schedule presets (used as lifecycle events on the schedule resource).
+const (
+	ScheduleHourly = "hourly"
+	ScheduleDaily  = "daily"
+	ScheduleWeekly = "weekly"
 )
 
 // AttributeSegment is the fixed path segment between resource and attribute key.

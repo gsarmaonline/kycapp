@@ -283,7 +283,7 @@ Org-scoped rules: trigger → AND/OR conditions → ordered actions. Executed by
 - `GET /v1/organisations/{id}/automations` — requires `automations:read`
 - `POST /v1/organisations/{id}/automations` — requires `automations:manage`  
   `{ "name", "trigger", "enabled"?, "conditions": { "mode": "all"|"any", "items": [{ "field", "op", "value"? }] }, "actions": [{ "type", "params" }] }`  
-  Action types: `send_email` (`template_key`), `call_webhook` (`webhook_id`), `db_insert` (`database_id`, `table`, optional `mode`=`event|columns`, optional `mapping`). Optional workflow edges: `id`, `on_success`, `on_error` (flat lists auto-chain on save). Legacy `{ "all": [...] }` / `{ "any": [...] }` also accepted.
+  Action types: `send_email` (`template_key`), `call_webhook` (`webhook_id`), `db_insert` (`database_id`, `table`, optional `mode`/`mapping`), `delay` (`duration`). Optional workflow edges: `id`, `on_success`, `on_error`. Schedule triggers: `schedule.hourly|daily|weekly` (org subject, UTC). Legacy `{ "all": [...] }` / `{ "any": [...] }` also accepted.
 - `GET /v1/automations/{id}` — requires `automations:read`
 - `PATCH /v1/automations/{id}` — requires `automations:manage`
 - `DELETE /v1/automations/{id}` — requires `automations:manage`

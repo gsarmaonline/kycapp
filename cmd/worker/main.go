@@ -43,10 +43,16 @@ func main() {
 		log.Fatalf("mailer: %v", err)
 	}
 	svc.SetMailer(mail)
-	riverClient, err := jobs.NewWorkerClient(db.Pool(), svc.ProcessAutomationEvent)
+
+	riverClient, err := jobs.NewWorkerClient(db.Pool(), jobs.WorkerHooks{
+		Process:      svc.ProcessAutomationEvent,
+		Resume:       svc.ResumeAutomation,
+		ScheduleTick: svc.ProcessScheduleTick,
+	})
 	if err != nil {
 		log.Fatalf("river: %v", err)
 	}
+	svc.SetEnqueuer(riverClient)
 
 	runCtx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -54,7 +60,7 @@ func main() {
 	if err := riverClient.Start(runCtx); err != nil {
 		log.Fatalf("river start: %v", err)
 	}
-	log.Printf("automation worker running (river, email=%s)", mail.Name())
+	log.Printf("automation worker running (river, email=%s, schedules=UTC)", mail.Name())
 
 	stop := make(chan os.Signal, 1)
 	signal.Notify(stop, syscall.SIGINT, syscall.SIGTERM)

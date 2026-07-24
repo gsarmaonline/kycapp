@@ -7,10 +7,11 @@ import (
 
 // Subject kinds that actions can require and triggers can provide.
 const (
-	SubjectAppUser      = AppUser
-	SubjectUser         = "user" // KYC operator (membership user)
-	SubjectMembership   = Membership
-	SubjectSubscription = Subscription
+	SubjectAppUser       = AppUser
+	SubjectUser          = "user" // KYC operator (membership user)
+	SubjectMembership    = Membership
+	SubjectSubscription  = Subscription
+	SubjectOrganisation  = "organisation" // org-scoped schedule triggers
 )
 
 // Relation declares that a resource payload can resolve another subject.
@@ -60,6 +61,14 @@ func Default() []Resource {
 			Provides:           []string{SubjectSubscription},
 			// No app_user/user relation yet — subscription automations cannot
 			// use send_email until we define how to resolve a recipient.
+		},
+		{
+			// Time-based triggers: subject is the organisation, not an app user.
+			Key:                Schedule,
+			Label:              "Schedule",
+			Lifecycles:         []string{ScheduleHourly, ScheduleDaily, ScheduleWeekly},
+			SupportsAttributes: false,
+			Provides:           []string{SubjectOrganisation},
 		},
 	}
 }

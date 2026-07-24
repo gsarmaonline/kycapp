@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -26,15 +27,36 @@ func NewInsertClient(pool *pgxpool.Pool) (*Client, error) {
 	return &Client{inner: inner}, nil
 }
 
+// WorkerHooks wires process / resume / schedule handlers into the worker client.
+type WorkerHooks struct {
+	Process      ProcessFunc
+	Resume       ResumeFunc
+	ScheduleTick ScheduleTickFunc
+}
+
 // NewWorkerClient creates a River client that processes automation jobs.
-func NewWorkerClient(pool *pgxpool.Pool, process ProcessFunc) (*Client, error) {
+func NewWorkerClient(pool *pgxpool.Pool, hooks WorkerHooks) (*Client, error) {
 	workers := river.NewWorkers()
-	river.AddWorker(workers, &AutomationEventWorker{Process: process})
+	river.AddWorker(workers, &AutomationEventWorker{Process: hooks.Process})
+	river.AddWorker(workers, &AutomationResumeWorker{Resume: hooks.Resume})
+	river.AddWorker(workers, &ScheduleTickWorker{Tick: hooks.ScheduleTick})
+
+	periodic := []*river.PeriodicJob{
+		river.NewPeriodicJob(
+			river.PeriodicInterval(time.Minute),
+			func() (river.JobArgs, *river.InsertOpts) {
+				return ScheduleTickArgs{At: time.Now().UTC()}, nil
+			},
+			&river.PeriodicJobOpts{RunOnStart: false},
+		),
+	}
+
 	inner, err := river.NewClient(riverpgxv5.New(pool), &river.Config{
 		Queues: map[string]river.QueueConfig{
 			river.QueueDefault: {MaxWorkers: 4},
 		},
-		Workers: workers,
+		Workers:      workers,
+		PeriodicJobs: periodic,
 	})
 	if err != nil {
 		return nil, err
@@ -58,6 +80,36 @@ func (w *AutomationEventWorker) Work(ctx context.Context, job *river.Job[Automat
 	return w.Process(ctx, job.Args.OrganisationID, job.Args.Trigger, job.Args.Payload)
 }
 
+// AutomationResumeWorker handles AutomationResumeArgs.
+type AutomationResumeWorker struct {
+	river.WorkerDefaults[AutomationResumeArgs]
+	Resume ResumeFunc
+}
+
+func (w *AutomationResumeWorker) Work(ctx context.Context, job *river.Job[AutomationResumeArgs]) error {
+	if w.Resume == nil {
+		return fmt.Errorf("automation resume func not configured")
+	}
+	return w.Resume(ctx, job.Args.OrganisationID, job.Args.AutomationID, job.Args.Trigger, job.Args.Payload, job.Args.NextActionID)
+}
+
+// ScheduleTickWorker handles ScheduleTickArgs.
+type ScheduleTickWorker struct {
+	river.WorkerDefaults[ScheduleTickArgs]
+	Tick ScheduleTickFunc
+}
+
+func (w *ScheduleTickWorker) Work(ctx context.Context, job *river.Job[ScheduleTickArgs]) error {
+	if w.Tick == nil {
+		return fmt.Errorf("schedule tick func not configured")
+	}
+	at := job.Args.At
+	if at.IsZero() {
+		at = time.Now().UTC()
+	}
+	return w.Tick(ctx, at)
+}
+
 // EnqueueAutomationEvent implements service.Enqueuer.
 func (c *Client) EnqueueAutomationEvent(ctx context.Context, orgID, trigger string, payload any) error {
 	raw, err := json.Marshal(payload)
@@ -69,6 +121,22 @@ func (c *Client) EnqueueAutomationEvent(ctx context.Context, orgID, trigger stri
 		Trigger:        trigger,
 		Payload:        raw,
 	}, nil)
+	return err
+}
+
+// EnqueueAutomationResume schedules continuation after a delay.
+func (c *Client) EnqueueAutomationResume(ctx context.Context, in EnqueueResumeInput) error {
+	raw, err := json.Marshal(in.Payload)
+	if err != nil {
+		return err
+	}
+	_, err = c.inner.Insert(ctx, AutomationResumeArgs{
+		OrganisationID: in.OrganisationID,
+		AutomationID:   in.AutomationID,
+		Trigger:        in.Trigger,
+		Payload:        raw,
+		NextActionID:   in.NextActionID,
+	}, &river.InsertOpts{ScheduledAt: in.RunAt})
 	return err
 }
 

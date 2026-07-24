@@ -128,7 +128,7 @@ export function AutomationsForm({ submitLabel, cancelTo, initial, onSubmit }: Pr
           }
         })
         .filter((c) => c.field)
-      if (!cleanedConditions.length) {
+      if (!cleanedConditions.length && !trigger.startsWith('schedule.')) {
         throw new Error('Add at least one condition')
       }
       for (const c of cleanedConditions) {
@@ -170,6 +170,9 @@ export function AutomationsForm({ submitLabel, cancelTo, initial, onSubmit }: Pr
         }
         if (a.on_error && !cleanedActions.some((x) => x.id === a.on_error)) {
           throw new Error(`Action ${a.id}: on_error target ${a.on_error} is missing`)
+        }
+        if (a.type === 'delay' && !a.params?.duration) {
+          throw new Error('Each delay action needs a duration (e.g. 5m, 1h)')
         }
         if (a.type === 'send_email' && !a.params?.template_key) {
           throw new Error('Each send_email action needs a template_key')

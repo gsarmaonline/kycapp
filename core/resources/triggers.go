@@ -11,6 +11,7 @@ type TriggerKind string
 const (
 	KindLifecycle TriggerKind = "lifecycle"
 	KindAttribute TriggerKind = "attribute"
+	KindSchedule  TriggerKind = "schedule"
 )
 
 // Trigger is a parsed, validated trigger ID.
@@ -28,7 +29,7 @@ type TriggerInfo struct {
 	Label       string   `json:"label"`
 	Description string   `json:"description"`
 	Resource    string   `json:"resource"`
-	Kind        string   `json:"kind"` // lifecycle | attribute
+	Kind        string   `json:"kind"` // lifecycle | attribute | schedule
 	Provides    []string `json:"provides"`
 }
 
@@ -75,7 +76,7 @@ func ParseTrigger(id string) (Trigger, error) {
 		}, nil
 	}
 
-	// {resource}.{lifecycle}
+	// {resource}.{lifecycle} — schedule.* uses KindSchedule
 	if len(parts) != 2 {
 		return Trigger{}, fmt.Errorf("invalid trigger %q", id)
 	}
@@ -83,12 +84,18 @@ func ParseTrigger(id string) (Trigger, error) {
 	if !res.HasLifecycle(event) {
 		return Trigger{}, fmt.Errorf("resource %q does not support lifecycle %q", res.Key, event)
 	}
+	kind := KindLifecycle
+	label := res.Label + " " + event
+	if res.Key == Schedule {
+		kind = KindSchedule
+		label = "Schedule · " + event
+	}
 	return Trigger{
 		ID:       id,
 		Resource: res.Key,
-		Kind:     KindLifecycle,
+		Kind:     kind,
 		Event:    event,
-		Label:    res.Label + " " + event,
+		Label:    label,
 	}, nil
 }
 
@@ -108,12 +115,20 @@ func ExpandTriggers(resources []Resource, attrsByResource map[string][]Attribute
 		provides := r.availableSubjectKinds()
 		for _, event := range r.Lifecycles {
 			id := LifecycleTrigger(r.Key, event)
+			kind := string(KindLifecycle)
+			label := r.Label + " " + event
+			desc := fmt.Sprintf("Fires when a %s is %s.", strings.ToLower(r.Label), event)
+			if r.Key == Schedule {
+				kind = string(KindSchedule)
+				label = "Schedule · " + event
+				desc = fmt.Sprintf("Fires on an organisation schedule (%s, UTC). Subject is the org — not an app user.", event)
+			}
 			out = append(out, TriggerInfo{
 				ID:          id,
-				Label:       r.Label + " " + event,
-				Description: fmt.Sprintf("Fires when a %s is %s.", strings.ToLower(r.Label), event),
+				Label:       label,
+				Description: desc,
 				Resource:    r.Key,
-				Kind:        string(KindLifecycle),
+				Kind:        kind,
 				Provides:    append([]string(nil), provides...),
 			})
 		}

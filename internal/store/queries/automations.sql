@@ -21,6 +21,13 @@ WHERE organisation_id = $1
   AND enabled = true
 ORDER BY created_at ASC;
 
+-- name: ListOrgIDsWithEnabledTrigger :many
+SELECT DISTINCT organisation_id FROM automations
+WHERE trigger = $1
+  AND enabled = true
+ORDER BY organisation_id;
+
+
 -- name: UpdateAutomation :one
 UPDATE automations SET
     name = COALESCE(sqlc.narg('name'), name),

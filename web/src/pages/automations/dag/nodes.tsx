@@ -410,6 +410,9 @@ export function ActionNode({ data }: NodeProps<ActionFlowNode>) {
       const mode = params.mode === 'columns' ? 'columns' : 'event'
       return [db?.name || params.database_id, params.table, mode].filter(Boolean).join(', ')
     }
+    if (a.type === 'delay') {
+      return params.duration || ''
+    }
     return paramDefs
       .map((p) => {
         if (p.key === 'template_key') {
@@ -474,6 +477,8 @@ export function ActionNode({ data }: NodeProps<ActionFlowNode>) {
                   nextParams[p.key] = 'event'
                 } else if (p.key === 'mapping') {
                   nextParams[p.key] = ''
+                } else if (p.key === 'duration') {
+                  nextParams[p.key] = params[p.key] || '1h'
                 } else {
                   nextParams[p.key] = params[p.key] ?? ''
                 }
@@ -494,6 +499,19 @@ export function ActionNode({ data }: NodeProps<ActionFlowNode>) {
               defaultDatabaseId={defaultDatabaseId}
               onChange={(next) => patch({ params: next })}
             />
+          ) : a.type === 'delay' ? (
+            <select
+              value={params.duration || '1h'}
+              onChange={(e) => patch({ params: { ...params, duration: e.target.value } })}
+            >
+              <option value="1m">1 minute</option>
+              <option value="5m">5 minutes</option>
+              <option value="15m">15 minutes</option>
+              <option value="1h">1 hour</option>
+              <option value="6h">6 hours</option>
+              <option value="24h">24 hours</option>
+              <option value="168h">7 days</option>
+            </select>
           ) : (
             paramDefs.map((p) => {
               if (p.key === 'template_key') {

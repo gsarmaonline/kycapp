@@ -3,14 +3,17 @@ package service
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"strings"
+	"time"
 
 	"github.com/gsarmaonline/kyc/core/automations"
 	"github.com/gsarmaonline/kyc/core/resources"
 	"github.com/gsarmaonline/kyc/internal/apperr"
 	"github.com/gsarmaonline/kyc/internal/ids"
+	"github.com/gsarmaonline/kyc/internal/jobs"
 	"github.com/gsarmaonline/kyc/internal/store/sqlc"
 	"github.com/jackc/pgx/v5/pgtype"
 )
@@ -335,11 +338,14 @@ func (s *Service) runOneAutomation(ctx context.Context, row sqlc.Automation, tri
 	}
 	actionPayload["trigger"] = trigger
 
-	var details []string
-	details, err = automations.RunActionGraph(actions, func(a automations.Action) (string, error) {
-		return s.executeAction(ctx, row.OrganisationID, a, actionPayload, subjects)
+	meta := actionRunMeta{AutomationID: row.ID, Trigger: trigger}
+	details, err := automations.RunActionGraph(actions, func(a automations.Action) (string, error) {
+		return s.executeAction(ctx, row.OrganisationID, a, actionPayload, subjects, meta)
 	})
 	if err != nil {
+		if errors.Is(err, automations.ErrActionPaused) {
+			return s.recordRun(ctx, row, trigger, payloadJSON, "paused", strings.Join(details, "; "))
+		}
 		msg := err.Error()
 		if len(details) > 0 {
 			msg = strings.Join(details, "; ") + "; " + msg
@@ -348,6 +354,89 @@ func (s *Service) runOneAutomation(ctx context.Context, row sqlc.Automation, tri
 		return err
 	}
 	return s.recordRun(ctx, row, trigger, payloadJSON, "success", strings.Join(details, "; "))
+}
+
+// ResumeAutomation continues a workflow after a delay action.
+func (s *Service) ResumeAutomation(ctx context.Context, orgID, automationID, trigger string, payloadJSON json.RawMessage, nextActionID string) error {
+	row, err := s.db.Q().GetAutomation(ctx, automationID)
+	if err != nil {
+		return err
+	}
+	if row.OrganisationID != orgID {
+		return apperr.NotFound("automation not found")
+	}
+	if !row.Enabled {
+		return s.recordRun(ctx, row, trigger, payloadJSON, "skipped", "automation disabled before resume")
+	}
+
+	var payload map[string]any
+	if len(payloadJSON) > 0 {
+		if err := json.Unmarshal(payloadJSON, &payload); err != nil {
+			return s.recordRun(ctx, row, trigger, payloadJSON, "error", "invalid resume payload")
+		}
+	}
+	if payload == nil {
+		payload = map[string]any{}
+	}
+
+	var actions []automations.Action
+	if err := json.Unmarshal(row.Actions, &actions); err != nil {
+		return s.recordRun(ctx, row, trigger, payloadJSON, "error", "invalid actions: "+err.Error())
+	}
+	actions = automations.NormalizeActions(actions)
+
+	subjects, err := s.resolveSubjects(ctx, orgID, trigger, payload)
+	if err != nil {
+		_ = s.recordRun(ctx, row, trigger, payloadJSON, "error", "resolve subjects: "+err.Error())
+		return err
+	}
+
+	actionPayload := make(map[string]any, len(payload)+1)
+	for k, v := range payload {
+		actionPayload[k] = v
+	}
+	actionPayload["trigger"] = trigger
+
+	meta := actionRunMeta{AutomationID: row.ID, Trigger: trigger}
+	details, err := automations.RunActionGraphFrom(actions, nextActionID, func(a automations.Action) (string, error) {
+		return s.executeAction(ctx, orgID, a, actionPayload, subjects, meta)
+	})
+	if err != nil {
+		if errors.Is(err, automations.ErrActionPaused) {
+			return s.recordRun(ctx, row, trigger, payloadJSON, "paused", strings.Join(details, "; "))
+		}
+		msg := err.Error()
+		if len(details) > 0 {
+			msg = strings.Join(details, "; ") + "; " + msg
+		}
+		_ = s.recordRun(ctx, row, trigger, payloadJSON, "error", msg)
+		return err
+	}
+	return s.recordRun(ctx, row, trigger, payloadJSON, "success", strings.Join(details, "; "))
+}
+
+// ProcessScheduleTick fires due schedule.* triggers for all orgs (UTC).
+func (s *Service) ProcessScheduleTick(ctx context.Context, at time.Time) error {
+	due := jobs.DueScheduleTriggers(at)
+	if len(due) == 0 {
+		return nil
+	}
+	for _, trigger := range due {
+		orgIDs, err := s.db.Q().ListOrgIDsWithEnabledTrigger(ctx, trigger)
+		if err != nil {
+			return err
+		}
+		for _, orgID := range orgIDs {
+			payload := map[string]any{
+				"id":              orgID,
+				"organisation_id": orgID,
+				"trigger":         trigger,
+				"scheduled_at":    at.UTC().Format(time.RFC3339),
+			}
+			s.EnqueueAutomationEvent(ctx, orgID, trigger, payload)
+		}
+	}
+	return nil
 }
 
 func (s *Service) recordRun(ctx context.Context, row sqlc.Automation, trigger string, payloadJSON json.RawMessage, status, detail string) error {

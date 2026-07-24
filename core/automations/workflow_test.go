@@ -44,6 +44,30 @@ func TestRunActionGraphOnErrorBranch(t *testing.T) {
 	}
 }
 
+func TestRunActionGraphPause(t *testing.T) {
+	actions := NormalizeActions([]Action{
+		{Type: ActionDelay, Params: map[string]any{"duration": "1m"}},
+		{Type: ActionSendEmail, Params: map[string]any{"template_key": "welcome"}},
+	})
+	var order []string
+	details, err := RunActionGraph(actions, func(a Action) (string, error) {
+		order = append(order, a.Type)
+		if a.Type == ActionDelay {
+			return "delay:paused", ErrActionPaused
+		}
+		return a.Type, nil
+	})
+	if !errors.Is(err, ErrActionPaused) {
+		t.Fatalf("err=%v", err)
+	}
+	if len(order) != 1 || order[0] != ActionDelay {
+		t.Fatalf("order=%v (email should not run yet)", order)
+	}
+	if len(details) != 1 {
+		t.Fatalf("details=%v", details)
+	}
+}
+
 func TestRunActionGraphSuccessPath(t *testing.T) {
 	actions := NormalizeActions([]Action{
 		{Type: ActionDBInsert, Params: map[string]any{"database_id": "d", "table": "t"}},

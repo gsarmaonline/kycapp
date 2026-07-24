@@ -7,6 +7,7 @@ import (
 
 	"github.com/gsarmaonline/kyc/internal/apperr"
 	"github.com/gsarmaonline/kyc/internal/ids"
+	"github.com/gsarmaonline/kyc/internal/jobs"
 	"github.com/gsarmaonline/kyc/internal/mailer"
 	"github.com/gsarmaonline/kyc/internal/payments"
 	"github.com/gsarmaonline/kyc/internal/store"
@@ -30,6 +31,7 @@ type Service struct {
 // Enqueuer inserts background jobs (River). Optional — nil skips enqueue.
 type Enqueuer interface {
 	EnqueueAutomationEvent(ctx context.Context, orgID, trigger string, payload any) error
+	EnqueueAutomationResume(ctx context.Context, in jobs.EnqueueResumeInput) error
 }
 
 func New(db *store.Store) *Service {

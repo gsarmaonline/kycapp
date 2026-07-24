@@ -41,7 +41,7 @@ Actions/ops/condition fields live in `core/automations`. **Triggers** are genera
 
 | Key | Source |
 | --- | --- |
-| `triggers` | `core/resources.ExpandTriggers` — lifecycle events for `app_user`, `membership`, `subscription`, plus `app_user.attribute.<key>` for every active attribute definition |
+| `triggers` | `core/resources.ExpandTriggers` — lifecycle events for `app_user`, `membership`, `subscription`, `schedule` (hourly/daily/weekly), plus `app_user.attribute.<key>` for every active attribute definition |
 | `actions` | Registered action types + params |
 | `ops` | Condition operators |
 | `condition_fields` | Base app-user fields + **all active org attribute definitions** as `app_user.<key>` |
@@ -125,6 +125,8 @@ Legacy `{ "type": "send_email", "template_key": "welcome" }` is still accepted o
 | --- | --- |
 | `send_email` | Render org email template + branding, deliver via Mailer |
 | `call_webhook` | POST JSON to a configured org **webhook**. Body from webhook `body_template` (`{{path}}` placeholders); empty template → `{ organisation_id, payload }`. Optional secret → `X-KYC-Webhook-Secret`. |
+| `db_insert` | Insert into a connected org Postgres database |
+| `delay` | Wait (`duration`), then continue `on_success` via scheduled River job |
 | `db_insert` | Insert into an org **database**. Mode `event` (default): `INSERT (trigger, payload)`. Mode `columns`: map columns → payload paths. |
 
 ### Action destinations (UI)
@@ -241,19 +243,29 @@ EMAIL_FROM=KYC <mail@yourdomain.com>   # verified domain in Resend
 
 Automations run in the **worker**, so Resend env must be on that service.
 
-## Out of scope (v1)
+## Out of scope (still)
 
-- Visual graph builder
-- Multi-branch trees, delays/schedules, human approval
+- Human approval steps
 - Cross-org / marketplace automations
 - Generic inbound “catch-all” webhook → automation (use first-class integrations → domain triggers instead)
 - Non-Postgres database drivers
+- Custom cron expressions (presets only: hourly / daily / weekly UTC)
+- Per–app-user date-field due scanners
 
-## Implementation order
+## Time: delays + org schedules
 
-1. Spec (this doc) — **done**
-2. Remove Temporal scaffolding — **done**
-3. Migration + sqlc for `automations` (+ run log) — **done** (`000014`)
-4. `core/automations` validate + evaluate — **done**
-5. River worker + enqueue from `app_user` create/update — **done** (`cmd/worker`, compose `worker`)
-6. REST + merchant UI — **done** (`/orgs/:orgId/automations`)
+### Delay action
+
+Action type `delay` with `duration` (`5m`, `1h`, `24h`, …). Schedules a River resume job and pauses the workflow (`run` status `paused`). Continues from `on_success` when due. Does not block a worker slot.
+
+### Schedule triggers (org is the subject)
+
+| Trigger | When (UTC) |
+| --- | --- |
+| `schedule.hourly` | top of each hour |
+| `schedule.daily` | 00:00 |
+| `schedule.weekly` | Monday 00:00 |
+
+Payload: `{ organisation_id, id, trigger, scheduled_at }`. Provides subject `organisation` — **not** `app_user`. Use with `call_webhook` / `db_insert` / `delay`; `send_email` is rejected at save (no recipient). Conditions may be empty for schedule rules.
+
+Worker runs a 1-minute River periodic tick that enqueues due schedule events.

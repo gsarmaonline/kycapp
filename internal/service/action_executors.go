@@ -18,6 +18,7 @@ import (
 	"github.com/gsarmaonline/kyc/core/automations"
 	"github.com/gsarmaonline/kyc/core/emailtemplates"
 	"github.com/gsarmaonline/kyc/core/resources"
+	"github.com/gsarmaonline/kyc/internal/jobs"
 	"github.com/gsarmaonline/kyc/internal/mailer"
 	"github.com/gsarmaonline/kyc/internal/store/sqlc"
 	"github.com/jackc/pgx/v5"
@@ -39,16 +40,60 @@ func (s *Service) executeAction(
 	a automations.Action,
 	payload map[string]any,
 	subjects map[string]map[string]any,
+	meta actionRunMeta,
 ) (string, error) {
 	a = a.Normalize()
 	if err := automations.ValidateAction(a); err != nil {
 		return "", err
+	}
+	if a.Type == automations.ActionDelay {
+		return s.execDelay(ctx, orgID, a, payload, meta)
 	}
 	exec, ok := actionExecutors[a.Type]
 	if !ok {
 		return "", fmt.Errorf("unsupported action %q", a.Type)
 	}
 	return exec(ctx, s, orgID, a.Params, payload, subjects)
+}
+
+type actionRunMeta struct {
+	AutomationID string
+	Trigger      string
+}
+
+func (s *Service) execDelay(
+	ctx context.Context,
+	orgID string,
+	a automations.Action,
+	payload map[string]any,
+	meta actionRunMeta,
+) (string, error) {
+	d, err := automations.ParseDelayDuration(a.Params)
+	if err != nil {
+		return "", err
+	}
+	next := strings.TrimSpace(a.OnSuccess)
+	if next == "" {
+		return fmt.Sprintf("delay:%s (no next step)", d), nil
+	}
+	if s.enqueue == nil {
+		return "", fmt.Errorf("delay: job queue not configured")
+	}
+	if meta.AutomationID == "" {
+		return "", fmt.Errorf("delay: missing automation id")
+	}
+	runAt := time.Now().UTC().Add(d)
+	if err := s.enqueue.EnqueueAutomationResume(ctx, jobs.EnqueueResumeInput{
+		OrganisationID: orgID,
+		AutomationID:   meta.AutomationID,
+		Trigger:        meta.Trigger,
+		Payload:        payload,
+		NextActionID:   next,
+		RunAt:          runAt,
+	}); err != nil {
+		return "", fmt.Errorf("delay: schedule resume: %w", err)
+	}
+	return fmt.Sprintf("delay:%s→%s at %s", d, next, runAt.Format(time.RFC3339)), automations.ErrActionPaused
 }
 
 var actionExecutors = map[string]actionExecutor{

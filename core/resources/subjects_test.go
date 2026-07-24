@@ -29,6 +29,26 @@ func TestAvailableSubjectsMembershipIncludesUser(t *testing.T) {
 	}
 }
 
+func TestAvailableSubjectsScheduleIsOrg(t *testing.T) {
+	got, err := AvailableSubjectSet("schedule.daily")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !got[SubjectOrganisation] || !got[Schedule] {
+		t.Fatalf("want organisation+schedule, got %v", got)
+	}
+	if got[SubjectAppUser] {
+		t.Fatal("schedule must not provide app_user")
+	}
+	missing, err := MissingSubjects("schedule.hourly", []string{SubjectAppUser})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(missing) != 1 {
+		t.Fatalf("send_email should be incompatible: %v", missing)
+	}
+}
+
 func TestMissingSubjectsSendEmailOnSubscription(t *testing.T) {
 	missing, err := MissingSubjects("subscription.created", []string{SubjectAppUser})
 	if err != nil {

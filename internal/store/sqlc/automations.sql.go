@@ -251,6 +251,33 @@ func (q *Queries) ListEnabledAutomationsByTrigger(ctx context.Context, arg ListE
 	return items, nil
 }
 
+const listOrgIDsWithEnabledTrigger = `-- name: ListOrgIDsWithEnabledTrigger :many
+SELECT DISTINCT organisation_id FROM automations
+WHERE trigger = $1
+  AND enabled = true
+ORDER BY organisation_id
+`
+
+func (q *Queries) ListOrgIDsWithEnabledTrigger(ctx context.Context, trigger string) ([]string, error) {
+	rows, err := q.db.Query(ctx, listOrgIDsWithEnabledTrigger, trigger)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []string{}
+	for rows.Next() {
+		var organisation_id string
+		if err := rows.Scan(&organisation_id); err != nil {
+			return nil, err
+		}
+		items = append(items, organisation_id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const updateAutomation = `-- name: UpdateAutomation :one
 UPDATE automations SET
     name = COALESCE($2, name),
