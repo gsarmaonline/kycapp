@@ -245,6 +245,10 @@ export function listOrgDatabases(orgId: string) {
   return request<{ items: OrgDatabase[] }>(`/v1/organisations/${orgId}/databases`)
 }
 
+export function getOrgDatabase(orgId: string, dbId: string) {
+  return request<OrgDatabase>(`/v1/organisations/${orgId}/databases/${dbId}`)
+}
+
 export function createOrgDatabase(
   orgId: string,
   input: {
@@ -301,6 +305,10 @@ export type OrgWebhook = {
 
 export function listOrgWebhooks(orgId: string) {
   return request<{ items: OrgWebhook[] }>(`/v1/organisations/${orgId}/webhooks`)
+}
+
+export function getOrgWebhook(orgId: string, webhookId: string) {
+  return request<OrgWebhook>(`/v1/organisations/${orgId}/webhooks/${webhookId}`)
 }
 
 export function createOrgWebhook(

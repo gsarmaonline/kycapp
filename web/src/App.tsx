@@ -20,7 +20,10 @@ import { AutomationsEdit } from './pages/automations/automations_edit'
 import { AutomationsIndex } from './pages/automations/automations_index'
 import { AutomationsNew } from './pages/automations/automations_new'
 import { AutomationsShow } from './pages/automations/automations_show'
-import { DatabasesPage } from './pages/databases_page'
+import { DatabasesEdit } from './pages/databases/databases_edit'
+import { DatabasesIndex } from './pages/databases/databases_index'
+import { DatabasesNew } from './pages/databases/databases_new'
+import { DatabasesShow } from './pages/databases/databases_show'
 import { EmailTemplatesEdit } from './pages/email_templates/email_templates_edit'
 import { EmailTemplatesIndex } from './pages/email_templates/email_templates_index'
 import { EmailTemplatesNew } from './pages/email_templates/email_templates_new'
@@ -44,7 +47,10 @@ import { UsersEdit } from './pages/users/users_edit'
 import { UsersIndex } from './pages/users/users_index'
 import { UsersNew } from './pages/users/users_new'
 import { UsersShow } from './pages/users/users_show'
-import { WebhooksPage } from './pages/webhooks_page'
+import { WebhooksEdit } from './pages/webhooks/webhooks_edit'
+import { WebhooksIndex } from './pages/webhooks/webhooks_index'
+import { WebhooksNew } from './pages/webhooks/webhooks_new'
+import { WebhooksShow } from './pages/webhooks/webhooks_show'
 import './App.css'
 
 type Gate = 'loading' | 'ready'
@@ -144,8 +150,14 @@ export default function App() {
         <Route path="email-templates/new" element={<EmailTemplatesNew />} />
         <Route path="email-templates/:id" element={<EmailTemplatesShow />} />
         <Route path="email-templates/:id/edit" element={<EmailTemplatesEdit />} />
-        <Route path="databases" element={<DatabasesPage />} />
-        <Route path="webhooks" element={<WebhooksPage />} />
+        <Route path="databases" element={<DatabasesIndex />} />
+        <Route path="databases/new" element={<DatabasesNew />} />
+        <Route path="databases/:id" element={<DatabasesShow />} />
+        <Route path="databases/:id/edit" element={<DatabasesEdit />} />
+        <Route path="webhooks" element={<WebhooksIndex />} />
+        <Route path="webhooks/new" element={<WebhooksNew />} />
+        <Route path="webhooks/:id" element={<WebhooksShow />} />
+        <Route path="webhooks/:id/edit" element={<WebhooksEdit />} />
         <Route path="automations" element={<AutomationsIndex />} />
         <Route path="automations/new" element={<AutomationsNew />} />
         <Route path="automations/:id" element={<AutomationsShow />} />
