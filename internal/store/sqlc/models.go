@@ -151,6 +151,22 @@ type Organisation struct {
 	AppUserAttributesMode  string    `json:"app_user_attributes_mode"`
 }
 
+type OrganisationDatabase struct {
+	ID             string    `json:"id"`
+	OrganisationID string    `json:"organisation_id"`
+	Name           string    `json:"name"`
+	Driver         string    `json:"driver"`
+	Host           string    `json:"host"`
+	Port           int32     `json:"port"`
+	DatabaseName   string    `json:"database_name"`
+	Username       string    `json:"username"`
+	Password       string    `json:"password"`
+	SslMode        string    `json:"ssl_mode"`
+	Status         string    `json:"status"`
+	CreatedAt      time.Time `json:"created_at"`
+	UpdatedAt      time.Time `json:"updated_at"`
+}
+
 type OrganisationEntitlement struct {
 	OrganisationID string `json:"organisation_id"`
 	EntitlementID  string `json:"entitlement_id"`

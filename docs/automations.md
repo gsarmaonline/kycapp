@@ -118,6 +118,24 @@ Legacy `{ "type": "send_email", "template_key": "welcome" }` is still accepted o
 | Type | Behavior |
 | --- | --- |
 | `send_email` | Render org email template + branding, deliver via Mailer |
+| `call_webhook` | POST `{ organisation_id, payload }` JSON to a URL; optional `secret` → `X-KYC-Webhook-Secret`. Blocks private/loopback hosts. |
+| `db_insert` | Insert into an org **database** connection (Postgres). Default: `INSERT (trigger, payload)`. Optional `mapping` JSON maps columns → payload paths. |
+
+### Databases (for `db_insert`)
+
+Org-scoped connection objects under Settings → Databases (`/v1/organisations/{id}/databases`).
+
+Landing table for default dump mode:
+
+```sql
+CREATE TABLE kyc_events (
+  "trigger" text not null,
+  payload   jsonb not null,
+  created_at timestamptz default now()
+);
+```
+
+Or map columns: `"mapping": { "email": "email", "country": "attributes.country" }`.
 
 Unknown action types fail validation / the run with a clear error (no silent skip).
 
@@ -163,7 +181,8 @@ Automations run in the **worker**, so Resend env must be on that service.
 - Visual graph builder
 - Multi-branch trees, delays/schedules, human approval
 - Cross-org / marketplace automations
-- Calling arbitrary HTTP webhooks (add when we have allowlists + secrets)
+- Generic inbound “catch-all” webhook → automation (use first-class integrations → domain triggers instead)
+- Non-Postgres database drivers
 
 ## Implementation order
 

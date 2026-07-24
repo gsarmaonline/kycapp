@@ -251,13 +251,22 @@ export function ActionNode({ data }: NodeProps<ActionFlowNode>) {
     ? selected.params
     : Object.keys(params).map((key) => ({ key, label: key, required: false }))
   const templates = data.emailTemplates ?? []
+  const databases = data.databases ?? []
   const defaultTemplateKey = templates[0]?.key ?? ''
+  const defaultDatabaseId = databases[0]?.id ?? ''
 
   const summary = paramDefs
     .map((p) => {
       if (p.key === 'template_key') {
         const t = templates.find((x) => x.key === params[p.key])
         return t ? t.name : params[p.key]
+      }
+      if (p.key === 'database_id') {
+        const d = databases.find((x) => x.id === params[p.key])
+        return d ? d.name : params[p.key]
+      }
+      if (p.key === 'secret') {
+        return params[p.key] ? 'secret set' : ''
       }
       return params[p.key]
     })
@@ -291,6 +300,8 @@ export function ActionNode({ data }: NodeProps<ActionFlowNode>) {
               for (const p of nextInfo?.params ?? []) {
                 if (p.key === 'template_key') {
                   nextParams[p.key] = params[p.key] || defaultTemplateKey
+                } else if (p.key === 'database_id') {
+                  nextParams[p.key] = params[p.key] || defaultDatabaseId
                 } else {
                   nextParams[p.key] = params[p.key] ?? ''
                 }
@@ -304,33 +315,63 @@ export function ActionNode({ data }: NodeProps<ActionFlowNode>) {
               </option>
             ))}
           </select>
-          {paramDefs.map((p) =>
-            p.key === 'template_key' ? (
-              <select
-                key={p.key}
-                value={params[p.key] || defaultTemplateKey}
-                onChange={(e) =>
-                  data.onChange?.({
-                    type: a.type,
-                    params: { ...params, [p.key]: e.target.value },
-                  })
-                }
-                required={p.required}
-              >
-                {!templates.length && <option value="">No templates</option>}
-                {params[p.key] &&
-                  !templates.some((t) => t.key === params[p.key]) && (
-                    <option value={params[p.key]}>{params[p.key]} (missing)</option>
-                  )}
-                {templates.map((t) => (
-                  <option key={t.key} value={t.key}>
-                    {t.name}
-                  </option>
-                ))}
-              </select>
-            ) : (
+          {paramDefs.map((p) => {
+            if (p.key === 'template_key') {
+              return (
+                <select
+                  key={p.key}
+                  value={params[p.key] || defaultTemplateKey}
+                  onChange={(e) =>
+                    data.onChange?.({
+                      type: a.type,
+                      params: { ...params, [p.key]: e.target.value },
+                    })
+                  }
+                  required={p.required}
+                >
+                  {!templates.length && <option value="">No templates</option>}
+                  {params[p.key] &&
+                    !templates.some((t) => t.key === params[p.key]) && (
+                      <option value={params[p.key]}>{params[p.key]} (missing)</option>
+                    )}
+                  {templates.map((t) => (
+                    <option key={t.key} value={t.key}>
+                      {t.name}
+                    </option>
+                  ))}
+                </select>
+              )
+            }
+            if (p.key === 'database_id') {
+              return (
+                <select
+                  key={p.key}
+                  value={params[p.key] || defaultDatabaseId}
+                  onChange={(e) =>
+                    data.onChange?.({
+                      type: a.type,
+                      params: { ...params, [p.key]: e.target.value },
+                    })
+                  }
+                  required={p.required}
+                >
+                  {!databases.length && <option value="">No databases</option>}
+                  {params[p.key] &&
+                    !databases.some((d) => d.id === params[p.key]) && (
+                      <option value={params[p.key]}>{params[p.key]} (missing)</option>
+                    )}
+                  {databases.map((d) => (
+                    <option key={d.id} value={d.id}>
+                      {d.name}
+                    </option>
+                  ))}
+                </select>
+              )
+            }
+            return (
               <input
                 key={p.key}
+                type={p.key === 'secret' || p.key === 'password' ? 'password' : 'text'}
                 value={params[p.key] ?? ''}
                 onChange={(e) =>
                   data.onChange?.({
@@ -340,8 +381,8 @@ export function ActionNode({ data }: NodeProps<ActionFlowNode>) {
                 }
                 placeholder={p.label || p.key}
               />
-            ),
-          )}
+            )
+          })}
         </div>
       )}
       <Handle type="source" position={Position.Right} />

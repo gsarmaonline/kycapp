@@ -37,6 +37,12 @@ type AutomationCatalog struct {
 	Actions         []automations.ActionInfo         `json:"actions"`
 	Ops             []automations.ConditionOpInfo    `json:"ops"`
 	ConditionFields []automations.ConditionFieldInfo `json:"condition_fields"`
+	Databases       []AutomationDatabaseOption       `json:"databases"`
+}
+
+type AutomationDatabaseOption struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
 }
 
 func (s *Service) AutomationCatalog(ctx context.Context, orgID string) (AutomationCatalog, error) {
@@ -48,11 +54,23 @@ func (s *Service) AutomationCatalog(ctx context.Context, orgID string) (Automati
 	if err != nil {
 		return AutomationCatalog{}, err
 	}
+	dbs, err := s.ListOrganisationDatabases(ctx, orgID)
+	if err != nil {
+		return AutomationCatalog{}, err
+	}
+	dbOpts := make([]AutomationDatabaseOption, 0, len(dbs))
+	for _, d := range dbs {
+		if d.Status != "connected" {
+			continue
+		}
+		dbOpts = append(dbOpts, AutomationDatabaseOption{ID: d.ID, Name: d.Name})
+	}
 	return AutomationCatalog{
 		Triggers:        automations.ExpandTriggers(attrs),
 		Actions:         automations.Actions(),
 		Ops:             automations.ConditionOps(),
 		ConditionFields: fields,
+		Databases:       dbOpts,
 	}, nil
 }
 
@@ -292,9 +310,15 @@ func (s *Service) runOneAutomation(ctx context.Context, row sqlc.Automation, tri
 		return err
 	}
 
+	actionPayload := make(map[string]any, len(payload)+1)
+	for k, v := range payload {
+		actionPayload[k] = v
+	}
+	actionPayload["trigger"] = trigger
+
 	var details []string
 	for _, a := range actions {
-		detail, err := s.executeAction(ctx, row.OrganisationID, a, payload, subjects)
+		detail, err := s.executeAction(ctx, row.OrganisationID, a, actionPayload, subjects)
 		if err != nil {
 			_ = s.recordRun(ctx, row, trigger, payloadJSON, "error", err.Error())
 			return err

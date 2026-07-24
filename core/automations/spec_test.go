@@ -149,6 +149,49 @@ func TestValidateConditionFieldsRejectsBadOp(t *testing.T) {
 	}
 }
 
+func TestValidateWebhookAndDBInsert(t *testing.T) {
+	_, err := ValidateCreate(
+		"subscription.created",
+		json.RawMessage(`{"all":[]}`),
+		json.RawMessage(`[{"type":"call_webhook","params":{"url":"https://example.com/hooks/kyc"}}]`),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = ValidateCreate(
+		"app_user.created",
+		json.RawMessage(`{"all":[]}`),
+		json.RawMessage(`[{"type":"call_webhook","params":{"url":"ftp://example.com"}}]`),
+	)
+	if err == nil {
+		t.Fatal("want invalid scheme")
+	}
+	_, err = ValidateCreate(
+		"app_user.created",
+		json.RawMessage(`{"all":[]}`),
+		json.RawMessage(`[{"type":"db_insert","params":{"database_id":"db1","table":"kyc_events"}}]`),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = ValidateCreate(
+		"app_user.created",
+		json.RawMessage(`{"all":[]}`),
+		json.RawMessage(`[{"type":"db_insert","params":{"database_id":"db1","table":"kyc;drop"}}]`),
+	)
+	if err == nil {
+		t.Fatal("want invalid table")
+	}
+	_, err = ValidateCreate(
+		"app_user.created",
+		json.RawMessage(`{"all":[]}`),
+		json.RawMessage(`[{"type":"db_insert","params":{"database_id":"db1","table":"events","mapping":{"email":"email"}}}]`),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestValidateSubjectCompatibility(t *testing.T) {
 	_, err := ValidateCreate(
 		"subscription.created",

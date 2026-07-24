@@ -266,6 +266,20 @@ Each entitlement has a **scope**:
 | `scope` | enum | `platform` \| `product` |
 | `organisation_id` | string? | Null = global (platform) catalog; set = org-owned **product** feature |
 
+### OrganisationDatabase
+
+Postgres connection used by the `db_insert` automation action. Password is stored server-side and returned only as a hint.
+
+| Field | Type | Notes |
+| --- | --- | --- |
+| `id` | string | PK |
+| `organisation_id` | string | FK → Organisation |
+| `name` | string | Display label |
+| `driver` | enum | `postgres` (v1) |
+| `host` / `port` / `database_name` / `username` / `password` | | Connection |
+| `ssl_mode` | string | Default `require` |
+| `status` | enum | `connected` \| `disconnected` |
+
 ### ProductPlan
 
 Org-owned package of product features for end-user gating (separate from KYC billing `Plan`). Optional Stripe Product/Price sync via org integration keys.

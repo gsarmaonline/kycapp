@@ -109,6 +109,7 @@ export function buildFlowElements(
         readOnly: opts.readOnly,
         actions: opts.catalog?.actions,
         emailTemplates: opts.emailTemplates,
+        databases: opts.catalog?.databases,
         canRemove: graph.actions.length > 1,
         onChange: (next) => opts.onActionChange?.(i, next),
         onRemove: () => opts.onActionRemove?.(i),

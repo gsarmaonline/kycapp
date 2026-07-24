@@ -3,11 +3,14 @@ import type { FormEvent } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import {
   createOrgAPIKey,
+  createOrgDatabase,
   deleteOrganisation,
+  deleteOrgDatabase,
   deleteOrgIntegration,
   getOrganisation,
   importStripeCatalog,
   listOrgAPIKeys,
+  listOrgDatabases,
   listOrgIntegrations,
   listStripeCatalog,
   revokeAPIKey,
@@ -15,6 +18,7 @@ import {
   updateOrganisation,
   upsertStripeIntegration,
   type OrgAPIKey,
+  type OrgDatabase,
   type OrgIntegration,
   type Organisation,
   type StripeCatalogItem,
@@ -33,9 +37,17 @@ export function SettingsPage() {
     'discover',
   )
   const [integrations, setIntegrations] = useState<OrgIntegration[]>([])
+  const [databases, setDatabases] = useState<OrgDatabase[]>([])
   const [apiKeys, setApiKeys] = useState<OrgAPIKey[]>([])
   const [stripeSecret, setStripeSecret] = useState('')
   const [stripePublishable, setStripePublishable] = useState('')
+  const [dbName, setDbName] = useState('')
+  const [dbHost, setDbHost] = useState('')
+  const [dbPort, setDbPort] = useState('5432')
+  const [dbDatabase, setDbDatabase] = useState('')
+  const [dbUser, setDbUser] = useState('')
+  const [dbPassword, setDbPassword] = useState('')
+  const [dbSSL, setDbSSL] = useState('require')
   const [catalog, setCatalog] = useState<StripeCatalogItem[] | null>(null)
   const [selectedPrices, setSelectedPrices] = useState<Record<string, boolean>>({})
   const [newKeyName, setNewKeyName] = useState('Default')
@@ -51,10 +63,11 @@ export function SettingsPage() {
     setLoading(true)
     setError(null)
     try {
-      const [o, ints, keys] = await Promise.all([
+      const [o, ints, keys, dbs] = await Promise.all([
         getOrganisation(orgId),
         listOrgIntegrations(orgId),
         listOrgAPIKeys(orgId),
+        listOrgDatabases(orgId),
       ])
       setOrg(o)
       setName(o.name)
@@ -63,6 +76,7 @@ export function SettingsPage() {
       setAppUserAttributesMode(o.app_user_attributes_mode ?? 'discover')
       setIntegrations(ints.items)
       setApiKeys(keys.items)
+      setDatabases(dbs.items)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to load settings')
     } finally {
@@ -174,6 +188,52 @@ export function SettingsPage() {
       setMessage('Stripe disconnected')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Disconnect failed')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function onCreateDatabase(e: FormEvent) {
+    e.preventDefault()
+    setBusy(true)
+    setError(null)
+    setMessage(null)
+    try {
+      const row = await createOrgDatabase(orgId, {
+        name: dbName,
+        host: dbHost,
+        port: Number(dbPort) || 5432,
+        database_name: dbDatabase,
+        username: dbUser,
+        password: dbPassword,
+        ssl_mode: dbSSL,
+      })
+      setDatabases((prev) => [...prev, row].sort((a, b) => a.name.localeCompare(b.name)))
+      setDbName('')
+      setDbHost('')
+      setDbPort('5432')
+      setDbDatabase('')
+      setDbUser('')
+      setDbPassword('')
+      setDbSSL('require')
+      setMessage(`Database “${row.name}” connected`)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Database save failed')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function onDeleteDatabase(id: string, name: string) {
+    if (!confirm(`Remove database “${name}”? Automations that use it will fail until updated.`)) return
+    setBusy(true)
+    setError(null)
+    try {
+      await deleteOrgDatabase(orgId, id)
+      setDatabases((prev) => prev.filter((d) => d.id !== id))
+      setMessage('Database removed')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Delete failed')
     } finally {
       setBusy(false)
     }
@@ -447,6 +507,79 @@ export function SettingsPage() {
             )}
           </div>
         )}
+      </section>
+
+      <section className="settings-block">
+        <h3>Databases</h3>
+        <p className="status">
+          Postgres connections for the <code>db_insert</code> automation action. Passwords are
+          never shown in full after save. Prefer a least-privilege write user and a dedicated
+          landing table.
+        </p>
+        {databases.length === 0 ? (
+          <p className="status">No databases connected</p>
+        ) : (
+          <ul className="run-list">
+            {databases.map((d) => (
+              <li key={d.id}>
+                <strong>{d.name}</strong> · {d.username}@{d.host}:{d.port}/{d.database_name} ·{' '}
+                {d.has_password ? d.password_hint : 'no password'} · {d.status}{' '}
+                <button
+                  type="button"
+                  className="ghost"
+                  disabled={busy}
+                  onClick={() => void onDeleteDatabase(d.id, d.name)}
+                >
+                  Remove
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+        <form className="create stacked" onSubmit={(e) => void onCreateDatabase(e)}>
+          <label>
+            Name
+            <input value={dbName} onChange={(e) => setDbName(e.target.value)} required placeholder="Analytics dump" />
+          </label>
+          <label>
+            Host
+            <input value={dbHost} onChange={(e) => setDbHost(e.target.value)} required placeholder="db.example.com" />
+          </label>
+          <label>
+            Port
+            <input value={dbPort} onChange={(e) => setDbPort(e.target.value)} inputMode="numeric" />
+          </label>
+          <label>
+            Database
+            <input value={dbDatabase} onChange={(e) => setDbDatabase(e.target.value)} required />
+          </label>
+          <label>
+            Username
+            <input value={dbUser} onChange={(e) => setDbUser(e.target.value)} required autoComplete="off" />
+          </label>
+          <label>
+            Password
+            <input
+              type="password"
+              value={dbPassword}
+              onChange={(e) => setDbPassword(e.target.value)}
+              required
+              autoComplete="new-password"
+            />
+          </label>
+          <label>
+            SSL mode
+            <select value={dbSSL} onChange={(e) => setDbSSL(e.target.value)}>
+              <option value="require">require</option>
+              <option value="verify-full">verify-full</option>
+              <option value="prefer">prefer</option>
+              <option value="disable">disable</option>
+            </select>
+          </label>
+          <button type="submit" disabled={busy}>
+            Add database
+          </button>
+        </form>
       </section>
 
       <section className="settings-block">

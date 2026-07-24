@@ -20,6 +20,6 @@
 ## Tech debt/improvements
 - Revisit authentication
 - Revisit billing
-- Add more actions like webhooks
+- Add more actions like webhooks / db_insert — **done** (outbound `call_webhook`; org databases + `db_insert`)
 
 

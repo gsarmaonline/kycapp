@@ -93,6 +93,11 @@ Requires `organisation:update`.
 - `POST /v1/organisations/{id}/integrations/stripe/import` — `{ "items": [{ "price_ref", "key"?, "name"? }] }` create product plans linked to those Prices
 - `POST /v1/organisations/{id}/integrations/stripe/sync` — push local product plan prices missing Stripe refs
 - `DELETE /v1/organisations/{id}/integrations/{provider}` — disconnect
+- `GET /v1/organisations/{id}/databases` — Postgres connections for `db_insert` (password masked)
+- `POST /v1/organisations/{id}/databases` — `{ "name", "host", "port"?, "database_name", "username", "password", "ssl_mode"? }`
+- `GET /v1/organisations/{id}/databases/{dbId}`
+- `PATCH /v1/organisations/{id}/databases/{dbId}` — omit/`""` password to keep current
+- `DELETE /v1/organisations/{id}/databases/{dbId}`
 - `POST /v1/organisations/{id}/api-keys` — `{ "name" }` → includes `token` once
 - `GET /v1/organisations/{id}/api-keys`
 - `DELETE /v1/api-keys/{id}` — revoke (org keys: org admin; platform keys: platform)
@@ -267,11 +272,11 @@ Org-scoped message copy for **app users** (not KYC member invites). Domain helpe
 Org-scoped rules: trigger → AND/OR conditions → ordered actions. Executed by the River worker (`cmd/worker`). Domain: `core/automations`. See [automations.md](automations.md).
 
 - `GET /v1/organisations/{id}/automations/catalog` — requires `automations:read`  
-  Returns `triggers` (from `core/resources`: lifecycle events for app_user/membership/subscription + `app_user.attribute.<key>` for each active attribute), `actions` (+ params), `ops` (with `needs_value` / `needs_list` / `value_types`), and `condition_fields` (base user fields + `attributes.<key>`, each with `allowed_ops` and optional `enum_values`).
+  Returns `triggers`, `actions` (+ params), `ops`, `condition_fields`, and connected `databases` (for `db_insert`).
 - `GET /v1/organisations/{id}/automations` — requires `automations:read`
 - `POST /v1/organisations/{id}/automations` — requires `automations:manage`  
-  `{ "name", "trigger", "enabled"?, "conditions": { "mode": "all"|"any", "items": [{ "field", "op", "value"? }] }, "actions": [{ "type": "send_email", "params": { "template_key": "welcome" } }] }`  
-  Legacy `{ "all": [...] }` / `{ "any": [...] }` also accepted. Ops include `eq`, `neq`, `contains`, `in`, `not_in`, `gt`, `gte`, `lt`, `lte`, `exists`, `not_exists`. `name` is required. Condition `field` / `op` must be valid for the org catalog. Legacy action `{ "template_key" }` (top-level) is accepted and normalized into `params`.
+  `{ "name", "trigger", "enabled"?, "conditions": { "mode": "all"|"any", "items": [{ "field", "op", "value"? }] }, "actions": [{ "type", "params" }] }`  
+  Action types: `send_email` (`template_key`), `call_webhook` (`url`, optional `secret`), `db_insert` (`database_id`, `table`, optional `mapping`). Legacy `{ "all": [...] }` / `{ "any": [...] }` also accepted.
 - `GET /v1/automations/{id}` — requires `automations:read`
 - `PATCH /v1/automations/{id}` — requires `automations:manage`
 - `DELETE /v1/automations/{id}` — requires `automations:manage`

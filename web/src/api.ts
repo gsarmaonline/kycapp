@@ -226,6 +226,69 @@ export function deleteOrgIntegration(orgId: string, provider: string) {
   })
 }
 
+export type OrgDatabase = {
+  id: string
+  organisation_id: string
+  name: string
+  driver: string
+  host: string
+  port: number
+  database_name: string
+  username: string
+  password_hint?: string
+  has_password: boolean
+  ssl_mode: string
+  status: string
+}
+
+export function listOrgDatabases(orgId: string) {
+  return request<{ items: OrgDatabase[] }>(`/v1/organisations/${orgId}/databases`)
+}
+
+export function createOrgDatabase(
+  orgId: string,
+  input: {
+    name: string
+    host: string
+    port?: number
+    database_name: string
+    username: string
+    password: string
+    ssl_mode?: string
+  },
+) {
+  return request<OrgDatabase>(`/v1/organisations/${orgId}/databases`, {
+    method: 'POST',
+    body: JSON.stringify(input),
+  })
+}
+
+export function updateOrgDatabase(
+  orgId: string,
+  dbId: string,
+  input: {
+    name?: string
+    host?: string
+    port?: number
+    database_name?: string
+    username?: string
+    password?: string
+    ssl_mode?: string
+    status?: string
+  },
+) {
+  return request<OrgDatabase>(`/v1/organisations/${orgId}/databases/${dbId}`, {
+    method: 'PATCH',
+    body: JSON.stringify(input),
+  })
+}
+
+export function deleteOrgDatabase(orgId: string, dbId: string) {
+  return request<{ ok: boolean }>(`/v1/organisations/${orgId}/databases/${dbId}`, {
+    method: 'DELETE',
+  })
+}
+
 export function listOrgAPIKeys(orgId: string) {
   return request<{ items: OrgAPIKey[] }>(`/v1/organisations/${orgId}/api-keys`)
 }
@@ -843,6 +906,7 @@ export type AutomationCatalog = {
     enum_values?: string[]
     allowed_ops?: string[]
   }[]
+  databases?: { id: string; name: string }[]
 }
 
 export type Automation = {
