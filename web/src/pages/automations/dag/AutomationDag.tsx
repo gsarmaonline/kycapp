@@ -76,7 +76,6 @@ function AutomationDagInner({
 
   const onConditionRemove = useCallback(
     (index: number) => {
-      if (graph.conditions.length <= 1) return
       onConditionsChange?.(graph.conditions.filter((_, i) => i !== index))
     },
     [graph.conditions, onConditionsChange],
@@ -176,10 +175,12 @@ function AutomationDagInner({
       )}
       {readOnly && (
         <p className="field-hint">
-          Match {conditionMode === 'any' ? 'any' : 'all'} condition
-          {graph.conditions.length === 1 ? '' : 's'} (
-          {conditionMode === 'any' ? 'OR' : 'AND'}
-          ). Green edges = on success; red = on error.
+          {graph.conditions.length === 0
+            ? 'No conditions (runs on every matching trigger).'
+            : `Match ${conditionMode === 'any' ? 'any' : 'all'} condition${
+                graph.conditions.length === 1 ? '' : 's'
+              } (${conditionMode === 'any' ? 'OR' : 'AND'}).`}{' '}
+          Green edges = on success; red = on error.
         </p>
       )}
       <div className="dag-canvas">

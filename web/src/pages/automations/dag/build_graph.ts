@@ -92,7 +92,7 @@ export function normalizeGraph(
   let conditions = input.conditions ? [...input.conditions] : []
   let actions = input.actions ? [...input.actions] : []
   if (opts?.ensureDefaults) {
-    if (!conditions.length) conditions = [defaultCondition()]
+    // Conditions are optional (trigger alone is enough). Always keep at least one action for editing.
     if (!actions.length) actions = [defaultAction()]
   }
   actions = normalizeActionWorkflow(actions)
@@ -177,7 +177,7 @@ export function buildFlowElements(
         readOnly: opts.readOnly,
         conditionFields: opts.catalog?.condition_fields,
         ops: opts.catalog?.ops,
-        canRemove: graph.conditions.length > 1,
+        canRemove: !opts.readOnly,
         onChange: (next) => opts.onConditionChange?.(i, next),
         onRemove: () => opts.onConditionRemove?.(i),
       },
