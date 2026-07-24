@@ -80,16 +80,25 @@ export function AutomationsForm({ submitLabel, cancelTo, initial, onSubmit }: Pr
         throw new Error('Add at least one condition')
       }
       const cleanedActions = actions
-        .map((a) => ({
-          type: a.type.trim(),
-          template_key: (a.template_key ?? '').trim(),
-        }))
+        .map((a) => {
+          const params: Record<string, string> = { ...(a.params ?? {}) }
+          if (a.template_key && !params.template_key) {
+            params.template_key = a.template_key
+          }
+          for (const [k, v] of Object.entries(params)) {
+            params[k] = String(v ?? '').trim()
+          }
+          return {
+            type: a.type.trim(),
+            params,
+          }
+        })
         .filter((a) => a.type)
       if (!cleanedActions.length) {
         throw new Error('Add at least one action')
       }
       for (const a of cleanedActions) {
-        if (a.type === 'send_email' && !a.template_key) {
+        if (a.type === 'send_email' && !a.params.template_key) {
           throw new Error('Each send_email action needs a template_key')
         }
       }

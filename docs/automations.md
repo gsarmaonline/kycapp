@@ -28,7 +28,7 @@ Org-scoped **Automation** (**name required**):
     ]
   },
   "actions": [
-    { "type": "send_email", "template_key": "welcome" }
+    { "type": "send_email", "params": { "template_key": "welcome" } }
   ]
 }
 ```
@@ -65,14 +65,26 @@ Lifecycles: `created`, `updated`, `deleted`. Attribute triggers fire when that k
 - Ops: `eq`, `neq`, `exists`, `not_exists` (enough for attributes / status).
 - Fields: base user fields (`id`, `email`, `display_name`, `status`, `external_id`) plus every active attribute definition.
 
-### Actions (v1)
+### Actions
+
+Actions use a generic handler interface (`core/automations.ActionHandler`):
+
+- **Catalog / validate** — register with `RegisterActionHandler` (`Info` + `Validate`)
+- **Execute** — register in `internal/service` `actionExecutors` map (needs DB/mailer)
+
+Persisted shape:
+
+```json
+{ "type": "send_email", "params": { "template_key": "welcome" } }
+```
+
+Legacy `{ "type": "send_email", "template_key": "welcome" }` is still accepted on read and rewritten to `params`.
 
 | Type | Behavior |
 | --- | --- |
-| `send_email` | Render org email template + branding, deliver via Mailer (`EMAIL_PROVIDER=resend` or `noop`) |
-| `set_attribute` | Optional later |
+| `send_email` | Render org email template + branding, deliver via Mailer |
 
-Unknown action types fail the run with a clear error (no silent skip). Register new actions in `core/automations` and implement execute in the service worker path.
+Unknown action types fail validation / the run with a clear error (no silent skip).
 
 **Topology is fixed for v1:** one trigger → AND conditions → **all** actions in the list (in order). There is no “this condition → only these actions” branching. Add multiple actions with **Add action**; they all run when the conditions match. Per-path branches would need a richer DSL later.
 

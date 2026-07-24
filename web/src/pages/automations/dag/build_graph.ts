@@ -15,7 +15,7 @@ const defaultCondition = (preferredField = 'status'): AutomationCondition => ({
 
 const defaultAction = (preferredType = 'send_email'): AutomationAction => ({
   type: preferredType,
-  template_key: preferredType === 'send_email' ? 'welcome' : '',
+  params: preferredType === 'send_email' ? { template_key: 'welcome' } : {},
 })
 
 export function normalizeGraph(

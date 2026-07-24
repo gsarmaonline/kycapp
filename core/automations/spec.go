@@ -13,8 +13,6 @@ const (
 	OpNeq       = "neq"
 	OpExists    = "exists"
 	OpNotExists = "not_exists"
-
-	ActionSendEmail = "send_email"
 )
 
 // Convenience aliases for common lifecycle triggers.
@@ -43,11 +41,6 @@ type Condition struct {
 	Field string `json:"field"`
 	Op    string `json:"op"`
 	Value any    `json:"value,omitempty"`
-}
-
-type Action struct {
-	Type        string `json:"type"`
-	TemplateKey string `json:"template_key,omitempty"`
 }
 
 // ValidateCreate checks trigger, conditions, and actions for create/update
@@ -93,8 +86,7 @@ func ValidateCreate(trigger string, conditionsJSON, actionsJSON json.RawMessage)
 		return Spec{}, fmt.Errorf("at least one action is required")
 	}
 	for i, a := range actions {
-		a.Type = strings.TrimSpace(a.Type)
-		a.TemplateKey = strings.TrimSpace(a.TemplateKey)
+		a = a.Normalize()
 		if err := ValidateAction(a); err != nil {
 			return Spec{}, fmt.Errorf("actions[%d]: %w", i, err)
 		}

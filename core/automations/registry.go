@@ -1,8 +1,6 @@
 package automations
 
 import (
-	"fmt"
-
 	"github.com/gsarmaonline/kyc/core/resources"
 )
 
@@ -39,17 +37,6 @@ type ConditionFieldInfo struct {
 	Group     string `json:"group"` // "user" | "attributes"
 }
 
-var registeredActions = []ActionInfo{
-	{
-		Type:        ActionSendEmail,
-		Label:       "Send email",
-		Description: "Render an org email template and deliver it to the app user's email.",
-		Params: []ActionParam{
-			{Key: "template_key", Label: "Template key", Required: true},
-		},
-	},
-}
-
 var registeredOps = []ConditionOpInfo{
 	{Op: OpEq, Label: "equals", NeedsValue: true},
 	{Op: OpNeq, Label: "not equals", NeedsValue: true},
@@ -83,13 +70,6 @@ func AllowedTriggerIDs(attrs []resources.AttributeKey) map[string]bool {
 	})
 }
 
-// Actions returns the registered action catalog.
-func Actions() []ActionInfo {
-	out := make([]ActionInfo, len(registeredActions))
-	copy(out, registeredActions)
-	return out
-}
-
 // ConditionOps returns the registered condition operators.
 func ConditionOps() []ConditionOpInfo {
 	out := make([]ConditionOpInfo, len(registeredOps))
@@ -103,16 +83,6 @@ func KnownTrigger(id string) bool {
 	return resources.IsValidTrigger(id)
 }
 
-// KnownAction reports whether typ is a registered action type.
-func KnownAction(typ string) bool {
-	for _, a := range registeredActions {
-		if a.Type == typ {
-			return true
-		}
-	}
-	return false
-}
-
 // KnownOp reports whether op is a registered condition operator.
 func KnownOp(op string) bool {
 	for _, o := range registeredOps {
@@ -121,32 +91,6 @@ func KnownOp(op string) bool {
 		}
 	}
 	return false
-}
-
-// ValidateAction checks action type and required params against the registry.
-func ValidateAction(a Action) error {
-	var info *ActionInfo
-	for i := range registeredActions {
-		if registeredActions[i].Type == a.Type {
-			info = &registeredActions[i]
-			break
-		}
-	}
-	if info == nil {
-		return fmt.Errorf("action type %q is not supported", a.Type)
-	}
-	for _, p := range info.Params {
-		if !p.Required {
-			continue
-		}
-		switch p.Key {
-		case "template_key":
-			if a.TemplateKey == "" {
-				return fmt.Errorf("template_key is required for %s", a.Type)
-			}
-		}
-	}
-	return nil
 }
 
 // AttributeConditionField builds a condition field path for an org attribute key.

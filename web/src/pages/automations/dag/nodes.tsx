@@ -117,6 +117,20 @@ export function ActionNode({ data }: NodeProps<ActionFlowNode>) {
   const actions = data.actions?.length
     ? data.actions
     : [{ type: 'send_email', label: 'Send email', description: '', params: [] }]
+  const selected = actions.find((act) => act.type === a.type) ?? actions[0]
+  const params = { ...(a.params ?? {}) }
+  if (a.template_key && !params.template_key) {
+    params.template_key = a.template_key
+  }
+  const paramDefs = selected?.params?.length
+    ? selected.params
+    : Object.keys(params).map((key) => ({ key, label: key, required: false }))
+
+  const summary = paramDefs
+    .map((p) => params[p.key])
+    .filter(Boolean)
+    .join(', ')
+
   return (
     <div className={`dag-node dag-node-action${data.readOnly ? ' is-readonly' : ''}`}>
       <Handle type="target" position={Position.Left} />
@@ -131,13 +145,21 @@ export function ActionNode({ data }: NodeProps<ActionFlowNode>) {
       {data.readOnly ? (
         <strong className="dag-node-title">
           {a.type}
-          {a.template_key ? `: ${a.template_key}` : ''}
+          {summary ? `: ${summary}` : ''}
         </strong>
       ) : (
         <div className="dag-node-fields">
           <select
             value={a.type}
-            onChange={(e) => data.onChange?.({ ...a, type: e.target.value })}
+            onChange={(e) => {
+              const nextType = e.target.value
+              const nextInfo = actions.find((act) => act.type === nextType)
+              const nextParams: Record<string, string> = {}
+              for (const p of nextInfo?.params ?? []) {
+                nextParams[p.key] = params[p.key] ?? (p.key === 'template_key' ? 'welcome' : '')
+              }
+              data.onChange?.({ type: nextType, params: nextParams })
+            }}
           >
             {actions.map((act) => (
               <option key={act.type} value={act.type}>
@@ -145,11 +167,19 @@ export function ActionNode({ data }: NodeProps<ActionFlowNode>) {
               </option>
             ))}
           </select>
-          <input
-            value={a.template_key ?? ''}
-            onChange={(e) => data.onChange?.({ ...a, template_key: e.target.value })}
-            placeholder="template_key"
-          />
+          {paramDefs.map((p) => (
+            <input
+              key={p.key}
+              value={params[p.key] ?? ''}
+              onChange={(e) =>
+                data.onChange?.({
+                  type: a.type,
+                  params: { ...params, [p.key]: e.target.value },
+                })
+              }
+              placeholder={p.label || p.key}
+            />
+          ))}
         </div>
       )}
       <Handle type="source" position={Position.Right} />

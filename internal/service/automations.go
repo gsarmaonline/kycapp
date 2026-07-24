@@ -4,16 +4,13 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"html"
 	"log/slog"
 	"strings"
 
 	"github.com/gsarmaonline/kyc/core/automations"
-	"github.com/gsarmaonline/kyc/core/emailtemplates"
 	"github.com/gsarmaonline/kyc/core/resources"
 	"github.com/gsarmaonline/kyc/internal/apperr"
 	"github.com/gsarmaonline/kyc/internal/ids"
-	"github.com/gsarmaonline/kyc/internal/mailer"
 	"github.com/gsarmaonline/kyc/internal/store/sqlc"
 	"github.com/jackc/pgx/v5/pgtype"
 )
@@ -291,66 +288,6 @@ func (s *Service) runOneAutomation(ctx context.Context, row sqlc.Automation, tri
 		details = append(details, detail)
 	}
 	return s.recordRun(ctx, row, trigger, payloadJSON, "success", strings.Join(details, "; "))
-}
-
-func (s *Service) executeAction(ctx context.Context, orgID string, a automations.Action, payload map[string]any) (string, error) {
-	switch a.Type {
-	case automations.ActionSendEmail:
-		if err := s.EnsureDefaultEmailTemplates(ctx, orgID); err != nil {
-			return "", err
-		}
-		tmpl, err := s.db.Q().GetEmailTemplateByOrgKey(ctx, sqlc.GetEmailTemplateByOrgKeyParams{
-			OrganisationID: orgID,
-			Key:            a.TemplateKey,
-		})
-		if err != nil {
-			return "", fmt.Errorf("email template %q not found", a.TemplateKey)
-		}
-		org, err := s.GetOrganisation(ctx, orgID)
-		if err != nil {
-			return "", err
-		}
-		to := stringifyPayload(payload["email"])
-		if to == "" {
-			return "", fmt.Errorf("send_email: payload email is required")
-		}
-		vars := map[string]string{
-			"display_name": stringifyPayload(payload["display_name"]),
-			"org_name":     org.Name,
-			"email":        to,
-		}
-		subject := emailtemplates.Render(tmpl.Subject, vars)
-		textBody := emailtemplates.Render(tmpl.BodyText, vars)
-		htmlInner := emailtemplates.Render(tmpl.BodyHtml, vars)
-		if strings.TrimSpace(htmlInner) == "" {
-			htmlInner = "<p>" + html.EscapeString(textBody) + "</p>"
-		}
-		htmlBody := emailtemplates.Wrap(htmlInner, BrandingFromOrg(org))
-		ref, err := s.mailer.Send(ctx, mailer.Message{
-			To:      []string{to},
-			Subject: subject,
-			HTML:    htmlBody,
-			Text:    textBody,
-			Tags: map[string]string{
-				"org_id":       orgID,
-				"template_key": a.TemplateKey,
-				"source":       "automation",
-			},
-		})
-		if err != nil {
-			return "", fmt.Errorf("send_email: %w", err)
-		}
-		slog.Info("automation send_email",
-			"org_id", orgID,
-			"template", a.TemplateKey,
-			"provider", s.mailer.Name(),
-			"provider_ref", ref,
-			"to", to,
-		)
-		return "send_email:" + a.TemplateKey + " → " + to + " (" + s.mailer.Name() + ":" + ref + ")", nil
-	default:
-		return "", fmt.Errorf("unsupported action %q", a.Type)
-	}
 }
 
 func (s *Service) recordRun(ctx context.Context, row sqlc.Automation, trigger string, payloadJSON json.RawMessage, status, detail string) error {

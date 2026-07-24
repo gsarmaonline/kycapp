@@ -771,6 +771,8 @@ export type AutomationCondition = {
 
 export type AutomationAction = {
   type: string
+  params?: Record<string, string>
+  /** @deprecated legacy flat field; prefer params.template_key */
   template_key?: string
 }
 

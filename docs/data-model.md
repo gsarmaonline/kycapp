@@ -211,7 +211,7 @@ Org-scoped rule (trigger + conditions + actions). Domain: `core/automations`. Ru
 | `trigger` | string | e.g. `app_user.created` |
 | `enabled` | bool | |
 | `conditions` | jsonb | `{ "all": [{ field, op, value? }] }` |
-| `actions` | jsonb | `[{ "type": "send_email", "template_key" }]` |
+| `actions` | jsonb | `[{ "type": "send_email", "params": { "template_key": "welcome" } }]` |
 
 ### AutomationRun
 
