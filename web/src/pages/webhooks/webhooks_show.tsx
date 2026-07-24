@@ -18,6 +18,10 @@ export function WebhooksShow() {
   if (error) return <p className="error">{error}</p>
   if (!item) return <p>Loading…</p>
 
+  const body = item.body_template?.trim()
+    ? item.body_template
+    : '{ organisation_id, payload }  (full event dump)'
+
   return (
     <section>
       <PageHeader title={item.name || 'Webhook'} />
@@ -30,11 +34,15 @@ export function WebhooksShow() {
             value: item.has_secret ? item.secret_hint || '••••' : '—',
           },
           { label: 'Status', value: item.status },
+          {
+            label: 'Body template',
+            value: <pre className="code-block">{body}</pre>,
+          },
         ]}
       />
       <p className="muted">
-        Automations POST <code>{'{ organisation_id, payload }'}</code> as JSON. When set, the shared
-        secret is sent as <code>X-KYC-Webhook-Secret</code>.
+        When set, the shared secret is sent as <code>X-KYC-Webhook-Secret</code>. Placeholders use{' '}
+        <code>{'{{path}}'}</code> from the trigger payload.
       </p>
       <div className="form-actions">
         <Link className="ghost" to={resourcePath(orgId, 'webhooks')}>

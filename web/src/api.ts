@@ -238,7 +238,9 @@ export type OrgDatabase = {
   password_hint?: string
   has_password: boolean
   ssl_mode: string
-  status: string
+  status: 'connected' | 'unreachable' | 'disconnected' | string
+  last_checked_at?: string | null
+  last_error?: string
 }
 
 export function listOrgDatabases(orgId: string) {
@@ -278,12 +280,23 @@ export function updateOrgDatabase(
     username?: string
     password?: string
     ssl_mode?: string
-    status?: string
   },
 ) {
   return request<OrgDatabase>(`/v1/organisations/${orgId}/databases/${dbId}`, {
     method: 'PATCH',
     body: JSON.stringify(input),
+  })
+}
+
+export function checkOrgDatabase(orgId: string, dbId: string) {
+  return request<OrgDatabase>(`/v1/organisations/${orgId}/databases/${dbId}/check`, {
+    method: 'POST',
+  })
+}
+
+export function disconnectOrgDatabase(orgId: string, dbId: string) {
+  return request<OrgDatabase>(`/v1/organisations/${orgId}/databases/${dbId}/disconnect`, {
+    method: 'POST',
   })
 }
 
@@ -301,6 +314,7 @@ export type OrgWebhook = {
   secret_hint?: string
   has_secret: boolean
   status: string
+  body_template?: string
 }
 
 export function listOrgWebhooks(orgId: string) {
@@ -313,7 +327,7 @@ export function getOrgWebhook(orgId: string, webhookId: string) {
 
 export function createOrgWebhook(
   orgId: string,
-  input: { name: string; url: string; secret?: string },
+  input: { name: string; url: string; secret?: string; body_template?: string },
 ) {
   return request<OrgWebhook>(`/v1/organisations/${orgId}/webhooks`, {
     method: 'POST',
@@ -324,7 +338,13 @@ export function createOrgWebhook(
 export function updateOrgWebhook(
   orgId: string,
   webhookId: string,
-  input: { name?: string; url?: string; secret?: string; status?: string },
+  input: {
+    name?: string
+    url?: string
+    secret?: string
+    status?: string
+    body_template?: string
+  },
 ) {
   return request<OrgWebhook>(`/v1/organisations/${orgId}/webhooks/${webhookId}`, {
     method: 'PATCH',

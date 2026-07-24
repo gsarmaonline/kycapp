@@ -6,6 +6,7 @@ import (
 	"net/url"
 	"strings"
 
+	"github.com/gsarmaonline/kyc/core/automations"
 	"github.com/gsarmaonline/kyc/internal/apperr"
 	"github.com/gsarmaonline/kyc/internal/ids"
 	"github.com/gsarmaonline/kyc/internal/store/sqlc"
@@ -19,19 +20,22 @@ type OrganisationWebhookView struct {
 	SecretHint     string
 	HasSecret      bool
 	Status         string
+	BodyTemplate   string
 }
 
 type CreateOrganisationWebhookInput struct {
-	Name   string
-	URL    string
-	Secret string
+	Name         string
+	URL          string
+	Secret       string
+	BodyTemplate string
 }
 
 type UpdateOrganisationWebhookInput struct {
-	Name   *string
-	URL    *string
-	Secret *string // empty/nil keeps existing
-	Status *string
+	Name         *string
+	URL          *string
+	Secret       *string // empty/nil keeps existing
+	Status       *string
+	BodyTemplate *string
 }
 
 func organisationWebhookView(row sqlc.OrganisationWebhook) OrganisationWebhookView {
@@ -43,6 +47,7 @@ func organisationWebhookView(row sqlc.OrganisationWebhook) OrganisationWebhookVi
 		SecretHint:     maskSecret(row.Secret),
 		HasSecret:      strings.TrimSpace(row.Secret) != "",
 		Status:         row.Status,
+		BodyTemplate:   row.BodyTemplate,
 	}
 }
 
@@ -95,6 +100,10 @@ func (s *Service) CreateOrganisationWebhook(ctx context.Context, orgID string, i
 	if err := validateWebhookURL(rawURL); err != nil {
 		return OrganisationWebhookView{}, err
 	}
+	body := strings.TrimSpace(in.BodyTemplate)
+	if err := automations.ValidateJSONTemplate(body); err != nil {
+		return OrganisationWebhookView{}, apperr.Validation(err.Error())
+	}
 	row, err := s.db.Q().CreateOrganisationWebhook(ctx, sqlc.CreateOrganisationWebhookParams{
 		ID:             ids.New(),
 		OrganisationID: orgID,
@@ -102,6 +111,7 @@ func (s *Service) CreateOrganisationWebhook(ctx context.Context, orgID string, i
 		Url:            rawURL,
 		Secret:         in.Secret,
 		Status:         "connected",
+		BodyTemplate:   body,
 	})
 	if err != nil {
 		return OrganisationWebhookView{}, err
@@ -119,6 +129,7 @@ func (s *Service) UpdateOrganisationWebhook(ctx context.Context, orgID, id strin
 	name := existing.Name
 	rawURL := existing.Url
 	status := existing.Status
+	body := existing.BodyTemplate
 	secret := ""
 	if in.Name != nil {
 		name = strings.TrimSpace(*in.Name)
@@ -141,8 +152,14 @@ func (s *Service) UpdateOrganisationWebhook(ctx context.Context, orgID, id strin
 			return OrganisationWebhookView{}, apperr.Validation("status must be connected or disconnected")
 		}
 	}
+	if in.BodyTemplate != nil {
+		body = strings.TrimSpace(*in.BodyTemplate)
+		if err := automations.ValidateJSONTemplate(body); err != nil {
+			return OrganisationWebhookView{}, apperr.Validation(err.Error())
+		}
+	}
 	row, err := s.db.Q().UpdateOrganisationWebhook(ctx, sqlc.UpdateOrganisationWebhookParams{
-		Name: name, Url: rawURL, Secret: secret, Status: status,
+		Name: name, Url: rawURL, Secret: secret, Status: status, BodyTemplate: body,
 		ID: id, OrganisationID: orgID,
 	})
 	if err != nil {

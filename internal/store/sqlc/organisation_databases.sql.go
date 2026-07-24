@@ -12,11 +12,11 @@ import (
 const createOrganisationDatabase = `-- name: CreateOrganisationDatabase :one
 INSERT INTO organisation_databases (
     id, organisation_id, name, driver, host, port, database_name,
-    username, password, ssl_mode, status
+    username, password, ssl_mode, status, last_error
 ) VALUES (
-    $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11
+    $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12
 )
-RETURNING id, organisation_id, name, driver, host, port, database_name, username, password, ssl_mode, status, created_at, updated_at
+RETURNING id, organisation_id, name, driver, host, port, database_name, username, password, ssl_mode, status, created_at, updated_at, last_checked_at, last_error
 `
 
 type CreateOrganisationDatabaseParams struct {
@@ -31,6 +31,7 @@ type CreateOrganisationDatabaseParams struct {
 	Password       string `json:"password"`
 	SslMode        string `json:"ssl_mode"`
 	Status         string `json:"status"`
+	LastError      string `json:"last_error"`
 }
 
 func (q *Queries) CreateOrganisationDatabase(ctx context.Context, arg CreateOrganisationDatabaseParams) (OrganisationDatabase, error) {
@@ -46,6 +47,7 @@ func (q *Queries) CreateOrganisationDatabase(ctx context.Context, arg CreateOrga
 		arg.Password,
 		arg.SslMode,
 		arg.Status,
+		arg.LastError,
 	)
 	var i OrganisationDatabase
 	err := row.Scan(
@@ -62,6 +64,8 @@ func (q *Queries) CreateOrganisationDatabase(ctx context.Context, arg CreateOrga
 		&i.Status,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.LastCheckedAt,
+		&i.LastError,
 	)
 	return i, err
 }
@@ -82,7 +86,7 @@ func (q *Queries) DeleteOrganisationDatabase(ctx context.Context, arg DeleteOrga
 }
 
 const getOrganisationDatabase = `-- name: GetOrganisationDatabase :one
-SELECT id, organisation_id, name, driver, host, port, database_name, username, password, ssl_mode, status, created_at, updated_at FROM organisation_databases
+SELECT id, organisation_id, name, driver, host, port, database_name, username, password, ssl_mode, status, created_at, updated_at, last_checked_at, last_error FROM organisation_databases
 WHERE id = $1
 `
 
@@ -103,12 +107,14 @@ func (q *Queries) GetOrganisationDatabase(ctx context.Context, id string) (Organ
 		&i.Status,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.LastCheckedAt,
+		&i.LastError,
 	)
 	return i, err
 }
 
 const getOrganisationDatabaseForOrg = `-- name: GetOrganisationDatabaseForOrg :one
-SELECT id, organisation_id, name, driver, host, port, database_name, username, password, ssl_mode, status, created_at, updated_at FROM organisation_databases
+SELECT id, organisation_id, name, driver, host, port, database_name, username, password, ssl_mode, status, created_at, updated_at, last_checked_at, last_error FROM organisation_databases
 WHERE id = $1 AND organisation_id = $2
 `
 
@@ -134,12 +140,14 @@ func (q *Queries) GetOrganisationDatabaseForOrg(ctx context.Context, arg GetOrga
 		&i.Status,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.LastCheckedAt,
+		&i.LastError,
 	)
 	return i, err
 }
 
 const listOrganisationDatabases = `-- name: ListOrganisationDatabases :many
-SELECT id, organisation_id, name, driver, host, port, database_name, username, password, ssl_mode, status, created_at, updated_at FROM organisation_databases
+SELECT id, organisation_id, name, driver, host, port, database_name, username, password, ssl_mode, status, created_at, updated_at, last_checked_at, last_error FROM organisation_databases
 WHERE organisation_id = $1
 ORDER BY name, created_at
 `
@@ -167,6 +175,8 @@ func (q *Queries) ListOrganisationDatabases(ctx context.Context, organisationID 
 			&i.Status,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.LastCheckedAt,
+			&i.LastError,
 		); err != nil {
 			return nil, err
 		}
@@ -190,10 +200,9 @@ SET name = $1,
         ELSE $6::text
     END,
     ssl_mode = $7,
-    status = $8,
     updated_at = now()
-WHERE id = $9 AND organisation_id = $10
-RETURNING id, organisation_id, name, driver, host, port, database_name, username, password, ssl_mode, status, created_at, updated_at
+WHERE id = $8 AND organisation_id = $9
+RETURNING id, organisation_id, name, driver, host, port, database_name, username, password, ssl_mode, status, created_at, updated_at, last_checked_at, last_error
 `
 
 type UpdateOrganisationDatabaseParams struct {
@@ -204,7 +213,6 @@ type UpdateOrganisationDatabaseParams struct {
 	Username       string `json:"username"`
 	Password       string `json:"password"`
 	SslMode        string `json:"ssl_mode"`
-	Status         string `json:"status"`
 	ID             string `json:"id"`
 	OrganisationID string `json:"organisation_id"`
 }
@@ -218,7 +226,6 @@ func (q *Queries) UpdateOrganisationDatabase(ctx context.Context, arg UpdateOrga
 		arg.Username,
 		arg.Password,
 		arg.SslMode,
-		arg.Status,
 		arg.ID,
 		arg.OrganisationID,
 	)
@@ -237,6 +244,53 @@ func (q *Queries) UpdateOrganisationDatabase(ctx context.Context, arg UpdateOrga
 		&i.Status,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.LastCheckedAt,
+		&i.LastError,
+	)
+	return i, err
+}
+
+const updateOrganisationDatabaseCheck = `-- name: UpdateOrganisationDatabaseCheck :one
+UPDATE organisation_databases
+SET status = $1,
+    last_checked_at = now(),
+    last_error = $2,
+    updated_at = now()
+WHERE id = $3 AND organisation_id = $4
+RETURNING id, organisation_id, name, driver, host, port, database_name, username, password, ssl_mode, status, created_at, updated_at, last_checked_at, last_error
+`
+
+type UpdateOrganisationDatabaseCheckParams struct {
+	Status         string `json:"status"`
+	LastError      string `json:"last_error"`
+	ID             string `json:"id"`
+	OrganisationID string `json:"organisation_id"`
+}
+
+func (q *Queries) UpdateOrganisationDatabaseCheck(ctx context.Context, arg UpdateOrganisationDatabaseCheckParams) (OrganisationDatabase, error) {
+	row := q.db.QueryRow(ctx, updateOrganisationDatabaseCheck,
+		arg.Status,
+		arg.LastError,
+		arg.ID,
+		arg.OrganisationID,
+	)
+	var i OrganisationDatabase
+	err := row.Scan(
+		&i.ID,
+		&i.OrganisationID,
+		&i.Name,
+		&i.Driver,
+		&i.Host,
+		&i.Port,
+		&i.DatabaseName,
+		&i.Username,
+		&i.Password,
+		&i.SslMode,
+		&i.Status,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.LastCheckedAt,
+		&i.LastError,
 	)
 	return i, err
 }

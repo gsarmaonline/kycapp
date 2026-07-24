@@ -53,7 +53,7 @@ export function DatabasesIndex() {
         <p>Loading…</p>
       ) : (
         <ResourceTable
-          columns={['Name', 'Host', 'Database', 'User', 'Status']}
+          columns={['Name', 'Host', 'Database', 'User', 'Status', 'Last check']}
           empty="No databases yet."
           rows={items.map((d) => ({
             key: d.id,
@@ -62,7 +62,10 @@ export function DatabasesIndex() {
               `${d.host}:${d.port}`,
               d.database_name,
               d.username,
-              d.status,
+              d.status === 'unreachable' && d.last_error
+                ? `${d.status}: ${d.last_error}`
+                : d.status,
+              d.last_checked_at ? new Date(d.last_checked_at).toLocaleString() : '—',
             ],
             actions: (
               <RowActions

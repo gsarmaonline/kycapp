@@ -16,6 +16,7 @@ func organisationWebhookJSON(v service.OrganisationWebhookView) map[string]any {
 		"secret_hint":     v.SecretHint,
 		"has_secret":      v.HasSecret,
 		"status":          v.Status,
+		"body_template":   v.BodyTemplate,
 	}
 }
 
@@ -44,16 +45,17 @@ func (s *Server) handleCreateOrgWebhook(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	var body struct {
-		Name   string `json:"name"`
-		URL    string `json:"url"`
-		Secret string `json:"secret"`
+		Name         string `json:"name"`
+		URL          string `json:"url"`
+		Secret       string `json:"secret"`
+		BodyTemplate string `json:"body_template"`
 	}
 	if err := decodeJSON(r, &body); err != nil {
 		writeError(w, apperr.Validation("invalid JSON body"))
 		return
 	}
 	view, err := s.svc.CreateOrganisationWebhook(r.Context(), orgID, service.CreateOrganisationWebhookInput{
-		Name: body.Name, URL: body.URL, Secret: body.Secret,
+		Name: body.Name, URL: body.URL, Secret: body.Secret, BodyTemplate: body.BodyTemplate,
 	})
 	if err != nil {
 		writeError(w, err)
@@ -85,17 +87,18 @@ func (s *Server) handlePatchOrgWebhook(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var body struct {
-		Name   *string `json:"name"`
-		URL    *string `json:"url"`
-		Secret *string `json:"secret"`
-		Status *string `json:"status"`
+		Name         *string `json:"name"`
+		URL          *string `json:"url"`
+		Secret       *string `json:"secret"`
+		Status       *string `json:"status"`
+		BodyTemplate *string `json:"body_template"`
 	}
 	if err := decodeJSON(r, &body); err != nil {
 		writeError(w, apperr.Validation("invalid JSON body"))
 		return
 	}
 	view, err := s.svc.UpdateOrganisationWebhook(r.Context(), orgID, whID, service.UpdateOrganisationWebhookInput{
-		Name: body.Name, URL: body.URL, Secret: body.Secret, Status: body.Status,
+		Name: body.Name, URL: body.URL, Secret: body.Secret, Status: body.Status, BodyTemplate: body.BodyTemplate,
 	})
 	if err != nil {
 		writeError(w, err)

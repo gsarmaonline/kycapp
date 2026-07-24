@@ -5,6 +5,14 @@ import { getOrgWebhook, updateOrgWebhook } from '../../api'
 import { FormActions, PageHeader } from '../../crud/ui'
 import { resourcePath } from '../../org_nav'
 
+const EXAMPLE_BODY = `{
+  "organisation_id": "{{organisation_id}}",
+  "trigger": "{{trigger}}",
+  "id": "{{id}}",
+  "email": "{{email}}",
+  "attributes": "{{attributes}}"
+}`
+
 export function WebhooksEdit() {
   const { orgId = '', id = '' } = useParams()
   const navigate = useNavigate()
@@ -12,6 +20,7 @@ export function WebhooksEdit() {
   const [url, setUrl] = useState('')
   const [secret, setSecret] = useState('')
   const [status, setStatus] = useState('connected')
+  const [bodyTemplate, setBodyTemplate] = useState('')
   const [hasSecret, setHasSecret] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
@@ -23,6 +32,7 @@ export function WebhooksEdit() {
         setUrl(w.url)
         setStatus(w.status)
         setHasSecret(w.has_secret)
+        setBodyTemplate(w.body_template || '')
       })
       .catch((e) => setError(e instanceof Error ? e.message : 'Failed to load'))
       .finally(() => setLoading(false))
@@ -37,6 +47,7 @@ export function WebhooksEdit() {
         url,
         secret: secret || undefined,
         status,
+        body_template: bodyTemplate,
       })
       navigate(resourcePath(orgId, 'webhooks', id))
     } catch (err) {
@@ -76,6 +87,22 @@ export function WebhooksEdit() {
             <option value="disconnected">disconnected</option>
           </select>
         </label>
+        <label>
+          Body template (JSON)
+          <textarea
+            value={bodyTemplate}
+            onChange={(e) => setBodyTemplate(e.target.value)}
+            rows={10}
+            spellCheck={false}
+            placeholder="Leave empty to POST { organisation_id, payload }"
+          />
+        </label>
+        <p className="field-hint">
+          Use <code>{'{{path}}'}</code> placeholders. Empty template sends the full event dump.
+        </p>
+        <button type="button" className="ghost" onClick={() => setBodyTemplate(EXAMPLE_BODY)}>
+          Use example template
+        </button>
         <FormActions cancelTo={resourcePath(orgId, 'webhooks', id)} submitLabel="Save" />
       </form>
     </section>

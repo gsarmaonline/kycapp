@@ -6,10 +6,18 @@ import (
 	"net"
 	"net/url"
 	"strings"
+	"time"
 
 	"github.com/gsarmaonline/kyc/internal/apperr"
 	"github.com/gsarmaonline/kyc/internal/ids"
 	"github.com/gsarmaonline/kyc/internal/store/sqlc"
+	"github.com/jackc/pgx/v5"
+)
+
+const (
+	DatabaseStatusConnected    = "connected"
+	DatabaseStatusUnreachable  = "unreachable"
+	DatabaseStatusDisconnected = "disconnected"
 )
 
 // OrganisationDatabaseView is the API-safe view (password masked).
@@ -26,6 +34,8 @@ type OrganisationDatabaseView struct {
 	HasPassword    bool
 	SSLMode        string
 	Status         string
+	LastCheckedAt  *time.Time
+	LastError      string
 }
 
 type CreateOrganisationDatabaseInput struct {
@@ -46,10 +56,14 @@ type UpdateOrganisationDatabaseInput struct {
 	Username     *string
 	Password     *string // empty/nil keeps existing
 	SSLMode      *string
-	Status       *string
 }
 
 func organisationDatabaseView(row sqlc.OrganisationDatabase) OrganisationDatabaseView {
+	var checked *time.Time
+	if row.LastCheckedAt.Valid {
+		t := row.LastCheckedAt.Time
+		checked = &t
+	}
 	return OrganisationDatabaseView{
 		ID:             row.ID,
 		OrganisationID: row.OrganisationID,
@@ -63,6 +77,8 @@ func organisationDatabaseView(row sqlc.OrganisationDatabase) OrganisationDatabas
 		HasPassword:    strings.TrimSpace(row.Password) != "",
 		SSLMode:        row.SslMode,
 		Status:         row.Status,
+		LastCheckedAt:  checked,
+		LastError:      row.LastError,
 	}
 }
 
@@ -111,6 +127,9 @@ func (s *Service) CreateOrganisationDatabase(ctx context.Context, orgID string, 
 	if user == "" {
 		return OrganisationDatabaseView{}, apperr.Validation("username is required")
 	}
+	if strings.TrimSpace(in.Password) == "" {
+		return OrganisationDatabaseView{}, apperr.Validation("password is required")
+	}
 	port := in.Port
 	if port == 0 {
 		port = 5432
@@ -133,12 +152,13 @@ func (s *Service) CreateOrganisationDatabase(ctx context.Context, orgID string, 
 		Username:       user,
 		Password:       in.Password,
 		SslMode:        ssl,
-		Status:         "connected",
+		Status:         DatabaseStatusUnreachable,
+		LastError:      "",
 	})
 	if err != nil {
 		return OrganisationDatabaseView{}, err
 	}
-	return organisationDatabaseView(row), nil
+	return s.applyDatabaseCheck(ctx, row)
 }
 
 func (s *Service) UpdateOrganisationDatabase(ctx context.Context, orgID, id string, in UpdateOrganisationDatabaseInput) (OrganisationDatabaseView, error) {
@@ -154,7 +174,6 @@ func (s *Service) UpdateOrganisationDatabase(ctx context.Context, orgID, id stri
 	dbName := existing.DatabaseName
 	user := existing.Username
 	ssl := existing.SslMode
-	status := existing.Status
 	password := "" // empty keeps existing in SQL
 	if in.Name != nil {
 		name = strings.TrimSpace(*in.Name)
@@ -195,12 +214,6 @@ func (s *Service) UpdateOrganisationDatabase(ctx context.Context, orgID, id stri
 			ssl = "require"
 		}
 	}
-	if in.Status != nil {
-		status = strings.TrimSpace(*in.Status)
-		if status != "connected" && status != "disconnected" {
-			return OrganisationDatabaseView{}, apperr.Validation("status must be connected or disconnected")
-		}
-	}
 	row, err := s.db.Q().UpdateOrganisationDatabase(ctx, sqlc.UpdateOrganisationDatabaseParams{
 		ID:             id,
 		OrganisationID: orgID,
@@ -211,12 +224,61 @@ func (s *Service) UpdateOrganisationDatabase(ctx context.Context, orgID, id stri
 		Username:       user,
 		Password:       password,
 		SslMode:        ssl,
-		Status:         status,
+	})
+	if err != nil {
+		return OrganisationDatabaseView{}, err
+	}
+	return s.applyDatabaseCheck(ctx, row)
+}
+
+// CheckOrganisationDatabase probes connectivity and updates status.
+func (s *Service) CheckOrganisationDatabase(ctx context.Context, orgID, id string) (OrganisationDatabaseView, error) {
+	row, err := s.db.Q().GetOrganisationDatabaseForOrg(ctx, sqlc.GetOrganisationDatabaseForOrgParams{
+		ID: id, OrganisationID: orgID,
+	})
+	if err != nil {
+		return OrganisationDatabaseView{}, mapNotFound(err, "database not found")
+	}
+	return s.applyDatabaseCheck(ctx, row)
+}
+
+// SetOrganisationDatabaseDisconnected marks the connection disabled without probing.
+func (s *Service) SetOrganisationDatabaseDisconnected(ctx context.Context, orgID, id string) (OrganisationDatabaseView, error) {
+	_, err := s.db.Q().GetOrganisationDatabaseForOrg(ctx, sqlc.GetOrganisationDatabaseForOrgParams{
+		ID: id, OrganisationID: orgID,
+	})
+	if err != nil {
+		return OrganisationDatabaseView{}, mapNotFound(err, "database not found")
+	}
+	row, err := s.db.Q().UpdateOrganisationDatabaseCheck(ctx, sqlc.UpdateOrganisationDatabaseCheckParams{
+		ID:             id,
+		OrganisationID: orgID,
+		Status:         DatabaseStatusDisconnected,
+		LastError:      "manually disconnected",
 	})
 	if err != nil {
 		return OrganisationDatabaseView{}, err
 	}
 	return organisationDatabaseView(row), nil
+}
+
+func (s *Service) applyDatabaseCheck(ctx context.Context, row sqlc.OrganisationDatabase) (OrganisationDatabaseView, error) {
+	status := DatabaseStatusConnected
+	lastErr := ""
+	if err := probePostgres(ctx, row); err != nil {
+		status = DatabaseStatusUnreachable
+		lastErr = truncateErr(err.Error(), 500)
+	}
+	updated, err := s.db.Q().UpdateOrganisationDatabaseCheck(ctx, sqlc.UpdateOrganisationDatabaseCheckParams{
+		ID:             row.ID,
+		OrganisationID: row.OrganisationID,
+		Status:         status,
+		LastError:      lastErr,
+	})
+	if err != nil {
+		return OrganisationDatabaseView{}, err
+	}
+	return organisationDatabaseView(updated), nil
 }
 
 func (s *Service) DeleteOrganisationDatabase(ctx context.Context, orgID, id string) error {
@@ -235,13 +297,36 @@ func (s *Service) organisationDatabaseRow(ctx context.Context, orgID, id string)
 	if err != nil {
 		return sqlc.OrganisationDatabase{}, mapNotFound(err, "database not found")
 	}
-	if row.Status != "connected" {
-		return sqlc.OrganisationDatabase{}, apperr.Validation("database is disconnected")
+	if row.Status != DatabaseStatusConnected {
+		return sqlc.OrganisationDatabase{}, apperr.Validation("database is not connected (status=" + row.Status + ")")
 	}
 	if strings.TrimSpace(row.Password) == "" {
 		return sqlc.OrganisationDatabase{}, apperr.Validation("database password is not set")
 	}
 	return row, nil
+}
+
+func probePostgres(ctx context.Context, row sqlc.OrganisationDatabase) error {
+	ctx, cancel := context.WithTimeout(ctx, 8*time.Second)
+	defer cancel()
+	conn, err := pgx.Connect(ctx, postgresDSN(row))
+	if err != nil {
+		return err
+	}
+	defer conn.Close(ctx)
+	var one int
+	if err := conn.QueryRow(ctx, "SELECT 1").Scan(&one); err != nil {
+		return err
+	}
+	return nil
+}
+
+func truncateErr(s string, n int) string {
+	s = strings.TrimSpace(s)
+	if len(s) <= n {
+		return s
+	}
+	return s[:n] + "…"
 }
 
 func postgresDSN(row sqlc.OrganisationDatabase) string {
@@ -257,7 +342,7 @@ func postgresDSN(row sqlc.OrganisationDatabase) string {
 		ssl = "require"
 	}
 	q.Set("sslmode", ssl)
-	q.Set("connect_timeout", "10")
+	q.Set("connect_timeout", "8")
 	u.RawQuery = q.Encode()
 	return u.String()
 }

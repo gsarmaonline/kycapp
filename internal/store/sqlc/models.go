@@ -152,19 +152,21 @@ type Organisation struct {
 }
 
 type OrganisationDatabase struct {
-	ID             string    `json:"id"`
-	OrganisationID string    `json:"organisation_id"`
-	Name           string    `json:"name"`
-	Driver         string    `json:"driver"`
-	Host           string    `json:"host"`
-	Port           int32     `json:"port"`
-	DatabaseName   string    `json:"database_name"`
-	Username       string    `json:"username"`
-	Password       string    `json:"password"`
-	SslMode        string    `json:"ssl_mode"`
-	Status         string    `json:"status"`
-	CreatedAt      time.Time `json:"created_at"`
-	UpdatedAt      time.Time `json:"updated_at"`
+	ID             string             `json:"id"`
+	OrganisationID string             `json:"organisation_id"`
+	Name           string             `json:"name"`
+	Driver         string             `json:"driver"`
+	Host           string             `json:"host"`
+	Port           int32              `json:"port"`
+	DatabaseName   string             `json:"database_name"`
+	Username       string             `json:"username"`
+	Password       string             `json:"password"`
+	SslMode        string             `json:"ssl_mode"`
+	Status         string             `json:"status"`
+	CreatedAt      time.Time          `json:"created_at"`
+	UpdatedAt      time.Time          `json:"updated_at"`
+	LastCheckedAt  pgtype.Timestamptz `json:"last_checked_at"`
+	LastError      string             `json:"last_error"`
 }
 
 type OrganisationEntitlement struct {
@@ -197,6 +199,7 @@ type OrganisationWebhook struct {
 	Status         string    `json:"status"`
 	CreatedAt      time.Time `json:"created_at"`
 	UpdatedAt      time.Time `json:"updated_at"`
+	BodyTemplate   string    `json:"body_template"`
 }
 
 type Permission struct {

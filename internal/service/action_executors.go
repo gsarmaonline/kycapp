@@ -148,13 +148,9 @@ func execCallWebhook(
 		return "", fmt.Errorf("call_webhook: %w", err)
 	}
 	secret := strings.TrimSpace(wh.Secret)
-	bodyObj := map[string]any{
-		"organisation_id": orgID,
-		"payload":         payload,
-	}
-	body, err := json.Marshal(bodyObj)
+	body, err := automations.BuildWebhookBody(wh.BodyTemplate, orgID, payload)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("call_webhook: %w", err)
 	}
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, rawURL, bytes.NewReader(body))
 	if err != nil {
@@ -212,6 +208,11 @@ func execDBInsert(
 	if err != nil {
 		return "", fmt.Errorf("db_insert: %w", err)
 	}
+	mode := ""
+	if v, ok := params["mode"]; ok && v != nil {
+		mode = strings.TrimSpace(fmt.Sprint(v))
+	}
+	useColumns := mode == "columns" || (mode == "" && len(mapping) > 0)
 	row, err := s.organisationDatabaseRow(ctx, orgID, dbID)
 	if err != nil {
 		return "", fmt.Errorf("db_insert: %w", err)
@@ -224,12 +225,8 @@ func execDBInsert(
 
 	var sql string
 	var args []any
-	if len(mapping) == 0 {
+	if !useColumns {
 		trigger := stringifyPayload(payload["trigger"])
-		if trigger == "" {
-			// Worker payload may not include trigger; still dump payload.
-			trigger = ""
-		}
 		payloadJSON, err := json.Marshal(payload)
 		if err != nil {
 			return "", err
@@ -237,6 +234,9 @@ func execDBInsert(
 		sql = fmt.Sprintf(`INSERT INTO %s ("trigger", payload) VALUES ($1, $2::jsonb)`, tableSQL)
 		args = []any{trigger, payloadJSON}
 	} else {
+		if len(mapping) == 0 {
+			return "", fmt.Errorf("db_insert: mapping is required for columns mode")
+		}
 		cols := make([]string, 0, len(mapping))
 		for col := range mapping {
 			cols = append(cols, col)

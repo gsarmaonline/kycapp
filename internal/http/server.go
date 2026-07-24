@@ -105,6 +105,8 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("POST /v1/organisations/{id}/databases", s.handleCreateOrgDatabase)
 	s.mux.HandleFunc("GET /v1/organisations/{id}/databases/{dbId}", s.handleGetOrgDatabase)
 	s.mux.HandleFunc("PATCH /v1/organisations/{id}/databases/{dbId}", s.handlePatchOrgDatabase)
+	s.mux.HandleFunc("POST /v1/organisations/{id}/databases/{dbId}/check", s.handleCheckOrgDatabase)
+	s.mux.HandleFunc("POST /v1/organisations/{id}/databases/{dbId}/disconnect", s.handleDisconnectOrgDatabase)
 	s.mux.HandleFunc("DELETE /v1/organisations/{id}/databases/{dbId}", s.handleDeleteOrgDatabase)
 	s.mux.HandleFunc("GET /v1/organisations/{id}/webhooks", s.handleListOrgWebhooks)
 	s.mux.HandleFunc("POST /v1/organisations/{id}/webhooks", s.handleCreateOrgWebhook)

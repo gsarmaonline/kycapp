@@ -30,7 +30,12 @@ export function DatabasesNew() {
         password,
         ssl_mode: sslMode,
       })
-      navigate(resourcePath(orgId, 'databases', row.id))
+      navigate(resourcePath(orgId, 'databases', row.id), {
+        state:
+          row.status === 'connected'
+            ? undefined
+            : { warning: row.last_error || 'Saved but unreachable' },
+      })
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Create failed')
     }
@@ -40,6 +45,10 @@ export function DatabasesNew() {
     <section>
       <PageHeader title="Add database" />
       {error && <p className="error">{error}</p>}
+      <p className="field-hint">
+        After save we probe <code>SELECT 1</code> and set status to <code>connected</code> or{' '}
+        <code>unreachable</code>.
+      </p>
       <form className="create stacked" onSubmit={(e) => void onSubmit(e)}>
         <label>
           Name
@@ -80,7 +89,7 @@ export function DatabasesNew() {
             <option value="disable">disable</option>
           </select>
         </label>
-        <FormActions cancelTo={resourcePath(orgId, 'databases')} submitLabel="Create" />
+        <FormActions cancelTo={resourcePath(orgId, 'databases')} submitLabel="Create & test" />
       </form>
     </section>
   )

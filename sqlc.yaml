@@ -27,6 +27,8 @@ sql:
       - "internal/store/migrations/000022_app_user_settings.up.sql"
       - "internal/store/migrations/000023_organisation_databases.up.sql"
       - "internal/store/migrations/000024_organisation_webhooks.up.sql"
+      - "internal/store/migrations/000025_webhook_body_template.up.sql"
+      - "internal/store/migrations/000026_database_check_status.up.sql"
     gen:
       go:
         package: "sqlc"

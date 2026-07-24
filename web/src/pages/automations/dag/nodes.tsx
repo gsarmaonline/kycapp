@@ -237,6 +237,141 @@ export function ConditionNode({ data }: NodeProps<ConditionFlowNode>) {
   )
 }
 
+function parseMappingRows(raw: string | undefined): { column: string; path: string }[] {
+  if (!raw?.trim()) return [{ column: '', path: '' }]
+  try {
+    const obj = JSON.parse(raw) as Record<string, string>
+    const rows = Object.entries(obj).map(([column, path]) => ({ column, path: String(path) }))
+    return rows.length ? rows : [{ column: '', path: '' }]
+  } catch {
+    return [{ column: '', path: '' }]
+  }
+}
+
+function serializeMappingRows(rows: { column: string; path: string }[]): string {
+  const out: Record<string, string> = {}
+  for (const r of rows) {
+    const col = r.column.trim()
+    const path = r.path.trim()
+    if (col && path) out[col] = path
+  }
+  return Object.keys(out).length ? JSON.stringify(out) : ''
+}
+
+function DBInsertFields({
+  params,
+  databases,
+  defaultDatabaseId,
+  onChange,
+}: {
+  params: Record<string, string>
+  databases: { id: string; name: string }[]
+  defaultDatabaseId: string
+  onChange: (params: Record<string, string>) => void
+}) {
+  const mode = params.mode === 'columns' ? 'columns' : 'event'
+  const rows = parseMappingRows(params.mapping)
+
+  function setParams(next: Record<string, string>) {
+    onChange(next)
+  }
+
+  return (
+    <>
+      <select
+        value={params.database_id || defaultDatabaseId}
+        onChange={(e) => setParams({ ...params, database_id: e.target.value })}
+        required
+      >
+        {!databases.length && <option value="">No databases</option>}
+        {params.database_id &&
+          !databases.some((d) => d.id === params.database_id) && (
+            <option value={params.database_id}>{params.database_id} (missing)</option>
+          )}
+        {databases.map((d) => (
+          <option key={d.id} value={d.id}>
+            {d.name}
+          </option>
+        ))}
+      </select>
+      <input
+        value={params.table ?? ''}
+        onChange={(e) => setParams({ ...params, table: e.target.value })}
+        placeholder="table (e.g. kyc_events)"
+        required
+      />
+      <select
+        value={mode}
+        onChange={(e) => {
+          const nextMode = e.target.value === 'columns' ? 'columns' : 'event'
+          setParams({
+            ...params,
+            mode: nextMode,
+            mapping: nextMode === 'event' ? '' : params.mapping || '{"email":"email"}',
+          })
+        }}
+      >
+        <option value="event">Event dump (trigger + payload jsonb)</option>
+        <option value="columns">Column mapping</option>
+      </select>
+      {mode === 'columns' && (
+        <div className="dag-map-rows">
+          {rows.map((row, i) => (
+            <div key={i} className="dag-map-row">
+              <input
+                value={row.column}
+                placeholder="column"
+                onChange={(e) => {
+                  const next = rows.map((r, j) =>
+                    j === i ? { ...r, column: e.target.value } : r,
+                  )
+                  setParams({ ...params, mode: 'columns', mapping: serializeMappingRows(next) })
+                }}
+              />
+              <input
+                value={row.path}
+                placeholder="payload path"
+                onChange={(e) => {
+                  const next = rows.map((r, j) => (j === i ? { ...r, path: e.target.value } : r))
+                  setParams({ ...params, mode: 'columns', mapping: serializeMappingRows(next) })
+                }}
+              />
+              <button
+                type="button"
+                className="dag-node-remove"
+                title="Remove row"
+                onClick={() => {
+                  const next = rows.filter((_, j) => j !== i)
+                  setParams({
+                    ...params,
+                    mode: 'columns',
+                    mapping: serializeMappingRows(next.length ? next : [{ column: '', path: '' }]),
+                  })
+                }}
+              >
+                ×
+              </button>
+            </div>
+          ))}
+          <button
+            type="button"
+            className="ghost"
+            onClick={() =>
+              setParams({
+                ...params,
+                mode: 'columns',
+                mapping: serializeMappingRows([...rows, { column: '', path: '' }]),
+              })
+            }
+          >
+            Add column
+          </button>
+        </div>
+      )}
+    </>
+  )
+}
+
 export function ActionNode({ data }: NodeProps<ActionFlowNode>) {
   const a = data.action
   const actions = data.actions?.length
@@ -257,24 +392,32 @@ export function ActionNode({ data }: NodeProps<ActionFlowNode>) {
   const defaultDatabaseId = databases[0]?.id ?? ''
   const defaultWebhookId = webhooks[0]?.id ?? ''
 
-  const summary = paramDefs
-    .map((p) => {
-      if (p.key === 'template_key') {
-        const t = templates.find((x) => x.key === params[p.key])
-        return t ? t.name : params[p.key]
-      }
-      if (p.key === 'database_id') {
-        const d = databases.find((x) => x.id === params[p.key])
-        return d ? d.name : params[p.key]
-      }
-      if (p.key === 'webhook_id') {
-        const w = webhooks.find((x) => x.id === params[p.key])
-        return w ? w.name : params[p.key]
-      }
-      return params[p.key]
-    })
-    .filter(Boolean)
-    .join(', ')
+  const summary = (() => {
+    if (a.type === 'db_insert') {
+      const db = databases.find((x) => x.id === params.database_id)
+      const mode = params.mode === 'columns' ? 'columns' : 'event'
+      return [db?.name || params.database_id, params.table, mode].filter(Boolean).join(', ')
+    }
+    return paramDefs
+      .map((p) => {
+        if (p.key === 'template_key') {
+          const t = templates.find((x) => x.key === params[p.key])
+          return t ? t.name : params[p.key]
+        }
+        if (p.key === 'database_id') {
+          const d = databases.find((x) => x.id === params[p.key])
+          return d ? d.name : params[p.key]
+        }
+        if (p.key === 'webhook_id') {
+          const w = webhooks.find((x) => x.id === params[p.key])
+          return w ? w.name : params[p.key]
+        }
+        if (p.key === 'mapping' || p.key === 'mode') return ''
+        return params[p.key]
+      })
+      .filter(Boolean)
+      .join(', ')
+  })()
 
   return (
     <div className={`dag-node dag-node-action${data.readOnly ? ' is-readonly' : ''}`}>
@@ -307,6 +450,10 @@ export function ActionNode({ data }: NodeProps<ActionFlowNode>) {
                   nextParams[p.key] = params[p.key] || defaultDatabaseId
                 } else if (p.key === 'webhook_id') {
                   nextParams[p.key] = params[p.key] || defaultWebhookId
+                } else if (p.key === 'mode') {
+                  nextParams[p.key] = 'event'
+                } else if (p.key === 'mapping') {
+                  nextParams[p.key] = ''
                 } else {
                   nextParams[p.key] = params[p.key] ?? ''
                 }
@@ -320,100 +467,86 @@ export function ActionNode({ data }: NodeProps<ActionFlowNode>) {
               </option>
             ))}
           </select>
-          {paramDefs.map((p) => {
-            if (p.key === 'template_key') {
+          {a.type === 'db_insert' ? (
+            <DBInsertFields
+              params={params}
+              databases={databases}
+              defaultDatabaseId={defaultDatabaseId}
+              onChange={(next) => data.onChange?.({ type: a.type, params: next })}
+            />
+          ) : (
+            paramDefs.map((p) => {
+              if (p.key === 'template_key') {
+                return (
+                  <select
+                    key={p.key}
+                    value={params[p.key] || defaultTemplateKey}
+                    onChange={(e) =>
+                      data.onChange?.({
+                        type: a.type,
+                        params: { ...params, [p.key]: e.target.value },
+                      })
+                    }
+                    required={p.required}
+                  >
+                    {!templates.length && <option value="">No templates</option>}
+                    {params[p.key] &&
+                      !templates.some((t) => t.key === params[p.key]) && (
+                        <option value={params[p.key]}>{params[p.key]} (missing)</option>
+                      )}
+                    {templates.map((t) => (
+                      <option key={t.key} value={t.key}>
+                        {t.name}
+                      </option>
+                    ))}
+                  </select>
+                )
+              }
+              if (p.key === 'webhook_id') {
+                return (
+                  <select
+                    key={p.key}
+                    value={params[p.key] || defaultWebhookId}
+                    onChange={(e) =>
+                      data.onChange?.({
+                        type: a.type,
+                        params: { ...params, [p.key]: e.target.value },
+                      })
+                    }
+                    required={p.required}
+                  >
+                    {!webhooks.length && <option value="">No webhooks</option>}
+                    {params[p.key] &&
+                      !webhooks.some((w) => w.id === params[p.key]) && (
+                        <option value={params[p.key]}>{params[p.key]} (missing)</option>
+                      )}
+                    {webhooks.map((w) => (
+                      <option key={w.id} value={w.id}>
+                        {w.name}
+                      </option>
+                    ))}
+                  </select>
+                )
+              }
+              if (p.key === 'database_id' || p.key === 'mapping' || p.key === 'mode') {
+                return null
+              }
               return (
-                <select
+                <input
                   key={p.key}
-                  value={params[p.key] || defaultTemplateKey}
+                  type={p.key === 'secret' || p.key === 'password' ? 'password' : 'text'}
+                  value={params[p.key] ?? ''}
                   onChange={(e) =>
                     data.onChange?.({
                       type: a.type,
                       params: { ...params, [p.key]: e.target.value },
                     })
                   }
-                  required={p.required}
-                >
-                  {!templates.length && <option value="">No templates</option>}
-                  {params[p.key] &&
-                    !templates.some((t) => t.key === params[p.key]) && (
-                      <option value={params[p.key]}>{params[p.key]} (missing)</option>
-                    )}
-                  {templates.map((t) => (
-                    <option key={t.key} value={t.key}>
-                      {t.name}
-                    </option>
-                  ))}
-                </select>
+                  placeholder={p.label || p.key}
+                />
               )
-            }
-            if (p.key === 'database_id') {
-              return (
-                <select
-                  key={p.key}
-                  value={params[p.key] || defaultDatabaseId}
-                  onChange={(e) =>
-                    data.onChange?.({
-                      type: a.type,
-                      params: { ...params, [p.key]: e.target.value },
-                    })
-                  }
-                  required={p.required}
-                >
-                  {!databases.length && <option value="">No databases</option>}
-                  {params[p.key] &&
-                    !databases.some((d) => d.id === params[p.key]) && (
-                      <option value={params[p.key]}>{params[p.key]} (missing)</option>
-                    )}
-                  {databases.map((d) => (
-                    <option key={d.id} value={d.id}>
-                      {d.name}
-                    </option>
-                  ))}
-                </select>
-              )
-            }
-            if (p.key === 'webhook_id') {
-              return (
-                <select
-                  key={p.key}
-                  value={params[p.key] || defaultWebhookId}
-                  onChange={(e) =>
-                    data.onChange?.({
-                      type: a.type,
-                      params: { ...params, [p.key]: e.target.value },
-                    })
-                  }
-                  required={p.required}
-                >
-                  {!webhooks.length && <option value="">No webhooks</option>}
-                  {params[p.key] &&
-                    !webhooks.some((w) => w.id === params[p.key]) && (
-                      <option value={params[p.key]}>{params[p.key]} (missing)</option>
-                    )}
-                  {webhooks.map((w) => (
-                    <option key={w.id} value={w.id}>
-                      {w.name}
-                    </option>
-                  ))}
-                </select>
-              )
-            }
-            return (
-              <input
-                key={p.key}
-                type={p.key === 'secret' || p.key === 'password' ? 'password' : 'text'}
-                value={params[p.key] ?? ''}
-                onChange={(e) =>
-                  data.onChange?.({
-                    type: a.type,
-                    params: { ...params, [p.key]: e.target.value },
-                  })
-                }
-                placeholder={p.label || p.key}
-              />
-            )
-          })}
+            })
+          )}
         </div>
       )}
       <Handle type="source" position={Position.Right} />

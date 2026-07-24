@@ -118,24 +118,34 @@ Legacy `{ "type": "send_email", "template_key": "welcome" }` is still accepted o
 | Type | Behavior |
 | --- | --- |
 | `send_email` | Render org email template + branding, deliver via Mailer |
-| `call_webhook` | POST `{ organisation_id, payload }` JSON to a configured org **webhook** (`webhook_id`). Optional secret → `X-KYC-Webhook-Secret`. Blocks private/loopback hosts. |
-| `db_insert` | Insert into an org **database** connection (Postgres). Default: `INSERT (trigger, payload)`. Optional `mapping` JSON maps columns → payload paths. |
+| `call_webhook` | POST JSON to a configured org **webhook**. Body from webhook `body_template` (`{{path}}` placeholders); empty template → `{ organisation_id, payload }`. Optional secret → `X-KYC-Webhook-Secret`. |
+| `db_insert` | Insert into an org **database**. Mode `event` (default): `INSERT (trigger, payload)`. Mode `columns`: map columns → payload paths. |
 
 ### Action destinations (UI)
 
 Sidebar **Actions**:
 
-| Page | Used by |
-| --- | --- |
-| Emails | `send_email` templates |
-| Databases | `db_insert` |
-| Webhooks | `call_webhook` |
+| Page | Used by | Shape |
+| --- | --- | --- |
+| Emails | `send_email` | Email template |
+| Databases | `db_insert` | Event dump or column mapping (on the action) |
+| Webhooks | `call_webhook` | JSON body template on the webhook |
 
 ### Databases (for `db_insert`)
 
 Org-scoped connection objects under **Actions → Databases** (`/v1/organisations/{id}/databases`).
 
-Landing table for default dump mode:
+Create/update **saves then probes** (`SELECT 1`). Status:
+
+| Status | Meaning |
+| --- | --- |
+| `connected` | Probe succeeded; usable by `db_insert` |
+| `unreachable` | Saved but probe failed (`last_error` set) |
+| `disconnected` | Manually disabled |
+
+Re-check anytime via **Test connection** on the database show page (`POST …/check`).
+
+Landing table for **event** mode:
 
 ```sql
 CREATE TABLE kyc_events (
@@ -145,11 +155,24 @@ CREATE TABLE kyc_events (
 );
 ```
 
-Or map columns: `"mapping": { "email": "email", "country": "attributes.country" }`.
+**Columns** mode on the action: `"mode": "columns", "mapping": { "email": "email", "country": "attributes.country" }`.
 
 ### Webhooks (for `call_webhook`)
 
-Org-scoped endpoints under **Actions → Webhooks** (`/v1/organisations/{id}/webhooks`). Automations select a `webhook_id`; URL/secret are not stored on the automation itself.
+Org-scoped endpoints under **Actions → Webhooks**. Automations select a `webhook_id`.
+
+`body_template` is JSON with `{{path}}` placeholders from the trigger payload (plus `organisation_id`). Example:
+
+```json
+{
+  "organisation_id": "{{organisation_id}}",
+  "trigger": "{{trigger}}",
+  "email": "{{email}}",
+  "attributes": "{{attributes}}"
+}
+```
+
+Empty `body_template` posts `{ "organisation_id", "payload" }` (full event dump).
 
 Unknown action types fail validation / the run with a clear error (no silent skip).
 

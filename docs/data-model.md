@@ -277,6 +277,7 @@ Outbound HTTP endpoint used by the `call_webhook` automation action. Secret is s
 | `name` | string | Display label |
 | `url` | string | http(s) endpoint |
 | `secret` | string | Optional shared secret header value |
+| `body_template` | string | JSON template with `{{path}}` placeholders; empty = full event dump |
 | `status` | enum | `connected` \| `disconnected` |
 
 ### OrganisationDatabase
@@ -291,7 +292,9 @@ Postgres connection used by the `db_insert` automation action. Password is store
 | `driver` | enum | `postgres` (v1) |
 | `host` / `port` / `database_name` / `username` / `password` | | Connection |
 | `ssl_mode` | string | Default `require` |
-| `status` | enum | `connected` \| `disconnected` |
+| `status` | enum | `connected` \| `unreachable` \| `disconnected` — set by connectivity probe (or manual disconnect) |
+| `last_checked_at` | timestamptz? | Last probe time |
+| `last_error` | string | Probe error when `unreachable` |
 
 ### ProductPlan
 

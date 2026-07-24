@@ -1,8 +1,8 @@
 -- name: CreateOrganisationWebhook :one
 INSERT INTO organisation_webhooks (
-    id, organisation_id, name, url, secret, status
+    id, organisation_id, name, url, secret, status, body_template
 ) VALUES (
-    $1, $2, $3, $4, $5, $6
+    $1, $2, $3, $4, $5, $6, $7
 )
 RETURNING *;
 
@@ -28,6 +28,7 @@ SET name = sqlc.arg(name),
         ELSE sqlc.arg(secret)::text
     END,
     status = sqlc.arg(status),
+    body_template = sqlc.arg(body_template),
     updated_at = now()
 WHERE id = sqlc.arg(id) AND organisation_id = sqlc.arg(organisation_id)
 RETURNING *;

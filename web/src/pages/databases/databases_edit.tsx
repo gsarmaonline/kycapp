@@ -15,7 +15,8 @@ export function DatabasesEdit() {
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [sslMode, setSslMode] = useState('require')
-  const [status, setStatus] = useState('connected')
+  const [status, setStatus] = useState('')
+  const [lastError, setLastError] = useState('')
   const [hasPassword, setHasPassword] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
@@ -30,6 +31,7 @@ export function DatabasesEdit() {
         setUsername(d.username)
         setSslMode(d.ssl_mode || 'require')
         setStatus(d.status)
+        setLastError(d.last_error || '')
         setHasPassword(d.has_password)
       })
       .catch((e) => setError(e instanceof Error ? e.message : 'Failed to load'))
@@ -40,7 +42,7 @@ export function DatabasesEdit() {
     e.preventDefault()
     setError(null)
     try {
-      await updateOrgDatabase(orgId, id, {
+      const row = await updateOrgDatabase(orgId, id, {
         name,
         host,
         port: Number(port) || 5432,
@@ -48,8 +50,15 @@ export function DatabasesEdit() {
         username,
         password: password || undefined,
         ssl_mode: sslMode,
-        status,
       })
+      if (row.status !== 'connected') {
+        setStatus(row.status)
+        setLastError(row.last_error || '')
+        setError(
+          `Saved, but database is unreachable: ${row.last_error || 'connection failed'}`,
+        )
+        return
+      }
       navigate(resourcePath(orgId, 'databases', id))
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Save failed')
@@ -62,6 +71,13 @@ export function DatabasesEdit() {
     <section>
       <PageHeader title="Edit database" />
       {error && <p className="error">{error}</p>}
+      {status && (
+        <p className="status">
+          Status: <strong>{status}</strong>
+          {lastError ? ` — ${lastError}` : ''}
+        </p>
+      )}
+      <p className="field-hint">Saving re-tests the connection and updates status.</p>
       <form className="create stacked" onSubmit={(e) => void onSubmit(e)}>
         <label>
           Name
@@ -102,14 +118,7 @@ export function DatabasesEdit() {
             <option value="disable">disable</option>
           </select>
         </label>
-        <label>
-          Status
-          <select value={status} onChange={(e) => setStatus(e.target.value)}>
-            <option value="connected">connected</option>
-            <option value="disconnected">disconnected</option>
-          </select>
-        </label>
-        <FormActions cancelTo={resourcePath(orgId, 'databases', id)} submitLabel="Save" />
+        <FormActions cancelTo={resourcePath(orgId, 'databases', id)} submitLabel="Save & test" />
       </form>
     </section>
   )

@@ -1,9 +1,9 @@
 -- name: CreateOrganisationDatabase :one
 INSERT INTO organisation_databases (
     id, organisation_id, name, driver, host, port, database_name,
-    username, password, ssl_mode, status
+    username, password, ssl_mode, status, last_error
 ) VALUES (
-    $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11
+    $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12
 )
 RETURNING *;
 
@@ -32,7 +32,15 @@ SET name = sqlc.arg(name),
         ELSE sqlc.arg(password)::text
     END,
     ssl_mode = sqlc.arg(ssl_mode),
-    status = sqlc.arg(status),
+    updated_at = now()
+WHERE id = sqlc.arg(id) AND organisation_id = sqlc.arg(organisation_id)
+RETURNING *;
+
+-- name: UpdateOrganisationDatabaseCheck :one
+UPDATE organisation_databases
+SET status = sqlc.arg(status),
+    last_checked_at = now(),
+    last_error = sqlc.arg(last_error),
     updated_at = now()
 WHERE id = sqlc.arg(id) AND organisation_id = sqlc.arg(organisation_id)
 RETURNING *;

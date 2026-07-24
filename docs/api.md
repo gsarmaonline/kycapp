@@ -94,14 +94,16 @@ Requires `organisation:update`.
 - `POST /v1/organisations/{id}/integrations/stripe/sync` — push local product plan prices missing Stripe refs
 - `DELETE /v1/organisations/{id}/integrations/{provider}` — disconnect
 - `GET /v1/organisations/{id}/databases` — Postgres connections for `db_insert` (password masked)
-- `POST /v1/organisations/{id}/databases` — `{ "name", "host", "port"?, "database_name", "username", "password", "ssl_mode"? }`
+- `POST /v1/organisations/{id}/databases` — `{ "name", "host", "port"?, "database_name", "username", "password", "ssl_mode"? }` — saves then probes (`SELECT 1`); status becomes `connected` or `unreachable`
 - `GET /v1/organisations/{id}/databases/{dbId}`
-- `PATCH /v1/organisations/{id}/databases/{dbId}` — omit/`""` password to keep current
+- `PATCH /v1/organisations/{id}/databases/{dbId}` — omit/`""` password to keep current; re-probes after save
+- `POST /v1/organisations/{id}/databases/{dbId}/check` — re-probe connectivity; updates `status`, `last_checked_at`, `last_error`
+- `POST /v1/organisations/{id}/databases/{dbId}/disconnect` — mark `disconnected` without probing
 - `DELETE /v1/organisations/{id}/databases/{dbId}`
 - `GET /v1/organisations/{id}/webhooks` — outbound webhook endpoints for `call_webhook` (secret masked)
-- `POST /v1/organisations/{id}/webhooks` — `{ "name", "url", "secret"? }`
+- `POST /v1/organisations/{id}/webhooks` — `{ "name", "url", "secret"?, "body_template"? }`
 - `GET /v1/organisations/{id}/webhooks/{webhookId}`
-- `PATCH /v1/organisations/{id}/webhooks/{webhookId}` — omit/`""` secret to keep current
+- `PATCH /v1/organisations/{id}/webhooks/{webhookId}` — omit/`""` secret to keep current; `body_template` is JSON with `{{path}}` placeholders (empty = full event dump)
 - `DELETE /v1/organisations/{id}/webhooks/{webhookId}`
 - `POST /v1/organisations/{id}/api-keys` — `{ "name" }` → includes `token` once
 - `GET /v1/organisations/{id}/api-keys`
@@ -281,7 +283,7 @@ Org-scoped rules: trigger → AND/OR conditions → ordered actions. Executed by
 - `GET /v1/organisations/{id}/automations` — requires `automations:read`
 - `POST /v1/organisations/{id}/automations` — requires `automations:manage`  
   `{ "name", "trigger", "enabled"?, "conditions": { "mode": "all"|"any", "items": [{ "field", "op", "value"? }] }, "actions": [{ "type", "params" }] }`  
-  Action types: `send_email` (`template_key`), `call_webhook` (`webhook_id`), `db_insert` (`database_id`, `table`, optional `mapping`). Legacy `{ "all": [...] }` / `{ "any": [...] }` also accepted.
+  Action types: `send_email` (`template_key`), `call_webhook` (`webhook_id`), `db_insert` (`database_id`, `table`, optional `mode`=`event|columns`, optional `mapping`). Legacy `{ "all": [...] }` / `{ "any": [...] }` also accepted.
 - `GET /v1/automations/{id}` — requires `automations:read`
 - `PATCH /v1/automations/{id}` — requires `automations:manage`
 - `DELETE /v1/automations/{id}` — requires `automations:manage`

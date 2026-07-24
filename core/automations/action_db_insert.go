@@ -28,7 +28,8 @@ func (dbInsertHandler) Info() ActionInfo {
 		Params: []ActionParam{
 			{Key: "database_id", Label: "Database", Required: true},
 			{Key: "table", Label: "Table", Required: true},
-			{Key: "mapping", Label: "Column mapping JSON (optional)", Required: false},
+			{Key: "mode", Label: "Mode (event|columns)", Required: false},
+			{Key: "mapping", Label: "Column mapping", Required: false},
 		},
 		Requires: nil,
 	}
@@ -47,8 +48,19 @@ func (dbInsertHandler) Validate(params map[string]any) error {
 	if _, err := ParseSQLIdentifier(table); err != nil {
 		return fmt.Errorf("table: %w", err)
 	}
-	if _, err := ParseColumnMapping(params["mapping"]); err != nil {
+	mode := ""
+	if v, ok := params["mode"]; ok && v != nil {
+		mode = strings.TrimSpace(fmt.Sprint(v))
+	}
+	mapping, err := ParseColumnMapping(params["mapping"])
+	if err != nil {
 		return err
+	}
+	if mode == "columns" && len(mapping) == 0 {
+		return fmt.Errorf("mapping is required when mode is columns")
+	}
+	if mode != "" && mode != "event" && mode != "columns" {
+		return fmt.Errorf("mode must be event or columns")
 	}
 	return nil
 }

@@ -11,11 +11,11 @@ import (
 
 const createOrganisationWebhook = `-- name: CreateOrganisationWebhook :one
 INSERT INTO organisation_webhooks (
-    id, organisation_id, name, url, secret, status
+    id, organisation_id, name, url, secret, status, body_template
 ) VALUES (
-    $1, $2, $3, $4, $5, $6
+    $1, $2, $3, $4, $5, $6, $7
 )
-RETURNING id, organisation_id, name, url, secret, status, created_at, updated_at
+RETURNING id, organisation_id, name, url, secret, status, created_at, updated_at, body_template
 `
 
 type CreateOrganisationWebhookParams struct {
@@ -25,6 +25,7 @@ type CreateOrganisationWebhookParams struct {
 	Url            string `json:"url"`
 	Secret         string `json:"secret"`
 	Status         string `json:"status"`
+	BodyTemplate   string `json:"body_template"`
 }
 
 func (q *Queries) CreateOrganisationWebhook(ctx context.Context, arg CreateOrganisationWebhookParams) (OrganisationWebhook, error) {
@@ -35,6 +36,7 @@ func (q *Queries) CreateOrganisationWebhook(ctx context.Context, arg CreateOrgan
 		arg.Url,
 		arg.Secret,
 		arg.Status,
+		arg.BodyTemplate,
 	)
 	var i OrganisationWebhook
 	err := row.Scan(
@@ -46,6 +48,7 @@ func (q *Queries) CreateOrganisationWebhook(ctx context.Context, arg CreateOrgan
 		&i.Status,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.BodyTemplate,
 	)
 	return i, err
 }
@@ -66,7 +69,7 @@ func (q *Queries) DeleteOrganisationWebhook(ctx context.Context, arg DeleteOrgan
 }
 
 const getOrganisationWebhook = `-- name: GetOrganisationWebhook :one
-SELECT id, organisation_id, name, url, secret, status, created_at, updated_at FROM organisation_webhooks
+SELECT id, organisation_id, name, url, secret, status, created_at, updated_at, body_template FROM organisation_webhooks
 WHERE id = $1
 `
 
@@ -82,12 +85,13 @@ func (q *Queries) GetOrganisationWebhook(ctx context.Context, id string) (Organi
 		&i.Status,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.BodyTemplate,
 	)
 	return i, err
 }
 
 const getOrganisationWebhookForOrg = `-- name: GetOrganisationWebhookForOrg :one
-SELECT id, organisation_id, name, url, secret, status, created_at, updated_at FROM organisation_webhooks
+SELECT id, organisation_id, name, url, secret, status, created_at, updated_at, body_template FROM organisation_webhooks
 WHERE id = $1 AND organisation_id = $2
 `
 
@@ -108,12 +112,13 @@ func (q *Queries) GetOrganisationWebhookForOrg(ctx context.Context, arg GetOrgan
 		&i.Status,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.BodyTemplate,
 	)
 	return i, err
 }
 
 const listOrganisationWebhooks = `-- name: ListOrganisationWebhooks :many
-SELECT id, organisation_id, name, url, secret, status, created_at, updated_at FROM organisation_webhooks
+SELECT id, organisation_id, name, url, secret, status, created_at, updated_at, body_template FROM organisation_webhooks
 WHERE organisation_id = $1
 ORDER BY name, created_at
 `
@@ -136,6 +141,7 @@ func (q *Queries) ListOrganisationWebhooks(ctx context.Context, organisationID s
 			&i.Status,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.BodyTemplate,
 		); err != nil {
 			return nil, err
 		}
@@ -156,9 +162,10 @@ SET name = $1,
         ELSE $3::text
     END,
     status = $4,
+    body_template = $5,
     updated_at = now()
-WHERE id = $5 AND organisation_id = $6
-RETURNING id, organisation_id, name, url, secret, status, created_at, updated_at
+WHERE id = $6 AND organisation_id = $7
+RETURNING id, organisation_id, name, url, secret, status, created_at, updated_at, body_template
 `
 
 type UpdateOrganisationWebhookParams struct {
@@ -166,6 +173,7 @@ type UpdateOrganisationWebhookParams struct {
 	Url            string `json:"url"`
 	Secret         string `json:"secret"`
 	Status         string `json:"status"`
+	BodyTemplate   string `json:"body_template"`
 	ID             string `json:"id"`
 	OrganisationID string `json:"organisation_id"`
 }
@@ -176,6 +184,7 @@ func (q *Queries) UpdateOrganisationWebhook(ctx context.Context, arg UpdateOrgan
 		arg.Url,
 		arg.Secret,
 		arg.Status,
+		arg.BodyTemplate,
 		arg.ID,
 		arg.OrganisationID,
 	)
@@ -189,6 +198,7 @@ func (q *Queries) UpdateOrganisationWebhook(ctx context.Context, arg UpdateOrgan
 		&i.Status,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.BodyTemplate,
 	)
 	return i, err
 }

@@ -170,6 +170,17 @@ export function AutomationsForm({ submitLabel, cancelTo, initial, onSubmit }: Pr
         if (a.type === 'db_insert') {
           if (!a.params.database_id) throw new Error('Each db_insert action needs a database')
           if (!a.params.table) throw new Error('Each db_insert action needs a table')
+          if (a.params.mode === 'columns') {
+            try {
+              const map = a.params.mapping ? JSON.parse(a.params.mapping) : {}
+              if (!map || typeof map !== 'object' || !Object.keys(map).length) {
+                throw new Error('Column mapping needs at least one column')
+              }
+            } catch (err) {
+              if (err instanceof Error && err.message.includes('Column mapping')) throw err
+              throw new Error('Column mapping must be valid JSON')
+            }
+          }
         }
       }
       await onSubmit({
