@@ -27,7 +27,7 @@ export function TriggerNode({ data }: NodeProps<TriggerFlowNode>) {
         >
           {triggers.map((t) => (
             <option key={t.id} value={t.id}>
-              {t.resource ? `${t.resource} · ${t.label}` : t.label}
+              {t.label}
             </option>
           ))}
         </select>
