@@ -243,7 +243,7 @@ Billing catalog entry.
 | Field | Type | Notes |
 | --- | --- | --- |
 | `id` | string | PK |
-| `key` | string | Unique, e.g. `trial`, `pro` |
+| `key` | string | Unique, e.g. `free_plan`, `pro` |
 | `name` | string | |
 | `status` | enum | `active` \| `archived` |
 

@@ -24,9 +24,9 @@ func (s *Server) handleCreateOrganisation(w http.ResponseWriter, r *http.Request
 		return
 	}
 	in := service.CreateOrganisationInput{
-		Name:        body.Name,
-		Slug:        body.Slug,
-		AttachTrial: true,
+		Name:              body.Name,
+		Slug:              body.Slug,
+		AttachDefaultPlan: true,
 	}
 	if p.Kind == authn.KindUser {
 		in.OwnerUserID = p.UserID

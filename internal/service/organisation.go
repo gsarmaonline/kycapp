@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/gsarmaonline/kyc/core/billing"
 	"github.com/gsarmaonline/kyc/core/organisation"
 	"github.com/gsarmaonline/kyc/internal/apperr"
 	"github.com/gsarmaonline/kyc/internal/ids"
@@ -15,10 +16,11 @@ import (
 )
 
 type CreateOrganisationInput struct {
-	Name         string
-	Slug         string
-	OwnerUserID  string // when set, creates owner membership for this user
-	AttachTrial  bool
+	Name        string
+	Slug        string
+	OwnerUserID string // when set, creates owner membership for this user
+	// AttachDefaultPlan assigns the seeded free_plan subscription (active).
+	AttachDefaultPlan bool
 }
 
 func (s *Service) CreateOrganisation(ctx context.Context, in CreateOrganisationInput) (sqlc.Organisation, error) {
@@ -73,8 +75,8 @@ func (s *Service) CreateOrganisation(ctx context.Context, in CreateOrganisationI
 				return err
 			}
 		}
-		if in.AttachTrial {
-			plan, err := q.GetPlanByKey(ctx, "trial")
+		if in.AttachDefaultPlan {
+			plan, err := q.GetPlanByKey(ctx, billing.DefaultPlanKey)
 			if err != nil {
 				return err
 			}
@@ -82,7 +84,7 @@ func (s *Service) CreateOrganisation(ctx context.Context, in CreateOrganisationI
 				ID:               ids.New(),
 				OrganisationID:   org.ID,
 				PlanID:           plan.ID,
-				Status:           "trialing",
+				Status:           "active",
 				CurrentPeriodEnd: pgtype.Timestamptz{},
 			})
 			return err

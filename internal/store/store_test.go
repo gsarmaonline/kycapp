@@ -59,12 +59,12 @@ func TestMigrateAndSeed(t *testing.T) {
 		t.Fatalf("permission count = %d, want 17", count)
 	}
 
-	exists, err := db.PlanExists(ctx, "trial")
+	exists, err := db.PlanExists(ctx, "free_plan")
 	if err != nil {
 		t.Fatalf("plan exists: %v", err)
 	}
 	if !exists {
-		t.Fatal("trial plan should be seeded")
+		t.Fatal("free_plan should be seeded")
 	}
 
 	if err := db.Migrate(); err != nil {

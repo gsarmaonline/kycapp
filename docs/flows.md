@@ -4,7 +4,7 @@ Related: [data model](data-model.md) · [api](api.md) · [README — How merchan
 
 ## What “create an account” means
 
-Creating an account = create **User + Organisation + owner Membership** (+ usually a trial **Subscription**).
+Creating an account = create **User + Organisation + owner Membership** (+ usually a **Subscription** on `free_plan`).
 
 After signup, “account settings” is the Organisation record plus the user’s Memberships. Switching orgs = switching Organisation context among memberships.
 
@@ -28,7 +28,7 @@ sequenceDiagram
   KYC-->>KYC: Create Organisation status=active
   KYC-->>KYC: Seed Roles owner admin member
   KYC-->>KYC: Create Membership role=owner
-  KYC-->>KYC: Create Subscription plan=trial status=trialing
+  KYC-->>KYC: Create Subscription plan=free_plan status=active
   KYC-->>ProductUI: user organisation membership subscription
   ProductUI->>Merchant: Session in organisation context
   Merchant->>ProductAPI: Use product
@@ -42,7 +42,7 @@ sequenceDiagram
 2. Create **Organisation** (`status=active`).
 3. Seed system **Roles**: `owner`, `admin`, `member` with default permissions.
 4. Create **Membership** (user → org, role=`owner`, `status=active`).
-5. Upsert **Subscription** to plan `trial` (`status=trialing`).
+5. Upsert **Subscription** to plan `free_plan` (`status=active`).
 6. Return `{ user, organisation, membership, subscription }`.
 
 Require `Idempotency-Key` so double-submit does not create two organisations.

@@ -35,7 +35,7 @@ All other `/v1/*` require `Authorization: Bearer <token>`.
 
 **Tenancy:** user sessions may only access organisations with an **active** membership (plus RBAC on mutations). Unscoped service tokens and `platform_admin` users bypass membership for platform ops. Org-scoped API keys act only within their organisation. Plan catalog writes, platform API keys, audit, and entitlement overrides are **platform-only**.
 
-**Onboarding:** sign in with Google, then `POST /v1/organisations` (caller becomes owner + trial). Invited users sign in with Google using the invited email to link `google_sub` and accept the invite.
+**Onboarding:** sign in with Google, then `POST /v1/organisations` (caller becomes owner + `free_plan`). Invited users sign in with Google using the invited email to link `google_sub` and accept the invite.
 
 ### `POST /v1/memberships/{id}/accept`
 
@@ -49,7 +49,7 @@ Invitee accepts (must be logged in as the invited user): membership `invited` â†
 
 ### `POST /v1/organisations`
 
-Create `{ "name": string, "slug": string? }`. Authenticated **users** become owner and get a trial subscription. Service/platform tokens may create orgs without an owner membership.
+Create `{ "name": string, "slug": string? }`. Authenticated **users** become owner and get an active `free_plan` subscription. Service/platform tokens may create orgs without an owner membership.
 
 **Response** `201` â€” organisation.
 

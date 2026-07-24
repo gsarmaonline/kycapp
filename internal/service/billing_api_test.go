@@ -20,14 +20,14 @@ func TestEntitlementsEffectiveAndCheck(t *testing.T) {
 	var allowed map[string]any
 	decodeBody(t, checkAPI, &allowed)
 	if allowed["allowed"] != true {
-		t.Fatalf("api_access should be allowed on trial: %#v", allowed)
+		t.Fatalf("api_access should be allowed on free_plan: %#v", allowed)
 	}
 	checkSSO := doJSON(t, h, http.MethodPost, "/v1/entitlements/check", map[string]any{
 		"organisation_id": orgID, "entitlement": "sso",
 	}, userAuth(token))
 	decodeBody(t, checkSSO, &allowed)
 	if allowed["allowed"] != false {
-		t.Fatalf("sso should be denied on trial: %#v", allowed)
+		t.Fatalf("sso should be denied on free_plan: %#v", allowed)
 	}
 
 	put := doJSON(t, h, http.MethodPut, "/v1/organisations/"+orgID+"/entitlements", map[string]any{
