@@ -8,6 +8,7 @@ export type TriggerNodeData = {
   inboundWebhooks?: { id: string; name: string }[]
   plans?: { id: string; name: string; key?: string }[]
   roles?: { id: string; name: string; key?: string }[]
+  schedulePresets?: { key: string; label: string; expr: string }[]
   onTriggerChange?: (trigger: string) => void
   onTriggerParamsChange?: (params: Record<string, string>) => void
 }

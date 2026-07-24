@@ -161,6 +161,7 @@ export function buildFlowElements(
         inboundWebhooks: opts.catalog?.inbound_webhooks,
         plans: opts.catalog?.plans,
         roles: opts.catalog?.roles,
+        schedulePresets: opts.catalog?.schedule_presets,
         onTriggerChange: opts.onTriggerChange,
         onTriggerParamsChange: opts.onTriggerParamsChange,
       },

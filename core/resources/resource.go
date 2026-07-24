@@ -18,11 +18,12 @@ const (
 	Webhook      = "webhook"  // org-scoped inbound HTTP trigger
 )
 
-// Schedule presets (used as lifecycle events on the schedule resource).
+// Schedule presets (legacy aliases — normalize to schedule.cron + expr).
 const (
-	ScheduleHourly = "hourly"
-	ScheduleDaily  = "daily"
-	ScheduleWeekly = "weekly"
+	ScheduleCron   = "cron"
+	ScheduleHourly = "hourly" // legacy → 0 * * * *
+	ScheduleDaily  = "daily"  // legacy → 0 0 * * *
+	ScheduleWeekly = "weekly" // legacy → 0 0 * * 1
 )
 
 // WebhookReceived is the lifecycle event for inbound automation webhooks.

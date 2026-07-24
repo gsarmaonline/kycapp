@@ -14,6 +14,8 @@ const (
 	ParamStatus           = "status"
 	ParamPlanID           = "plan_id"
 	ParamRoleID           = "role_id"
+	ParamCronExpr         = "expr"
+	ParamTimezone         = "timezone"
 )
 
 // Catalog option list keys for TriggerParamInfo.OptionsFrom.
@@ -105,7 +107,22 @@ func ParamSchemaForTrigger(trigger string, attrEnums map[string][]string) []reso
 		}
 		return []resources.TriggerParamInfo{p}
 	case resources.KindSchedule:
-		return nil
+		return []resources.TriggerParamInfo{
+			{
+				Key:      ParamCronExpr,
+				Label:    "Cron expression",
+				Required: true,
+				Input:    "text",
+				Hint:     "Standard 5-field cron: minute hour day-of-month month day-of-week",
+			},
+			{
+				Key:      ParamTimezone,
+				Label:    "Timezone",
+				Required: false,
+				Input:    "text",
+				Hint:     "IANA timezone (default UTC), e.g. Australia/Sydney",
+			},
+		}
 	case resources.KindLifecycle:
 		switch parsed.Resource {
 		case resources.AppUser:
@@ -195,6 +212,14 @@ func ValidateTriggerParamsWithEnums(trigger string, params map[string]string, at
 		}
 		if _, ok := allowed[k]; !ok {
 			return fmt.Errorf("unknown trigger_params key %q for %s", k, trigger)
+		}
+	}
+	if trigger == TriggerScheduleCron {
+		if err := ValidateCronExpr(params[ParamCronExpr]); err != nil {
+			return err
+		}
+		if err := ValidateTimezone(params[ParamTimezone]); err != nil {
+			return err
 		}
 	}
 	return nil

@@ -984,6 +984,18 @@ button.link-btn.danger:hover {
   margin-top: 0;
 }
 
+.dag-preset-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-top: 0.25rem;
+}
+
+.dag-preset-btn {
+  font-size: 0.7rem;
+  padding: 0.2rem 0.45rem;
+}
+
 .inbound-hook-card {
   display: flex;
   flex-direction: column;

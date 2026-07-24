@@ -33,6 +33,7 @@ sql:
       - "internal/store/migrations/000028_inbound_webhooks_multi.up.sql"
       - "internal/store/migrations/000029_inbound_auth_mode.up.sql"
       - "internal/store/migrations/000030_automation_trigger_params.up.sql"
+      - "internal/store/migrations/000031_schedule_cron.up.sql"
     gen:
       go:
         package: "sqlc"

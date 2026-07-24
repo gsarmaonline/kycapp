@@ -66,7 +66,7 @@ func Default() []Resource {
 			// Time-based triggers: subject is the organisation, not an app user.
 			Key:                Schedule,
 			Label:              "Schedule",
-			Lifecycles:         []string{ScheduleHourly, ScheduleDaily, ScheduleWeekly},
+			Lifecycles:         []string{ScheduleCron},
 			SupportsAttributes: false,
 			Provides:           []string{SubjectOrganisation},
 		},

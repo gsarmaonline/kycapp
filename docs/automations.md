@@ -55,7 +55,7 @@ Actions/ops/condition fields live in `core/automations`. **Triggers** are genera
 
 | Key | Source |
 | --- | --- |
-| `triggers` | `core/resources.ExpandTriggers` — lifecycle events for `app_user`, `membership`, `subscription`, `schedule` (hourly/daily/weekly), `webhook.received` (bind via `trigger_params.inbound_webhook_id`), plus `app_user.attribute.<key>` |
+| `triggers` | `core/resources.ExpandTriggers` — lifecycle events for `app_user`, `membership`, `subscription`, `schedule.cron`, `webhook.received` (bind via `trigger_params`), plus `app_user.attribute.<key>` |
 | `actions` | Registered action types + params |
 | `ops` | Condition operators |
 | `condition_fields` | Base app-user fields + **all active org attribute definitions** as `app_user.<key>` |
@@ -81,13 +81,13 @@ Like action `params`, triggers can bind optional (or required) scope via `trigge
 | Trigger | Params | Required |
 | --- | --- | --- |
 | `webhook.received` | `inbound_webhook_id` | yes |
+| `schedule.cron` | `expr` (5-field cron), `timezone` (IANA, default UTC) | expr yes |
 | `app_user.attribute.<key>` | `app_user.<key>` (attribute value) | no |
 | `app_user.created\|updated\|deleted` | `status` | no |
 | `membership.*` | `role_id`, `status` | no |
 | `subscription.*` | `plan_id`, `status` | no |
-| `schedule.*` | — | — |
 
-Catalog `triggers[].params` describes the editor fields; `plans` / `roles` / `inbound_webhooks` supply select options.
+Catalog `triggers[].params` describes the editor fields; `plans` / `roles` / `inbound_webhooks` / `schedule_presets` supply pickers and cron shortcuts. Legacy `schedule.hourly\|daily\|weekly` normalize to `schedule.cron` + expr on save.
 
 ### Conditions
 
@@ -306,7 +306,6 @@ Automations run in the **worker**, so Resend env must be on that service.
 - Cross-org / marketplace automations
 - Generic inbound “catch-all” that invents domain objects (use `webhook.received` + your own mapping, or first-class integrations)
 - Non-Postgres database drivers
-- Custom cron expressions (presets only: hourly / daily / weekly UTC)
 - Per–app-user date-field due scanners
 
 ## Time: delays + org schedules
@@ -315,14 +314,17 @@ Automations run in the **worker**, so Resend env must be on that service.
 
 Action type `delay` with `duration` (`5m`, `1h`, `24h`, …). Schedules a River resume job and pauses the workflow (`run` status `paused`). Continues from `on_success` when due. Does not block a worker slot.
 
-### Schedule triggers (org is the subject)
+### Schedule trigger (org is the subject)
 
-| Trigger | When (UTC) |
+Single trigger **`schedule.cron`** with:
+
+| Param | Meaning |
 | --- | --- |
-| `schedule.hourly` | top of each hour |
-| `schedule.daily` | 00:00 |
-| `schedule.weekly` | Monday 00:00 |
+| `expr` | Standard 5-field cron (`minute hour dom month dow`) |
+| `timezone` | IANA name (default `UTC`), e.g. `Australia/Sydney` |
 
-Payload: `{ organisation_id, id, trigger, scheduled_at }`. Provides subject `organisation` — **not** `app_user`. Use with `call_webhook` / `db_insert` / `delay`; `send_email` is rejected at save (no recipient). Conditions may be empty for schedule rules.
+UI presets (hourly / daily / weekly / weekdays 09:00) only fill `expr` — still stored as `schedule.cron`. Legacy `schedule.hourly|daily|weekly` rows migrate / normalize to the same shape.
 
-Worker runs a 1-minute River periodic tick that enqueues due schedule events.
+Payload: `{ organisation_id, id, trigger, scheduled_at, expr, timezone, automation_id }`. Provides subject `organisation` — **not** `app_user`. Use with `call_webhook` / `db_insert` / `delay`; `send_email` is rejected at save (no recipient).
+
+Worker runs a 1-minute River tick, evaluates each enabled `schedule.cron` automation, and enqueues only due rules (scoped by `automation_id`).

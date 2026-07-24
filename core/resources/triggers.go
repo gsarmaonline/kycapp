@@ -139,7 +139,7 @@ func ExpandTriggers(resources []Resource, attrsByResource map[string][]Attribute
 			if r.Key == Schedule {
 				kind = string(KindSchedule)
 				label = "Schedule · " + event
-				desc = fmt.Sprintf("Fires on an organisation schedule (%s, UTC). Subject is the org — not an app user.", event)
+				desc = fmt.Sprintf("Fires on a cron schedule (%s). Subject is the org — not an app user. Bind expr + optional timezone in trigger_params.", event)
 			}
 			if r.Key == Webhook {
 				kind = string(KindWebhook)

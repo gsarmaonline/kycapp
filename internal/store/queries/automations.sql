@@ -27,6 +27,12 @@ WHERE trigger = $1
   AND enabled = true
 ORDER BY organisation_id;
 
+-- name: ListEnabledAutomationsByTriggerAll :many
+SELECT * FROM automations
+WHERE trigger = $1
+  AND enabled = true
+ORDER BY organisation_id ASC, created_at ASC;
+
 
 -- name: UpdateAutomation :one
 UPDATE automations SET

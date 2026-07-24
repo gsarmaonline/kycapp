@@ -1042,6 +1042,7 @@ export type AutomationCatalog = {
   inbound_webhooks?: { id: string; name: string }[]
   plans?: { id: string; name: string; key?: string }[]
   roles?: { id: string; name: string; key?: string }[]
+  schedule_presets?: { key: string; label: string; expr: string }[]
 }
 
 

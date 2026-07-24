@@ -30,22 +30,6 @@ type ResumeFunc func(ctx context.Context, orgID, automationID, trigger string, p
 // ScheduleTickFunc evaluates which schedule triggers are due and fires them.
 type ScheduleTickFunc func(ctx context.Context, at time.Time) error
 
-// DueScheduleTriggers returns schedule.* trigger IDs that should fire at t (UTC).
-func DueScheduleTriggers(t time.Time) []string {
-	t = t.UTC()
-	var out []string
-	if t.Minute() == 0 {
-		out = append(out, "schedule.hourly")
-	}
-	if t.Minute() == 0 && t.Hour() == 0 {
-		out = append(out, "schedule.daily")
-	}
-	if t.Minute() == 0 && t.Hour() == 0 && t.Weekday() == time.Monday {
-		out = append(out, "schedule.weekly")
-	}
-	return out
-}
-
 // EnqueueResumeInput is passed to delayed resume inserts.
 type EnqueueResumeInput struct {
 	OrganisationID string

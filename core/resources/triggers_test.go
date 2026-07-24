@@ -25,17 +25,15 @@ func TestExpandTriggersIncludesAttributesAndOtherResources(t *testing.T) {
 		"membership.updated",
 		"subscription.created",
 		"subscription.updated",
-		"schedule.hourly",
-		"schedule.daily",
-		"schedule.weekly",
+		"schedule.cron",
 		"webhook.received",
 	} {
 		if _, ok := byID[want]; !ok {
 			t.Fatalf("missing trigger %s in %#v", want, byID)
 		}
 	}
-	if byID["schedule.daily"].Kind != string(KindSchedule) {
-		t.Fatalf("schedule kind=%s", byID["schedule.daily"].Kind)
+	if byID["schedule.cron"].Kind != string(KindSchedule) {
+		t.Fatalf("schedule kind=%s", byID["schedule.cron"].Kind)
 	}
 	if byID["webhook.received"].Kind != string(KindWebhook) {
 		t.Fatalf("webhook kind=%s", byID["webhook.received"].Kind)

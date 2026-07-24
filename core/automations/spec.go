@@ -32,9 +32,6 @@ type Spec struct {
 // triggerParamsJSON may be nil/empty; webhook.received requires inbound_webhook_id.
 func ValidateCreate(trigger string, conditionsJSON, actionsJSON json.RawMessage, triggerParamsJSON ...json.RawMessage) (Spec, error) {
 	trigger = strings.TrimSpace(trigger)
-	if !KnownTrigger(trigger) {
-		return Spec{}, fmt.Errorf("unknown trigger %q", trigger)
-	}
 
 	var paramsRaw json.RawMessage
 	if len(triggerParamsJSON) > 0 {
@@ -43,6 +40,11 @@ func ValidateCreate(trigger string, conditionsJSON, actionsJSON json.RawMessage,
 	params, err := NormalizeTriggerParams(paramsRaw)
 	if err != nil {
 		return Spec{}, err
+	}
+	trigger, params = NormalizeScheduleTrigger(trigger, params)
+
+	if !KnownTrigger(trigger) {
+		return Spec{}, fmt.Errorf("unknown trigger %q", trigger)
 	}
 	if err := ValidateTriggerParams(trigger, params); err != nil {
 		return Spec{}, err

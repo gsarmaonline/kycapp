@@ -175,6 +175,29 @@ export function TriggerNode({ data }: NodeProps<TriggerFlowNode>) {
               </option>
             ))}
           </select>
+          {data.trigger === 'schedule.cron' && (data.schedulePresets?.length ?? 0) > 0 && (
+            <div className="dag-node-field">
+              <span>Presets</span>
+              <div className="dag-preset-row">
+                {data.schedulePresets!.map((p) => (
+                  <button
+                    key={p.key}
+                    type="button"
+                    className="ghost dag-preset-btn"
+                    onClick={() =>
+                      data.onTriggerParamsChange?.({
+                        ...params,
+                        expr: p.expr,
+                        timezone: params.timezone || 'UTC',
+                      })
+                    }
+                  >
+                    {p.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
           {paramDefs.map((p) => {
             const value = params[p.key] ?? ''
             const opts = optionsFor(p.options_from)

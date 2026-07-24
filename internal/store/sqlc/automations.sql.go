@@ -257,6 +257,44 @@ func (q *Queries) ListEnabledAutomationsByTrigger(ctx context.Context, arg ListE
 	return items, nil
 }
 
+const listEnabledAutomationsByTriggerAll = `-- name: ListEnabledAutomationsByTriggerAll :many
+SELECT id, organisation_id, name, trigger, enabled, conditions, actions, created_at, updated_at, trigger_params FROM automations
+WHERE trigger = $1
+  AND enabled = true
+ORDER BY organisation_id ASC, created_at ASC
+`
+
+func (q *Queries) ListEnabledAutomationsByTriggerAll(ctx context.Context, trigger string) ([]Automation, error) {
+	rows, err := q.db.Query(ctx, listEnabledAutomationsByTriggerAll, trigger)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []Automation{}
+	for rows.Next() {
+		var i Automation
+		if err := rows.Scan(
+			&i.ID,
+			&i.OrganisationID,
+			&i.Name,
+			&i.Trigger,
+			&i.Enabled,
+			&i.Conditions,
+			&i.Actions,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.TriggerParams,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listOrgIDsWithEnabledTrigger = `-- name: ListOrgIDsWithEnabledTrigger :many
 SELECT DISTINCT organisation_id FROM automations
 WHERE trigger = $1

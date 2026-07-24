@@ -13,7 +13,6 @@ import (
 	"github.com/gsarmaonline/kyc/core/resources"
 	"github.com/gsarmaonline/kyc/internal/apperr"
 	"github.com/gsarmaonline/kyc/internal/ids"
-	"github.com/gsarmaonline/kyc/internal/jobs"
 	"github.com/gsarmaonline/kyc/internal/store/sqlc"
 	"github.com/jackc/pgx/v5/pgtype"
 )
@@ -47,6 +46,7 @@ type AutomationCatalog struct {
 	InboundWebhooks []AutomationWebhookOption        `json:"inbound_webhooks"`
 	Plans           []AutomationCatalogOption        `json:"plans"`
 	Roles           []AutomationCatalogOption        `json:"roles"`
+	SchedulePresets []AutomationSchedulePreset       `json:"schedule_presets"`
 }
 
 type AutomationDatabaseOption struct {
@@ -63,6 +63,12 @@ type AutomationCatalogOption struct {
 	ID   string `json:"id"`
 	Name string `json:"name"`
 	Key  string `json:"key,omitempty"`
+}
+
+type AutomationSchedulePreset struct {
+	Key   string `json:"key"`
+	Label string `json:"label"`
+	Expr  string `json:"expr"`
 }
 
 func (s *Service) AutomationCatalog(ctx context.Context, orgID string) (AutomationCatalog, error) {
@@ -132,16 +138,25 @@ func (s *Service) AutomationCatalog(ctx context.Context, orgID string) (Automati
 		})
 	}
 	return AutomationCatalog{
-		Triggers:        automations.EnrichTriggersWithParams(automations.ExpandTriggers(attrs), attrEnums),
-		Actions:         automations.Actions(),
-		Ops:             automations.ConditionOps(),
-		ConditionFields: fields,
-		Databases:       dbOpts,
-		Webhooks:        whOpts,
-		InboundWebhooks: inOpts,
-		Plans:           planOpts,
-		Roles:           roleOpts,
+		Triggers:         automations.EnrichTriggersWithParams(automations.ExpandTriggers(attrs), attrEnums),
+		Actions:          automations.Actions(),
+		Ops:              automations.ConditionOps(),
+		ConditionFields:  fields,
+		Databases:        dbOpts,
+		Webhooks:         whOpts,
+		InboundWebhooks:  inOpts,
+		Plans:            planOpts,
+		Roles:            roleOpts,
+		SchedulePresets:  schedulePresetOpts(),
 	}, nil
+}
+
+func schedulePresetOpts() []AutomationSchedulePreset {
+	out := make([]AutomationSchedulePreset, 0, len(automations.SchedulePresets))
+	for _, p := range automations.SchedulePresets {
+		out = append(out, AutomationSchedulePreset{Key: p.Key, Label: p.Label, Expr: p.Expr})
+	}
+	return out
 }
 
 func (s *Service) appUserAttributeEnums(ctx context.Context, orgID string) (map[string][]string, error) {
@@ -412,6 +427,9 @@ func (s *Service) ProcessAutomationEvent(ctx context.Context, orgID, trigger str
 	}
 
 	for _, row := range rows {
+		if targetID := stringifyPayload(payload["automation_id"]); targetID != "" && row.ID != targetID {
+			continue
+		}
 		params, err := automations.NormalizeTriggerParams(row.TriggerParams)
 		if err != nil {
 			slog.Error("automation trigger_params invalid", "automation_id", row.ID, "err", err)
@@ -531,26 +549,42 @@ func (s *Service) ResumeAutomation(ctx context.Context, orgID, automationID, tri
 	return s.recordRun(ctx, row, trigger, payloadJSON, "success", strings.Join(details, "; "))
 }
 
-// ProcessScheduleTick fires due schedule.* triggers for all orgs (UTC).
+// ProcessScheduleTick fires due schedule.cron automations (expr + timezone).
 func (s *Service) ProcessScheduleTick(ctx context.Context, at time.Time) error {
-	due := jobs.DueScheduleTriggers(at)
-	if len(due) == 0 {
-		return nil
+	rows, err := s.db.Q().ListEnabledAutomationsByTriggerAll(ctx, automations.TriggerScheduleCron)
+	if err != nil {
+		return err
 	}
-	for _, trigger := range due {
-		orgIDs, err := s.db.Q().ListOrgIDsWithEnabledTrigger(ctx, trigger)
+	at = at.UTC()
+	for _, row := range rows {
+		params, err := automations.NormalizeTriggerParams(row.TriggerParams)
 		if err != nil {
-			return err
+			slog.Error("schedule trigger_params invalid", "automation_id", row.ID, "err", err)
+			continue
 		}
-		for _, orgID := range orgIDs {
-			payload := map[string]any{
-				"id":              orgID,
-				"organisation_id": orgID,
-				"trigger":         trigger,
-				"scheduled_at":    at.UTC().Format(time.RFC3339),
-			}
-			s.EnqueueAutomationEvent(ctx, orgID, trigger, payload)
+		expr := strings.TrimSpace(params[automations.ParamCronExpr])
+		tz := strings.TrimSpace(params[automations.ParamTimezone])
+		due, err := automations.CronDueAt(expr, tz, at)
+		if err != nil {
+			slog.Error("schedule cron evaluate", "automation_id", row.ID, "err", err)
+			continue
 		}
+		if !due {
+			continue
+		}
+		if tz == "" {
+			tz = automations.DefaultTimezone
+		}
+		payload := map[string]any{
+			"id":              row.OrganisationID,
+			"organisation_id": row.OrganisationID,
+			"trigger":         automations.TriggerScheduleCron,
+			"scheduled_at":    at.Format(time.RFC3339),
+			"expr":            expr,
+			"timezone":        tz,
+			"automation_id":   row.ID,
+		}
+		s.EnqueueAutomationEvent(ctx, row.OrganisationID, automations.TriggerScheduleCron, payload)
 	}
 	return nil
 }

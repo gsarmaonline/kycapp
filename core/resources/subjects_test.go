@@ -30,7 +30,7 @@ func TestAvailableSubjectsMembershipIncludesUser(t *testing.T) {
 }
 
 func TestAvailableSubjectsScheduleIsOrg(t *testing.T) {
-	got, err := AvailableSubjectSet("schedule.daily")
+	got, err := AvailableSubjectSet("schedule.cron")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -40,7 +40,7 @@ func TestAvailableSubjectsScheduleIsOrg(t *testing.T) {
 	if got[SubjectAppUser] {
 		t.Fatal("schedule must not provide app_user")
 	}
-	missing, err := MissingSubjects("schedule.hourly", []string{SubjectAppUser})
+	missing, err := MissingSubjects("schedule.cron", []string{SubjectAppUser})
 	if err != nil {
 		t.Fatal(err)
 	}

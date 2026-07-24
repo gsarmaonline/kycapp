@@ -81,6 +81,11 @@ function paramsForTrigger(
       const first = catalog?.inbound_webhooks?.[0]?.id
       if (first) out[p.key] = first
     }
+    if (p.key === 'expr' && trigger === 'schedule.cron') {
+      const first = catalog?.schedule_presets?.[0]?.expr
+      if (first) out[p.key] = first
+      if (!out.timezone) out.timezone = 'UTC'
+    }
   }
   return out
 }
