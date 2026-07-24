@@ -81,12 +81,14 @@ export function removeActionAt(
 export function normalizeGraph(
   input: {
     trigger?: string
+    triggerParams?: Record<string, string>
     conditions?: AutomationCondition[]
     actions?: AutomationAction[]
   },
   opts?: { ensureDefaults?: boolean },
 ) {
   const trigger = input.trigger || 'app_user.created'
+  const triggerParams = { ...(input.triggerParams ?? {}) }
   let conditions = input.conditions ? [...input.conditions] : []
   let actions = input.actions ? [...input.actions] : []
   if (opts?.ensureDefaults) {
@@ -94,12 +96,13 @@ export function normalizeGraph(
     if (!actions.length) actions = [defaultAction()]
   }
   actions = normalizeActionWorkflow(actions)
-  return { trigger, conditions, actions }
+  return { trigger, triggerParams, conditions, actions }
 }
 
 export function buildFlowElements(
   graph: {
     trigger: string
+    triggerParams?: Record<string, string>
     conditions: AutomationCondition[]
     actions: AutomationAction[]
   },
@@ -108,6 +111,7 @@ export function buildFlowElements(
     catalog?: AutomationCatalog | null
     emailTemplates?: { key: string; name: string }[]
     onTriggerChange?: (trigger: string) => void
+    onTriggerParamsChange?: (params: Record<string, string>) => void
     onConditionChange?: (index: number, condition: AutomationCondition) => void
     onConditionRemove?: (index: number) => void
     onActionChange?: (index: number, action: AutomationAction) => void
@@ -151,9 +155,12 @@ export function buildFlowElements(
       position: { x: X_TRIGGER, y: midY },
       data: {
         trigger: graph.trigger,
+        triggerParams: graph.triggerParams,
         readOnly: opts.readOnly,
         triggers: opts.catalog?.triggers,
+        inboundWebhooks: opts.catalog?.inbound_webhooks,
         onTriggerChange: opts.onTriggerChange,
+        onTriggerParamsChange: opts.onTriggerParamsChange,
       },
       draggable: false,
       selectable: !opts.readOnly,

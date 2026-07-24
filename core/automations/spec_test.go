@@ -64,6 +64,29 @@ func containsParams(raw json.RawMessage) bool {
 	return ok && !legacy
 }
 
+func TestValidateCreateWebhookRequiresInbound(t *testing.T) {
+	_, err := ValidateCreate(
+		TriggerWebhookReceived,
+		json.RawMessage(`{"all":[]}`),
+		json.RawMessage(`[{"type":"call_webhook","params":{"webhook_id":"w1"}}]`),
+	)
+	if err == nil {
+		t.Fatal("want inbound_webhook_id required")
+	}
+	spec, err := ValidateCreate(
+		TriggerWebhookReceived,
+		json.RawMessage(`{"all":[]}`),
+		json.RawMessage(`[{"type":"call_webhook","params":{"webhook_id":"w1"}}]`),
+		json.RawMessage(`{"inbound_webhook_id":"hook1"}`),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if spec.TriggerParams[ParamInboundWebhookID] != "hook1" {
+		t.Fatalf("params=%v", spec.TriggerParams)
+	}
+}
+
 func TestValidateRejectsBadTrigger(t *testing.T) {
 	_, err := ValidateCreate("nope", json.RawMessage(`{"all":[]}`), json.RawMessage(`[{"type":"send_email","params":{"template_key":"welcome"}}]`))
 	if err == nil {

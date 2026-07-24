@@ -71,6 +71,7 @@ type Automation struct {
 	Actions        json.RawMessage `json:"actions"`
 	CreatedAt      time.Time       `json:"created_at"`
 	UpdatedAt      time.Time       `json:"updated_at"`
+	TriggerParams  json.RawMessage `json:"trigger_params"`
 }
 
 type AutomationRun struct {

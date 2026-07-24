@@ -36,6 +36,7 @@ export function AutomationsEdit() {
         initial={{
           name: item.name,
           trigger: item.trigger,
+          triggerParams: item.trigger_params ?? {},
           enabled: item.enabled,
           conditionMode: flat.mode,
           conditions: flat.items,

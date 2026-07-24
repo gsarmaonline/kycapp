@@ -21,17 +21,31 @@ var (
 
 // Spec is a validated automation definition body.
 type Spec struct {
-	Trigger    string     `json:"trigger"`
-	Conditions Conditions `json:"conditions"`
-	Actions    []Action   `json:"actions"`
+	Trigger       string            `json:"trigger"`
+	TriggerParams map[string]string `json:"trigger_params,omitempty"`
+	Conditions    Conditions        `json:"conditions"`
+	Actions       []Action          `json:"actions"`
 }
 
 // ValidateCreate checks trigger, conditions, and actions for create/update
 // against the registered catalogs in registry.go.
-func ValidateCreate(trigger string, conditionsJSON, actionsJSON json.RawMessage) (Spec, error) {
+// triggerParamsJSON may be nil/empty; webhook.received requires inbound_webhook_id.
+func ValidateCreate(trigger string, conditionsJSON, actionsJSON json.RawMessage, triggerParamsJSON ...json.RawMessage) (Spec, error) {
 	trigger = strings.TrimSpace(trigger)
 	if !KnownTrigger(trigger) {
 		return Spec{}, fmt.Errorf("unknown trigger %q", trigger)
+	}
+
+	var paramsRaw json.RawMessage
+	if len(triggerParamsJSON) > 0 {
+		paramsRaw = triggerParamsJSON[0]
+	}
+	params, err := NormalizeTriggerParams(paramsRaw)
+	if err != nil {
+		return Spec{}, err
+	}
+	if err := ValidateTriggerParams(trigger, params); err != nil {
+		return Spec{}, err
 	}
 
 	var cond Conditions
@@ -41,7 +55,6 @@ func ValidateCreate(trigger string, conditionsJSON, actionsJSON json.RawMessage)
 		return Spec{}, fmt.Errorf("invalid conditions JSON")
 	}
 	cond = NormalizeConditionsFields(cond.Normalize())
-	var err error
 	if cond.All, err = validateConditionList("conditions.all", cond.All); err != nil {
 		return Spec{}, err
 	}
@@ -74,7 +87,7 @@ func ValidateCreate(trigger string, conditionsJSON, actionsJSON json.RawMessage)
 		return Spec{}, err
 	}
 
-	return Spec{Trigger: trigger, Conditions: cond, Actions: actions}, nil
+	return Spec{Trigger: trigger, TriggerParams: params, Conditions: cond, Actions: actions}, nil
 }
 
 // ValidateConditionFields ensures each condition field is in the allowed set

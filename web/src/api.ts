@@ -1030,6 +1030,7 @@ export type AutomationCatalog = {
   }[]
   databases?: { id: string; name: string }[]
   webhooks?: { id: string; name: string }[]
+  inbound_webhooks?: { id: string; name: string }[]
 }
 
 export type Automation = {
@@ -1037,6 +1038,7 @@ export type Automation = {
   organisation_id: string
   name: string
   trigger: string
+  trigger_params?: Record<string, string>
   enabled: boolean
   conditions: AutomationConditions
   actions: AutomationAction[]
@@ -1069,6 +1071,7 @@ export function createAutomation(
   input: {
     name: string
     trigger: string
+    trigger_params?: Record<string, string>
     enabled?: boolean
     conditions: AutomationConditions
     actions: AutomationAction[]
@@ -1085,6 +1088,7 @@ export function updateAutomation(
   input: {
     name?: string
     trigger?: string
+    trigger_params?: Record<string, string>
     enabled?: boolean
     conditions?: AutomationConditions
     actions?: AutomationAction[]

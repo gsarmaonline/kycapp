@@ -125,23 +125,62 @@ export function TriggerNode({ data }: NodeProps<TriggerFlowNode>) {
         { id: 'app_user.created', label: 'App user created', description: '' },
         { id: 'app_user.updated', label: 'App user updated', description: '' },
       ]
+  const inbound = data.inboundWebhooks ?? []
+  const isWebhook = data.trigger === 'webhook.received'
+  const inboundId = data.triggerParams?.inbound_webhook_id ?? ''
+  const inboundLabel =
+    inbound.find((h) => h.id === inboundId)?.name || inboundId || '—'
+
   return (
     <div className={`dag-node dag-node-trigger${data.readOnly ? ' is-readonly' : ''}`}>
       <div className="dag-node-kind">Trigger</div>
       {data.readOnly ? (
-        <strong className="dag-node-title">{data.trigger}</strong>
+        <>
+          <strong className="dag-node-title">{data.trigger}</strong>
+          {isWebhook && (
+            <p className="field-hint" style={{ margin: '0.35rem 0 0' }}>
+              Inbound: {inboundLabel}
+            </p>
+          )}
+        </>
       ) : (
-        <select
-          className="dag-node-select"
-          value={data.trigger}
-          onChange={(e) => data.onTriggerChange?.(e.target.value)}
-        >
-          {triggers.map((t) => (
-            <option key={t.id} value={t.id}>
-              {t.label}
-            </option>
-          ))}
-        </select>
+        <>
+          <select
+            className="dag-node-select"
+            value={data.trigger}
+            onChange={(e) => data.onTriggerChange?.(e.target.value)}
+          >
+            {triggers.map((t) => (
+              <option key={t.id} value={t.id}>
+                {t.label}
+              </option>
+            ))}
+          </select>
+          {isWebhook && (
+            <label className="dag-node-field">
+              Inbound webhook
+              <select
+                className="dag-node-select"
+                value={inboundId}
+                onChange={(e) =>
+                  data.onTriggerParamsChange?.({
+                    inbound_webhook_id: e.target.value,
+                  })
+                }
+              >
+                <option value="">Select endpoint…</option>
+                {inboundId && !inbound.some((h) => h.id === inboundId) && (
+                  <option value={inboundId}>{inboundId} (missing)</option>
+                )}
+                {inbound.map((h) => (
+                  <option key={h.id} value={h.id}>
+                    {h.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
+        </>
       )}
       <Handle type="source" position={Position.Right} />
     </div>

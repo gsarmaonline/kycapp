@@ -131,7 +131,7 @@ func ExpandTriggers(resources []Resource, attrsByResource map[string][]Attribute
 			if r.Key == Webhook {
 				kind = string(KindWebhook)
 				label = "Webhook · " + event
-				desc = "Fires when a POST hits any connected inbound webhook endpoint. Subject is the org — not an app user. Filter with inbound_webhook_id / inbound_webhook_name."
+				desc = "Fires when a POST hits a connected inbound webhook. Bind trigger_params.inbound_webhook_id to a specific endpoint. Subject is the org — not an app user."
 			}
 			out = append(out, TriggerInfo{
 				ID:          id,

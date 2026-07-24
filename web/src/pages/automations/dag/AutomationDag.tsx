@@ -21,10 +21,12 @@ type Props = {
   catalog?: AutomationCatalog | null
   emailTemplates?: { key: string; name: string }[]
   trigger: string
+  triggerParams?: Record<string, string>
   conditionMode?: AutomationConditionMode
   conditions: AutomationCondition[]
   actions: AutomationAction[]
   onTriggerChange?: (trigger: string) => void
+  onTriggerParamsChange?: (params: Record<string, string>) => void
   onConditionModeChange?: (mode: AutomationConditionMode) => void
   onConditionsChange?: (conditions: AutomationCondition[]) => void
   onActionsChange?: (actions: AutomationAction[]) => void
@@ -44,10 +46,12 @@ function AutomationDagInner({
   catalog,
   emailTemplates = [],
   trigger,
+  triggerParams = {},
   conditionMode = 'all',
   conditions,
   actions,
   onTriggerChange,
+  onTriggerParamsChange,
   onConditionModeChange,
   onConditionsChange,
   onActionsChange,
@@ -55,10 +59,10 @@ function AutomationDagInner({
   const graph = useMemo(
     () =>
       normalizeGraph(
-        { trigger, conditions, actions },
+        { trigger, triggerParams, conditions, actions },
         { ensureDefaults: !readOnly },
       ),
-    [trigger, conditions, actions, readOnly],
+    [trigger, triggerParams, conditions, actions, readOnly],
   )
 
   const onConditionChange = useCallback(
@@ -102,6 +106,7 @@ function AutomationDagInner({
         catalog,
         emailTemplates,
         onTriggerChange,
+        onTriggerParamsChange,
         onConditionChange,
         onConditionRemove,
         onActionChange,
@@ -113,6 +118,7 @@ function AutomationDagInner({
       catalog,
       emailTemplates,
       onTriggerChange,
+      onTriggerParamsChange,
       onConditionChange,
       onConditionRemove,
       onActionChange,

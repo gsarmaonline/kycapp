@@ -971,6 +971,19 @@ button.link-btn.danger:hover {
   gap: 0.35rem;
 }
 
+.dag-node-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  margin-top: 0.45rem;
+  font-size: 0.75rem;
+  color: color-mix(in srgb, CanvasText 72%, transparent);
+}
+
+.dag-node-field .dag-node-select {
+  margin-top: 0;
+}
+
 .inbound-hook-card {
   display: flex;
   flex-direction: column;

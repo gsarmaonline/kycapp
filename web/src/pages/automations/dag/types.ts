@@ -2,9 +2,12 @@ import type { AutomationAction, AutomationCatalog, AutomationCondition } from '.
 
 export type TriggerNodeData = {
   trigger: string
+  triggerParams?: Record<string, string>
   readOnly: boolean
   triggers?: AutomationCatalog['triggers']
+  inboundWebhooks?: { id: string; name: string }[]
   onTriggerChange?: (trigger: string) => void
+  onTriggerParamsChange?: (params: Record<string, string>) => void
 }
 
 export type ConditionNodeData = {
@@ -33,6 +36,7 @@ export type ActionNodeData = {
 
 export type AutomationGraph = {
   trigger: string
+  triggerParams?: Record<string, string>
   conditions: AutomationCondition[]
   actions: AutomationAction[]
 }

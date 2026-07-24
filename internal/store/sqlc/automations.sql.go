@@ -14,11 +14,11 @@ import (
 
 const createAutomation = `-- name: CreateAutomation :one
 INSERT INTO automations (
-    id, organisation_id, name, trigger, enabled, conditions, actions
+    id, organisation_id, name, trigger, trigger_params, enabled, conditions, actions
 ) VALUES (
-    $1, $2, $3, $4, $5, $6, $7
+    $1, $2, $3, $4, $5, $6, $7, $8
 )
-RETURNING id, organisation_id, name, trigger, enabled, conditions, actions, created_at, updated_at
+RETURNING id, organisation_id, name, trigger, enabled, conditions, actions, created_at, updated_at, trigger_params
 `
 
 type CreateAutomationParams struct {
@@ -26,6 +26,7 @@ type CreateAutomationParams struct {
 	OrganisationID string          `json:"organisation_id"`
 	Name           string          `json:"name"`
 	Trigger        string          `json:"trigger"`
+	TriggerParams  json.RawMessage `json:"trigger_params"`
 	Enabled        bool            `json:"enabled"`
 	Conditions     json.RawMessage `json:"conditions"`
 	Actions        json.RawMessage `json:"actions"`
@@ -37,6 +38,7 @@ func (q *Queries) CreateAutomation(ctx context.Context, arg CreateAutomationPara
 		arg.OrganisationID,
 		arg.Name,
 		arg.Trigger,
+		arg.TriggerParams,
 		arg.Enabled,
 		arg.Conditions,
 		arg.Actions,
@@ -52,6 +54,7 @@ func (q *Queries) CreateAutomation(ctx context.Context, arg CreateAutomationPara
 		&i.Actions,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.TriggerParams,
 	)
 	return i, err
 }
@@ -109,7 +112,7 @@ func (q *Queries) DeleteAutomation(ctx context.Context, id string) error {
 }
 
 const getAutomation = `-- name: GetAutomation :one
-SELECT id, organisation_id, name, trigger, enabled, conditions, actions, created_at, updated_at FROM automations WHERE id = $1
+SELECT id, organisation_id, name, trigger, enabled, conditions, actions, created_at, updated_at, trigger_params FROM automations WHERE id = $1
 `
 
 func (q *Queries) GetAutomation(ctx context.Context, id string) (Automation, error) {
@@ -125,6 +128,7 @@ func (q *Queries) GetAutomation(ctx context.Context, id string) (Automation, err
 		&i.Actions,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.TriggerParams,
 	)
 	return i, err
 }
@@ -173,7 +177,7 @@ func (q *Queries) ListAutomationRuns(ctx context.Context, arg ListAutomationRuns
 }
 
 const listAutomations = `-- name: ListAutomations :many
-SELECT id, organisation_id, name, trigger, enabled, conditions, actions, created_at, updated_at FROM automations
+SELECT id, organisation_id, name, trigger, enabled, conditions, actions, created_at, updated_at, trigger_params FROM automations
 WHERE organisation_id = $1
 ORDER BY created_at DESC
 `
@@ -197,6 +201,7 @@ func (q *Queries) ListAutomations(ctx context.Context, organisationID string) ([
 			&i.Actions,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.TriggerParams,
 		); err != nil {
 			return nil, err
 		}
@@ -209,7 +214,7 @@ func (q *Queries) ListAutomations(ctx context.Context, organisationID string) ([
 }
 
 const listEnabledAutomationsByTrigger = `-- name: ListEnabledAutomationsByTrigger :many
-SELECT id, organisation_id, name, trigger, enabled, conditions, actions, created_at, updated_at FROM automations
+SELECT id, organisation_id, name, trigger, enabled, conditions, actions, created_at, updated_at, trigger_params FROM automations
 WHERE organisation_id = $1
   AND trigger = $2
   AND enabled = true
@@ -240,6 +245,7 @@ func (q *Queries) ListEnabledAutomationsByTrigger(ctx context.Context, arg ListE
 			&i.Actions,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.TriggerParams,
 		); err != nil {
 			return nil, err
 		}
@@ -282,21 +288,23 @@ const updateAutomation = `-- name: UpdateAutomation :one
 UPDATE automations SET
     name = COALESCE($2, name),
     trigger = COALESCE($3, trigger),
-    enabled = COALESCE($4, enabled),
-    conditions = COALESCE($5, conditions),
-    actions = COALESCE($6, actions),
+    trigger_params = COALESCE($4, trigger_params),
+    enabled = COALESCE($5, enabled),
+    conditions = COALESCE($6, conditions),
+    actions = COALESCE($7, actions),
     updated_at = now()
 WHERE id = $1
-RETURNING id, organisation_id, name, trigger, enabled, conditions, actions, created_at, updated_at
+RETURNING id, organisation_id, name, trigger, enabled, conditions, actions, created_at, updated_at, trigger_params
 `
 
 type UpdateAutomationParams struct {
-	ID         string      `json:"id"`
-	Name       pgtype.Text `json:"name"`
-	Trigger    pgtype.Text `json:"trigger"`
-	Enabled    pgtype.Bool `json:"enabled"`
-	Conditions []byte      `json:"conditions"`
-	Actions    []byte      `json:"actions"`
+	ID            string      `json:"id"`
+	Name          pgtype.Text `json:"name"`
+	Trigger       pgtype.Text `json:"trigger"`
+	TriggerParams []byte      `json:"trigger_params"`
+	Enabled       pgtype.Bool `json:"enabled"`
+	Conditions    []byte      `json:"conditions"`
+	Actions       []byte      `json:"actions"`
 }
 
 func (q *Queries) UpdateAutomation(ctx context.Context, arg UpdateAutomationParams) (Automation, error) {
@@ -304,6 +312,7 @@ func (q *Queries) UpdateAutomation(ctx context.Context, arg UpdateAutomationPara
 		arg.ID,
 		arg.Name,
 		arg.Trigger,
+		arg.TriggerParams,
 		arg.Enabled,
 		arg.Conditions,
 		arg.Actions,
@@ -319,6 +328,7 @@ func (q *Queries) UpdateAutomation(ctx context.Context, arg UpdateAutomationPara
 		&i.Actions,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.TriggerParams,
 	)
 	return i, err
 }

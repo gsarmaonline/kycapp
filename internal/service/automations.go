@@ -19,29 +19,32 @@ import (
 )
 
 type CreateAutomationInput struct {
-	Name       string
-	Trigger    string
-	Enabled    *bool
-	Conditions json.RawMessage
-	Actions    json.RawMessage
+	Name          string
+	Trigger       string
+	TriggerParams json.RawMessage
+	Enabled       *bool
+	Conditions    json.RawMessage
+	Actions       json.RawMessage
 }
 
 type UpdateAutomationInput struct {
-	Name       *string
-	Trigger    *string
-	Enabled    *bool
-	Conditions json.RawMessage
-	Actions    json.RawMessage
+	Name          *string
+	Trigger       *string
+	TriggerParams json.RawMessage
+	Enabled       *bool
+	Conditions    json.RawMessage
+	Actions       json.RawMessage
 }
 
 // AutomationCatalog is the editor/runtime surface for triggers, actions, and condition fields.
 type AutomationCatalog struct {
-	Triggers        []automations.TriggerInfo        `json:"triggers"`
-	Actions         []automations.ActionInfo         `json:"actions"`
-	Ops             []automations.ConditionOpInfo    `json:"ops"`
-	ConditionFields []automations.ConditionFieldInfo `json:"condition_fields"`
-	Databases       []AutomationDatabaseOption       `json:"databases"`
-	Webhooks        []AutomationWebhookOption        `json:"webhooks"`
+	Triggers         []automations.TriggerInfo        `json:"triggers"`
+	Actions          []automations.ActionInfo         `json:"actions"`
+	Ops              []automations.ConditionOpInfo    `json:"ops"`
+	ConditionFields  []automations.ConditionFieldInfo `json:"condition_fields"`
+	Databases        []AutomationDatabaseOption       `json:"databases"`
+	Webhooks         []AutomationWebhookOption        `json:"webhooks"`
+	InboundWebhooks  []AutomationWebhookOption        `json:"inbound_webhooks"`
 }
 
 type AutomationDatabaseOption struct {
@@ -85,6 +88,14 @@ func (s *Service) AutomationCatalog(ctx context.Context, orgID string) (Automati
 		}
 		whOpts = append(whOpts, AutomationWebhookOption{ID: h.ID, Name: h.Name})
 	}
+	inbound, err := s.ListInboundWebhooks(ctx, orgID)
+	if err != nil {
+		return AutomationCatalog{}, err
+	}
+	inOpts := make([]AutomationWebhookOption, 0, len(inbound))
+	for _, h := range inbound {
+		inOpts = append(inOpts, AutomationWebhookOption{ID: h.ID, Name: h.Name})
+	}
 	return AutomationCatalog{
 		Triggers:        automations.ExpandTriggers(attrs),
 		Actions:         automations.Actions(),
@@ -92,6 +103,7 @@ func (s *Service) AutomationCatalog(ctx context.Context, orgID string) (Automati
 		ConditionFields: fields,
 		Databases:       dbOpts,
 		Webhooks:        whOpts,
+		InboundWebhooks: inOpts,
 	}, nil
 }
 
@@ -123,8 +135,8 @@ func (s *Service) automationConditionFields(ctx context.Context, orgID string) (
 	return fields, nil
 }
 
-func (s *Service) validateAutomationSpec(ctx context.Context, orgID, trigger string, conditionsJSON, actionsJSON json.RawMessage) (automations.Spec, error) {
-	spec, err := automations.ValidateCreate(trigger, conditionsJSON, actionsJSON)
+func (s *Service) validateAutomationSpec(ctx context.Context, orgID, trigger string, conditionsJSON, actionsJSON, triggerParamsJSON json.RawMessage) (automations.Spec, error) {
+	spec, err := automations.ValidateCreate(trigger, conditionsJSON, actionsJSON, triggerParamsJSON)
 	if err != nil {
 		return automations.Spec{}, apperr.Validation(err.Error())
 	}
@@ -134,6 +146,9 @@ func (s *Service) validateAutomationSpec(ctx context.Context, orgID, trigger str
 	}
 	if !automations.AllowedTriggerIDs(attrs)[spec.Trigger] {
 		return automations.Spec{}, apperr.Validation(fmt.Sprintf("unknown trigger %q", spec.Trigger))
+	}
+	if err := s.validateTriggerParamBindings(ctx, orgID, spec); err != nil {
+		return automations.Spec{}, err
 	}
 	fields, err := s.automationConditionFields(ctx, orgID)
 	if err != nil {
@@ -147,6 +162,20 @@ func (s *Service) validateAutomationSpec(ctx context.Context, orgID, trigger str
 		return automations.Spec{}, apperr.Validation(err.Error())
 	}
 	return spec, nil
+}
+
+func (s *Service) validateTriggerParamBindings(ctx context.Context, orgID string, spec automations.Spec) error {
+	if spec.Trigger != automations.TriggerWebhookReceived {
+		return nil
+	}
+	hookID := strings.TrimSpace(spec.TriggerParams[automations.ParamInboundWebhookID])
+	if hookID == "" {
+		return apperr.Validation("trigger_params.inbound_webhook_id is required")
+	}
+	if _, err := s.GetInboundWebhook(ctx, orgID, hookID); err != nil {
+		return apperr.Validation("unknown inbound_webhook_id")
+	}
+	return nil
 }
 
 // EnqueueResourceLifecycle fires {resource}.{lifecycle} for a payload.
@@ -169,7 +198,7 @@ func (s *Service) CreateAutomation(ctx context.Context, orgID string, in CreateA
 	if name == "" {
 		return sqlc.Automation{}, apperr.Validation("name is required")
 	}
-	spec, err := s.validateAutomationSpec(ctx, orgID, in.Trigger, in.Conditions, in.Actions)
+	spec, err := s.validateAutomationSpec(ctx, orgID, in.Trigger, in.Conditions, in.Actions, in.TriggerParams)
 	if err != nil {
 		return sqlc.Automation{}, err
 	}
@@ -181,6 +210,10 @@ func (s *Service) CreateAutomation(ctx context.Context, orgID string, in CreateA
 	if err != nil {
 		return sqlc.Automation{}, apperr.Validation("invalid actions")
 	}
+	paramsRaw, err := automations.MarshalTriggerParams(spec.TriggerParams)
+	if err != nil {
+		return sqlc.Automation{}, apperr.Validation("invalid trigger_params")
+	}
 	enabled := true
 	if in.Enabled != nil {
 		enabled = *in.Enabled
@@ -190,6 +223,7 @@ func (s *Service) CreateAutomation(ctx context.Context, orgID string, in CreateA
 		OrganisationID: orgID,
 		Name:           name,
 		Trigger:        spec.Trigger,
+		TriggerParams:  paramsRaw,
 		Enabled:        enabled,
 		Conditions:     condRaw,
 		Actions:        actRaw,
@@ -215,6 +249,13 @@ func (s *Service) UpdateAutomation(ctx context.Context, id string, in UpdateAuto
 	if in.Trigger != nil {
 		trigger = *in.Trigger
 	}
+	paramsRaw := existing.TriggerParams
+	if len(in.TriggerParams) > 0 {
+		paramsRaw = in.TriggerParams
+	}
+	if trigger != automations.TriggerWebhookReceived {
+		paramsRaw = json.RawMessage(`{}`)
+	}
 	condRaw := existing.Conditions
 	if len(in.Conditions) > 0 {
 		condRaw = in.Conditions
@@ -223,7 +264,7 @@ func (s *Service) UpdateAutomation(ctx context.Context, id string, in UpdateAuto
 	if len(in.Actions) > 0 {
 		actRaw = in.Actions
 	}
-	spec, err := s.validateAutomationSpec(ctx, existing.OrganisationID, trigger, condRaw, actRaw)
+	spec, err := s.validateAutomationSpec(ctx, existing.OrganisationID, trigger, condRaw, actRaw, paramsRaw)
 	if err != nil {
 		return sqlc.Automation{}, err
 	}
@@ -235,12 +276,17 @@ func (s *Service) UpdateAutomation(ctx context.Context, id string, in UpdateAuto
 	if err != nil {
 		return sqlc.Automation{}, apperr.Validation("invalid actions")
 	}
+	paramsRaw, err = automations.MarshalTriggerParams(spec.TriggerParams)
+	if err != nil {
+		return sqlc.Automation{}, apperr.Validation("invalid trigger_params")
+	}
 
 	params := sqlc.UpdateAutomationParams{
-		ID:         id,
-		Trigger:    pgtype.Text{String: spec.Trigger, Valid: true},
-		Conditions: condRaw,
-		Actions:    actRaw,
+		ID:            id,
+		Trigger:       pgtype.Text{String: spec.Trigger, Valid: true},
+		TriggerParams: paramsRaw,
+		Conditions:    condRaw,
+		Actions:       actRaw,
 	}
 	if in.Name != nil {
 		name := strings.TrimSpace(*in.Name)
@@ -304,6 +350,14 @@ func (s *Service) ProcessAutomationEvent(ctx context.Context, orgID, trigger str
 	}
 
 	for _, row := range rows {
+		params, err := automations.NormalizeTriggerParams(row.TriggerParams)
+		if err != nil {
+			slog.Error("automation trigger_params invalid", "automation_id", row.ID, "err", err)
+			continue
+		}
+		if !automations.MatchTriggerParams(params, payload) {
+			continue
+		}
 		if err := s.runOneAutomation(ctx, row, trigger, payload, payloadJSON); err != nil {
 			slog.Error("automation run failed", "automation_id", row.ID, "err", err)
 		}

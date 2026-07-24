@@ -19,6 +19,7 @@ type Props = {
   initial?: {
     name: string
     trigger: string
+    triggerParams?: Record<string, string>
     enabled: boolean
     conditionMode?: AutomationConditionMode
     conditions: AutomationCondition[]
@@ -27,6 +28,7 @@ type Props = {
   onSubmit: (input: {
     name: string
     trigger: string
+    trigger_params: Record<string, string>
     enabled: boolean
     conditions: AutomationConditions
     actions: AutomationAction[]
@@ -61,11 +63,24 @@ function serializeConditionValue(
   return String(value ?? '').trim()
 }
 
+function paramsForTrigger(
+  trigger: string,
+  params: Record<string, string>,
+  catalog: AutomationCatalog | null,
+): Record<string, string> {
+  if (trigger !== 'webhook.received') return {}
+  const inboundId = (params.inbound_webhook_id || '').trim()
+  if (inboundId) return { inbound_webhook_id: inboundId }
+  const first = catalog?.inbound_webhooks?.[0]?.id
+  return first ? { inbound_webhook_id: first } : {}
+}
+
 export function AutomationsForm({ submitLabel, cancelTo, initial, onSubmit }: Props) {
   const { orgId = '' } = useParams()
   const initialGraph = normalizeGraph(
     {
       trigger: initial?.trigger,
+      triggerParams: initial?.triggerParams,
       conditions: initial?.conditions,
       actions: initial?.actions,
     },
@@ -74,6 +89,9 @@ export function AutomationsForm({ submitLabel, cancelTo, initial, onSubmit }: Pr
   const [name, setName] = useState(initial?.name ?? '')
   const [enabled, setEnabled] = useState(initial?.enabled ?? true)
   const [trigger, setTrigger] = useState(initialGraph.trigger)
+  const [triggerParams, setTriggerParams] = useState<Record<string, string>>(
+    initialGraph.triggerParams ?? {},
+  )
   const [conditionMode, setConditionMode] = useState<AutomationConditionMode>(
     initial?.conditionMode ?? 'all',
   )
@@ -93,6 +111,9 @@ export function AutomationsForm({ submitLabel, cancelTo, initial, onSubmit }: Pr
         if (!initial?.trigger && c.triggers[0]) {
           setTrigger(c.triggers[0].id)
         }
+        setTriggerParams((prev) =>
+          paramsForTrigger(initial?.trigger || c.triggers[0]?.id || trigger, prev, c),
+        )
         if (!initial?.actions?.length && items[0]) {
           setActions((prev) =>
             prev.map((a) =>
@@ -108,6 +129,11 @@ export function AutomationsForm({ submitLabel, cancelTo, initial, onSubmit }: Pr
       })
   }, [orgId, initial?.trigger, initial?.actions?.length])
 
+  function handleTriggerChange(next: string) {
+    setTrigger(next)
+    setTriggerParams(paramsForTrigger(next, {}, catalog))
+  }
+
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
     setError(null)
@@ -115,6 +141,10 @@ export function AutomationsForm({ submitLabel, cancelTo, initial, onSubmit }: Pr
       const trimmedName = name.trim()
       if (!trimmedName) {
         throw new Error('Name is required')
+      }
+      const cleanedTriggerParams = paramsForTrigger(trigger, triggerParams, catalog)
+      if (trigger === 'webhook.received' && !cleanedTriggerParams.inbound_webhook_id) {
+        throw new Error('Select an inbound webhook for webhook.received')
       }
       const fieldByKey = new Map((catalog?.condition_fields ?? []).map((f) => [f.field, f]))
       const cleanedConditions = conditions
@@ -203,6 +233,7 @@ export function AutomationsForm({ submitLabel, cancelTo, initial, onSubmit }: Pr
       await onSubmit({
         name: trimmedName,
         trigger,
+        trigger_params: cleanedTriggerParams,
         enabled,
         conditions: { mode: conditionMode, items: cleanedConditions },
         actions: cleanedActions,
@@ -239,10 +270,12 @@ export function AutomationsForm({ submitLabel, cancelTo, initial, onSubmit }: Pr
         catalog={catalog}
         emailTemplates={emailTemplates}
         trigger={trigger}
+        triggerParams={triggerParams}
         conditionMode={conditionMode}
         conditions={conditions}
         actions={actions}
-        onTriggerChange={setTrigger}
+        onTriggerChange={handleTriggerChange}
+        onTriggerParamsChange={setTriggerParams}
         onConditionModeChange={setConditionMode}
         onConditionsChange={setConditions}
         onActionsChange={setActions}

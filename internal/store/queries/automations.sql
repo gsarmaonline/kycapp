@@ -1,8 +1,8 @@
 -- name: CreateAutomation :one
 INSERT INTO automations (
-    id, organisation_id, name, trigger, enabled, conditions, actions
+    id, organisation_id, name, trigger, trigger_params, enabled, conditions, actions
 ) VALUES (
-    $1, $2, $3, $4, $5, $6, $7
+    $1, $2, $3, $4, $5, $6, $7, $8
 )
 RETURNING *;
 
@@ -32,6 +32,7 @@ ORDER BY organisation_id;
 UPDATE automations SET
     name = COALESCE(sqlc.narg('name'), name),
     trigger = COALESCE(sqlc.narg('trigger'), trigger),
+    trigger_params = COALESCE(sqlc.narg('trigger_params'), trigger_params),
     enabled = COALESCE(sqlc.narg('enabled'), enabled),
     conditions = COALESCE(sqlc.narg('conditions'), conditions),
     actions = COALESCE(sqlc.narg('actions'), actions),

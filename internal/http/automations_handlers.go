@@ -17,18 +17,19 @@ func (s *Server) handleCreateAutomation(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	var body struct {
-		Name       string          `json:"name"`
-		Trigger    string          `json:"trigger"`
-		Enabled    *bool           `json:"enabled"`
-		Conditions json.RawMessage `json:"conditions"`
-		Actions    json.RawMessage `json:"actions"`
+		Name          string          `json:"name"`
+		Trigger       string          `json:"trigger"`
+		TriggerParams json.RawMessage `json:"trigger_params"`
+		Enabled       *bool           `json:"enabled"`
+		Conditions    json.RawMessage `json:"conditions"`
+		Actions       json.RawMessage `json:"actions"`
 	}
 	if err := decodeJSON(r, &body); err != nil {
 		writeError(w, apperr.Validation("invalid JSON body"))
 		return
 	}
 	row, err := s.svc.CreateAutomation(r.Context(), orgID, service.CreateAutomationInput{
-		Name: body.Name, Trigger: body.Trigger, Enabled: body.Enabled,
+		Name: body.Name, Trigger: body.Trigger, TriggerParams: body.TriggerParams, Enabled: body.Enabled,
 		Conditions: body.Conditions, Actions: body.Actions,
 	})
 	if err != nil {
@@ -94,18 +95,19 @@ func (s *Server) handlePatchAutomation(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var body struct {
-		Name       *string         `json:"name"`
-		Trigger    *string         `json:"trigger"`
-		Enabled    *bool           `json:"enabled"`
-		Conditions json.RawMessage `json:"conditions"`
-		Actions    json.RawMessage `json:"actions"`
+		Name          *string         `json:"name"`
+		Trigger       *string         `json:"trigger"`
+		TriggerParams json.RawMessage `json:"trigger_params"`
+		Enabled       *bool           `json:"enabled"`
+		Conditions    json.RawMessage `json:"conditions"`
+		Actions       json.RawMessage `json:"actions"`
 	}
 	if err := decodeJSON(r, &body); err != nil {
 		writeError(w, apperr.Validation("invalid JSON body"))
 		return
 	}
 	row, err := s.svc.UpdateAutomation(r.Context(), r.PathValue("id"), service.UpdateAutomationInput{
-		Name: body.Name, Trigger: body.Trigger, Enabled: body.Enabled,
+		Name: body.Name, Trigger: body.Trigger, TriggerParams: body.TriggerParams, Enabled: body.Enabled,
 		Conditions: body.Conditions, Actions: body.Actions,
 	})
 	if err != nil {
@@ -153,19 +155,25 @@ func (s *Server) handleListAutomationRuns(w http.ResponseWriter, r *http.Request
 func automationJSON(a sqlc.Automation) map[string]any {
 	var conditions any
 	var actions any
+	var triggerParams any
 	_ = json.Unmarshal(a.Conditions, &conditions)
 	_ = json.Unmarshal(a.Actions, &actions)
+	_ = json.Unmarshal(a.TriggerParams, &triggerParams)
 	if conditions == nil {
 		conditions = map[string]any{"all": []any{}}
 	}
 	if actions == nil {
 		actions = []any{}
 	}
+	if triggerParams == nil {
+		triggerParams = map[string]any{}
+	}
 	return map[string]any{
 		"id":              a.ID,
 		"organisation_id": a.OrganisationID,
 		"name":            a.Name,
 		"trigger":         a.Trigger,
+		"trigger_params":  triggerParams,
 		"enabled":         a.Enabled,
 		"conditions":      conditions,
 		"actions":         actions,
