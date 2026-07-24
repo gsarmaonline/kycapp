@@ -74,6 +74,21 @@ ID shapes (from `core/resources`):
 
 Lifecycles: `created`, `updated`, `deleted`. Attribute triggers fire when that key is set (create) or changed (update). Register new resources in `core/resources.Default()`.
 
+### Trigger params (bindings)
+
+Like action `params`, triggers can bind optional (or required) scope via `trigger_params`. Matching runs at dispatch **before** conditions. Empty values mean “any”.
+
+| Trigger | Params | Required |
+| --- | --- | --- |
+| `webhook.received` | `inbound_webhook_id` | yes |
+| `app_user.attribute.<key>` | `app_user.<key>` (attribute value) | no |
+| `app_user.created\|updated\|deleted` | `status` | no |
+| `membership.*` | `role_id`, `status` | no |
+| `subscription.*` | `plan_id`, `status` | no |
+| `schedule.*` | — | — |
+
+Catalog `triggers[].params` describes the editor fields; `plans` / `roles` / `inbound_webhooks` supply select options.
+
 ### Conditions
 
 Combinator (pick one group):
@@ -192,7 +207,7 @@ Multiple endpoints per org under **Actions → Inbound webhooks**. Each endpoint
 
 Body may be JSON or raw text (stored under `body`). Fires **`webhook.received`** with `inbound_webhook_id` / `inbound_webhook_name`. Subject is the **organisation**.
 
-Automations on this trigger **must** set `trigger_params.inbound_webhook_id` to the endpoint they listen to (same pattern as `call_webhook` + `webhook_id`). Matching happens at dispatch before conditions run. Legacy rows with empty `trigger_params` still match any inbound endpoint until re-saved.
+Automations on this trigger **must** set `trigger_params.inbound_webhook_id` to the endpoint they listen to (same pattern as `call_webhook` + `webhook_id`). Other triggers use optional `trigger_params` for value / plan / role / status scope. Matching happens at dispatch before conditions run. Legacy rows with empty `trigger_params` still match broadly until re-saved.
 
 ```json
 {

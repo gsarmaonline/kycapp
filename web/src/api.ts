@@ -1005,6 +1005,15 @@ export type AutomationCatalog = {
     resource?: string
     kind?: string
     provides?: string[]
+    params?: {
+      key: string
+      label: string
+      required: boolean
+      input: string
+      options_from?: string
+      enum_values?: string[]
+      hint?: string
+    }[]
   }[]
   actions: {
     type: string
@@ -1031,7 +1040,10 @@ export type AutomationCatalog = {
   databases?: { id: string; name: string }[]
   webhooks?: { id: string; name: string }[]
   inbound_webhooks?: { id: string; name: string }[]
+  plans?: { id: string; name: string; key?: string }[]
+  roles?: { id: string; name: string; key?: string }[]
 }
+
 
 export type Automation = {
   id: string

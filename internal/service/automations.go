@@ -38,13 +38,15 @@ type UpdateAutomationInput struct {
 
 // AutomationCatalog is the editor/runtime surface for triggers, actions, and condition fields.
 type AutomationCatalog struct {
-	Triggers         []automations.TriggerInfo        `json:"triggers"`
-	Actions          []automations.ActionInfo         `json:"actions"`
-	Ops              []automations.ConditionOpInfo    `json:"ops"`
-	ConditionFields  []automations.ConditionFieldInfo `json:"condition_fields"`
-	Databases        []AutomationDatabaseOption       `json:"databases"`
-	Webhooks         []AutomationWebhookOption        `json:"webhooks"`
-	InboundWebhooks  []AutomationWebhookOption        `json:"inbound_webhooks"`
+	Triggers        []automations.TriggerInfo        `json:"triggers"`
+	Actions         []automations.ActionInfo         `json:"actions"`
+	Ops             []automations.ConditionOpInfo    `json:"ops"`
+	ConditionFields []automations.ConditionFieldInfo `json:"condition_fields"`
+	Databases       []AutomationDatabaseOption       `json:"databases"`
+	Webhooks        []AutomationWebhookOption        `json:"webhooks"`
+	InboundWebhooks []AutomationWebhookOption        `json:"inbound_webhooks"`
+	Plans           []AutomationCatalogOption        `json:"plans"`
+	Roles           []AutomationCatalogOption        `json:"roles"`
 }
 
 type AutomationDatabaseOption struct {
@@ -57,8 +59,18 @@ type AutomationWebhookOption struct {
 	Name string `json:"name"`
 }
 
+type AutomationCatalogOption struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+	Key  string `json:"key,omitempty"`
+}
+
 func (s *Service) AutomationCatalog(ctx context.Context, orgID string) (AutomationCatalog, error) {
 	attrs, err := s.appUserAttributeKeys(ctx, orgID)
+	if err != nil {
+		return AutomationCatalog{}, err
+	}
+	attrEnums, err := s.appUserAttributeEnums(ctx, orgID)
 	if err != nil {
 		return AutomationCatalog{}, err
 	}
@@ -96,15 +108,58 @@ func (s *Service) AutomationCatalog(ctx context.Context, orgID string) (Automati
 	for _, h := range inbound {
 		inOpts = append(inOpts, AutomationWebhookOption{ID: h.ID, Name: h.Name})
 	}
+	plans, err := s.ListPlans(ctx)
+	if err != nil {
+		return AutomationCatalog{}, err
+	}
+	planOpts := make([]AutomationCatalogOption, 0, len(plans))
+	for _, p := range plans {
+		if p.Plan.Status != "" && p.Plan.Status != "active" {
+			continue
+		}
+		planOpts = append(planOpts, AutomationCatalogOption{
+			ID: p.Plan.ID, Name: p.Plan.Name, Key: p.Plan.Key,
+		})
+	}
+	roles, err := s.ListRoles(ctx, orgID)
+	if err != nil {
+		return AutomationCatalog{}, err
+	}
+	roleOpts := make([]AutomationCatalogOption, 0, len(roles))
+	for _, r := range roles {
+		roleOpts = append(roleOpts, AutomationCatalogOption{
+			ID: r.Role.ID, Name: r.Role.Name, Key: r.Role.Key,
+		})
+	}
 	return AutomationCatalog{
-		Triggers:        automations.ExpandTriggers(attrs),
+		Triggers:        automations.EnrichTriggersWithParams(automations.ExpandTriggers(attrs), attrEnums),
 		Actions:         automations.Actions(),
 		Ops:             automations.ConditionOps(),
 		ConditionFields: fields,
 		Databases:       dbOpts,
 		Webhooks:        whOpts,
 		InboundWebhooks: inOpts,
+		Plans:           planOpts,
+		Roles:           roleOpts,
 	}, nil
+}
+
+func (s *Service) appUserAttributeEnums(ctx context.Context, orgID string) (map[string][]string, error) {
+	defs, err := s.ListAttributeDefinitions(ctx, orgID, "active")
+	if err != nil {
+		return nil, err
+	}
+	out := make(map[string][]string)
+	for _, d := range defs {
+		var enums []string
+		if len(d.EnumValues) > 0 {
+			_ = json.Unmarshal(d.EnumValues, &enums)
+		}
+		if len(enums) > 0 {
+			out[d.Key] = enums
+		}
+	}
+	return out, nil
 }
 
 func (s *Service) appUserAttributeKeys(ctx context.Context, orgID string) ([]resources.AttributeKey, error) {
@@ -165,15 +220,25 @@ func (s *Service) validateAutomationSpec(ctx context.Context, orgID, trigger str
 }
 
 func (s *Service) validateTriggerParamBindings(ctx context.Context, orgID string, spec automations.Spec) error {
-	if spec.Trigger != automations.TriggerWebhookReceived {
-		return nil
+	params := spec.TriggerParams
+	if id := strings.TrimSpace(params[automations.ParamInboundWebhookID]); id != "" {
+		if _, err := s.GetInboundWebhook(ctx, orgID, id); err != nil {
+			return apperr.Validation("unknown inbound_webhook_id")
+		}
 	}
-	hookID := strings.TrimSpace(spec.TriggerParams[automations.ParamInboundWebhookID])
-	if hookID == "" {
-		return apperr.Validation("trigger_params.inbound_webhook_id is required")
+	if id := strings.TrimSpace(params[automations.ParamRoleID]); id != "" {
+		role, err := s.GetRole(ctx, id)
+		if err != nil {
+			return apperr.Validation("unknown role_id")
+		}
+		if role.Role.OrganisationID != orgID {
+			return apperr.Validation("unknown role_id")
+		}
 	}
-	if _, err := s.GetInboundWebhook(ctx, orgID, hookID); err != nil {
-		return apperr.Validation("unknown inbound_webhook_id")
+	if id := strings.TrimSpace(params[automations.ParamPlanID]); id != "" {
+		if _, err := s.GetPlan(ctx, id); err != nil {
+			return apperr.Validation("unknown plan_id")
+		}
 	}
 	return nil
 }
@@ -252,9 +317,6 @@ func (s *Service) UpdateAutomation(ctx context.Context, id string, in UpdateAuto
 	paramsRaw := existing.TriggerParams
 	if len(in.TriggerParams) > 0 {
 		paramsRaw = in.TriggerParams
-	}
-	if trigger != automations.TriggerWebhookReceived {
-		paramsRaw = json.RawMessage(`{}`)
 	}
 	condRaw := existing.Conditions
 	if len(in.Conditions) > 0 {

@@ -159,6 +159,8 @@ export function buildFlowElements(
         readOnly: opts.readOnly,
         triggers: opts.catalog?.triggers,
         inboundWebhooks: opts.catalog?.inbound_webhooks,
+        plans: opts.catalog?.plans,
+        roles: opts.catalog?.roles,
         onTriggerChange: opts.onTriggerChange,
         onTriggerParamsChange: opts.onTriggerParamsChange,
       },

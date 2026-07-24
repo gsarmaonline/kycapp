@@ -26,12 +26,25 @@ type Trigger struct {
 
 // TriggerInfo is the editor-facing descriptor (JSON-friendly).
 type TriggerInfo struct {
-	ID          string   `json:"id"`
+	ID          string             `json:"id"`
+	Label       string             `json:"label"`
+	Description string             `json:"description"`
+	Resource    string             `json:"resource"`
+	Kind        string             `json:"kind"` // lifecycle | attribute | schedule | webhook
+	Provides    []string           `json:"provides"`
+	Params      []TriggerParamInfo `json:"params,omitempty"`
+}
+
+// TriggerParamInfo describes an optional or required binding on a trigger
+// (same idea as action params: type + concrete scope).
+type TriggerParamInfo struct {
+	Key         string   `json:"key"`
 	Label       string   `json:"label"`
-	Description string   `json:"description"`
-	Resource    string   `json:"resource"`
-	Kind        string   `json:"kind"` // lifecycle | attribute | schedule
-	Provides    []string `json:"provides"`
+	Required    bool     `json:"required"`
+	Input       string   `json:"input"`                   // text | select
+	OptionsFrom string   `json:"options_from,omitempty"` // catalog list: inbound_webhooks | plans | roles
+	EnumValues  []string `json:"enum_values,omitempty"`
+	Hint        string   `json:"hint,omitempty"`
 }
 
 // LifecycleTrigger builds {resource}.{event}.

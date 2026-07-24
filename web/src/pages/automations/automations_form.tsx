@@ -68,11 +68,21 @@ function paramsForTrigger(
   params: Record<string, string>,
   catalog: AutomationCatalog | null,
 ): Record<string, string> {
-  if (trigger !== 'webhook.received') return {}
-  const inboundId = (params.inbound_webhook_id || '').trim()
-  if (inboundId) return { inbound_webhook_id: inboundId }
-  const first = catalog?.inbound_webhooks?.[0]?.id
-  return first ? { inbound_webhook_id: first } : {}
+  const schema = catalog?.triggers?.find((t) => t.id === trigger)?.params ?? []
+  const out: Record<string, string> = {}
+  for (const p of schema) {
+    const v = (params[p.key] || '').trim()
+    if (v) out[p.key] = v
+  }
+  // Default required select bindings when empty (e.g. inbound webhook).
+  for (const p of schema) {
+    if (!p.required || out[p.key]) continue
+    if (p.options_from === 'inbound_webhooks') {
+      const first = catalog?.inbound_webhooks?.[0]?.id
+      if (first) out[p.key] = first
+    }
+  }
+  return out
 }
 
 export function AutomationsForm({ submitLabel, cancelTo, initial, onSubmit }: Props) {
@@ -143,8 +153,11 @@ export function AutomationsForm({ submitLabel, cancelTo, initial, onSubmit }: Pr
         throw new Error('Name is required')
       }
       const cleanedTriggerParams = paramsForTrigger(trigger, triggerParams, catalog)
-      if (trigger === 'webhook.received' && !cleanedTriggerParams.inbound_webhook_id) {
-        throw new Error('Select an inbound webhook for webhook.received')
+      const triggerSchema = catalog?.triggers?.find((t) => t.id === trigger)?.params ?? []
+      for (const p of triggerSchema) {
+        if (p.required && !cleanedTriggerParams[p.key]) {
+          throw new Error(`${p.label} is required for this trigger`)
+        }
       }
       const fieldByKey = new Map((catalog?.condition_fields ?? []).map((f) => [f.field, f]))
       const cleanedConditions = conditions

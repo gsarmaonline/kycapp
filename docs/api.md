@@ -286,11 +286,11 @@ Org-scoped message copy for **app users** (not KYC member invites). Domain helpe
 Org-scoped rules: trigger → AND/OR conditions → ordered actions. Executed by the River worker (`cmd/worker`). Domain: `core/automations`. See [automations.md](automations.md).
 
 - `GET /v1/organisations/{id}/automations/catalog` — requires `automations:read`  
-  Returns `triggers`, `actions` (+ params), `ops`, `condition_fields`, connected `databases` (for `db_insert`), connected `webhooks` (for `call_webhook`), and `inbound_webhooks` (for `webhook.received` trigger binding).
+  Returns `triggers` (each may include `params` bindings), `actions` (+ params), `ops`, `condition_fields`, connected `databases` (for `db_insert`), connected `webhooks` (for `call_webhook`), `inbound_webhooks`, platform `plans`, and org `roles` (for trigger scoping).
 - `GET /v1/organisations/{id}/automations` — requires `automations:read`
 - `POST /v1/organisations/{id}/automations` — requires `automations:manage`  
   `{ "name", "trigger", "trigger_params"?, "enabled"?, "conditions": { "mode": "all"|"any", "items": [{ "field", "op", "value"? }] }, "actions": [{ "type", "params" }] }`  
-  Action types: `send_email` (`template_key`), `call_webhook` (`webhook_id`), `db_insert` (`database_id`, `table`, optional `mode`/`mapping`), `delay` (`duration`). Optional workflow edges: `id`, `on_success`, `on_error`. Schedule triggers: `schedule.hourly|daily|weekly` (org subject, UTC). `webhook.received` requires `trigger_params.inbound_webhook_id`. Legacy `{ "all": [...] }` / `{ "any": [...] }` also accepted.
+  Action types: `send_email` (`template_key`), `call_webhook` (`webhook_id`), `db_insert` (`database_id`, `table`, optional `mode`/`mapping`), `delay` (`duration`). Optional workflow edges: `id`, `on_success`, `on_error`. Schedule triggers: `schedule.hourly|daily|weekly` (org subject, UTC). `webhook.received` requires `trigger_params.inbound_webhook_id`. Other triggers accept optional scope params (attribute value, `status`, `plan_id`, `role_id`). Legacy `{ "all": [...] }` / `{ "any": [...] }` also accepted.
 - `GET /v1/automations/{id}` — requires `automations:read`
 - `PATCH /v1/automations/{id}` — requires `automations:manage`
 - `DELETE /v1/automations/{id}` — requires `automations:manage`

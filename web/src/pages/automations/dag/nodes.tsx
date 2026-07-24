@@ -125,11 +125,34 @@ export function TriggerNode({ data }: NodeProps<TriggerFlowNode>) {
         { id: 'app_user.created', label: 'App user created', description: '' },
         { id: 'app_user.updated', label: 'App user updated', description: '' },
       ]
-  const inbound = data.inboundWebhooks ?? []
-  const isWebhook = data.trigger === 'webhook.received'
-  const inboundId = data.triggerParams?.inbound_webhook_id ?? ''
-  const inboundLabel =
-    inbound.find((h) => h.id === inboundId)?.name || inboundId || '—'
+  const selected = triggers.find((t) => t.id === data.trigger)
+  const paramDefs = selected?.params ?? []
+  const params = data.triggerParams ?? {}
+
+  function optionsFor(from?: string): { id: string; name: string }[] {
+    if (from === 'inbound_webhooks') return data.inboundWebhooks ?? []
+    if (from === 'plans') return data.plans ?? []
+    if (from === 'roles') return data.roles ?? []
+    return []
+  }
+
+  function setParam(key: string, value: string) {
+    const next = { ...params }
+    if (!value.trim()) delete next[key]
+    else next[key] = value
+    data.onTriggerParamsChange?.(next)
+  }
+
+  function paramDisplay(key: string, value: string, def?: (typeof paramDefs)[number]) {
+    if (!value) return null
+    const opts = optionsFor(def?.options_from)
+    const label = opts.find((o) => o.id === value)?.name || value
+    return (
+      <p key={key} className="field-hint" style={{ margin: '0.25rem 0 0' }}>
+        {def?.label || key}: {label}
+      </p>
+    )
+  }
 
   return (
     <div className={`dag-node dag-node-trigger${data.readOnly ? ' is-readonly' : ''}`}>
@@ -137,11 +160,7 @@ export function TriggerNode({ data }: NodeProps<TriggerFlowNode>) {
       {data.readOnly ? (
         <>
           <strong className="dag-node-title">{data.trigger}</strong>
-          {isWebhook && (
-            <p className="field-hint" style={{ margin: '0.35rem 0 0' }}>
-              Inbound: {inboundLabel}
-            </p>
-          )}
+          {paramDefs.map((p) => paramDisplay(p.key, params[p.key] || '', p))}
         </>
       ) : (
         <>
@@ -156,30 +175,50 @@ export function TriggerNode({ data }: NodeProps<TriggerFlowNode>) {
               </option>
             ))}
           </select>
-          {isWebhook && (
-            <label className="dag-node-field">
-              Inbound webhook
-              <select
-                className="dag-node-select"
-                value={inboundId}
-                onChange={(e) =>
-                  data.onTriggerParamsChange?.({
-                    inbound_webhook_id: e.target.value,
-                  })
-                }
-              >
-                <option value="">Select endpoint…</option>
-                {inboundId && !inbound.some((h) => h.id === inboundId) && (
-                  <option value={inboundId}>{inboundId} (missing)</option>
+          {paramDefs.map((p) => {
+            const value = params[p.key] ?? ''
+            const opts = optionsFor(p.options_from)
+            const useSelect =
+              p.input === 'select' && (opts.length > 0 || (p.enum_values?.length ?? 0) > 0)
+            return (
+              <label key={p.key} className="dag-node-field" title={p.hint}>
+                {p.label}
+                {p.required ? '' : ' (optional)'}
+                {useSelect ? (
+                  <select
+                    className="dag-node-select"
+                    value={value}
+                    onChange={(e) => setParam(p.key, e.target.value)}
+                  >
+                    <option value="">{p.required ? 'Select…' : 'Any'}</option>
+                    {value &&
+                      opts.length > 0 &&
+                      !opts.some((o) => o.id === value) &&
+                      !(p.enum_values ?? []).includes(value) && (
+                        <option value={value}>{value} (missing)</option>
+                      )}
+                    {opts.map((o) => (
+                      <option key={o.id} value={o.id}>
+                        {o.name}
+                      </option>
+                    ))}
+                    {(p.enum_values ?? []).map((v) => (
+                      <option key={v} value={v}>
+                        {v}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <input
+                    className="dag-node-select"
+                    value={value}
+                    onChange={(e) => setParam(p.key, e.target.value)}
+                    placeholder={p.hint || 'Any'}
+                  />
                 )}
-                {inbound.map((h) => (
-                  <option key={h.id} value={h.id}>
-                    {h.name}
-                  </option>
-                ))}
-              </select>
-            </label>
-          )}
+              </label>
+            )
+          })}
         </>
       )}
       <Handle type="source" position={Position.Right} />

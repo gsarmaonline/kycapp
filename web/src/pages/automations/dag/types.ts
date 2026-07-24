@@ -6,6 +6,8 @@ export type TriggerNodeData = {
   readOnly: boolean
   triggers?: AutomationCatalog['triggers']
   inboundWebhooks?: { id: string; name: string }[]
+  plans?: { id: string; name: string; key?: string }[]
+  roles?: { id: string; name: string; key?: string }[]
   onTriggerChange?: (trigger: string) => void
   onTriggerParamsChange?: (params: Record<string, string>) => void
 }
