@@ -10,8 +10,7 @@ ON CONFLICT DO NOTHING;
 UPDATE subscriptions s
 SET
     plan_id = 'plan_free',
-    status = 'active',
-    updated_at = now()
+    status = 'active'
 FROM plans p
 WHERE s.plan_id = p.id
   AND p.key = 'trial'

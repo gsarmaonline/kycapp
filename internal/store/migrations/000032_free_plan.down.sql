@@ -1,8 +1,7 @@
 UPDATE subscriptions s
 SET
     plan_id = 'plan_trial',
-    status = 'trialing',
-    updated_at = now()
+    status = 'trialing'
 FROM plans p
 WHERE s.plan_id = p.id
   AND p.key = 'free_plan'
