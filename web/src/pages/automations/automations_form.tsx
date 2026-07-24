@@ -7,6 +7,8 @@ import {
   type AutomationAction,
   type AutomationCatalog,
   type AutomationCondition,
+  type AutomationConditionMode,
+  type AutomationConditions,
 } from '../../api'
 import { AutomationDag } from './dag/AutomationDag'
 import { normalizeGraph } from './dag/build_graph'
@@ -18,6 +20,7 @@ type Props = {
     name: string
     trigger: string
     enabled: boolean
+    conditionMode?: AutomationConditionMode
     conditions: AutomationCondition[]
     actions: AutomationAction[]
   }
@@ -25,9 +28,37 @@ type Props = {
     name: string
     trigger: string
     enabled: boolean
-    conditions: { all: AutomationCondition[] }
+    conditions: AutomationConditions
     actions: AutomationAction[]
   }) => Promise<void>
+}
+
+function serializeConditionValue(
+  op: string,
+  value: AutomationCondition['value'],
+  valueType?: string,
+): AutomationCondition['value'] | undefined {
+  if (op === 'exists' || op === 'not_exists') return undefined
+  if (op === 'in' || op === 'not_in') {
+    const list = Array.isArray(value)
+      ? value.map((v) => String(v).trim()).filter(Boolean)
+      : String(value ?? '')
+          .split(',')
+          .map((s) => s.trim())
+          .filter(Boolean)
+    return list
+  }
+  if (valueType === 'boolean') {
+    if (typeof value === 'boolean') return value
+    const s = String(value ?? '').toLowerCase()
+    return s === 'true' || s === '1'
+  }
+  if (valueType === 'number') {
+    if (typeof value === 'number' && Number.isFinite(value)) return value
+    const n = Number(String(value ?? '').trim())
+    return Number.isFinite(n) ? n : String(value ?? '').trim()
+  }
+  return String(value ?? '').trim()
 }
 
 export function AutomationsForm({ submitLabel, cancelTo, initial, onSubmit }: Props) {
@@ -43,6 +74,9 @@ export function AutomationsForm({ submitLabel, cancelTo, initial, onSubmit }: Pr
   const [name, setName] = useState(initial?.name ?? '')
   const [enabled, setEnabled] = useState(initial?.enabled ?? true)
   const [trigger, setTrigger] = useState(initialGraph.trigger)
+  const [conditionMode, setConditionMode] = useState<AutomationConditionMode>(
+    initial?.conditionMode ?? 'all',
+  )
   const [conditions, setConditions] = useState(initialGraph.conditions)
   const [actions, setActions] = useState(initialGraph.actions)
   const [catalog, setCatalog] = useState<AutomationCatalog | null>(null)
@@ -82,15 +116,31 @@ export function AutomationsForm({ submitLabel, cancelTo, initial, onSubmit }: Pr
       if (!trimmedName) {
         throw new Error('Name is required')
       }
+      const fieldByKey = new Map((catalog?.condition_fields ?? []).map((f) => [f.field, f]))
       const cleanedConditions = conditions
-        .map((c) => ({
-          field: c.field.trim(),
-          op: c.op,
-          value: c.op === 'exists' || c.op === 'not_exists' ? undefined : String(c.value ?? '').trim(),
-        }))
+        .map((c) => {
+          const meta = fieldByKey.get(c.field)
+          const value = serializeConditionValue(c.op, c.value, meta?.value_type)
+          return {
+            field: c.field.trim(),
+            op: c.op,
+            ...(value === undefined ? {} : { value }),
+          }
+        })
         .filter((c) => c.field)
       if (!cleanedConditions.length) {
         throw new Error('Add at least one condition')
+      }
+      for (const c of cleanedConditions) {
+        const opMeta = catalog?.ops.find((o) => o.op === c.op)
+        if (opMeta?.needs_list) {
+          const list = Array.isArray(c.value) ? c.value : []
+          if (!list.length) {
+            throw new Error(`Condition on ${c.field} needs at least one value for “${opMeta.label}”`)
+          }
+        } else if (opMeta?.needs_value && (c.value === undefined || c.value === '')) {
+          throw new Error(`Condition on ${c.field} needs a value`)
+        }
       }
       const cleanedActions = actions
         .map((a) => {
@@ -119,7 +169,7 @@ export function AutomationsForm({ submitLabel, cancelTo, initial, onSubmit }: Pr
         name: trimmedName,
         trigger,
         enabled,
-        conditions: { all: cleanedConditions },
+        conditions: { mode: conditionMode, items: cleanedConditions },
         actions: cleanedActions,
       })
     } catch (err) {
@@ -154,9 +204,11 @@ export function AutomationsForm({ submitLabel, cancelTo, initial, onSubmit }: Pr
         catalog={catalog}
         emailTemplates={emailTemplates}
         trigger={trigger}
+        conditionMode={conditionMode}
         conditions={conditions}
         actions={actions}
         onTriggerChange={setTrigger}
+        onConditionModeChange={setConditionMode}
         onConditionsChange={setConditions}
         onActionsChange={setActions}
       />

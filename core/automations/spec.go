@@ -8,13 +8,6 @@ import (
 	"github.com/gsarmaonline/kyc/core/resources"
 )
 
-const (
-	OpEq        = "eq"
-	OpNeq       = "neq"
-	OpExists    = "exists"
-	OpNotExists = "not_exists"
-)
-
 // Convenience aliases for common lifecycle triggers.
 var (
 	TriggerAppUserCreated      = resources.LifecycleTrigger(resources.AppUser, resources.LifecycleCreated)
@@ -33,16 +26,6 @@ type Spec struct {
 	Actions    []Action   `json:"actions"`
 }
 
-type Conditions struct {
-	All []Condition `json:"all"`
-}
-
-type Condition struct {
-	Field string `json:"field"`
-	Op    string `json:"op"`
-	Value any    `json:"value,omitempty"`
-}
-
 // ValidateCreate checks trigger, conditions, and actions for create/update
 // against the registered catalogs in registry.go.
 func ValidateCreate(trigger string, conditionsJSON, actionsJSON json.RawMessage) (Spec, error) {
@@ -57,22 +40,13 @@ func ValidateCreate(trigger string, conditionsJSON, actionsJSON json.RawMessage)
 	} else if err := json.Unmarshal(conditionsJSON, &cond); err != nil {
 		return Spec{}, fmt.Errorf("invalid conditions JSON")
 	}
-	if cond.All == nil {
-		cond.All = []Condition{}
+	cond = cond.Normalize()
+	var err error
+	if cond.All, err = validateConditionList("conditions.all", cond.All); err != nil {
+		return Spec{}, err
 	}
-	for i, c := range cond.All {
-		c.Field = strings.TrimSpace(c.Field)
-		c.Op = strings.TrimSpace(c.Op)
-		if c.Field == "" {
-			return Spec{}, fmt.Errorf("conditions.all[%d].field is required", i)
-		}
-		if !KnownOp(c.Op) {
-			return Spec{}, fmt.Errorf("conditions.all[%d].op must be eq, neq, exists, or not_exists", i)
-		}
-		if (c.Op == OpEq || c.Op == OpNeq) && c.Value == nil {
-			return Spec{}, fmt.Errorf("conditions.all[%d].value is required for %s", i, c.Op)
-		}
-		cond.All[i] = c
+	if cond.Any, err = validateConditionList("conditions.any", cond.Any); err != nil {
+		return Spec{}, err
 	}
 
 	var actions []Action
@@ -100,108 +74,37 @@ func ValidateCreate(trigger string, conditionsJSON, actionsJSON json.RawMessage)
 }
 
 // ValidateConditionFields ensures each condition field is in the allowed set
-// (base payload fields + org attribute definitions).
-func ValidateConditionFields(cond Conditions, allowed map[string]bool) error {
-	for i, c := range cond.All {
-		if !allowed[c.Field] {
-			return fmt.Errorf("conditions.all[%d].field %q is not an available condition field", i, c.Field)
-		}
-	}
-	return nil
-}
-
-// AllowedConditionFieldSet builds a lookup from catalog fields.
-func AllowedConditionFieldSet(fields []ConditionFieldInfo) map[string]bool {
-	out := make(map[string]bool, len(fields))
+// and that the operator is valid for that field's value type.
+func ValidateConditionFields(cond Conditions, fields []ConditionFieldInfo) error {
+	byField := make(map[string]ConditionFieldInfo, len(fields))
 	for _, f := range fields {
-		out[f.Field] = true
+		byField[f.Field] = f
 	}
-	return out
-}
-
-// Match reports whether all conditions pass against payload.
-func Match(cond Conditions, payload map[string]any) bool {
-	for _, c := range cond.All {
-		if !matchOne(c, payload) {
-			return false
+	n := cond.Normalize()
+	check := func(prefix string, list []Condition) error {
+		for i, c := range list {
+			info, ok := byField[c.Field]
+			if !ok {
+				return fmt.Errorf("%s[%d].field %q is not an available condition field", prefix, i, c.Field)
+			}
+			if len(info.AllowedOps) == 0 {
+				continue
+			}
+			allowed := false
+			for _, op := range info.AllowedOps {
+				if op == c.Op {
+					allowed = true
+					break
+				}
+			}
+			if !allowed {
+				return fmt.Errorf("%s[%d].op %q is not valid for field %q (%s)", prefix, i, c.Op, c.Field, info.ValueType)
+			}
 		}
+		return nil
 	}
-	return true
-}
-
-func matchOne(c Condition, payload map[string]any) bool {
-	val, ok := lookup(payload, c.Field)
-	switch c.Op {
-	case OpExists:
-		return ok && val != nil && val != ""
-	case OpNotExists:
-		return !ok || val == nil || val == ""
-	case OpEq:
-		return ok && stringify(val) == stringify(c.Value)
-	case OpNeq:
-		return !ok || stringify(val) != stringify(c.Value)
-	default:
-		return false
+	if err := check("conditions.all", n.All); err != nil {
+		return err
 	}
-}
-
-func lookup(payload map[string]any, field string) (any, bool) {
-	parts := strings.Split(field, ".")
-	var cur any = payload
-	for _, p := range parts {
-		m, ok := cur.(map[string]any)
-		if !ok {
-			return nil, false
-		}
-		next, ok := m[p]
-		if !ok {
-			return nil, false
-		}
-		cur = next
-	}
-	return cur, true
-}
-
-func stringify(v any) string {
-	if v == nil {
-		return ""
-	}
-	switch t := v.(type) {
-	case string:
-		return t
-	case json.Number:
-		return t.String()
-	case float64:
-		// JSON numbers decode as float64
-		if t == float64(int64(t)) {
-			return fmt.Sprintf("%d", int64(t))
-		}
-		return fmt.Sprintf("%v", t)
-	case bool:
-		if t {
-			return "true"
-		}
-		return "false"
-	default:
-		b, err := json.Marshal(t)
-		if err != nil {
-			return fmt.Sprintf("%v", t)
-		}
-		return strings.Trim(string(b), `"`)
-	}
-}
-
-// MarshalConditions / MarshalActions for persistence.
-func MarshalConditions(c Conditions) (json.RawMessage, error) {
-	if c.All == nil {
-		c.All = []Condition{}
-	}
-	return json.Marshal(c)
-}
-
-func MarshalActions(a []Action) (json.RawMessage, error) {
-	if a == nil {
-		a = []Action{}
-	}
-	return json.Marshal(a)
+	return check("conditions.any", n.Any)
 }

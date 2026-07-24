@@ -763,10 +763,46 @@ export function deleteEmailTemplate(id: string) {
   return request<EmailTemplate>(`/v1/email-templates/${id}`, { method: 'DELETE' })
 }
 
+export type AutomationConditionOp =
+  | 'eq'
+  | 'neq'
+  | 'exists'
+  | 'not_exists'
+  | 'in'
+  | 'not_in'
+  | 'gt'
+  | 'gte'
+  | 'lt'
+  | 'lte'
+  | 'contains'
+
 export type AutomationCondition = {
   field: string
-  op: 'eq' | 'neq' | 'exists' | 'not_exists'
-  value?: string
+  op: AutomationConditionOp | string
+  value?: string | number | boolean | string[]
+}
+
+export type AutomationConditionMode = 'all' | 'any'
+
+export type AutomationConditions = {
+  mode?: AutomationConditionMode
+  items?: AutomationCondition[]
+  all?: AutomationCondition[]
+  any?: AutomationCondition[]
+}
+
+export function flattenAutomationConditions(c?: AutomationConditions | null): {
+  mode: AutomationConditionMode
+  items: AutomationCondition[]
+} {
+  if (!c) return { mode: 'all', items: [] }
+  if (c.items?.length) {
+    return { mode: c.mode === 'any' ? 'any' : 'all', items: [...c.items] }
+  }
+  if ((c.any?.length ?? 0) > 0 && !(c.all?.length ?? 0)) {
+    return { mode: 'any', items: [...(c.any ?? [])] }
+  }
+  return { mode: c.mode === 'any' ? 'any' : 'all', items: [...(c.all ?? [])] }
 }
 
 export type AutomationAction = {
@@ -792,12 +828,20 @@ export type AutomationCatalog = {
     params: { key: string; label: string; required: boolean }[]
     requires?: string[]
   }[]
-  ops: { op: string; label: string; needs_value: boolean }[]
+  ops: {
+    op: string
+    label: string
+    needs_value: boolean
+    needs_list?: boolean
+    value_types?: string[]
+  }[]
   condition_fields: {
     field: string
     label: string
     value_type: string
     group: string
+    enum_values?: string[]
+    allowed_ops?: string[]
   }[]
 }
 
@@ -807,7 +851,7 @@ export type Automation = {
   name: string
   trigger: string
   enabled: boolean
-  conditions: { all: AutomationCondition[] }
+  conditions: AutomationConditions
   actions: AutomationAction[]
 }
 
@@ -839,7 +883,7 @@ export function createAutomation(
     name: string
     trigger: string
     enabled?: boolean
-    conditions: { all: AutomationCondition[] }
+    conditions: AutomationConditions
     actions: AutomationAction[]
   },
 ) {
@@ -855,7 +899,7 @@ export function updateAutomation(
     name?: string
     trigger?: string
     enabled?: boolean
-    conditions?: { all: AutomationCondition[] }
+    conditions?: AutomationConditions
     actions?: AutomationAction[]
   },
 ) {

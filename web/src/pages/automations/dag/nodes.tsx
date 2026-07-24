@@ -1,11 +1,122 @@
 import { Handle, Position, type Node, type NodeProps } from '@xyflow/react'
-import type { AutomationCondition } from '../../../api'
+import type { AutomationCatalog, AutomationCondition } from '../../../api'
 import type { ActionNodeData, ConditionNodeData, TriggerNodeData } from './types'
 
 export type TriggerFlowNode = Node<TriggerNodeData, 'trigger'>
 export type ConditionFlowNode = Node<ConditionNodeData, 'condition'>
 export type ActionFlowNode = Node<ActionNodeData, 'action'>
 export type AutomationFlowNode = TriggerFlowNode | ConditionFlowNode | ActionFlowNode
+
+function opsForField(
+  field: AutomationCatalog['condition_fields'][number] | undefined,
+  allOps: AutomationCatalog['ops'],
+): AutomationCatalog['ops'] {
+  if (field?.allowed_ops?.length) {
+    const allowed = new Set(field.allowed_ops)
+    const filtered = allOps.filter((o) => allowed.has(o.op))
+    if (filtered.length) return filtered
+  }
+  if (field?.value_type) {
+    const filtered = allOps.filter(
+      (o) => !o.value_types?.length || o.value_types.includes(field.value_type),
+    )
+    if (filtered.length) return filtered
+  }
+  return allOps
+}
+
+function displayValue(value: AutomationCondition['value']): string {
+  if (Array.isArray(value)) return value.join(', ')
+  if (value == null) return ''
+  return String(value)
+}
+
+function ConditionValueInput({
+  condition,
+  field,
+  op,
+  onChange,
+}: {
+  condition: AutomationCondition
+  field?: AutomationCatalog['condition_fields'][number]
+  op?: AutomationCatalog['ops'][number]
+  onChange: (next: AutomationCondition) => void
+}) {
+  if (!op?.needs_value) return null
+
+  const enums = field?.enum_values ?? []
+  const valueType = field?.value_type ?? 'string'
+  const isList = Boolean(op.needs_list)
+
+  if (valueType === 'boolean' && !isList) {
+    return (
+      <select
+        value={displayValue(condition.value) || 'true'}
+        onChange={(e) => onChange({ ...condition, value: e.target.value })}
+      >
+        <option value="true">true</option>
+        <option value="false">false</option>
+      </select>
+    )
+  }
+
+  if (enums.length > 0 && !isList) {
+    return (
+      <select
+        value={displayValue(condition.value)}
+        onChange={(e) => onChange({ ...condition, value: e.target.value })}
+      >
+        <option value="">Select…</option>
+        {enums.map((v) => (
+          <option key={v} value={v}>
+            {v}
+          </option>
+        ))}
+      </select>
+    )
+  }
+
+  if (enums.length > 0 && isList) {
+    return (
+      <input
+        value={displayValue(condition.value)}
+        onChange={(e) => onChange({ ...condition, value: e.target.value })}
+        placeholder={enums.slice(0, 3).join(', ') + (enums.length > 3 ? ', …' : '')}
+        title="Comma-separated values"
+      />
+    )
+  }
+
+  if (valueType === 'date' && !isList) {
+    return (
+      <input
+        type="date"
+        value={displayValue(condition.value)}
+        onChange={(e) => onChange({ ...condition, value: e.target.value })}
+      />
+    )
+  }
+
+  if (valueType === 'number' && !isList) {
+    return (
+      <input
+        type="number"
+        value={displayValue(condition.value)}
+        onChange={(e) => onChange({ ...condition, value: e.target.value })}
+        placeholder="number"
+      />
+    )
+  }
+
+  return (
+    <input
+      value={displayValue(condition.value)}
+      onChange={(e) => onChange({ ...condition, value: e.target.value })}
+      placeholder={isList ? 'a, b, c' : 'value'}
+      title={isList ? 'Comma-separated values' : undefined}
+    />
+  )
+}
 
 export function TriggerNode({ data }: NodeProps<TriggerFlowNode>) {
   const triggers = data.triggers?.length
@@ -40,7 +151,7 @@ export function TriggerNode({ data }: NodeProps<TriggerFlowNode>) {
 export function ConditionNode({ data }: NodeProps<ConditionFlowNode>) {
   const c = data.condition
   const fields = data.conditionFields ?? []
-  const ops = data.ops?.length
+  const allOps = data.ops?.length
     ? data.ops
     : [
         { op: 'eq', label: 'equals', needs_value: true },
@@ -52,6 +163,15 @@ export function ConditionNode({ data }: NodeProps<ConditionFlowNode>) {
     ? fields
     : [{ field: c.field || 'status', label: c.field || 'status', value_type: 'string', group: 'user' }]
   const knownField = fieldOptions.some((f) => f.field === c.field)
+  const selectedField = fieldOptions.find((f) => f.field === c.field)
+  let ops = opsForField(selectedField, allOps)
+  if (c.op && !ops.some((o) => o.op === c.op)) {
+    const orphan = allOps.find((o) => o.op === c.op)
+    ops = orphan
+      ? [orphan, ...ops]
+      : [{ op: c.op, label: c.op, needs_value: true }, ...ops]
+  }
+  const selectedOp = ops.find((o) => o.op === c.op) ?? ops[0]
 
   return (
     <div className={`dag-node dag-node-condition${data.readOnly ? ' is-readonly' : ''}`}>
@@ -66,13 +186,19 @@ export function ConditionNode({ data }: NodeProps<ConditionFlowNode>) {
       </div>
       {data.readOnly ? (
         <strong className="dag-node-title">
-          {c.field} {c.op} {c.value ?? ''}
+          {c.field} {c.op} {displayValue(c.value)}
         </strong>
       ) : (
         <div className="dag-node-fields">
           <select
             value={knownField ? c.field : c.field}
-            onChange={(e) => data.onChange?.({ ...c, field: e.target.value })}
+            onChange={(e) => {
+              const nextField = e.target.value
+              const meta = fieldOptions.find((f) => f.field === nextField)
+              const nextOps = opsForField(meta, allOps)
+              const nextOp = nextOps.some((o) => o.op === c.op) ? c.op : nextOps[0]?.op ?? 'eq'
+              data.onChange?.({ ...c, field: nextField, op: nextOp, value: c.value ?? '' })
+            }}
           >
             {!knownField && c.field && (
               <option value={c.field}>{c.field} (unavailable)</option>
@@ -84,11 +210,11 @@ export function ConditionNode({ data }: NodeProps<ConditionFlowNode>) {
             ))}
           </select>
           <select
-            value={c.op}
+            value={selectedOp?.op ?? c.op}
             onChange={(e) =>
               data.onChange?.({
                 ...c,
-                op: e.target.value as AutomationCondition['op'],
+                op: e.target.value,
               })
             }
           >
@@ -98,13 +224,12 @@ export function ConditionNode({ data }: NodeProps<ConditionFlowNode>) {
               </option>
             ))}
           </select>
-          {c.op !== 'exists' && c.op !== 'not_exists' && (
-            <input
-              value={String(c.value ?? '')}
-              onChange={(e) => data.onChange?.({ ...c, value: e.target.value })}
-              placeholder="value"
-            />
-          )}
+          <ConditionValueInput
+            condition={c}
+            field={selectedField}
+            op={selectedOp}
+            onChange={(next) => data.onChange?.(next)}
+          />
         </div>
       )}
       <Handle type="source" position={Position.Right} />

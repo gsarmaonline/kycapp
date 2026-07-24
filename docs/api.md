@@ -264,14 +264,14 @@ Org-scoped message copy for **app users** (not KYC member invites). Domain helpe
 
 ## Automations
 
-Org-scoped rules: trigger → simple AND conditions → ordered actions. Executed by the River worker (`cmd/worker`). Domain: `core/automations`. See [automations.md](automations.md).
+Org-scoped rules: trigger → AND/OR conditions → ordered actions. Executed by the River worker (`cmd/worker`). Domain: `core/automations`. See [automations.md](automations.md).
 
 - `GET /v1/organisations/{id}/automations/catalog` — requires `automations:read`  
-  Returns `triggers` (from `core/resources`: lifecycle events for app_user/membership/subscription + `app_user.attribute.<key>` for each active attribute), `actions` (+ params), `ops`, and `condition_fields` (base user fields + `attributes.<key>`).
+  Returns `triggers` (from `core/resources`: lifecycle events for app_user/membership/subscription + `app_user.attribute.<key>` for each active attribute), `actions` (+ params), `ops` (with `needs_value` / `needs_list` / `value_types`), and `condition_fields` (base user fields + `attributes.<key>`, each with `allowed_ops` and optional `enum_values`).
 - `GET /v1/organisations/{id}/automations` — requires `automations:read`
 - `POST /v1/organisations/{id}/automations` — requires `automations:manage`  
-  `{ "name", "trigger", "enabled"?, "conditions": { "all": [{ "field", "op", "value"? }] }, "actions": [{ "type": "send_email", "params": { "template_key": "welcome" } }] }`  
-  `name` is required. Condition `field` values must appear in the org catalog. Legacy action `{ "template_key" }` (top-level) is accepted and normalized into `params`.
+  `{ "name", "trigger", "enabled"?, "conditions": { "mode": "all"|"any", "items": [{ "field", "op", "value"? }] }, "actions": [{ "type": "send_email", "params": { "template_key": "welcome" } }] }`  
+  Legacy `{ "all": [...] }` / `{ "any": [...] }` also accepted. Ops include `eq`, `neq`, `contains`, `in`, `not_in`, `gt`, `gte`, `lt`, `lte`, `exists`, `not_exists`. `name` is required. Condition `field` / `op` must be valid for the org catalog. Legacy action `{ "template_key" }` (top-level) is accepted and normalized into `params`.
 - `GET /v1/automations/{id}` — requires `automations:read`
 - `PATCH /v1/automations/{id}` — requires `automations:manage`
 - `DELETE /v1/automations/{id}` — requires `automations:manage`

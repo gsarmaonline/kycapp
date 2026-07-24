@@ -18,7 +18,8 @@
 3. Reading cusotmer DB via streaming/logs/wal
 
 ## Tech debt/improvements
-1. Revisit authentication
-2. Revisit billing
+- Revisit authentication
+- Revisit billing
+- Add more actions like webhooks
 
 

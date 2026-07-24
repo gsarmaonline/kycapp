@@ -75,7 +75,11 @@ func (s *Service) automationConditionFields(ctx context.Context, orgID string) (
 		return nil, err
 	}
 	for _, d := range defs {
-		fields = append(fields, automations.AttributeConditionField(d.Key, d.Label, d.ValueType))
+		var enums []string
+		if len(d.EnumValues) > 0 {
+			_ = json.Unmarshal(d.EnumValues, &enums)
+		}
+		fields = append(fields, automations.AttributeConditionField(d.Key, d.Label, d.ValueType, enums))
 	}
 	return fields, nil
 }
@@ -96,7 +100,7 @@ func (s *Service) validateAutomationSpec(ctx context.Context, orgID, trigger str
 	if err != nil {
 		return automations.Spec{}, err
 	}
-	if err := automations.ValidateConditionFields(spec.Conditions, automations.AllowedConditionFieldSet(fields)); err != nil {
+	if err := automations.ValidateConditionFields(spec.Conditions, fields); err != nil {
 		return automations.Spec{}, apperr.Validation(err.Error())
 	}
 	// Subject compatibility is enforced inside ValidateCreate; re-check for clarity in errors.

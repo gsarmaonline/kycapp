@@ -1,6 +1,11 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { getAutomation, updateAutomation, type Automation } from '../../api'
+import {
+  flattenAutomationConditions,
+  getAutomation,
+  updateAutomation,
+  type Automation,
+} from '../../api'
 import { PageHeader } from '../../crud/ui'
 import { resourcePath } from '../../org_nav'
 import { AutomationsForm } from './automations_form'
@@ -20,6 +25,8 @@ export function AutomationsEdit() {
   if (error) return <p className="error">{error}</p>
   if (!item) return <p>Loading…</p>
 
+  const flat = flattenAutomationConditions(item.conditions)
+
   return (
     <section>
       <PageHeader title="Edit automation" />
@@ -30,7 +37,8 @@ export function AutomationsEdit() {
           name: item.name,
           trigger: item.trigger,
           enabled: item.enabled,
-          conditions: item.conditions?.all ?? [],
+          conditionMode: flat.mode,
+          conditions: flat.items,
           actions: item.actions ?? [],
         }}
         onSubmit={async (input) => {

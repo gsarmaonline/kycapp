@@ -899,6 +899,17 @@ button.link-btn.danger:hover {
   align-items: center;
 }
 
+.dag-mode {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.85rem;
+}
+
+.dag-mode select {
+  font: inherit;
+}
+
 .dag-canvas {
   height: min(520px, 70vh);
   min-height: 360px;

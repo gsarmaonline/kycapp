@@ -61,9 +61,28 @@ Lifecycles: `created`, `updated`, `deleted`. Attribute triggers fire when that k
 
 ### Conditions
 
-- Combinator: `all` (AND) only in v1; `any` (OR) later if needed.
-- Ops: `eq`, `neq`, `exists`, `not_exists` (enough for attributes / status).
-- Fields: base user fields (`id`, `email`, `display_name`, `status`, `external_id`) plus every active attribute definition.
+Combinator (pick one group):
+
+| Form | Meaning |
+| --- | --- |
+| `{ "mode": "all", "items": [...] }` or `{ "all": [...] }` | AND — every condition must match |
+| `{ "mode": "any", "items": [...] }` or `{ "any": [...] }` | OR — at least one condition must match |
+
+If both `all` and `any` are set (legacy), Match requires `(all of all) AND (at least one of any)`.
+
+Operators (filtered by field `value_type` in the catalog):
+
+| Op | Needs value | Typical types |
+| --- | --- | --- |
+| `eq` / `neq` | yes | string, number, boolean, date, dropdown |
+| `contains` | yes | string |
+| `in` / `not_in` | list (array or comma-separated) | string, number, dropdown |
+| `gt` / `gte` / `lt` / `lte` | yes | number, date |
+| `exists` / `not_exists` | no | any |
+
+Fields: base user fields (`id`, `email`, `display_name`, `status`, `external_id`) plus every active attribute definition as `attributes.<key>`. Catalog fields include `allowed_ops` and optional `enum_values` for dropdown attributes.
+
+Matching is typed where possible (numbers, booleans, RFC3339 / `YYYY-MM-DD` dates); otherwise string compare.
 
 ### Subjects (trigger ↔ action)
 
@@ -102,7 +121,7 @@ Legacy `{ "type": "send_email", "template_key": "welcome" }` is still accepted o
 
 Unknown action types fail validation / the run with a clear error (no silent skip).
 
-**Topology is fixed for v1:** one trigger → AND conditions → **all** actions in the list (in order). There is no “this condition → only these actions” branching. Add multiple actions with **Add action**; they all run when the conditions match. Per-path branches would need a richer DSL later.
+**Topology is fixed for v1:** one trigger → condition group (AND or OR) → **all** actions in the list (in order). There is no “this condition → only these actions” branching. Add multiple actions with **Add action**; they all run when the conditions match. Per-path branches would need a richer DSL later.
 
 ## Runtime
 

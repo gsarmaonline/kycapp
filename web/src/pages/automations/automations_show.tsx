@@ -1,6 +1,12 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { getAutomation, listAutomationRuns, type Automation, type AutomationRun } from '../../api'
+import {
+  flattenAutomationConditions,
+  getAutomation,
+  listAutomationRuns,
+  type Automation,
+  type AutomationRun,
+} from '../../api'
 import { PageHeader } from '../../crud/ui'
 import { resourcePath } from '../../org_nav'
 import { AutomationDag } from './dag/AutomationDag'
@@ -30,9 +36,10 @@ export function AutomationsShow() {
   if (error) return <p className="error">{error}</p>
   if (!item) return <p>Loading…</p>
 
+  const flat = flattenAutomationConditions(item.conditions)
   const graph = normalizeGraph({
     trigger: item.trigger,
-    conditions: item.conditions?.all ?? [],
+    conditions: flat.items,
     actions: item.actions ?? [],
   }) // read-only: no invented defaults
 
@@ -45,6 +52,7 @@ export function AutomationsShow() {
       <AutomationDag
         readOnly
         trigger={graph.trigger}
+        conditionMode={flat.mode}
         conditions={graph.conditions}
         actions={graph.actions}
       />

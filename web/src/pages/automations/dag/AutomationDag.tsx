@@ -7,7 +7,12 @@ import {
   ReactFlowProvider,
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
-import type { AutomationAction, AutomationCatalog, AutomationCondition } from '../../../api'
+import type {
+  AutomationAction,
+  AutomationCatalog,
+  AutomationCondition,
+  AutomationConditionMode,
+} from '../../../api'
 import { buildFlowElements, defaultAction, defaultCondition, normalizeGraph } from './build_graph'
 import { automationNodeTypes } from './nodes'
 
@@ -16,9 +21,11 @@ type Props = {
   catalog?: AutomationCatalog | null
   emailTemplates?: { key: string; name: string }[]
   trigger: string
+  conditionMode?: AutomationConditionMode
   conditions: AutomationCondition[]
   actions: AutomationAction[]
   onTriggerChange?: (trigger: string) => void
+  onConditionModeChange?: (mode: AutomationConditionMode) => void
   onConditionsChange?: (conditions: AutomationCondition[]) => void
   onActionsChange?: (actions: AutomationAction[]) => void
 }
@@ -37,9 +44,11 @@ function AutomationDagInner({
   catalog,
   emailTemplates = [],
   trigger,
+  conditionMode = 'all',
   conditions,
   actions,
   onTriggerChange,
+  onConditionModeChange,
   onConditionsChange,
   onActionsChange,
 }: Props) {
@@ -115,6 +124,18 @@ function AutomationDagInner({
     <div className={`automation-dag${readOnly ? ' is-readonly' : ''}`}>
       {!readOnly && (
         <div className="dag-toolbar">
+          <label className="dag-mode">
+            Match
+            <select
+              value={conditionMode}
+              onChange={(e) =>
+                onConditionModeChange?.(e.target.value === 'any' ? 'any' : 'all')
+              }
+            >
+              <option value="all">all conditions (AND)</option>
+              <option value="any">any condition (OR)</option>
+            </select>
+          </label>
           <button
             type="button"
             className="ghost"
@@ -140,10 +161,19 @@ function AutomationDagInner({
             Add action
           </button>
           <span className="field-hint">
-            All conditions must match (AND), then every action runs. Condition fields include all
-            active user attributes.
+            {conditionMode === 'any'
+              ? 'Any matching condition is enough, then every action runs.'
+              : 'All conditions must match, then every action runs.'}{' '}
+            Operators depend on each field’s type.
           </span>
         </div>
+      )}
+      {readOnly && (
+        <p className="field-hint">
+          Match {conditionMode === 'any' ? 'any' : 'all'} condition
+          {graph.conditions.length === 1 ? '' : 's'} (
+          {conditionMode === 'any' ? 'OR' : 'AND'})
+        </p>
       )}
       <div className="dag-canvas">
         <ReactFlow

@@ -82,6 +82,73 @@ func TestValidateRejectsUnknownAction(t *testing.T) {
 	}
 }
 
+func TestMatchAnyAndTypedOps(t *testing.T) {
+	anySpec, err := ValidateCreate(
+		"app_user.created",
+		json.RawMessage(`{"mode":"any","items":[{"field":"status","op":"eq","value":"active"},{"field":"status","op":"eq","value":"pending"}]}`),
+		json.RawMessage(`[{"type":"send_email","params":{"template_key":"welcome"}}]`),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !Match(anySpec.Conditions, map[string]any{"status": "pending"}) {
+		t.Fatal("OR should match pending")
+	}
+	if Match(anySpec.Conditions, map[string]any{"status": "blocked"}) {
+		t.Fatal("OR should not match blocked")
+	}
+
+	inSpec, err := ValidateCreate(
+		"app_user.created",
+		json.RawMessage(`{"all":[{"field":"attributes.country","op":"in","value":["AU","NZ"]}]}`),
+		json.RawMessage(`[{"type":"send_email","params":{"template_key":"welcome"}}]`),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !Match(inSpec.Conditions, map[string]any{"attributes": map[string]any{"country": "NZ"}}) {
+		t.Fatal("in should match NZ")
+	}
+	if Match(inSpec.Conditions, map[string]any{"attributes": map[string]any{"country": "US"}}) {
+		t.Fatal("in should not match US")
+	}
+
+	numPayload := map[string]any{"attributes": map[string]any{"score": 80}}
+	gt := Conditions{All: []Condition{{Field: "attributes.score", Op: OpGte, Value: 70}}}
+	if !Match(gt, numPayload) {
+		t.Fatal("gte should match")
+	}
+	lt := Conditions{All: []Condition{{Field: "attributes.score", Op: OpLt, Value: 50}}}
+	if Match(lt, numPayload) {
+		t.Fatal("lt should not match")
+	}
+
+	contains := Conditions{All: []Condition{{Field: "email", Op: OpContains, Value: "@example.com"}}}
+	if !Match(contains, map[string]any{"email": "a@example.com"}) {
+		t.Fatal("contains should match")
+	}
+}
+
+func TestValidateConditionFieldsRejectsBadOp(t *testing.T) {
+	fields := []ConditionFieldInfo{
+		AttributeConditionField("country", "Country", "string", nil),
+	}
+	err := ValidateConditionFields(
+		Conditions{All: []Condition{{Field: "attributes.country", Op: OpGt, Value: "AU"}}},
+		fields,
+	)
+	if err == nil {
+		t.Fatal("gt on string field should fail")
+	}
+	err = ValidateConditionFields(
+		Conditions{All: []Condition{{Field: "attributes.country", Op: OpEq, Value: "AU"}}},
+		fields,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestValidateSubjectCompatibility(t *testing.T) {
 	_, err := ValidateCreate(
 		"subscription.created",
