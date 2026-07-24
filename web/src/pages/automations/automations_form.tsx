@@ -11,7 +11,7 @@ import {
   type AutomationConditions,
 } from '../../api'
 import { AutomationDag } from './dag/AutomationDag'
-import { normalizeGraph } from './dag/build_graph'
+import { normalizeActionWorkflow, normalizeGraph } from './dag/build_graph'
 
 type Props = {
   submitLabel: string
@@ -142,7 +142,7 @@ export function AutomationsForm({ submitLabel, cancelTo, initial, onSubmit }: Pr
           throw new Error(`Condition on ${c.field} needs a value`)
         }
       }
-      const cleanedActions = actions
+      const cleanedActions = normalizeActionWorkflow(actions)
         .map((a) => {
           const params: Record<string, string> = { ...(a.params ?? {}) }
           if (a.template_key && !params.template_key) {
@@ -151,25 +151,35 @@ export function AutomationsForm({ submitLabel, cancelTo, initial, onSubmit }: Pr
           for (const [k, v] of Object.entries(params)) {
             params[k] = String(v ?? '').trim()
           }
-          return {
+          const out: AutomationAction = {
+            id: a.id,
             type: a.type.trim(),
             params,
           }
+          if (a.on_success) out.on_success = a.on_success
+          if (a.on_error) out.on_error = a.on_error
+          return out
         })
         .filter((a) => a.type)
       if (!cleanedActions.length) {
         throw new Error('Add at least one action')
       }
       for (const a of cleanedActions) {
-        if (a.type === 'send_email' && !a.params.template_key) {
+        if (a.on_success && !cleanedActions.some((x) => x.id === a.on_success)) {
+          throw new Error(`Action ${a.id}: on_success target ${a.on_success} is missing`)
+        }
+        if (a.on_error && !cleanedActions.some((x) => x.id === a.on_error)) {
+          throw new Error(`Action ${a.id}: on_error target ${a.on_error} is missing`)
+        }
+        if (a.type === 'send_email' && !a.params?.template_key) {
           throw new Error('Each send_email action needs a template_key')
         }
-        if (a.type === 'call_webhook' && !a.params.webhook_id) {
+        if (a.type === 'call_webhook' && !a.params?.webhook_id) {
           throw new Error('Each call_webhook action needs a webhook')
         }
         if (a.type === 'db_insert') {
-          if (!a.params.database_id) throw new Error('Each db_insert action needs a database')
-          if (!a.params.table) throw new Error('Each db_insert action needs a table')
+          if (!a.params?.database_id) throw new Error('Each db_insert action needs a database')
+          if (!a.params?.table) throw new Error('Each db_insert action needs a table')
           if (a.params.mode === 'columns') {
             try {
               const map = a.params.mapping ? JSON.parse(a.params.mapping) : {}

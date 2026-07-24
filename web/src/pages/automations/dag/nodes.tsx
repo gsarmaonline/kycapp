@@ -443,11 +443,18 @@ export function ActionNode({ data }: NodeProps<ActionFlowNode>) {
         )}
       </div>
       {data.readOnly ? (
-        <strong className="dag-node-title">
-          {a.type}
-          {summary ? `: ${summary}` : ''}
-          {a.on_error ? ` (on error → ${a.on_error})` : ''}
-        </strong>
+        <div className="dag-node-readonly">
+          <strong className="dag-node-title">
+            {a.type}
+            {summary ? `: ${summary}` : ''}
+          </strong>
+          {(a.on_success || a.on_error) && (
+            <p className="dag-node-edges muted">
+              {a.on_success ? `ok → ${a.on_success}` : 'ok → stop'}
+              {a.on_error ? ` · error → ${a.on_error}` : ' · error → fail'}
+            </p>
+          )}
+        </div>
       ) : (
         <div className="dag-node-fields">
           <select
@@ -545,6 +552,20 @@ export function ActionNode({ data }: NodeProps<ActionFlowNode>) {
               )
             })
           )}
+          <label className="dag-edge-field">
+            On success
+            <select
+              value={a.on_success || ''}
+              onChange={(e) => patch({ on_success: e.target.value })}
+            >
+              <option value="">Stop (end workflow)</option>
+              {siblings.map((s) => (
+                <option key={s.id} value={s.id}>
+                  → {s.id} ({s.type})
+                </option>
+              ))}
+            </select>
+          </label>
           <label className="dag-edge-field">
             On error
             <select

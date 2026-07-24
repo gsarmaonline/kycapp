@@ -115,10 +115,34 @@ export function buildFlowElements(
   },
 ): { nodes: AutomationFlowNode[]; edges: Edge[] } {
   const actions = normalizeActionWorkflow(graph.actions)
+  const byId = new Map(actions.map((a) => [a.id!, a]))
+  const positions = new Map<string, { x: number; y: number }>()
+  let successY = 0
+  let cur = actions[0]?.id
+  const onSuccessPath = new Set<string>()
+  while (cur && !onSuccessPath.has(cur)) {
+    onSuccessPath.add(cur)
+    positions.set(cur, { x: X_ACTION, y: successY * Y_STEP })
+    successY += 1
+    cur = byId.get(cur)?.on_success
+  }
+  let errorY = 0
+  for (const a of actions) {
+    if (!a.id || positions.has(a.id)) continue
+    positions.set(a.id, { x: X_ACTION + 300, y: errorY * Y_STEP })
+    errorY += 1
+  }
+  // Any still missing (shouldn't) — fall back to list order
+  actions.forEach((a, i) => {
+    if (a.id && !positions.has(a.id)) {
+      positions.set(a.id, { x: X_ACTION, y: i * Y_STEP })
+    }
+  })
+
   const condCount = Math.max(graph.conditions.length, 1)
-  const actionCount = Math.max(actions.length, 1)
-  const rowCount = Math.max(condCount, actionCount)
-  const midY = ((rowCount - 1) * Y_STEP) / 2
+  const actionYs = [...positions.values()].map((p) => p.y)
+  const maxActionY = actionYs.length ? Math.max(...actionYs) : 0
+  const midY = Math.max(((condCount - 1) * Y_STEP) / 2, maxActionY / 2)
 
   const nodes: AutomationFlowNode[] = [
     {
@@ -156,10 +180,11 @@ export function buildFlowElements(
   })
 
   actions.forEach((action, i) => {
+    const pos = positions.get(action.id!) ?? { x: X_ACTION, y: i * Y_STEP }
     nodes.push({
       id: `action-${action.id || i}`,
       type: 'action',
-      position: { x: X_ACTION + (i % 2) * 40, y: i * Y_STEP },
+      position: pos,
       data: {
         action,
         actionIndex: i,

@@ -971,12 +971,9 @@ button.link-btn.danger:hover {
   gap: 0.35rem;
 }
 
-.dag-edge-field {
-  display: flex;
-  flex-direction: column;
-  gap: 0.2rem;
+.dag-node-edges {
+  margin: 0.35rem 0 0;
   font-size: 0.75rem;
-  color: color-mix(in srgb, CanvasText 70%, transparent);
 }
 
 .dag-handle-error {

@@ -13,7 +13,7 @@ import type {
   AutomationCondition,
   AutomationConditionMode,
 } from '../../../api'
-import { buildFlowElements, appendAction, defaultAction, defaultCondition, normalizeGraph, removeActionAt } from './build_graph'
+import { buildFlowElements, appendAction, defaultAction, defaultCondition, normalizeActionWorkflow, normalizeGraph, removeActionAt } from './build_graph'
 import { automationNodeTypes } from './nodes'
 
 type Props = {
@@ -82,7 +82,7 @@ function AutomationDagInner({
     (index: number, action: AutomationAction) => {
       const next = [...graph.actions]
       next[index] = action
-      onActionsChange?.(next)
+      onActionsChange?.(normalizeActionWorkflow(next))
     },
     [graph.actions, onActionsChange],
   )
@@ -172,7 +172,8 @@ function AutomationDagInner({
         <p className="field-hint">
           Match {conditionMode === 'any' ? 'any' : 'all'} condition
           {graph.conditions.length === 1 ? '' : 's'} (
-          {conditionMode === 'any' ? 'OR' : 'AND'})
+          {conditionMode === 'any' ? 'OR' : 'AND'}
+          ). Green edges = on success; red = on error.
         </p>
       )}
       <div className="dag-canvas">
