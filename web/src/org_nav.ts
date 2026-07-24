@@ -7,6 +7,7 @@ export type OrgSection =
   | 'email-templates'
   | 'databases'
   | 'webhooks'
+  | 'inbound-webhooks'
   | 'automations'
   | 'product-features'
   | 'product-plans'
@@ -33,7 +34,8 @@ export const ORG_SECTIONS: OrgNavItem[] = [
   { id: 'attributes', label: 'User Attributes', path: 'attributes' },
   { id: 'email-templates', label: 'Emails', path: 'email-templates' },
   { id: 'databases', label: 'Databases', path: 'databases' },
-  { id: 'webhooks', label: 'Webhooks', path: 'webhooks' },
+  { id: 'webhooks', label: 'Outbound webhooks', path: 'webhooks' },
+  { id: 'inbound-webhooks', label: 'Inbound webhooks', path: 'inbound-webhooks' },
   { id: 'automations', label: 'Automations', path: 'automations' },
   { id: 'product-features', label: 'Features', path: 'product-features' },
   { id: 'product-plans', label: 'Plans', path: 'product-plans' },
@@ -61,11 +63,12 @@ export const ORG_NAV_GROUPS: OrgNavGroup[] = [
   {
     id: 'actions',
     label: 'Actions',
-    hint: 'Destinations used by automation actions',
+    hint: 'Destinations and inbound triggers used by automations',
     items: [
       { id: 'email-templates', label: 'Emails', path: 'email-templates' },
       { id: 'databases', label: 'Databases', path: 'databases' },
-      { id: 'webhooks', label: 'Webhooks', path: 'webhooks' },
+      { id: 'webhooks', label: 'Outbound webhooks', path: 'webhooks' },
+      { id: 'inbound-webhooks', label: 'Inbound webhooks', path: 'inbound-webhooks' },
     ],
   },
   {
@@ -92,6 +95,7 @@ export function sectionFromPathname(pathname: string, orgId: string): OrgSection
     case 'email-templates':
     case 'databases':
     case 'webhooks':
+    case 'inbound-webhooks':
     case 'automations':
     case 'product-features':
     case 'product-plans':

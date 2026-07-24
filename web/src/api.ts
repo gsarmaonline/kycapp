@@ -358,27 +358,50 @@ export function deleteOrgWebhook(orgId: string, webhookId: string) {
   })
 }
 
-export type InboundHook = {
+export type InboundWebhook = {
+  id: string
   organisation_id: string
+  name: string
   url: string
   secret_hint?: string
   has_secret: boolean
   status: string
-  /** Present only after rotate / set */
+  /** Present only after create / rotate */
   secret?: string
 }
 
-export function getInboundHook(orgId: string) {
-  return request<InboundHook>(`/v1/organisations/${orgId}/inbound-hook`)
+export function listInboundWebhooks(orgId: string) {
+  return request<{ items: InboundWebhook[] }>(`/v1/organisations/${orgId}/inbound-webhooks`)
 }
 
-export function updateInboundHook(
+export function getInboundWebhook(orgId: string, hookId: string) {
+  return request<InboundWebhook>(`/v1/organisations/${orgId}/inbound-webhooks/${hookId}`)
+}
+
+export function createInboundWebhook(
   orgId: string,
-  input: { secret?: string; status?: string; rotate?: boolean },
+  input: { name: string; secret?: string; status?: string },
 ) {
-  return request<InboundHook>(`/v1/organisations/${orgId}/inbound-hook`, {
-    method: 'PUT',
+  return request<InboundWebhook>(`/v1/organisations/${orgId}/inbound-webhooks`, {
+    method: 'POST',
     body: JSON.stringify(input),
+  })
+}
+
+export function updateInboundWebhook(
+  orgId: string,
+  hookId: string,
+  input: { name?: string; secret?: string; status?: string; rotate?: boolean },
+) {
+  return request<InboundWebhook>(`/v1/organisations/${orgId}/inbound-webhooks/${hookId}`, {
+    method: 'PATCH',
+    body: JSON.stringify(input),
+  })
+}
+
+export function deleteInboundWebhook(orgId: string, hookId: string) {
+  return request<{ ok: boolean }>(`/v1/organisations/${orgId}/inbound-webhooks/${hookId}`, {
+    method: 'DELETE',
   })
 }
 

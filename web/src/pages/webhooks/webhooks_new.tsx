@@ -40,7 +40,7 @@ export function WebhooksNew() {
 
   return (
     <section>
-      <PageHeader title="Add webhook" />
+      <PageHeader title="Add outbound webhook" />
       {error && <p className="error">{error}</p>}
       <form className="create stacked" onSubmit={(e) => void onSubmit(e)}>
         <label>

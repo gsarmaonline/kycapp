@@ -105,9 +105,12 @@ Requires `organisation:update`.
 - `GET /v1/organisations/{id}/webhooks/{webhookId}`
 - `PATCH /v1/organisations/{id}/webhooks/{webhookId}` — omit/`""` secret to keep current; `body_template` is JSON with `{{path}}` placeholders (empty = full event dump)
 - `DELETE /v1/organisations/{id}/webhooks/{webhookId}`
-- `GET /v1/organisations/{id}/inbound-hook` — inbound URL + status (secret masked)
-- `PUT /v1/organisations/{id}/inbound-hook` — `{ "rotate": true }` or `{ "secret", "status" }`
-- `POST /v1/hooks/inbound/{orgId}` — **public**; header `X-KYC-Webhook-Secret`; fires `webhook.received`
+- `GET /v1/organisations/{id}/inbound-webhooks` — inbound endpoints that fire `webhook.received`
+- `POST /v1/organisations/{id}/inbound-webhooks` — `{ "name", "secret"?, "status"? }` (secret auto-generated if omitted; returned once)
+- `GET /v1/organisations/{id}/inbound-webhooks/{hookId}`
+- `PATCH /v1/organisations/{id}/inbound-webhooks/{hookId}` — `{ "name"?, "status"?, "rotate"? }`
+- `DELETE /v1/organisations/{id}/inbound-webhooks/{hookId}`
+- `POST /v1/hooks/inbound/{hookId}` — **public**; header `X-KYC-Webhook-Secret`; fires `webhook.received`
 - `POST /v1/organisations/{id}/api-keys` — `{ "name" }` → includes `token` once
 - `GET /v1/organisations/{id}/api-keys`
 - `DELETE /v1/api-keys/{id}` — revoke (org keys: org admin; platform keys: platform)

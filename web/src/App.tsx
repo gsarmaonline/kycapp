@@ -51,6 +51,10 @@ import { WebhooksEdit } from './pages/webhooks/webhooks_edit'
 import { WebhooksIndex } from './pages/webhooks/webhooks_index'
 import { WebhooksNew } from './pages/webhooks/webhooks_new'
 import { WebhooksShow } from './pages/webhooks/webhooks_show'
+import { InboundWebhooksEdit } from './pages/inbound_webhooks/inbound_webhooks_edit'
+import { InboundWebhooksIndex } from './pages/inbound_webhooks/inbound_webhooks_index'
+import { InboundWebhooksNew } from './pages/inbound_webhooks/inbound_webhooks_new'
+import { InboundWebhooksShow } from './pages/inbound_webhooks/inbound_webhooks_show'
 import './App.css'
 
 type Gate = 'loading' | 'ready'
@@ -158,6 +162,10 @@ export default function App() {
         <Route path="webhooks/new" element={<WebhooksNew />} />
         <Route path="webhooks/:id" element={<WebhooksShow />} />
         <Route path="webhooks/:id/edit" element={<WebhooksEdit />} />
+        <Route path="inbound-webhooks" element={<InboundWebhooksIndex />} />
+        <Route path="inbound-webhooks/new" element={<InboundWebhooksNew />} />
+        <Route path="inbound-webhooks/:id" element={<InboundWebhooksShow />} />
+        <Route path="inbound-webhooks/:id/edit" element={<InboundWebhooksEdit />} />
         <Route path="automations" element={<AutomationsIndex />} />
         <Route path="automations/new" element={<AutomationsNew />} />
         <Route path="automations/:id" element={<AutomationsShow />} />

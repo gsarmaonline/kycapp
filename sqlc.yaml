@@ -30,6 +30,7 @@ sql:
       - "internal/store/migrations/000025_webhook_body_template.up.sql"
       - "internal/store/migrations/000026_database_check_status.up.sql"
       - "internal/store/migrations/000027_inbound_hooks.up.sql"
+      - "internal/store/migrations/000028_inbound_webhooks_multi.up.sql"
     gen:
       go:
         package: "sqlc"

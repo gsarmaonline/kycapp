@@ -41,7 +41,7 @@ Actions/ops/condition fields live in `core/automations`. **Triggers** are genera
 
 | Key | Source |
 | --- | --- |
-| `triggers` | `core/resources.ExpandTriggers` — lifecycle events for `app_user`, `membership`, `subscription`, `schedule` (hourly/daily/weekly), `webhook.received`, plus `app_user.attribute.<key>` |
+| `triggers` | `core/resources.ExpandTriggers` — lifecycle events for `app_user`, `membership`, `subscription`, `schedule` (hourly/daily/weekly), `webhook.received` (any inbound endpoint), plus `app_user.attribute.<key>` |
 | `actions` | Registered action types + params |
 | `ops` | Condition operators |
 | `condition_fields` | Base app-user fields + **all active org attribute definitions** as `app_user.<key>` |
@@ -165,34 +165,32 @@ CREATE TABLE kyc_events (
 
 **Columns** mode on the action: `"mode": "columns", "mapping": { "email": "app_user.email", "country": "app_user.country" }`.
 
-### Inbound webhook (org trigger)
+### Inbound webhooks (automation trigger)
 
-One public endpoint per org:
+Multiple endpoints per org under **Actions → Inbound webhooks**.
 
-`POST /v1/hooks/inbound/{organisation_id}`  
+`POST /v1/hooks/inbound/{hookId}`  
 Header: `X-KYC-Webhook-Secret: <secret>`  
 Body: JSON (stored under `body` on the event payload)
 
-Fires trigger **`webhook.received`**. Subject is the **organisation** (same rules as schedule: no `send_email` unless you add a recipient model later). Manage URL/secret under **Actions → Webhooks → Inbound**.
-
-Payload shape:
+Fires trigger **`webhook.received`**. Payload includes `inbound_webhook_id` / `inbound_webhook_name` so conditions can target a specific endpoint. Subject is the **organisation**.
 
 ```json
 {
   "id": "<org_id>",
   "organisation_id": "<org_id>",
   "trigger": "webhook.received",
+  "inbound_webhook_id": "<hook_id>",
+  "inbound_webhook_name": "Partner events",
   "body": { "...": "request JSON" },
   "content_type": "application/json",
   "received_at": "..."
 }
 ```
 
-Conditions may use paths like `body.event` / `body.type`. Empty conditions are allowed.
+### Outbound webhooks (for `call_webhook`)
 
-### Webhooks (for `call_webhook`)
-
-Org-scoped endpoints under **Actions → Webhooks**. Automations select a `webhook_id`.
+Org-scoped destinations under **Actions → Outbound webhooks**. Automations select a `webhook_id`.
 
 `body_template` is JSON with `{{path}}` placeholders using the same `app_user.*` field paths (plus `organisation_id` / `trigger`). Example:
 
