@@ -16,19 +16,30 @@ export function InboundWebhooksNew() {
   const navigate = useNavigate()
   const [name, setName] = useState('')
   const [authMode, setAuthMode] = useState('header')
+  const [secret, setSecret] = useState('')
+  const [status, setStatus] = useState('connected')
   const [error, setError] = useState<string | null>(null)
   const [createdSecret, setCreatedSecret] = useState<string | null>(null)
   const [createdURL, setCreatedURL] = useState<string | null>(null)
   const [createdId, setCreatedId] = useState<string | null>(null)
+  const [createdStatus, setCreatedStatus] = useState('connected')
+  const [createdAuthMode, setCreatedAuthMode] = useState('header')
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault()
     setError(null)
     try {
-      const row = await createInboundWebhook(orgId, { name, auth_mode: authMode })
+      const row = await createInboundWebhook(orgId, {
+        name,
+        auth_mode: authMode,
+        status,
+        ...(secret.trim() ? { secret: secret.trim() } : {}),
+      })
       setCreatedSecret(row.secret ?? null)
       setCreatedURL(row.url)
       setCreatedId(row.id)
+      setCreatedStatus(row.status)
+      setCreatedAuthMode(row.auth_mode || authMode)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Create failed')
     }
@@ -43,9 +54,15 @@ export function InboundWebhooksNew() {
           <br />
           <code>{createdURL}</code>
         </p>
-        {authMode === 'header' && createdSecret && (
+        {createdAuthMode === 'header' && createdSecret && (
           <p className="notice">
             Header secret (copy now): <code>{createdSecret}</code>
+          </p>
+        )}
+        {createdStatus === 'disconnected' && (
+          <p className="field-hint">
+            Status is <strong>disconnected</strong> — connect it before the source can call this
+            endpoint.
           </p>
         )}
         <div className="form-actions">
@@ -83,6 +100,26 @@ export function InboundWebhooksNew() {
           </select>
         </label>
         <p className="field-hint">{AUTH_HINTS[authMode]}</p>
+        <label>
+          Secret (optional)
+          <input
+            type="password"
+            value={secret}
+            onChange={(e) => setSecret(e.target.value)}
+            autoComplete="new-password"
+            placeholder="Leave blank to auto-generate"
+          />
+        </label>
+        <p className="field-hint">
+          Leave blank to generate a secret. For query/path modes it becomes part of the URL.
+        </p>
+        <label>
+          Status
+          <select value={status} onChange={(e) => setStatus(e.target.value)}>
+            <option value="connected">connected (accept traffic)</option>
+            <option value="disconnected">disconnected (reject until enabled)</option>
+          </select>
+        </label>
         <FormActions cancelTo={resourcePath(orgId, 'inbound-webhooks')} submitLabel="Create" />
       </form>
     </section>
