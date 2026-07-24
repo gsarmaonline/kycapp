@@ -183,6 +183,7 @@ type OrganisationInboundWebhook struct {
 	Status         string    `json:"status"`
 	CreatedAt      time.Time `json:"created_at"`
 	UpdatedAt      time.Time `json:"updated_at"`
+	AuthMode       string    `json:"auth_mode"`
 }
 
 type OrganisationIntegration struct {

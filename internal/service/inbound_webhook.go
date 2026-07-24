@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"net/url"
 	"strings"
 	"time"
 
@@ -16,46 +17,97 @@ import (
 	"github.com/gsarmaonline/kyc/internal/store/sqlc"
 )
 
+const (
+	InboundAuthHeader = "header" // X-KYC-Webhook-Secret
+	InboundAuthQuery  = "query"  // ?secret=
+	InboundAuthPath   = "path"   // /v1/hooks/inbound/{id}/{secret}
+)
+
 // InboundWebhookView is an org inbound endpoint (fires webhook.received).
 type InboundWebhookView struct {
 	ID             string
 	OrganisationID string
 	Name           string
 	URL            string
+	AuthMode       string
 	SecretHint     string
 	HasSecret      bool
 	Status         string
-	// Secret is only set when newly generated/rotated.
+	// Secret is set on create/rotate, and also when auth embeds it in the URL
+	// so admins can copy the vendor-facing endpoint.
 	Secret string `json:"-"`
 }
 
 type CreateInboundWebhookInput struct {
-	Name   string
-	Secret string // empty → auto-generate
-	Status string // default connected when secret present
+	Name     string
+	Secret   string // empty → auto-generate
+	Status   string
+	AuthMode string // header | query | path
 }
 
 type UpdateInboundWebhookInput struct {
-	Name   *string
-	Secret *string // nil keep; "" clear; non-empty set
-	Status *string
-	Rotate bool
+	Name     *string
+	Secret   *string
+	Status   *string
+	AuthMode *string
+	Rotate   bool
 }
 
-func (s *Service) inboundWebhookURL(hookID string) string {
-	return s.publicBaseURL + "/v1/hooks/inbound/" + hookID
+// InboundAuthInput is how the caller presented credentials.
+type InboundAuthInput struct {
+	HeaderSecret string
+	QuerySecret  string
+	PathSecret   string
+}
+
+func normalizeInboundAuthMode(mode string) (string, error) {
+	mode = strings.TrimSpace(strings.ToLower(mode))
+	if mode == "" {
+		return InboundAuthHeader, nil
+	}
+	switch mode {
+	case InboundAuthHeader, InboundAuthQuery, InboundAuthPath:
+		return mode, nil
+	default:
+		return "", apperr.Validation("auth_mode must be header, query, or path")
+	}
+}
+
+func (s *Service) inboundWebhookURL(row sqlc.OrganisationInboundWebhook) string {
+	base := s.publicBaseURL + "/v1/hooks/inbound/" + row.ID
+	secret := strings.TrimSpace(row.Secret)
+	switch row.AuthMode {
+	case InboundAuthQuery:
+		if secret == "" {
+			return base + "?secret="
+		}
+		return base + "?secret=" + url.QueryEscape(secret)
+	case InboundAuthPath:
+		if secret == "" {
+			return base + "/"
+		}
+		return base + "/" + url.PathEscape(secret)
+	default:
+		return base
+	}
 }
 
 func inboundWebhookView(s *Service, row sqlc.OrganisationInboundWebhook, revealed string) InboundWebhookView {
+	secretOut := revealed
+	// For query/path modes the URL embeds the secret — expose it to admins for copy/paste.
+	if secretOut == "" && (row.AuthMode == InboundAuthQuery || row.AuthMode == InboundAuthPath) {
+		secretOut = row.Secret
+	}
 	return InboundWebhookView{
 		ID:             row.ID,
 		OrganisationID: row.OrganisationID,
 		Name:           row.Name,
-		URL:            s.inboundWebhookURL(row.ID),
+		URL:            s.inboundWebhookURL(row),
+		AuthMode:       row.AuthMode,
 		SecretHint:     maskSecret(row.Secret),
 		HasSecret:      strings.TrimSpace(row.Secret) != "",
 		Status:         row.Status,
-		Secret:         revealed,
+		Secret:         secretOut,
 	}
 }
 
@@ -92,10 +144,13 @@ func (s *Service) CreateInboundWebhook(ctx context.Context, orgID string, in Cre
 	if name == "" {
 		return InboundWebhookView{}, apperr.Validation("name is required")
 	}
+	authMode, err := normalizeInboundAuthMode(in.AuthMode)
+	if err != nil {
+		return InboundWebhookView{}, err
+	}
 	secret := strings.TrimSpace(in.Secret)
 	var revealed string
 	if secret == "" {
-		var err error
 		revealed, err = generateInboundSecret()
 		if err != nil {
 			return InboundWebhookView{}, err
@@ -117,6 +172,7 @@ func (s *Service) CreateInboundWebhook(ctx context.Context, orgID string, in Cre
 		Name:           name,
 		Secret:         secret,
 		Status:         status,
+		AuthMode:       authMode,
 	})
 	if err != nil {
 		return InboundWebhookView{}, err
@@ -134,12 +190,19 @@ func (s *Service) UpdateInboundWebhook(ctx context.Context, orgID, id string, in
 	name := existing.Name
 	secret := existing.Secret
 	status := existing.Status
+	authMode := existing.AuthMode
 	var revealed string
 
 	if in.Name != nil {
 		name = strings.TrimSpace(*in.Name)
 		if name == "" {
 			return InboundWebhookView{}, apperr.Validation("name is required")
+		}
+	}
+	if in.AuthMode != nil {
+		authMode, err = normalizeInboundAuthMode(*in.AuthMode)
+		if err != nil {
+			return InboundWebhookView{}, err
 		}
 	}
 	if in.Rotate {
@@ -176,6 +239,7 @@ func (s *Service) UpdateInboundWebhook(ctx context.Context, orgID, id string, in
 		Name:           name,
 		Secret:         secret,
 		Status:         status,
+		AuthMode:       authMode,
 	})
 	if err != nil {
 		return InboundWebhookView{}, err
@@ -192,8 +256,17 @@ func (s *Service) DeleteInboundWebhook(ctx context.Context, orgID, id string) er
 	})
 }
 
-// HandleInboundWebhook verifies secret for a specific inbound endpoint and enqueues webhook.received.
-func (s *Service) HandleInboundWebhook(ctx context.Context, hookID string, secretHeader string, rawBody []byte, contentType string) error {
+func secretsEqual(got, want string) bool {
+	got = strings.TrimSpace(got)
+	want = strings.TrimSpace(want)
+	if got == "" || want == "" {
+		return false
+	}
+	return subtle.ConstantTimeCompare([]byte(got), []byte(want)) == 1
+}
+
+// HandleInboundWebhook verifies credentials per auth_mode and enqueues webhook.received.
+func (s *Service) HandleInboundWebhook(ctx context.Context, hookID string, auth InboundAuthInput, rawBody []byte, contentType string) error {
 	hookID = strings.TrimSpace(hookID)
 	if hookID == "" {
 		return apperr.NotFound("inbound webhook not found")
@@ -205,37 +278,54 @@ func (s *Service) HandleInboundWebhook(ctx context.Context, hookID string, secre
 	if row.Status != "connected" || strings.TrimSpace(row.Secret) == "" {
 		return apperr.Unauthorized("inbound webhook is disconnected")
 	}
-	got := strings.TrimSpace(secretHeader)
-	if got == "" || subtle.ConstantTimeCompare([]byte(got), []byte(row.Secret)) != 1 {
-		return apperr.Unauthorized("invalid webhook secret")
+
+	switch row.AuthMode {
+	case InboundAuthQuery:
+		if !secretsEqual(auth.QuerySecret, row.Secret) {
+			return apperr.Unauthorized("invalid webhook secret")
+		}
+	case InboundAuthPath:
+		if !secretsEqual(auth.PathSecret, row.Secret) {
+			return apperr.Unauthorized("invalid webhook secret")
+		}
+	default: // header
+		if !secretsEqual(auth.HeaderSecret, row.Secret) {
+			return apperr.Unauthorized("invalid webhook secret")
+		}
 	}
 
-	var body any
-	ct := strings.ToLower(strings.TrimSpace(contentType))
-	if len(rawBody) == 0 {
-		body = map[string]any{}
-	} else if strings.Contains(ct, "json") || (len(rawBody) > 0 && (rawBody[0] == '{' || rawBody[0] == '[')) {
-		if err := json.Unmarshal(rawBody, &body); err != nil {
-			return apperr.Validation("body must be valid JSON")
-		}
-	} else {
-		body = string(rawBody)
-	}
+	body := parseInboundBody(rawBody, contentType)
 
 	orgID := row.OrganisationID
 	trigger := resources.LifecycleTrigger(resources.Webhook, resources.WebhookReceived)
 	payload := map[string]any{
-		"id":                  orgID,
-		"organisation_id":     orgID,
-		"trigger":             trigger,
-		"inbound_webhook_id":  row.ID,
+		"id":                   orgID,
+		"organisation_id":      orgID,
+		"trigger":              trigger,
+		"inbound_webhook_id":   row.ID,
 		"inbound_webhook_name": row.Name,
-		"body":                body,
-		"content_type":        contentType,
-		"received_at":         time.Now().UTC().Format(time.RFC3339),
+		"body":                 body,
+		"content_type":         contentType,
+		"received_at":          time.Now().UTC().Format(time.RFC3339),
 	}
 	s.EnqueueAutomationEvent(ctx, orgID, trigger, payload)
 	return nil
+}
+
+func parseInboundBody(rawBody []byte, contentType string) any {
+	if len(rawBody) == 0 {
+		return map[string]any{}
+	}
+	ct := strings.ToLower(strings.TrimSpace(contentType))
+	looksJSON := strings.Contains(ct, "json") || rawBody[0] == '{' || rawBody[0] == '['
+	if looksJSON {
+		var body any
+		if err := json.Unmarshal(rawBody, &body); err == nil {
+			return body
+		}
+	}
+	// Source could not / did not send JSON — keep raw text.
+	return string(rawBody)
 }
 
 func generateInboundSecret() (string, error) {

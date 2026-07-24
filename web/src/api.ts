@@ -363,10 +363,11 @@ export type InboundWebhook = {
   organisation_id: string
   name: string
   url: string
+  auth_mode: 'header' | 'query' | 'path' | string
   secret_hint?: string
   has_secret: boolean
   status: string
-  /** Present only after create / rotate */
+  /** Present after create/rotate, or always for query/path (embedded in URL) */
   secret?: string
 }
 
@@ -380,7 +381,7 @@ export function getInboundWebhook(orgId: string, hookId: string) {
 
 export function createInboundWebhook(
   orgId: string,
-  input: { name: string; secret?: string; status?: string },
+  input: { name: string; secret?: string; status?: string; auth_mode?: string },
 ) {
   return request<InboundWebhook>(`/v1/organisations/${orgId}/inbound-webhooks`, {
     method: 'POST',
@@ -391,7 +392,7 @@ export function createInboundWebhook(
 export function updateInboundWebhook(
   orgId: string,
   hookId: string,
-  input: { name?: string; secret?: string; status?: string; rotate?: boolean },
+  input: { name?: string; secret?: string; status?: string; auth_mode?: string; rotate?: boolean },
 ) {
   return request<InboundWebhook>(`/v1/organisations/${orgId}/inbound-webhooks/${hookId}`, {
     method: 'PATCH',

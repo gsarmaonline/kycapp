@@ -1,8 +1,8 @@
 -- name: CreateOrganisationInboundWebhook :one
 INSERT INTO organisation_inbound_webhooks (
-    id, organisation_id, name, secret, status
+    id, organisation_id, name, secret, status, auth_mode
 ) VALUES (
-    $1, $2, $3, $4, $5
+    $1, $2, $3, $4, $5, $6
 )
 RETURNING *;
 
@@ -24,6 +24,7 @@ UPDATE organisation_inbound_webhooks SET
     name = $3,
     secret = $4,
     status = $5,
+    auth_mode = $6,
     updated_at = now()
 WHERE id = $1 AND organisation_id = $2
 RETURNING *;

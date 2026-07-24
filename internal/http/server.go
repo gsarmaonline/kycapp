@@ -119,6 +119,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("PATCH /v1/organisations/{id}/inbound-webhooks/{hookId}", s.handlePatchInboundWebhook)
 	s.mux.HandleFunc("DELETE /v1/organisations/{id}/inbound-webhooks/{hookId}", s.handleDeleteInboundWebhook)
 	s.mux.HandleFunc("POST /v1/hooks/inbound/{hookId}", s.handleInboundWebhook)
+	s.mux.HandleFunc("POST /v1/hooks/inbound/{hookId}/{token}", s.handleInboundWebhookWithPathToken)
 	s.mux.HandleFunc("POST /v1/organisations/{id}/api-keys", s.handleCreateOrgAPIKey)
 	s.mux.HandleFunc("GET /v1/organisations/{id}/api-keys", s.handleListOrgAPIKeys)
 	s.mux.HandleFunc("POST /v1/organisations/{id}/branding/logo", s.handleUploadOrganisationLogo)

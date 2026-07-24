@@ -14,6 +14,7 @@ func inboundWebhookJSON(v service.InboundWebhookView) map[string]any {
 		"organisation_id": v.OrganisationID,
 		"name":            v.Name,
 		"url":             v.URL,
+		"auth_mode":       v.AuthMode,
 		"secret_hint":     v.SecretHint,
 		"has_secret":      v.HasSecret,
 		"status":          v.Status,
@@ -49,16 +50,17 @@ func (s *Server) handleCreateInboundWebhook(w http.ResponseWriter, r *http.Reque
 		return
 	}
 	var body struct {
-		Name   string `json:"name"`
-		Secret string `json:"secret"`
-		Status string `json:"status"`
+		Name     string `json:"name"`
+		Secret   string `json:"secret"`
+		Status   string `json:"status"`
+		AuthMode string `json:"auth_mode"`
 	}
 	if err := decodeJSON(r, &body); err != nil {
 		writeError(w, apperr.Validation("invalid JSON body"))
 		return
 	}
 	view, err := s.svc.CreateInboundWebhook(r.Context(), orgID, service.CreateInboundWebhookInput{
-		Name: body.Name, Secret: body.Secret, Status: body.Status,
+		Name: body.Name, Secret: body.Secret, Status: body.Status, AuthMode: body.AuthMode,
 	})
 	if err != nil {
 		writeError(w, err)
@@ -90,17 +92,18 @@ func (s *Server) handlePatchInboundWebhook(w http.ResponseWriter, r *http.Reques
 		return
 	}
 	var body struct {
-		Name   *string `json:"name"`
-		Secret *string `json:"secret"`
-		Status *string `json:"status"`
-		Rotate bool    `json:"rotate"`
+		Name     *string `json:"name"`
+		Secret   *string `json:"secret"`
+		Status   *string `json:"status"`
+		AuthMode *string `json:"auth_mode"`
+		Rotate   bool    `json:"rotate"`
 	}
 	if err := decodeJSON(r, &body); err != nil {
 		writeError(w, apperr.Validation("invalid JSON body"))
 		return
 	}
 	view, err := s.svc.UpdateInboundWebhook(r.Context(), orgID, hookID, service.UpdateInboundWebhookInput{
-		Name: body.Name, Secret: body.Secret, Status: body.Status, Rotate: body.Rotate,
+		Name: body.Name, Secret: body.Secret, Status: body.Status, AuthMode: body.AuthMode, Rotate: body.Rotate,
 	})
 	if err != nil {
 		writeError(w, err)
@@ -123,18 +126,39 @@ func (s *Server) handleDeleteInboundWebhook(w http.ResponseWriter, r *http.Reque
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
 }
 
-// Public: POST /v1/hooks/inbound/{hookId} with X-KYC-Webhook-Secret.
-func (s *Server) handleInboundWebhook(w http.ResponseWriter, r *http.Request) {
-	hookID := r.PathValue("hookId")
+func (s *Server) receiveInboundWebhook(w http.ResponseWriter, r *http.Request, hookID, pathSecret string) {
 	body, err := io.ReadAll(io.LimitReader(r.Body, 1<<20))
 	if err != nil {
 		writeError(w, apperr.Validation("could not read body"))
 		return
 	}
-	secret := r.Header.Get("X-KYC-Webhook-Secret")
-	if err := s.svc.HandleInboundWebhook(r.Context(), hookID, secret, body, r.Header.Get("Content-Type")); err != nil {
+	auth := service.InboundAuthInput{
+		HeaderSecret: r.Header.Get("X-KYC-Webhook-Secret"),
+		QuerySecret:  firstNonEmpty(r.URL.Query().Get("secret"), r.URL.Query().Get("token")),
+		PathSecret:   pathSecret,
+	}
+	if err := s.svc.HandleInboundWebhook(r.Context(), hookID, auth, body, r.Header.Get("Content-Type")); err != nil {
 		writeError(w, err)
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"received": true, "trigger": "webhook.received"})
+}
+
+func firstNonEmpty(vals ...string) string {
+	for _, v := range vals {
+		if v != "" {
+			return v
+		}
+	}
+	return ""
+}
+
+// Public: POST /v1/hooks/inbound/{hookId} — header or query auth.
+func (s *Server) handleInboundWebhook(w http.ResponseWriter, r *http.Request) {
+	s.receiveInboundWebhook(w, r, r.PathValue("hookId"), "")
+}
+
+// Public: POST /v1/hooks/inbound/{hookId}/{token} — path-token auth.
+func (s *Server) handleInboundWebhookWithPathToken(w http.ResponseWriter, r *http.Request) {
+	s.receiveInboundWebhook(w, r, r.PathValue("hookId"), r.PathValue("token"))
 }

@@ -10,6 +10,7 @@ export function InboundWebhooksEdit() {
   const navigate = useNavigate()
   const [name, setName] = useState('')
   const [status, setStatus] = useState('connected')
+  const [authMode, setAuthMode] = useState('header')
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
@@ -17,6 +18,7 @@ export function InboundWebhooksEdit() {
       .then((w) => {
         setName(w.name)
         setStatus(w.status)
+        setAuthMode(w.auth_mode || 'header')
       })
       .catch((e) => setError(e instanceof Error ? e.message : 'Not found'))
   }, [orgId, id])
@@ -25,7 +27,7 @@ export function InboundWebhooksEdit() {
     e.preventDefault()
     setError(null)
     try {
-      await updateInboundWebhook(orgId, id, { name, status })
+      await updateInboundWebhook(orgId, id, { name, status, auth_mode: authMode })
       navigate(resourcePath(orgId, 'inbound-webhooks', id))
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Save failed')
@@ -40,6 +42,14 @@ export function InboundWebhooksEdit() {
         <label>
           Name
           <input value={name} onChange={(e) => setName(e.target.value)} required />
+        </label>
+        <label>
+          How the source authenticates
+          <select value={authMode} onChange={(e) => setAuthMode(e.target.value)}>
+            <option value="header">Custom header (X-KYC-Webhook-Secret)</option>
+            <option value="query">Secret in query string (?secret=)</option>
+            <option value="path">Secret in URL path</option>
+          </select>
         </label>
         <label>
           Status

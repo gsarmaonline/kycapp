@@ -11,11 +11,11 @@ import (
 
 const createOrganisationInboundWebhook = `-- name: CreateOrganisationInboundWebhook :one
 INSERT INTO organisation_inbound_webhooks (
-    id, organisation_id, name, secret, status
+    id, organisation_id, name, secret, status, auth_mode
 ) VALUES (
-    $1, $2, $3, $4, $5
+    $1, $2, $3, $4, $5, $6
 )
-RETURNING id, organisation_id, name, secret, status, created_at, updated_at
+RETURNING id, organisation_id, name, secret, status, created_at, updated_at, auth_mode
 `
 
 type CreateOrganisationInboundWebhookParams struct {
@@ -24,6 +24,7 @@ type CreateOrganisationInboundWebhookParams struct {
 	Name           string `json:"name"`
 	Secret         string `json:"secret"`
 	Status         string `json:"status"`
+	AuthMode       string `json:"auth_mode"`
 }
 
 func (q *Queries) CreateOrganisationInboundWebhook(ctx context.Context, arg CreateOrganisationInboundWebhookParams) (OrganisationInboundWebhook, error) {
@@ -33,6 +34,7 @@ func (q *Queries) CreateOrganisationInboundWebhook(ctx context.Context, arg Crea
 		arg.Name,
 		arg.Secret,
 		arg.Status,
+		arg.AuthMode,
 	)
 	var i OrganisationInboundWebhook
 	err := row.Scan(
@@ -43,6 +45,7 @@ func (q *Queries) CreateOrganisationInboundWebhook(ctx context.Context, arg Crea
 		&i.Status,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.AuthMode,
 	)
 	return i, err
 }
@@ -63,7 +66,7 @@ func (q *Queries) DeleteOrganisationInboundWebhook(ctx context.Context, arg Dele
 }
 
 const getOrganisationInboundWebhook = `-- name: GetOrganisationInboundWebhook :one
-SELECT id, organisation_id, name, secret, status, created_at, updated_at FROM organisation_inbound_webhooks
+SELECT id, organisation_id, name, secret, status, created_at, updated_at, auth_mode FROM organisation_inbound_webhooks
 WHERE id = $1
 `
 
@@ -78,12 +81,13 @@ func (q *Queries) GetOrganisationInboundWebhook(ctx context.Context, id string) 
 		&i.Status,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.AuthMode,
 	)
 	return i, err
 }
 
 const getOrganisationInboundWebhookForOrg = `-- name: GetOrganisationInboundWebhookForOrg :one
-SELECT id, organisation_id, name, secret, status, created_at, updated_at FROM organisation_inbound_webhooks
+SELECT id, organisation_id, name, secret, status, created_at, updated_at, auth_mode FROM organisation_inbound_webhooks
 WHERE id = $1 AND organisation_id = $2
 `
 
@@ -103,12 +107,13 @@ func (q *Queries) GetOrganisationInboundWebhookForOrg(ctx context.Context, arg G
 		&i.Status,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.AuthMode,
 	)
 	return i, err
 }
 
 const listOrganisationInboundWebhooks = `-- name: ListOrganisationInboundWebhooks :many
-SELECT id, organisation_id, name, secret, status, created_at, updated_at FROM organisation_inbound_webhooks
+SELECT id, organisation_id, name, secret, status, created_at, updated_at, auth_mode FROM organisation_inbound_webhooks
 WHERE organisation_id = $1
 ORDER BY created_at DESC
 `
@@ -130,6 +135,7 @@ func (q *Queries) ListOrganisationInboundWebhooks(ctx context.Context, organisat
 			&i.Status,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.AuthMode,
 		); err != nil {
 			return nil, err
 		}
@@ -146,9 +152,10 @@ UPDATE organisation_inbound_webhooks SET
     name = $3,
     secret = $4,
     status = $5,
+    auth_mode = $6,
     updated_at = now()
 WHERE id = $1 AND organisation_id = $2
-RETURNING id, organisation_id, name, secret, status, created_at, updated_at
+RETURNING id, organisation_id, name, secret, status, created_at, updated_at, auth_mode
 `
 
 type UpdateOrganisationInboundWebhookParams struct {
@@ -157,6 +164,7 @@ type UpdateOrganisationInboundWebhookParams struct {
 	Name           string `json:"name"`
 	Secret         string `json:"secret"`
 	Status         string `json:"status"`
+	AuthMode       string `json:"auth_mode"`
 }
 
 func (q *Queries) UpdateOrganisationInboundWebhook(ctx context.Context, arg UpdateOrganisationInboundWebhookParams) (OrganisationInboundWebhook, error) {
@@ -166,6 +174,7 @@ func (q *Queries) UpdateOrganisationInboundWebhook(ctx context.Context, arg Upda
 		arg.Name,
 		arg.Secret,
 		arg.Status,
+		arg.AuthMode,
 	)
 	var i OrganisationInboundWebhook
 	err := row.Scan(
@@ -176,6 +185,7 @@ func (q *Queries) UpdateOrganisationInboundWebhook(ctx context.Context, arg Upda
 		&i.Status,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.AuthMode,
 	)
 	return i, err
 }

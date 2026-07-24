@@ -57,16 +57,11 @@ export function InboundWebhooksIndex() {
         <p>Loading…</p>
       ) : (
         <ResourceTable
-          columns={['Name', 'URL', 'Secret', 'Status']}
+          columns={['Name', 'Auth', 'Status']}
           empty="No inbound webhooks yet."
           rows={items.map((w) => ({
             key: w.id,
-            cells: [
-              w.name,
-              w.url,
-              w.has_secret ? w.secret_hint || '••••' : '—',
-              w.status,
-            ],
+            cells: [w.name, w.auth_mode || 'header', w.status],
             actions: (
               <RowActions
                 viewTo={resourcePath(orgId, 'inbound-webhooks', w.id)}

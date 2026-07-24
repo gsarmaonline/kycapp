@@ -167,13 +167,15 @@ CREATE TABLE kyc_events (
 
 ### Inbound webhooks (automation trigger)
 
-Multiple endpoints per org under **Actions → Inbound webhooks**.
+Multiple endpoints per org under **Actions → Inbound webhooks**. Each endpoint chooses how the **source** can authenticate (KYC adapts):
 
-`POST /v1/hooks/inbound/{hookId}`  
-Header: `X-KYC-Webhook-Secret: <secret>`  
-Body: JSON (stored under `body` on the event payload)
+| `auth_mode` | How the source calls KYC |
+| --- | --- |
+| `header` | `POST /v1/hooks/inbound/{hookId}` + header `X-KYC-Webhook-Secret` |
+| `query` | `POST /v1/hooks/inbound/{hookId}?secret=…` (secret in URL) |
+| `path` | `POST /v1/hooks/inbound/{hookId}/{secret}` (secret in path) |
 
-Fires trigger **`webhook.received`**. Payload includes `inbound_webhook_id` / `inbound_webhook_name` so conditions can target a specific endpoint. Subject is the **organisation**.
+Body may be JSON or raw text (stored under `body`). Fires **`webhook.received`** with `inbound_webhook_id` / `inbound_webhook_name`. Subject is the **organisation**.
 
 ```json
 {
@@ -182,7 +184,7 @@ Fires trigger **`webhook.received`**. Payload includes `inbound_webhook_id` / `i
   "trigger": "webhook.received",
   "inbound_webhook_id": "<hook_id>",
   "inbound_webhook_name": "Partner events",
-  "body": { "...": "request JSON" },
+  "body": { "...": "request JSON or string" },
   "content_type": "application/json",
   "received_at": "..."
 }
