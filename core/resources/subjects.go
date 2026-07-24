@@ -70,6 +70,14 @@ func Default() []Resource {
 			SupportsAttributes: false,
 			Provides:           []string{SubjectOrganisation},
 		},
+		{
+			// Inbound HTTP: subject is the organisation.
+			Key:                Webhook,
+			Label:              "Webhook",
+			Lifecycles:         []string{WebhookReceived},
+			SupportsAttributes: false,
+			Provides:           []string{SubjectOrganisation},
+		},
 	}
 }
 

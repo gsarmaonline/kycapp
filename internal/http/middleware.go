@@ -37,6 +37,9 @@ func isPublicAPIPath(path string) bool {
 	if strings.HasPrefix(path, "/v1/billing/webhooks/") {
 		return true
 	}
+	if strings.HasPrefix(path, "/v1/hooks/inbound/") {
+		return true
+	}
 	switch path {
 	case "/v1/auth/providers",
 		"/v1/auth/google",

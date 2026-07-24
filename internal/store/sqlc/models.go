@@ -175,6 +175,13 @@ type OrganisationEntitlement struct {
 	Effect         string `json:"effect"`
 }
 
+type OrganisationInboundHook struct {
+	OrganisationID string    `json:"organisation_id"`
+	Secret         string    `json:"secret"`
+	Status         string    `json:"status"`
+	UpdatedAt      time.Time `json:"updated_at"`
+}
+
 type OrganisationIntegration struct {
 	OrganisationID string    `json:"organisation_id"`
 	Provider       string    `json:"provider"`

@@ -41,7 +41,7 @@ Actions/ops/condition fields live in `core/automations`. **Triggers** are genera
 
 | Key | Source |
 | --- | --- |
-| `triggers` | `core/resources.ExpandTriggers` — lifecycle events for `app_user`, `membership`, `subscription`, `schedule` (hourly/daily/weekly), plus `app_user.attribute.<key>` for every active attribute definition |
+| `triggers` | `core/resources.ExpandTriggers` — lifecycle events for `app_user`, `membership`, `subscription`, `schedule` (hourly/daily/weekly), `webhook.received`, plus `app_user.attribute.<key>` |
 | `actions` | Registered action types + params |
 | `ops` | Condition operators |
 | `condition_fields` | Base app-user fields + **all active org attribute definitions** as `app_user.<key>` |
@@ -165,6 +165,31 @@ CREATE TABLE kyc_events (
 
 **Columns** mode on the action: `"mode": "columns", "mapping": { "email": "app_user.email", "country": "app_user.country" }`.
 
+### Inbound webhook (org trigger)
+
+One public endpoint per org:
+
+`POST /v1/hooks/inbound/{organisation_id}`  
+Header: `X-KYC-Webhook-Secret: <secret>`  
+Body: JSON (stored under `body` on the event payload)
+
+Fires trigger **`webhook.received`**. Subject is the **organisation** (same rules as schedule: no `send_email` unless you add a recipient model later). Manage URL/secret under **Actions → Webhooks → Inbound**.
+
+Payload shape:
+
+```json
+{
+  "id": "<org_id>",
+  "organisation_id": "<org_id>",
+  "trigger": "webhook.received",
+  "body": { "...": "request JSON" },
+  "content_type": "application/json",
+  "received_at": "..."
+}
+```
+
+Conditions may use paths like `body.event` / `body.type`. Empty conditions are allowed.
+
 ### Webhooks (for `call_webhook`)
 
 Org-scoped endpoints under **Actions → Webhooks**. Automations select a `webhook_id`.
@@ -247,7 +272,7 @@ Automations run in the **worker**, so Resend env must be on that service.
 
 - Human approval steps
 - Cross-org / marketplace automations
-- Generic inbound “catch-all” webhook → automation (use first-class integrations → domain triggers instead)
+- Generic inbound “catch-all” that invents domain objects (use `webhook.received` + your own mapping, or first-class integrations)
 - Non-Postgres database drivers
 - Custom cron expressions (presets only: hourly / daily / weekly UTC)
 - Per–app-user date-field due scanners

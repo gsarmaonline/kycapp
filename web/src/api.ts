@@ -358,6 +358,30 @@ export function deleteOrgWebhook(orgId: string, webhookId: string) {
   })
 }
 
+export type InboundHook = {
+  organisation_id: string
+  url: string
+  secret_hint?: string
+  has_secret: boolean
+  status: string
+  /** Present only after rotate / set */
+  secret?: string
+}
+
+export function getInboundHook(orgId: string) {
+  return request<InboundHook>(`/v1/organisations/${orgId}/inbound-hook`)
+}
+
+export function updateInboundHook(
+  orgId: string,
+  input: { secret?: string; status?: string; rotate?: boolean },
+) {
+  return request<InboundHook>(`/v1/organisations/${orgId}/inbound-hook`, {
+    method: 'PUT',
+    body: JSON.stringify(input),
+  })
+}
+
 export function listOrgAPIKeys(orgId: string) {
   return request<{ items: OrgAPIKey[] }>(`/v1/organisations/${orgId}/api-keys`)
 }

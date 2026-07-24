@@ -12,6 +12,7 @@ const (
 	KindLifecycle TriggerKind = "lifecycle"
 	KindAttribute TriggerKind = "attribute"
 	KindSchedule  TriggerKind = "schedule"
+	KindWebhook   TriggerKind = "webhook"
 )
 
 // Trigger is a parsed, validated trigger ID.
@@ -90,6 +91,10 @@ func ParseTrigger(id string) (Trigger, error) {
 		kind = KindSchedule
 		label = "Schedule · " + event
 	}
+	if res.Key == Webhook {
+		kind = KindWebhook
+		label = "Webhook · " + event
+	}
 	return Trigger{
 		ID:       id,
 		Resource: res.Key,
@@ -122,6 +127,11 @@ func ExpandTriggers(resources []Resource, attrsByResource map[string][]Attribute
 				kind = string(KindSchedule)
 				label = "Schedule · " + event
 				desc = fmt.Sprintf("Fires on an organisation schedule (%s, UTC). Subject is the org — not an app user.", event)
+			}
+			if r.Key == Webhook {
+				kind = string(KindWebhook)
+				label = "Webhook · " + event
+				desc = "Fires when a POST hits the org inbound webhook. Subject is the org — not an app user."
 			}
 			out = append(out, TriggerInfo{
 				ID:          id,

@@ -128,7 +128,11 @@ export function AutomationsForm({ submitLabel, cancelTo, initial, onSubmit }: Pr
           }
         })
         .filter((c) => c.field)
-      if (!cleanedConditions.length && !trigger.startsWith('schedule.')) {
+      if (
+        !cleanedConditions.length &&
+        !trigger.startsWith('schedule.') &&
+        trigger !== 'webhook.received'
+      ) {
         throw new Error('Add at least one condition')
       }
       for (const c of cleanedConditions) {

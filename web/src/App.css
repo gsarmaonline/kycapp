@@ -971,9 +971,18 @@ button.link-btn.danger:hover {
   gap: 0.35rem;
 }
 
-.dag-node-edges {
-  margin: 0.35rem 0 0;
-  font-size: 0.75rem;
+.inbound-hook-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin: 0 0 1.5rem;
+  padding: 1rem 0;
+  max-width: 40rem;
+}
+
+.inbound-hook-card input {
+  width: 100%;
+  font: inherit;
 }
 
 .dag-handle-error {

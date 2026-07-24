@@ -15,6 +15,7 @@ const (
 	Membership   = "membership"
 	Subscription = "subscription"
 	Schedule     = "schedule" // org-scoped time triggers (not per app_user)
+	Webhook      = "webhook"  // org-scoped inbound HTTP trigger
 )
 
 // Schedule presets (used as lifecycle events on the schedule resource).
@@ -23,6 +24,9 @@ const (
 	ScheduleDaily  = "daily"
 	ScheduleWeekly = "weekly"
 )
+
+// WebhookReceived is the lifecycle event for inbound automation webhooks.
+const WebhookReceived = "received"
 
 // AttributeSegment is the fixed path segment between resource and attribute key.
 const AttributeSegment = "attribute"

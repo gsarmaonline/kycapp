@@ -113,6 +113,9 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /v1/organisations/{id}/webhooks/{webhookId}", s.handleGetOrgWebhook)
 	s.mux.HandleFunc("PATCH /v1/organisations/{id}/webhooks/{webhookId}", s.handlePatchOrgWebhook)
 	s.mux.HandleFunc("DELETE /v1/organisations/{id}/webhooks/{webhookId}", s.handleDeleteOrgWebhook)
+	s.mux.HandleFunc("GET /v1/organisations/{id}/inbound-hook", s.handleGetInboundHook)
+	s.mux.HandleFunc("PUT /v1/organisations/{id}/inbound-hook", s.handlePutInboundHook)
+	s.mux.HandleFunc("POST /v1/hooks/inbound/{orgId}", s.handleInboundWebhook)
 	s.mux.HandleFunc("POST /v1/organisations/{id}/api-keys", s.handleCreateOrgAPIKey)
 	s.mux.HandleFunc("GET /v1/organisations/{id}/api-keys", s.handleListOrgAPIKeys)
 	s.mux.HandleFunc("POST /v1/organisations/{id}/branding/logo", s.handleUploadOrganisationLogo)
@@ -226,7 +229,7 @@ func (s *Server) Handler() http.Handler {
 func corsMiddleware(origin string, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Access-Control-Allow-Origin", origin)
-		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Idempotency-Key, Authorization")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Idempotency-Key, Authorization, X-KYC-Webhook-Secret")
 		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS")
 		if r.Method == http.MethodOptions {
 			w.WriteHeader(http.StatusNoContent)
