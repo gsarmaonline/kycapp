@@ -971,6 +971,20 @@ button.link-btn.danger:hover {
   gap: 0.35rem;
 }
 
+.dag-edge-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  font-size: 0.75rem;
+  color: color-mix(in srgb, CanvasText 70%, transparent);
+}
+
+.dag-handle-error {
+  background: #a33 !important;
+  width: 8px !important;
+  height: 8px !important;
+}
+
 .dag-node-fields input,
 .dag-node-fields select,
 .dag-node-fields textarea,

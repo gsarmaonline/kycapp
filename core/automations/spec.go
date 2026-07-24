@@ -66,6 +66,10 @@ func ValidateCreate(trigger string, conditionsJSON, actionsJSON json.RawMessage)
 		}
 		actions[i] = a
 	}
+	actions = NormalizeActions(actions)
+	if err := ValidateActionGraph(actions); err != nil {
+		return Spec{}, err
+	}
 	if err := ValidateSubjectCompatibility(trigger, actions); err != nil {
 		return Spec{}, err
 	}

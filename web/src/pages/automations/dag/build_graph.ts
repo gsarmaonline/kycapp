@@ -3,9 +3,9 @@ import type { AutomationAction, AutomationCatalog, AutomationCondition } from '.
 import type { AutomationFlowNode } from './nodes'
 
 const X_TRIGGER = 40
-const X_CONDITION = 300
-const X_ACTION = 620
-const Y_STEP = 150
+const X_CONDITION = 280
+const X_ACTION = 560
+const Y_STEP = 170
 
 const defaultCondition = (preferredField = 'app_user.status'): AutomationCondition => ({
   field: preferredField,
@@ -24,6 +24,60 @@ const defaultAction = (
       : {},
 })
 
+/** Assign ids and linear on_success when no explicit edges exist (matches server). */
+export function normalizeActionWorkflow(actions: AutomationAction[]): AutomationAction[] {
+  if (!actions.length) return actions
+  const used = new Map<string, number>()
+  const withIds = actions.map((a, i) => {
+    let id = (a.id || `a${i + 1}`).trim()
+    const n = used.get(id) ?? 0
+    if (n > 0) {
+      id = `${id}_${n + 1}`
+      used.set(a.id || `a${i + 1}`, n + 1)
+    } else {
+      used.set(id, 1)
+    }
+    return { ...a, id }
+  })
+  const hasEdges = withIds.some((a) => a.on_success || a.on_error)
+  if (!hasEdges) {
+    return withIds.map((a, i) => ({
+      ...a,
+      on_success: i < withIds.length - 1 ? withIds[i + 1].id : undefined,
+      on_error: a.on_error || undefined,
+    }))
+  }
+  return withIds
+}
+
+export function appendAction(
+  actions: AutomationAction[],
+  action: AutomationAction,
+): AutomationAction[] {
+  const base = normalizeActionWorkflow(actions)
+  const id = `a${base.length + 1}`
+  const next: AutomationAction = { ...action, id }
+  if (!base.length) return [next]
+  const last = base[base.length - 1]
+  return [...base.slice(0, -1), { ...last, on_success: id }, next]
+}
+
+export function removeActionAt(
+  actions: AutomationAction[],
+  index: number,
+): AutomationAction[] {
+  if (actions.length <= 1) return actions
+  const base = normalizeActionWorkflow(actions)
+  const removed = base[index]
+  const next = base.filter((_, i) => i !== index).map((a) => {
+    const patch = { ...a }
+    if (patch.on_success === removed.id) patch.on_success = removed.on_success
+    if (patch.on_error === removed.id) patch.on_error = undefined
+    return patch
+  })
+  return next
+}
+
 export function normalizeGraph(
   input: {
     trigger?: string
@@ -39,6 +93,7 @@ export function normalizeGraph(
     if (!conditions.length) conditions = [defaultCondition()]
     if (!actions.length) actions = [defaultAction()]
   }
+  actions = normalizeActionWorkflow(actions)
   return { trigger, conditions, actions }
 }
 
@@ -59,8 +114,9 @@ export function buildFlowElements(
     onActionRemove?: (index: number) => void
   },
 ): { nodes: AutomationFlowNode[]; edges: Edge[] } {
+  const actions = normalizeActionWorkflow(graph.actions)
   const condCount = Math.max(graph.conditions.length, 1)
-  const actionCount = Math.max(graph.actions.length, 1)
+  const actionCount = Math.max(actions.length, 1)
   const rowCount = Math.max(condCount, actionCount)
   const midY = ((rowCount - 1) * Y_STEP) / 2
 
@@ -99,19 +155,21 @@ export function buildFlowElements(
     })
   })
 
-  graph.actions.forEach((action, i) => {
+  actions.forEach((action, i) => {
     nodes.push({
-      id: `action-${i}`,
+      id: `action-${action.id || i}`,
       type: 'action',
-      position: { x: X_ACTION, y: i * Y_STEP },
+      position: { x: X_ACTION + (i % 2) * 40, y: i * Y_STEP },
       data: {
         action,
+        actionIndex: i,
+        siblingActions: actions,
         readOnly: opts.readOnly,
         actions: opts.catalog?.actions,
         emailTemplates: opts.emailTemplates,
         databases: opts.catalog?.databases,
         webhooks: opts.catalog?.webhooks,
-        canRemove: graph.actions.length > 1,
+        canRemove: actions.length > 1,
         onChange: (next) => opts.onActionChange?.(i, next),
         onRemove: () => opts.onActionRemove?.(i),
       },
@@ -120,21 +178,19 @@ export function buildFlowElements(
     })
   })
 
-  // Topology (fixed v1 semantics):
-  //   trigger → every condition (AND)
-  //   every condition → every action (all actions run when conditions match)
-  // Actions still execute in list order at runtime; the graph shows fan-out, not
-  // per-condition branching (that would need a richer DSL).
   const edges: Edge[] = []
+  const entryId = actions[0] ? `action-${actions[0].id}` : undefined
+
   if (graph.conditions.length === 0) {
-    graph.actions.forEach((_, j) => {
+    if (entryId) {
       edges.push({
-        id: `e-trigger-action-${j}`,
+        id: 'e-trigger-entry',
         source: 'trigger',
-        target: `action-${j}`,
+        target: entryId,
         animated: true,
+        label: 'then',
       })
-    })
+    }
   } else {
     graph.conditions.forEach((_, i) => {
       edges.push({
@@ -143,15 +199,41 @@ export function buildFlowElements(
         target: `cond-${i}`,
         animated: true,
       })
-      graph.actions.forEach((_, j) => {
+      if (entryId) {
         edges.push({
-          id: `e-cond-${i}-action-${j}`,
+          id: `e-cond-${i}-entry`,
           source: `cond-${i}`,
-          target: `action-${j}`,
+          target: entryId,
+          label: i === 0 ? 'then' : undefined,
         })
-      })
+      }
     })
   }
+
+  actions.forEach((a) => {
+    const src = `action-${a.id}`
+    if (a.on_success) {
+      edges.push({
+        id: `e-ok-${a.id}-${a.on_success}`,
+        source: src,
+        sourceHandle: 'success',
+        target: `action-${a.on_success}`,
+        label: 'ok',
+        style: { stroke: 'var(--ok, #2f6f4e)' },
+      })
+    }
+    if (a.on_error) {
+      edges.push({
+        id: `e-err-${a.id}-${a.on_error}`,
+        source: src,
+        sourceHandle: 'error',
+        target: `action-${a.on_error}`,
+        label: 'error',
+        animated: true,
+        style: { stroke: 'var(--danger, #a33)' },
+      })
+    }
+  })
 
   return { nodes, edges }
 }

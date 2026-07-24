@@ -938,8 +938,13 @@ export function flattenAutomationConditions(c?: AutomationConditions | null): {
 }
 
 export type AutomationAction = {
+  id?: string
   type: string
   params?: Record<string, string>
+  /** Next action id when this step succeeds */
+  on_success?: string
+  /** Next action id when this step fails (omit = fail the run) */
+  on_error?: string
   /** @deprecated legacy flat field; prefer params.template_key */
   template_key?: string
 }

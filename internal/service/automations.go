@@ -321,6 +321,7 @@ func (s *Service) runOneAutomation(ctx context.Context, row sqlc.Automation, tri
 	if err := json.Unmarshal(row.Actions, &actions); err != nil {
 		return s.recordRun(ctx, row, trigger, payloadJSON, "error", "invalid actions: "+err.Error())
 	}
+	actions = automations.NormalizeActions(actions)
 
 	subjects, err := s.resolveSubjects(ctx, row.OrganisationID, trigger, payload)
 	if err != nil {
@@ -335,13 +336,16 @@ func (s *Service) runOneAutomation(ctx context.Context, row sqlc.Automation, tri
 	actionPayload["trigger"] = trigger
 
 	var details []string
-	for _, a := range actions {
-		detail, err := s.executeAction(ctx, row.OrganisationID, a, actionPayload, subjects)
-		if err != nil {
-			_ = s.recordRun(ctx, row, trigger, payloadJSON, "error", err.Error())
-			return err
+	details, err = automations.RunActionGraph(actions, func(a automations.Action) (string, error) {
+		return s.executeAction(ctx, row.OrganisationID, a, actionPayload, subjects)
+	})
+	if err != nil {
+		msg := err.Error()
+		if len(details) > 0 {
+			msg = strings.Join(details, "; ") + "; " + msg
 		}
-		details = append(details, detail)
+		_ = s.recordRun(ctx, row, trigger, payloadJSON, "error", msg)
+		return err
 	}
 	return s.recordRun(ctx, row, trigger, payloadJSON, "success", strings.Join(details, "; "))
 }

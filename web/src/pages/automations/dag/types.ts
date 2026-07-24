@@ -19,6 +19,8 @@ export type ConditionNodeData = {
 
 export type ActionNodeData = {
   action: AutomationAction
+  actionIndex?: number
+  siblingActions?: AutomationAction[]
   readOnly: boolean
   actions?: AutomationCatalog['actions']
   emailTemplates?: { key: string; name: string }[]

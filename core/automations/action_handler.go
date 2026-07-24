@@ -76,15 +76,22 @@ func KnownAction(typ string) bool {
 }
 
 // Action is a persisted automation step. Params are handler-defined.
+// Optional id + on_success / on_error form an action workflow graph.
 // Legacy top-level keys (e.g. template_key) are lifted into Params on unmarshal.
 type Action struct {
-	Type   string         `json:"type"`
-	Params map[string]any `json:"params,omitempty"`
+	ID        string         `json:"id,omitempty"`
+	Type      string         `json:"type"`
+	Params    map[string]any `json:"params,omitempty"`
+	OnSuccess string         `json:"on_success,omitempty"` // next action id on success
+	OnError   string         `json:"on_error,omitempty"`   // next action id on failure
 }
 
 type actionJSON struct {
+	ID          string         `json:"id,omitempty"`
 	Type        string         `json:"type"`
 	Params      map[string]any `json:"params,omitempty"`
+	OnSuccess   string         `json:"on_success,omitempty"`
+	OnError     string         `json:"on_error,omitempty"`
 	TemplateKey string         `json:"template_key,omitempty"` // legacy
 }
 
@@ -94,7 +101,10 @@ func (a *Action) UnmarshalJSON(data []byte) error {
 	if err := json.Unmarshal(data, &raw); err != nil {
 		return err
 	}
+	a.ID = strings.TrimSpace(raw.ID)
 	a.Type = strings.TrimSpace(raw.Type)
+	a.OnSuccess = strings.TrimSpace(raw.OnSuccess)
+	a.OnError = strings.TrimSpace(raw.OnError)
 	a.Params = raw.Params
 	if a.Params == nil {
 		a.Params = map[string]any{}
@@ -114,14 +124,20 @@ func (a Action) MarshalJSON() ([]byte, error) {
 		params = map[string]any{}
 	}
 	return json.Marshal(actionJSON{
-		Type:   a.Type,
-		Params: params,
+		ID:        strings.TrimSpace(a.ID),
+		Type:      a.Type,
+		Params:    params,
+		OnSuccess: strings.TrimSpace(a.OnSuccess),
+		OnError:   strings.TrimSpace(a.OnError),
 	})
 }
 
-// Normalize trims type and ensures Params is non-nil.
+// Normalize trims type/ids and ensures Params is non-nil.
 func (a Action) Normalize() Action {
+	a.ID = strings.TrimSpace(a.ID)
 	a.Type = strings.TrimSpace(a.Type)
+	a.OnSuccess = strings.TrimSpace(a.OnSuccess)
+	a.OnError = strings.TrimSpace(a.OnError)
 	if a.Params == nil {
 		a.Params = map[string]any{}
 	}

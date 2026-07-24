@@ -182,13 +182,35 @@ Empty `body_template` posts `{ "organisation_id", "payload" }` (full event dump)
 
 Unknown action types fail validation / the run with a clear error (no silent skip).
 
-**Topology is fixed for v1:** one trigger → condition group (AND or OR) → **all** actions in the list (in order). There is no “this condition → only these actions” branching. Add multiple actions with **Add action**; they all run when the conditions match. Per-path branches would need a richer DSL later.
+**Topology:** trigger → condition group (AND or OR) → **action workflow**. Actions form a graph:
+
+- Each action has an `id`
+- `on_success` → next step when it succeeds (flat lists auto-chain in order)
+- `on_error` → next step when it fails (omit = fail the run)
+
+Example: insert, then email on success; webhook on insert failure:
+
+```json
+[
+  {
+    "id": "a1",
+    "type": "db_insert",
+    "params": { "database_id": "…", "table": "events" },
+    "on_success": "a2",
+    "on_error": "a3"
+  },
+  { "id": "a2", "type": "send_email", "params": { "template_key": "welcome" } },
+  { "id": "a3", "type": "call_webhook", "params": { "webhook_id": "…" } }
+]
+```
+
+Per-condition action branching is still out of scope.
 
 ## Runtime
 
 1. Domain event in API/service → enqueue River job `{ org_id, trigger, payload }`.
 2. Worker loads enabled automations for that org + trigger.
-3. For each rule: evaluate conditions → run actions in order.
+3. For each rule: evaluate conditions → walk the action workflow (`on_success` / `on_error`).
 4. Persist run log (success / skip / error) for merchant visibility.
 
 Same worker binary serves platform and merchant automations; tenancy is always `organisation_id`.
@@ -198,8 +220,8 @@ Same worker binary serves platform and merchant automations; tenancy is always `
 Under `/orgs/:orgId/automations`:
 
 - List / create / edit / enable-disable / delete
-- **Visual DAG** (React Flow): trigger → conditions (AND fan-out) → ordered actions
-- Node fields edit inline; add condition/action from the toolbar
+- **Visual DAG** (React Flow): trigger → conditions → action workflow (success / error edges)
+- Node fields edit inline; add condition/action from the toolbar; set **On error** per action
 - Show page renders the same DAG read-only, plus recent runs
 
 ## Local & Railway

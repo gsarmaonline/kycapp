@@ -1,5 +1,5 @@
 import { Handle, Position, type Node, type NodeProps } from '@xyflow/react'
-import type { AutomationCatalog, AutomationCondition } from '../../../api'
+import type { AutomationAction, AutomationCatalog, AutomationCondition } from '../../../api'
 import type { ActionNodeData, ConditionNodeData, TriggerNodeData } from './types'
 
 export type TriggerFlowNode = Node<TriggerNodeData, 'trigger'>
@@ -391,6 +391,18 @@ export function ActionNode({ data }: NodeProps<ActionFlowNode>) {
   const defaultTemplateKey = templates[0]?.key ?? ''
   const defaultDatabaseId = databases[0]?.id ?? ''
   const defaultWebhookId = webhooks[0]?.id ?? ''
+  const siblings = (data.siblingActions ?? []).filter((s) => s.id && s.id !== a.id)
+
+  function patch(next: Partial<AutomationAction>) {
+    data.onChange?.({
+      id: a.id,
+      type: next.type ?? a.type,
+      params: next.params ?? params,
+      on_success: next.on_success !== undefined ? next.on_success || undefined : a.on_success,
+      on_error: next.on_error !== undefined ? next.on_error || undefined : a.on_error,
+      template_key: a.template_key,
+    })
+  }
 
   const summary = (() => {
     if (a.type === 'db_insert') {
@@ -423,7 +435,7 @@ export function ActionNode({ data }: NodeProps<ActionFlowNode>) {
     <div className={`dag-node dag-node-action${data.readOnly ? ' is-readonly' : ''}`}>
       <Handle type="target" position={Position.Left} />
       <div className="dag-node-kind">
-        Action
+        Action{a.id ? ` · ${a.id}` : ''}
         {!data.readOnly && data.canRemove && (
           <button type="button" className="dag-node-remove" onClick={() => data.onRemove?.()}>
             ×
@@ -434,6 +446,7 @@ export function ActionNode({ data }: NodeProps<ActionFlowNode>) {
         <strong className="dag-node-title">
           {a.type}
           {summary ? `: ${summary}` : ''}
+          {a.on_error ? ` (on error → ${a.on_error})` : ''}
         </strong>
       ) : (
         <div className="dag-node-fields">
@@ -458,7 +471,7 @@ export function ActionNode({ data }: NodeProps<ActionFlowNode>) {
                   nextParams[p.key] = params[p.key] ?? ''
                 }
               }
-              data.onChange?.({ type: nextType, params: nextParams })
+              patch({ type: nextType, params: nextParams })
             }}
           >
             {actions.map((act) => (
@@ -472,7 +485,7 @@ export function ActionNode({ data }: NodeProps<ActionFlowNode>) {
               params={params}
               databases={databases}
               defaultDatabaseId={defaultDatabaseId}
-              onChange={(next) => data.onChange?.({ type: a.type, params: next })}
+              onChange={(next) => patch({ params: next })}
             />
           ) : (
             paramDefs.map((p) => {
@@ -481,12 +494,7 @@ export function ActionNode({ data }: NodeProps<ActionFlowNode>) {
                   <select
                     key={p.key}
                     value={params[p.key] || defaultTemplateKey}
-                    onChange={(e) =>
-                      data.onChange?.({
-                        type: a.type,
-                        params: { ...params, [p.key]: e.target.value },
-                      })
-                    }
+                    onChange={(e) => patch({ params: { ...params, [p.key]: e.target.value } })}
                     required={p.required}
                   >
                     {!templates.length && <option value="">No templates</option>}
@@ -507,12 +515,7 @@ export function ActionNode({ data }: NodeProps<ActionFlowNode>) {
                   <select
                     key={p.key}
                     value={params[p.key] || defaultWebhookId}
-                    onChange={(e) =>
-                      data.onChange?.({
-                        type: a.type,
-                        params: { ...params, [p.key]: e.target.value },
-                      })
-                    }
+                    onChange={(e) => patch({ params: { ...params, [p.key]: e.target.value } })}
                     required={p.required}
                   >
                     {!webhooks.length && <option value="">No webhooks</option>}
@@ -536,20 +539,35 @@ export function ActionNode({ data }: NodeProps<ActionFlowNode>) {
                   key={p.key}
                   type={p.key === 'secret' || p.key === 'password' ? 'password' : 'text'}
                   value={params[p.key] ?? ''}
-                  onChange={(e) =>
-                    data.onChange?.({
-                      type: a.type,
-                      params: { ...params, [p.key]: e.target.value },
-                    })
-                  }
+                  onChange={(e) => patch({ params: { ...params, [p.key]: e.target.value } })}
                   placeholder={p.label || p.key}
                 />
               )
             })
           )}
+          <label className="dag-edge-field">
+            On error
+            <select
+              value={a.on_error || ''}
+              onChange={(e) => patch({ on_error: e.target.value })}
+            >
+              <option value="">Fail the run</option>
+              {siblings.map((s) => (
+                <option key={s.id} value={s.id}>
+                  → {s.id} ({s.type})
+                </option>
+              ))}
+            </select>
+          </label>
         </div>
       )}
-      <Handle type="source" position={Position.Right} />
+      <Handle type="source" position={Position.Right} id="success" />
+      <Handle
+        type="source"
+        position={Position.Bottom}
+        id="error"
+        className="dag-handle-error"
+      />
     </div>
   )
 }

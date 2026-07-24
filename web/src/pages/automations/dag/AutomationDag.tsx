@@ -13,7 +13,7 @@ import type {
   AutomationCondition,
   AutomationConditionMode,
 } from '../../../api'
-import { buildFlowElements, defaultAction, defaultCondition, normalizeGraph } from './build_graph'
+import { buildFlowElements, appendAction, defaultAction, defaultCondition, normalizeGraph, removeActionAt } from './build_graph'
 import { automationNodeTypes } from './nodes'
 
 type Props = {
@@ -90,7 +90,7 @@ function AutomationDagInner({
   const onActionRemove = useCallback(
     (index: number) => {
       if (graph.actions.length <= 1) return
-      onActionsChange?.(graph.actions.filter((_, i) => i !== index))
+      onActionsChange?.(removeActionAt(graph.actions, index))
     },
     [graph.actions, onActionsChange],
   )
@@ -152,19 +152,19 @@ function AutomationDagInner({
             type="button"
             className="ghost"
             onClick={() =>
-              onActionsChange?.([
-                ...graph.actions,
-                defaultAction(preferredActionType(catalog), emailTemplates[0]?.key ?? ''),
-              ])
+              onActionsChange?.(
+                appendAction(
+                  graph.actions,
+                  defaultAction(preferredActionType(catalog), emailTemplates[0]?.key ?? ''),
+                ),
+              )
             }
           >
             Add action
           </button>
           <span className="field-hint">
-            {conditionMode === 'any'
-              ? 'Any matching condition is enough, then every action runs.'
-              : 'All conditions must match, then every action runs.'}{' '}
-            Operators depend on each field’s type.
+            Actions run as a workflow: success follows the green path; set{' '}
+            <em>On error</em> to branch instead of failing the run.
           </span>
         </div>
       )}
