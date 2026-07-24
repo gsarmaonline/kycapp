@@ -277,7 +277,7 @@ Outbound HTTP endpoint used by the `call_webhook` automation action. Secret is s
 | `name` | string | Display label |
 | `url` | string | http(s) endpoint |
 | `secret` | string | Optional shared secret header value |
-| `body_template` | string | JSON template with `{{path}}` placeholders; empty = full event dump |
+| `body_template` | string | JSON with `{{app_user.*}}` placeholders; empty = full event dump |
 | `status` | enum | `connected` \| `disconnected` |
 
 ### OrganisationDatabase

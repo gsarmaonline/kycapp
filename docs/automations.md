@@ -24,7 +24,7 @@ Org-scoped **Automation** (**name required**):
   "enabled": true,
   "conditions": {
     "all": [
-      { "field": "attributes.country", "op": "eq", "value": "AU" }
+      { "field": "app_user.country", "op": "eq", "value": "AU" }
     ]
   },
   "actions": [
@@ -44,7 +44,7 @@ Actions/ops/condition fields live in `core/automations`. **Triggers** are genera
 | `triggers` | `core/resources.ExpandTriggers` — lifecycle events for `app_user`, `membership`, `subscription`, plus `app_user.attribute.<key>` for every active attribute definition |
 | `actions` | Registered action types + params |
 | `ops` | Condition operators |
-| `condition_fields` | Base app-user payload fields + **all active org attribute definitions** as `attributes.<key>` |
+| `condition_fields` | Base app-user fields + **all active org attribute definitions** as `app_user.<key>` |
 
 The merchant UI loads this catalog for dropdowns. Create/update validates triggers and condition fields against the same set.
 
@@ -80,7 +80,13 @@ Operators (filtered by field `value_type` in the catalog):
 | `gt` / `gte` / `lt` / `lte` | yes | number, date |
 | `exists` / `not_exists` | no | any |
 
-Fields: base user fields (`id`, `email`, `display_name`, `status`, `external_id`) plus every active attribute definition as `attributes.<key>`. Catalog fields include `allowed_ops` and optional `enum_values` for dropdown attributes.
+Fields use a shared **`app_user.*` vocabulary** (same paths in conditions, webhook templates, and `db_insert` mappings):
+
+- Core: `app_user.id`, `app_user.email`, `app_user.display_name`, `app_user.status`, `app_user.external_id`
+- Org attributes: `app_user.<key>` (e.g. `app_user.country`)
+- Run metadata: `organisation_id`, `trigger`
+
+Catalog fields include `allowed_ops` and optional `enum_values` for dropdown attributes. Legacy paths (`email`, `attributes.country`) still resolve at runtime and are normalized on save.
 
 Matching is typed where possible (numbers, booleans, RFC3339 / `YYYY-MM-DD` dates); otherwise string compare.
 
@@ -155,20 +161,20 @@ CREATE TABLE kyc_events (
 );
 ```
 
-**Columns** mode on the action: `"mode": "columns", "mapping": { "email": "email", "country": "attributes.country" }`.
+**Columns** mode on the action: `"mode": "columns", "mapping": { "email": "app_user.email", "country": "app_user.country" }`.
 
 ### Webhooks (for `call_webhook`)
 
 Org-scoped endpoints under **Actions → Webhooks**. Automations select a `webhook_id`.
 
-`body_template` is JSON with `{{path}}` placeholders from the trigger payload (plus `organisation_id`). Example:
+`body_template` is JSON with `{{path}}` placeholders using the same `app_user.*` field paths (plus `organisation_id` / `trigger`). Example:
 
 ```json
 {
   "organisation_id": "{{organisation_id}}",
   "trigger": "{{trigger}}",
-  "email": "{{email}}",
-  "attributes": "{{attributes}}"
+  "email": "{{app_user.email}}",
+  "country": "{{app_user.country}}"
 }
 ```
 

@@ -24,7 +24,7 @@ func TestAutomationsCRUDAndProcess(t *testing.T) {
 		"trigger": "app_user.created",
 		"conditions": map[string]any{
 			"all": []map[string]any{
-				{"field": "status", "op": "eq", "value": "active"},
+				{"field": "app_user.status", "op": "eq", "value": "active"},
 			},
 		},
 		"actions": []map[string]any{
@@ -66,12 +66,12 @@ func TestAutomationsCRUDAndProcess(t *testing.T) {
 	}
 	foundCountry := false
 	for _, f := range cat.ConditionFields {
-		if f["field"] == "attributes.country" {
+		if f["field"] == "app_user.country" {
 			foundCountry = true
 		}
 	}
 	if !foundCountry {
-		t.Fatalf("catalog missing attributes.country: %#v", cat.ConditionFields)
+		t.Fatalf("catalog missing app_user.country: %#v", cat.ConditionFields)
 	}
 
 	created := doJSON(t, h, http.MethodPost, "/v1/organisations/"+orgID+"/automations", map[string]any{
@@ -79,7 +79,7 @@ func TestAutomationsCRUDAndProcess(t *testing.T) {
 		"trigger": "app_user.created",
 		"conditions": map[string]any{
 			"all": []map[string]any{
-				{"field": "attributes.country", "op": "eq", "value": "AU"},
+				{"field": "app_user.country", "op": "eq", "value": "AU"},
 			},
 		},
 		"actions": []map[string]any{

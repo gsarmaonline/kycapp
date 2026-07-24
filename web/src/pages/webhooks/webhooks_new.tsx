@@ -8,9 +8,9 @@ import { resourcePath } from '../../org_nav'
 const EXAMPLE_BODY = `{
   "organisation_id": "{{organisation_id}}",
   "trigger": "{{trigger}}",
-  "id": "{{id}}",
-  "email": "{{email}}",
-  "attributes": "{{attributes}}"
+  "id": "{{app_user.id}}",
+  "email": "{{app_user.email}}",
+  "country": "{{app_user.country}}"
 }`
 
 export function WebhooksNew() {
@@ -77,8 +77,8 @@ export function WebhooksNew() {
           />
         </label>
         <p className="field-hint">
-          Use <code>{'{{path}}'}</code> placeholders from the trigger payload (e.g.{' '}
-          <code>{'{{email}}'}</code>, <code>{'{{attributes.country}}'}</code>). Empty template
+          Use <code>{'{{path}}'}</code> placeholders from the shared field vocabulary (e.g.{' '}
+          <code>{'{{app_user.email}}'}</code>, <code>{'{{app_user.country}}'}</code>). Empty template
           sends the full event dump.
         </p>
         <button

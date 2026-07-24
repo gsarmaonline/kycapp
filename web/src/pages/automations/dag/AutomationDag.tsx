@@ -32,7 +32,7 @@ type Props = {
 
 function preferredConditionField(catalog?: AutomationCatalog | null) {
   const attrs = catalog?.condition_fields?.find((f) => f.group === 'attributes')
-  return attrs?.field ?? catalog?.condition_fields?.[0]?.field ?? 'status'
+  return attrs?.field ?? catalog?.condition_fields?.[0]?.field ?? 'app_user.status'
 }
 
 function preferredActionType(catalog?: AutomationCatalog | null) {

@@ -26,9 +26,9 @@ func TestBuildWebhookBodyDefaultDump(t *testing.T) {
 func TestRenderJSONTemplateTypedAndNested(t *testing.T) {
 	tmpl := `{
 		"org": "{{organisation_id}}",
-		"user": "{{email}}",
-		"country": "{{attributes.country}}",
-		"note": "hello {{email}}"
+		"user": "{{app_user.email}}",
+		"country": "{{app_user.country}}",
+		"note": "hello {{app_user.email}}"
 	}`
 	raw, err := BuildWebhookBody(tmpl, "org1", map[string]any{
 		"email":      "a@b.c",

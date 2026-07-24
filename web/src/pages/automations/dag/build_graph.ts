@@ -7,7 +7,7 @@ const X_CONDITION = 300
 const X_ACTION = 620
 const Y_STEP = 150
 
-const defaultCondition = (preferredField = 'status'): AutomationCondition => ({
+const defaultCondition = (preferredField = 'app_user.status'): AutomationCondition => ({
   field: preferredField,
   op: 'eq',
   value: '',

@@ -10,12 +10,13 @@ import (
 var placeholderRE = regexp.MustCompile(`\{\{\s*([^{}]+?)\s*\}\}`)
 
 // ExampleWebhookBodyTemplate is a starter JSON shape shown in the UI.
+// Placeholders use the shared app_user.* field vocabulary.
 const ExampleWebhookBodyTemplate = `{
   "organisation_id": "{{organisation_id}}",
   "trigger": "{{trigger}}",
-  "id": "{{id}}",
-  "email": "{{email}}",
-  "attributes": "{{attributes}}"
+  "id": "{{app_user.id}}",
+  "email": "{{app_user.email}}",
+  "country": "{{app_user.country}}"
 }`
 
 // BuildWebhookBody renders a webhook JSON body.
@@ -107,10 +108,7 @@ func lookupPathOrNil(data map[string]any, path string) any {
 	if path == "" {
 		return nil
 	}
-	if path == "payload" {
-		return data
-	}
-	val, ok := lookup(data, path)
+	val, ok := Lookup(data, path)
 	if !ok {
 		return nil
 	}

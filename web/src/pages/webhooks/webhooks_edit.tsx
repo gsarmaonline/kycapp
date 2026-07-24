@@ -8,9 +8,9 @@ import { resourcePath } from '../../org_nav'
 const EXAMPLE_BODY = `{
   "organisation_id": "{{organisation_id}}",
   "trigger": "{{trigger}}",
-  "id": "{{id}}",
-  "email": "{{email}}",
-  "attributes": "{{attributes}}"
+  "id": "{{app_user.id}}",
+  "email": "{{app_user.email}}",
+  "country": "{{app_user.country}}"
 }`
 
 export function WebhooksEdit() {
@@ -98,7 +98,8 @@ export function WebhooksEdit() {
           />
         </label>
         <p className="field-hint">
-          Use <code>{'{{path}}'}</code> placeholders. Empty template sends the full event dump.
+          Use <code>{'{{app_user.email}}'}</code>-style paths (same as automation conditions). Empty
+          template sends the full event dump.
         </p>
         <button type="button" className="ghost" onClick={() => setBodyTemplate(EXAMPLE_BODY)}>
           Use example template

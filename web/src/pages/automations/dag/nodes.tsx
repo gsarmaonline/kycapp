@@ -161,7 +161,7 @@ export function ConditionNode({ data }: NodeProps<ConditionFlowNode>) {
       ]
   const fieldOptions = fields.length
     ? fields
-    : [{ field: c.field || 'status', label: c.field || 'status', value_type: 'string', group: 'user' }]
+    : [{ field: c.field || 'app_user.status', label: c.field || 'app_user.status', value_type: 'string', group: 'user' }]
   const knownField = fieldOptions.some((f) => f.field === c.field)
   const selectedField = fieldOptions.find((f) => f.field === c.field)
   let ops = opsForField(selectedField, allOps)
@@ -307,7 +307,7 @@ function DBInsertFields({
           setParams({
             ...params,
             mode: nextMode,
-            mapping: nextMode === 'event' ? '' : params.mapping || '{"email":"email"}',
+            mapping: nextMode === 'event' ? '' : params.mapping || '{"email":"app_user.email"}',
           })
         }}
       >
@@ -330,7 +330,7 @@ function DBInsertFields({
               />
               <input
                 value={row.path}
-                placeholder="payload path"
+                placeholder="app_user.email"
                 onChange={(e) => {
                   const next = rows.map((r, j) => (j === i ? { ...r, path: e.target.value } : r))
                   setParams({ ...params, mode: 'columns', mapping: serializeMappingRows(next) })

@@ -40,7 +40,7 @@ func ValidateCreate(trigger string, conditionsJSON, actionsJSON json.RawMessage)
 	} else if err := json.Unmarshal(conditionsJSON, &cond); err != nil {
 		return Spec{}, fmt.Errorf("invalid conditions JSON")
 	}
-	cond = cond.Normalize()
+	cond = NormalizeConditionsFields(cond.Normalize())
 	var err error
 	if cond.All, err = validateConditionList("conditions.all", cond.All); err != nil {
 		return Spec{}, err
@@ -83,7 +83,8 @@ func ValidateConditionFields(cond Conditions, fields []ConditionFieldInfo) error
 	n := cond.Normalize()
 	check := func(prefix string, list []Condition) error {
 		for i, c := range list {
-			info, ok := byField[c.Field]
+			field := NormalizeFieldPath(c.Field)
+			info, ok := byField[field]
 			if !ok {
 				return fmt.Errorf("%s[%d].field %q is not an available condition field", prefix, i, c.Field)
 			}

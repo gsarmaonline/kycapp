@@ -8,7 +8,7 @@ import (
 func TestValidateAndMatch(t *testing.T) {
 	spec, err := ValidateCreate(
 		"app_user.created",
-		json.RawMessage(`{"all":[{"field":"attributes.country","op":"eq","value":"AU"}]}`),
+		json.RawMessage(`{"all":[{"field":"app_user.country","op":"eq","value":"AU"}]}`),
 		json.RawMessage(`[{"type":"send_email","params":{"template_key":"welcome"}}]`),
 	)
 	if err != nil {
@@ -106,6 +106,9 @@ func TestMatchAnyAndTypedOps(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	if inSpec.Conditions.All[0].Field != "app_user.country" {
+		t.Fatalf("legacy field not normalized: %q", inSpec.Conditions.All[0].Field)
+	}
 	if !Match(inSpec.Conditions, map[string]any{"attributes": map[string]any{"country": "NZ"}}) {
 		t.Fatal("in should match NZ")
 	}
@@ -114,16 +117,16 @@ func TestMatchAnyAndTypedOps(t *testing.T) {
 	}
 
 	numPayload := map[string]any{"attributes": map[string]any{"score": 80}}
-	gt := Conditions{All: []Condition{{Field: "attributes.score", Op: OpGte, Value: 70}}}
+	gt := Conditions{All: []Condition{{Field: "app_user.score", Op: OpGte, Value: 70}}}
 	if !Match(gt, numPayload) {
 		t.Fatal("gte should match")
 	}
-	lt := Conditions{All: []Condition{{Field: "attributes.score", Op: OpLt, Value: 50}}}
+	lt := Conditions{All: []Condition{{Field: "app_user.score", Op: OpLt, Value: 50}}}
 	if Match(lt, numPayload) {
 		t.Fatal("lt should not match")
 	}
 
-	contains := Conditions{All: []Condition{{Field: "email", Op: OpContains, Value: "@example.com"}}}
+	contains := Conditions{All: []Condition{{Field: "app_user.email", Op: OpContains, Value: "@example.com"}}}
 	if !Match(contains, map[string]any{"email": "a@example.com"}) {
 		t.Fatal("contains should match")
 	}
@@ -185,7 +188,7 @@ func TestValidateWebhookAndDBInsert(t *testing.T) {
 	_, err = ValidateCreate(
 		"app_user.created",
 		json.RawMessage(`{"all":[]}`),
-		json.RawMessage(`[{"type":"db_insert","params":{"database_id":"db1","table":"events","mapping":{"email":"email"}}}]`),
+		json.RawMessage(`[{"type":"db_insert","params":{"database_id":"db1","table":"events","mapping":{"email":"app_user.email"}}}]`),
 	)
 	if err != nil {
 		t.Fatal(err)

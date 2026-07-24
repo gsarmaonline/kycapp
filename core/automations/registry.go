@@ -96,13 +96,14 @@ func allowedOpIDs(valueType string) []string {
 }
 
 // BaseConditionFields are always available on app_user.* payloads.
+// Paths use the shared app_user.* vocabulary (see paths.go).
 func BaseConditionFields() []ConditionFieldInfo {
 	fields := []ConditionFieldInfo{
-		{Field: "id", Label: "User ID", ValueType: "string", Group: "user"},
-		{Field: "email", Label: "Email", ValueType: "string", Group: "user"},
-		{Field: "display_name", Label: "Display name", ValueType: "string", Group: "user"},
-		{Field: "status", Label: "Status", ValueType: "string", Group: "user"},
-		{Field: "external_id", Label: "External ID", ValueType: "string", Group: "user"},
+		{Field: AppUserFieldPath("id"), Label: "User ID", ValueType: "string", Group: "user"},
+		{Field: AppUserFieldPath("email"), Label: "Email", ValueType: "string", Group: "user"},
+		{Field: AppUserFieldPath("display_name"), Label: "Display name", ValueType: "string", Group: "user"},
+		{Field: AppUserFieldPath("status"), Label: "Status", ValueType: "string", Group: "user"},
+		{Field: AppUserFieldPath("external_id"), Label: "External ID", ValueType: "string", Group: "user"},
 	}
 	for i := range fields {
 		fields[i].AllowedOps = allowedOpIDs(fields[i].ValueType)
@@ -143,6 +144,7 @@ func KnownOp(op string) bool {
 }
 
 // AttributeConditionField builds a condition field path for an org attribute key.
+// Path is app_user.<key> (same refs as webhook templates and db_insert mappings).
 func AttributeConditionField(key, label, valueType string, enumValues []string) ConditionFieldInfo {
 	if label == "" {
 		label = key
@@ -151,7 +153,7 @@ func AttributeConditionField(key, label, valueType string, enumValues []string) 
 		valueType = "string"
 	}
 	return ConditionFieldInfo{
-		Field:      "attributes." + key,
+		Field:      AppUserFieldPath(key),
 		Label:      label,
 		ValueType:  valueType,
 		Group:      "attributes",

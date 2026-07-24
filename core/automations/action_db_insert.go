@@ -86,7 +86,7 @@ func ParseSQLIdentifier(raw string) (quoted string, err error) {
 }
 
 // ParseColumnMapping accepts nil/empty, a JSON object, or a JSON string object.
-// Values are payload field paths (e.g. "email", "attributes.country").
+// Values are field paths (e.g. "app_user.email", "app_user.country").
 func ParseColumnMapping(raw any) (map[string]string, error) {
 	if raw == nil {
 		return nil, nil

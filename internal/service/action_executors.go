@@ -267,20 +267,7 @@ func execDBInsert(
 }
 
 func lookupPayloadPath(payload map[string]any, path string) (any, bool) {
-	parts := strings.Split(path, ".")
-	var cur any = payload
-	for _, p := range parts {
-		m, ok := cur.(map[string]any)
-		if !ok {
-			return nil, false
-		}
-		next, ok := m[p]
-		if !ok {
-			return nil, false
-		}
-		cur = next
-	}
-	return cur, true
+	return automations.Lookup(payload, path)
 }
 
 func assertPublicHTTPURL(raw string) error {

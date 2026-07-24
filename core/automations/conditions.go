@@ -346,20 +346,7 @@ func asTime(v any) (time.Time, bool) {
 }
 
 func lookup(payload map[string]any, field string) (any, bool) {
-	parts := strings.Split(field, ".")
-	var cur any = payload
-	for _, p := range parts {
-		m, ok := cur.(map[string]any)
-		if !ok {
-			return nil, false
-		}
-		next, ok := m[p]
-		if !ok {
-			return nil, false
-		}
-		cur = next
-	}
-	return cur, true
+	return Lookup(payload, field)
 }
 
 func stringify(v any) string {
