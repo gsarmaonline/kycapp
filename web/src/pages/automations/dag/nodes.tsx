@@ -125,9 +125,17 @@ export function ActionNode({ data }: NodeProps<ActionFlowNode>) {
   const paramDefs = selected?.params?.length
     ? selected.params
     : Object.keys(params).map((key) => ({ key, label: key, required: false }))
+  const templates = data.emailTemplates ?? []
+  const defaultTemplateKey = templates[0]?.key ?? ''
 
   const summary = paramDefs
-    .map((p) => params[p.key])
+    .map((p) => {
+      if (p.key === 'template_key') {
+        const t = templates.find((x) => x.key === params[p.key])
+        return t ? t.name : params[p.key]
+      }
+      return params[p.key]
+    })
     .filter(Boolean)
     .join(', ')
 
@@ -156,7 +164,11 @@ export function ActionNode({ data }: NodeProps<ActionFlowNode>) {
               const nextInfo = actions.find((act) => act.type === nextType)
               const nextParams: Record<string, string> = {}
               for (const p of nextInfo?.params ?? []) {
-                nextParams[p.key] = params[p.key] ?? (p.key === 'template_key' ? 'welcome' : '')
+                if (p.key === 'template_key') {
+                  nextParams[p.key] = params[p.key] || defaultTemplateKey
+                } else {
+                  nextParams[p.key] = params[p.key] ?? ''
+                }
               }
               data.onChange?.({ type: nextType, params: nextParams })
             }}
@@ -167,19 +179,44 @@ export function ActionNode({ data }: NodeProps<ActionFlowNode>) {
               </option>
             ))}
           </select>
-          {paramDefs.map((p) => (
-            <input
-              key={p.key}
-              value={params[p.key] ?? ''}
-              onChange={(e) =>
-                data.onChange?.({
-                  type: a.type,
-                  params: { ...params, [p.key]: e.target.value },
-                })
-              }
-              placeholder={p.label || p.key}
-            />
-          ))}
+          {paramDefs.map((p) =>
+            p.key === 'template_key' ? (
+              <select
+                key={p.key}
+                value={params[p.key] || defaultTemplateKey}
+                onChange={(e) =>
+                  data.onChange?.({
+                    type: a.type,
+                    params: { ...params, [p.key]: e.target.value },
+                  })
+                }
+                required={p.required}
+              >
+                {!templates.length && <option value="">No templates</option>}
+                {params[p.key] &&
+                  !templates.some((t) => t.key === params[p.key]) && (
+                    <option value={params[p.key]}>{params[p.key]} (missing)</option>
+                  )}
+                {templates.map((t) => (
+                  <option key={t.key} value={t.key}>
+                    {t.name}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <input
+                key={p.key}
+                value={params[p.key] ?? ''}
+                onChange={(e) =>
+                  data.onChange?.({
+                    type: a.type,
+                    params: { ...params, [p.key]: e.target.value },
+                  })
+                }
+                placeholder={p.label || p.key}
+              />
+            ),
+          )}
         </div>
       )}
       <Handle type="source" position={Position.Right} />

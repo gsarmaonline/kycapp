@@ -14,6 +14,7 @@ import { automationNodeTypes } from './nodes'
 type Props = {
   readOnly?: boolean
   catalog?: AutomationCatalog | null
+  emailTemplates?: { key: string; name: string }[]
   trigger: string
   conditions: AutomationCondition[]
   actions: AutomationAction[]
@@ -34,6 +35,7 @@ function preferredActionType(catalog?: AutomationCatalog | null) {
 function AutomationDagInner({
   readOnly = false,
   catalog,
+  emailTemplates = [],
   trigger,
   conditions,
   actions,
@@ -89,6 +91,7 @@ function AutomationDagInner({
       buildFlowElements(graph, {
         readOnly,
         catalog,
+        emailTemplates,
         onTriggerChange,
         onConditionChange,
         onConditionRemove,
@@ -99,6 +102,7 @@ function AutomationDagInner({
       graph,
       readOnly,
       catalog,
+      emailTemplates,
       onTriggerChange,
       onConditionChange,
       onConditionRemove,
@@ -127,7 +131,10 @@ function AutomationDagInner({
             type="button"
             className="ghost"
             onClick={() =>
-              onActionsChange?.([...graph.actions, defaultAction(preferredActionType(catalog))])
+              onActionsChange?.([
+                ...graph.actions,
+                defaultAction(preferredActionType(catalog), emailTemplates[0]?.key ?? ''),
+              ])
             }
           >
             Add action

@@ -13,9 +13,15 @@ const defaultCondition = (preferredField = 'status'): AutomationCondition => ({
   value: '',
 })
 
-const defaultAction = (preferredType = 'send_email'): AutomationAction => ({
+const defaultAction = (
+  preferredType = 'send_email',
+  preferredTemplateKey = '',
+): AutomationAction => ({
   type: preferredType,
-  params: preferredType === 'send_email' ? { template_key: 'welcome' } : {},
+  params:
+    preferredType === 'send_email'
+      ? { template_key: preferredTemplateKey }
+      : {},
 })
 
 export function normalizeGraph(
@@ -45,6 +51,7 @@ export function buildFlowElements(
   opts: {
     readOnly: boolean
     catalog?: AutomationCatalog | null
+    emailTemplates?: { key: string; name: string }[]
     onTriggerChange?: (trigger: string) => void
     onConditionChange?: (index: number, condition: AutomationCondition) => void
     onConditionRemove?: (index: number) => void
@@ -101,6 +108,7 @@ export function buildFlowElements(
         action,
         readOnly: opts.readOnly,
         actions: opts.catalog?.actions,
+        emailTemplates: opts.emailTemplates,
         canRemove: graph.actions.length > 1,
         onChange: (next) => opts.onActionChange?.(i, next),
         onRemove: () => opts.onActionRemove?.(i),

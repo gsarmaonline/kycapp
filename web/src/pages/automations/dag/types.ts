@@ -21,6 +21,7 @@ export type ActionNodeData = {
   action: AutomationAction
   readOnly: boolean
   actions?: AutomationCatalog['actions']
+  emailTemplates?: { key: string; name: string }[]
   onChange?: (action: AutomationAction) => void
   onRemove?: () => void
   canRemove: boolean

@@ -3,6 +3,7 @@ import type { FormEvent } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import {
   getAutomationCatalog,
+  listEmailTemplates,
   type AutomationAction,
   type AutomationCatalog,
   type AutomationCondition,
@@ -45,21 +46,33 @@ export function AutomationsForm({ submitLabel, cancelTo, initial, onSubmit }: Pr
   const [conditions, setConditions] = useState(initialGraph.conditions)
   const [actions, setActions] = useState(initialGraph.actions)
   const [catalog, setCatalog] = useState<AutomationCatalog | null>(null)
+  const [emailTemplates, setEmailTemplates] = useState<{ key: string; name: string }[]>([])
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     if (!orgId) return
-    void getAutomationCatalog(orgId)
-      .then((c) => {
+    void Promise.all([getAutomationCatalog(orgId), listEmailTemplates(orgId, 'active')])
+      .then(([c, templates]) => {
         setCatalog(c)
+        const items = templates.items.map((t) => ({ key: t.key, name: t.name || t.key }))
+        setEmailTemplates(items)
         if (!initial?.trigger && c.triggers[0]) {
           setTrigger(c.triggers[0].id)
+        }
+        if (!initial?.actions?.length && items[0]) {
+          setActions((prev) =>
+            prev.map((a) =>
+              a.type === 'send_email' && !a.params?.template_key && !a.template_key
+                ? { ...a, params: { ...a.params, template_key: items[0].key } }
+                : a,
+            ),
+          )
         }
       })
       .catch((err) => {
         setError(err instanceof Error ? err.message : 'Failed to load automation catalog')
       })
-  }, [orgId, initial?.trigger])
+  }, [orgId, initial?.trigger, initial?.actions?.length])
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
@@ -139,6 +152,7 @@ export function AutomationsForm({ submitLabel, cancelTo, initial, onSubmit }: Pr
 
       <AutomationDag
         catalog={catalog}
+        emailTemplates={emailTemplates}
         trigger={trigger}
         conditions={conditions}
         actions={actions}
