@@ -35,6 +35,9 @@ export function AuthScreen({ onAuthed }: { onAuthed: (token: string) => Promise<
     }
   }
 
+  const googleReady = providers?.google === true
+  const loadingProviders = providers === null && !error
+
   return (
     <main className="page auth-page">
       <header>
@@ -53,14 +56,22 @@ export function AuthScreen({ onAuthed }: { onAuthed: (token: string) => Promise<
         </p>
       )}
 
-      {providers?.google && (
+      {loadingProviders ? (
+        <p className="lede">Loading sign-in options…</p>
+      ) : googleReady ? (
         <a className="google-btn" href={googleAuthURL()}>
           Continue with Google
         </a>
-      )}
-
-      {!providers?.google && !providers?.dev_login && providers !== null && (
-        <p className="lede">Google OAuth is not configured on this server.</p>
+      ) : (
+        <div className="auth-google-missing">
+          <p className="google-btn google-btn-disabled" aria-disabled="true">
+            Continue with Google
+          </p>
+          <p className="field-hint">
+            Google OAuth is not configured. Set <code>GOOGLE_CLIENT_ID</code> and{' '}
+            <code>GOOGLE_CLIENT_SECRET</code> on the API, then restart.
+          </p>
+        </div>
       )}
 
       {providers?.dev_login && (

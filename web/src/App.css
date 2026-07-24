@@ -418,6 +418,17 @@ a.overview-tile:focus-visible {
   background: #16382a;
 }
 
+.google-btn-disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  pointer-events: none;
+  margin-bottom: 0.5rem;
+}
+
+.auth-google-missing {
+  margin-bottom: 1.5rem;
+}
+
 .eyebrow {
   text-transform: uppercase;
   letter-spacing: 0.08em;
