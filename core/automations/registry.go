@@ -1,13 +1,13 @@
 package automations
 
-import "fmt"
+import (
+	"fmt"
 
-// TriggerInfo describes a trigger the editor and validators know about.
-type TriggerInfo struct {
-	ID          string `json:"id"`
-	Label       string `json:"label"`
-	Description string `json:"description"`
-}
+	"github.com/gsarmaonline/kyc/core/resources"
+)
+
+// TriggerInfo is the editor-facing trigger descriptor (from core/resources).
+type TriggerInfo = resources.TriggerInfo
 
 // ActionParam describes a config field on an action.
 type ActionParam struct {
@@ -39,19 +39,6 @@ type ConditionFieldInfo struct {
 	Group     string `json:"group"` // "user" | "attributes"
 }
 
-var registeredTriggers = []TriggerInfo{
-	{
-		ID:          TriggerAppUserCreated,
-		Label:       "App user created",
-		Description: "Fires after an app user is created (including ingest insert).",
-	},
-	{
-		ID:          TriggerAppUserUpdated,
-		Label:       "App user updated",
-		Description: "Fires after an app user is updated (including ingest upsert).",
-	},
-}
-
 var registeredActions = []ActionInfo{
 	{
 		Type:        ActionSendEmail,
@@ -81,11 +68,19 @@ func BaseConditionFields() []ConditionFieldInfo {
 	}
 }
 
-// Triggers returns the registered trigger catalog.
-func Triggers() []TriggerInfo {
-	out := make([]TriggerInfo, len(registeredTriggers))
-	copy(out, registeredTriggers)
-	return out
+// ExpandTriggers builds lifecycle + attribute triggers via core/resources.
+// attrs are org app-user attribute definitions (other resources expand lifecycles only).
+func ExpandTriggers(attrs []resources.AttributeKey) []TriggerInfo {
+	return resources.ExpandTriggers(resources.Default(), map[string][]resources.AttributeKey{
+		resources.AppUser: attrs,
+	})
+}
+
+// AllowedTriggerIDs is the set of ExpandTriggers IDs for validation.
+func AllowedTriggerIDs(attrs []resources.AttributeKey) map[string]bool {
+	return resources.AllowedTriggerIDs(resources.Default(), map[string][]resources.AttributeKey{
+		resources.AppUser: attrs,
+	})
 }
 
 // Actions returns the registered action catalog.
@@ -102,14 +97,10 @@ func ConditionOps() []ConditionOpInfo {
 	return out
 }
 
-// KnownTrigger reports whether id is a registered trigger.
+// KnownTrigger reports whether id matches a registered resource trigger shape.
+// Org attribute-key existence is checked separately via AllowedTriggerIDs.
 func KnownTrigger(id string) bool {
-	for _, t := range registeredTriggers {
-		if t.ID == id {
-			return true
-		}
-	}
-	return false
+	return resources.IsValidTrigger(id)
 }
 
 // KnownAction reports whether typ is a registered action type.

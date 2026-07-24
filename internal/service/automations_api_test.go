@@ -48,6 +48,22 @@ func TestAutomationsCRUDAndProcess(t *testing.T) {
 	if len(cat.Triggers) < 2 || len(cat.Actions) < 1 {
 		t.Fatalf("catalog incomplete: %#v", cat)
 	}
+	triggerIDs := map[string]bool{}
+	for _, tr := range cat.Triggers {
+		if id, _ := tr["id"].(string); id != "" {
+			triggerIDs[id] = true
+		}
+	}
+	for _, want := range []string{
+		"app_user.created",
+		"app_user.attribute.country",
+		"membership.created",
+		"subscription.updated",
+	} {
+		if !triggerIDs[want] {
+			t.Fatalf("catalog missing trigger %s in %#v", want, triggerIDs)
+		}
+	}
 	foundCountry := false
 	for _, f := range cat.ConditionFields {
 		if f["field"] == "attributes.country" {

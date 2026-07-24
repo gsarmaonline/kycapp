@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gsarmaonline/kyc/core/automations"
+	"github.com/gsarmaonline/kyc/core/resources"
 	"github.com/gsarmaonline/kyc/internal/apperr"
 	"github.com/gsarmaonline/kyc/internal/ids"
 	"github.com/gsarmaonline/kyc/internal/store"
@@ -236,7 +236,13 @@ func (s *Service) CreateAppUser(ctx context.Context, orgID string, in CreateAppU
 		return sqlc.AppUser{}, err
 	}
 	if payload, err := AppUserEventPayload(row); err == nil {
-		s.EnqueueAutomationEvent(ctx, orgID, automations.TriggerAppUserCreated, payload)
+		s.EnqueueResourceLifecycle(ctx, orgID, resources.AppUser, resources.LifecycleCreated, payload)
+		attrs := appUserAttributesMap(row)
+		keys := make([]string, 0, len(attrs))
+		for k := range attrs {
+			keys = append(keys, k)
+		}
+		s.EnqueueAttributeTriggers(ctx, orgID, resources.AppUser, keys, payload)
 	}
 	return row, nil
 }
@@ -295,14 +301,37 @@ func (s *Service) UpdateAppUser(ctx context.Context, id string, in UpdateAppUser
 		return sqlc.AppUser{}, err
 	}
 	if payload, err := AppUserEventPayload(row); err == nil {
-		s.EnqueueAutomationEvent(ctx, existing.OrganisationID, automations.TriggerAppUserUpdated, payload)
+		s.EnqueueResourceLifecycle(ctx, existing.OrganisationID, resources.AppUser, resources.LifecycleUpdated, payload)
+		changed := resources.ChangedAttributeKeys(appUserAttributesMap(existing), appUserAttributesMap(row))
+		s.EnqueueAttributeTriggers(ctx, existing.OrganisationID, resources.AppUser, changed, payload)
 	}
 	return row, nil
 }
 
 func (s *Service) DeleteAppUser(ctx context.Context, id string) (sqlc.AppUser, error) {
+	existing, err := s.GetAppUser(ctx, id)
+	if err != nil {
+		return sqlc.AppUser{}, err
+	}
 	row, err := s.db.Q().ArchiveAppUser(ctx, id)
-	return row, mapNotFound(err, "app user not found")
+	if err != nil {
+		return sqlc.AppUser{}, mapNotFound(err, "app user not found")
+	}
+	if payload, err := AppUserEventPayload(existing); err == nil {
+		s.EnqueueResourceLifecycle(ctx, existing.OrganisationID, resources.AppUser, resources.LifecycleDeleted, payload)
+	}
+	return row, nil
+}
+
+func appUserAttributesMap(u sqlc.AppUser) map[string]any {
+	out := map[string]any{}
+	if len(u.Attributes) > 0 {
+		_ = json.Unmarshal(u.Attributes, &out)
+	}
+	if out == nil {
+		out = map[string]any{}
+	}
+	return out
 }
 
 func (s *Service) DeleteAttributeDefinition(ctx context.Context, id string) (sqlc.AttributeDefinition, error) {

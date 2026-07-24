@@ -775,7 +775,13 @@ export type AutomationAction = {
 }
 
 export type AutomationCatalog = {
-  triggers: { id: string; label: string; description: string }[]
+  triggers: {
+    id: string
+    label: string
+    description: string
+    resource?: string
+    kind?: string
+  }[]
   actions: {
     type: string
     label: string

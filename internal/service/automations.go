@@ -10,6 +10,7 @@ import (
 
 	"github.com/gsarmaonline/kyc/core/automations"
 	"github.com/gsarmaonline/kyc/core/emailtemplates"
+	"github.com/gsarmaonline/kyc/core/resources"
 	"github.com/gsarmaonline/kyc/internal/apperr"
 	"github.com/gsarmaonline/kyc/internal/ids"
 	"github.com/gsarmaonline/kyc/internal/mailer"
@@ -42,16 +43,32 @@ type AutomationCatalog struct {
 }
 
 func (s *Service) AutomationCatalog(ctx context.Context, orgID string) (AutomationCatalog, error) {
+	attrs, err := s.appUserAttributeKeys(ctx, orgID)
+	if err != nil {
+		return AutomationCatalog{}, err
+	}
 	fields, err := s.automationConditionFields(ctx, orgID)
 	if err != nil {
 		return AutomationCatalog{}, err
 	}
 	return AutomationCatalog{
-		Triggers:        automations.Triggers(),
+		Triggers:        automations.ExpandTriggers(attrs),
 		Actions:         automations.Actions(),
 		Ops:             automations.ConditionOps(),
 		ConditionFields: fields,
 	}, nil
+}
+
+func (s *Service) appUserAttributeKeys(ctx context.Context, orgID string) ([]resources.AttributeKey, error) {
+	defs, err := s.ListAttributeDefinitions(ctx, orgID, "active")
+	if err != nil {
+		return nil, err
+	}
+	out := make([]resources.AttributeKey, 0, len(defs))
+	for _, d := range defs {
+		out = append(out, resources.AttributeKey{Key: d.Key, Label: d.Label})
+	}
+	return out, nil
 }
 
 func (s *Service) automationConditionFields(ctx context.Context, orgID string) ([]automations.ConditionFieldInfo, error) {
@@ -71,6 +88,13 @@ func (s *Service) validateAutomationSpec(ctx context.Context, orgID, trigger str
 	if err != nil {
 		return automations.Spec{}, apperr.Validation(err.Error())
 	}
+	attrs, err := s.appUserAttributeKeys(ctx, orgID)
+	if err != nil {
+		return automations.Spec{}, err
+	}
+	if !automations.AllowedTriggerIDs(attrs)[spec.Trigger] {
+		return automations.Spec{}, apperr.Validation(fmt.Sprintf("unknown trigger %q", spec.Trigger))
+	}
 	fields, err := s.automationConditionFields(ctx, orgID)
 	if err != nil {
 		return automations.Spec{}, err
@@ -79,6 +103,21 @@ func (s *Service) validateAutomationSpec(ctx context.Context, orgID, trigger str
 		return automations.Spec{}, apperr.Validation(err.Error())
 	}
 	return spec, nil
+}
+
+// EnqueueResourceLifecycle fires {resource}.{lifecycle} for a payload.
+func (s *Service) EnqueueResourceLifecycle(ctx context.Context, orgID, resource, lifecycle string, payload any) {
+	s.EnqueueAutomationEvent(ctx, orgID, resources.LifecycleTrigger(resource, lifecycle), payload)
+}
+
+// EnqueueAttributeTriggers fires {resource}.attribute.{key} for each key.
+func (s *Service) EnqueueAttributeTriggers(ctx context.Context, orgID, resource string, keys []string, payload any) {
+	for _, key := range keys {
+		if strings.TrimSpace(key) == "" {
+			continue
+		}
+		s.EnqueueAutomationEvent(ctx, orgID, resources.AttributeTrigger(resource, key), payload)
+	}
 }
 
 func (s *Service) CreateAutomation(ctx context.Context, orgID string, in CreateAutomationInput) (sqlc.Automation, error) {

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"strings"
 
+	"github.com/gsarmaonline/kyc/core/resources"
 	"github.com/gsarmaonline/kyc/internal/apperr"
 	"github.com/gsarmaonline/kyc/internal/ids"
 	"github.com/gsarmaonline/kyc/internal/store"
@@ -101,6 +102,7 @@ func (s *Service) CreateMembership(ctx context.Context, orgID string, in CreateM
 		}
 		return sqlc.Membership{}, err
 	}
+	s.EnqueueResourceLifecycle(ctx, orgID, resources.Membership, resources.LifecycleCreated, membershipEventPayload(m))
 	return m, nil
 }
 
@@ -142,7 +144,21 @@ func (s *Service) UpdateMembership(ctx context.Context, id string, in UpdateMemb
 		}
 	}
 	out, err := s.db.Q().UpdateMembership(ctx, params)
-	return out, mapNotFound(err, "membership not found")
+	if err != nil {
+		return sqlc.Membership{}, mapNotFound(err, "membership not found")
+	}
+	s.EnqueueResourceLifecycle(ctx, out.OrganisationID, resources.Membership, resources.LifecycleUpdated, membershipEventPayload(out))
+	return out, nil
+}
+
+func membershipEventPayload(m sqlc.Membership) map[string]any {
+	return map[string]any{
+		"id":              m.ID,
+		"organisation_id": m.OrganisationID,
+		"user_id":         m.UserID,
+		"role_id":         m.RoleID,
+		"status":          m.Status,
+	}
 }
 
 func (s *Service) AcceptMembership(ctx context.Context, id string) (sqlc.Membership, error) {

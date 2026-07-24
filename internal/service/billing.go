@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/gsarmaonline/kyc/core/billing"
+	"github.com/gsarmaonline/kyc/core/resources"
 	"github.com/gsarmaonline/kyc/internal/apperr"
 	"github.com/gsarmaonline/kyc/internal/ids"
 	"github.com/gsarmaonline/kyc/internal/store"
@@ -214,6 +215,11 @@ func (s *Service) UpsertSubscription(ctx context.Context, orgID string, in Upser
 	default:
 		return sqlc.Subscription{}, apperr.Validation("invalid subscription status")
 	}
+	_, existingErr := s.db.Q().GetSubscriptionByOrganisation(ctx, orgID)
+	created := errors.Is(existingErr, pgx.ErrNoRows)
+	if existingErr != nil && !created {
+		return sqlc.Subscription{}, existingErr
+	}
 	sub, err := s.db.Q().UpsertSubscription(ctx, sqlc.UpsertSubscriptionParams{
 		ID:               ids.New(),
 		OrganisationID:   orgID,
@@ -221,7 +227,28 @@ func (s *Service) UpsertSubscription(ctx context.Context, orgID string, in Upser
 		Status:           status,
 		CurrentPeriodEnd: pgtype.Timestamptz{},
 	})
-	return sub, err
+	if err != nil {
+		return sqlc.Subscription{}, err
+	}
+	lifecycle := resources.LifecycleUpdated
+	if created {
+		lifecycle = resources.LifecycleCreated
+	}
+	s.EnqueueResourceLifecycle(ctx, orgID, resources.Subscription, lifecycle, subscriptionEventPayload(sub))
+	return sub, nil
+}
+
+func subscriptionEventPayload(sub sqlc.Subscription) map[string]any {
+	out := map[string]any{
+		"id":              sub.ID,
+		"organisation_id": sub.OrganisationID,
+		"plan_id":         sub.PlanID,
+		"status":          sub.Status,
+	}
+	if sub.CurrentPeriodEnd.Valid {
+		out["current_period_end"] = sub.CurrentPeriodEnd.Time.UTC().Format("2006-01-02T15:04:05Z07:00")
+	}
+	return out
 }
 
 func (s *Service) GetSubscription(ctx context.Context, orgID string) (sqlc.Subscription, error) {

@@ -4,18 +4,28 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+
+	"github.com/gsarmaonline/kyc/core/resources"
 )
 
 const (
-	TriggerAppUserCreated = "app_user.created"
-	TriggerAppUserUpdated = "app_user.updated"
-
 	OpEq        = "eq"
 	OpNeq       = "neq"
 	OpExists    = "exists"
 	OpNotExists = "not_exists"
 
 	ActionSendEmail = "send_email"
+)
+
+// Convenience aliases for common lifecycle triggers.
+var (
+	TriggerAppUserCreated      = resources.LifecycleTrigger(resources.AppUser, resources.LifecycleCreated)
+	TriggerAppUserUpdated      = resources.LifecycleTrigger(resources.AppUser, resources.LifecycleUpdated)
+	TriggerAppUserDeleted      = resources.LifecycleTrigger(resources.AppUser, resources.LifecycleDeleted)
+	TriggerMembershipCreated   = resources.LifecycleTrigger(resources.Membership, resources.LifecycleCreated)
+	TriggerMembershipUpdated   = resources.LifecycleTrigger(resources.Membership, resources.LifecycleUpdated)
+	TriggerSubscriptionCreated = resources.LifecycleTrigger(resources.Subscription, resources.LifecycleCreated)
+	TriggerSubscriptionUpdated = resources.LifecycleTrigger(resources.Subscription, resources.LifecycleUpdated)
 )
 
 // Spec is a validated automation definition body.
