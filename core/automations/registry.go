@@ -20,6 +20,7 @@ type ActionInfo struct {
 	Label       string        `json:"label"`
 	Description string        `json:"description"`
 	Params      []ActionParam `json:"params"`
+	Requires    []string      `json:"requires"` // subject kinds (e.g. app_user)
 }
 
 // ConditionOpInfo describes a condition operator.

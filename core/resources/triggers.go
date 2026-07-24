@@ -24,11 +24,12 @@ type Trigger struct {
 
 // TriggerInfo is the editor-facing descriptor (JSON-friendly).
 type TriggerInfo struct {
-	ID          string `json:"id"`
-	Label       string `json:"label"`
-	Description string `json:"description"`
-	Resource    string `json:"resource"`
-	Kind        string `json:"kind"` // lifecycle | attribute
+	ID          string   `json:"id"`
+	Label       string   `json:"label"`
+	Description string   `json:"description"`
+	Resource    string   `json:"resource"`
+	Kind        string   `json:"kind"` // lifecycle | attribute
+	Provides    []string `json:"provides"`
 }
 
 // LifecycleTrigger builds {resource}.{event}.
@@ -104,6 +105,7 @@ func IsValidTrigger(id string) bool {
 func ExpandTriggers(resources []Resource, attrsByResource map[string][]AttributeKey) []TriggerInfo {
 	var out []TriggerInfo
 	for _, r := range resources {
+		provides := r.availableSubjectKinds()
 		for _, event := range r.Lifecycles {
 			id := LifecycleTrigger(r.Key, event)
 			out = append(out, TriggerInfo{
@@ -112,6 +114,7 @@ func ExpandTriggers(resources []Resource, attrsByResource map[string][]Attribute
 				Description: fmt.Sprintf("Fires when a %s is %s.", strings.ToLower(r.Label), event),
 				Resource:    r.Key,
 				Kind:        string(KindLifecycle),
+				Provides:    append([]string(nil), provides...),
 			})
 		}
 		if !r.SupportsAttributes {
@@ -133,6 +136,7 @@ func ExpandTriggers(resources []Resource, attrsByResource map[string][]Attribute
 				Description: fmt.Sprintf("Fires when %s attribute %q is set or changed.", strings.ToLower(r.Label), key),
 				Resource:    r.Key,
 				Kind:        string(KindAttribute),
+				Provides:    append([]string(nil), provides...),
 			})
 		}
 	}

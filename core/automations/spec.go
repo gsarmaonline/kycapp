@@ -92,6 +92,9 @@ func ValidateCreate(trigger string, conditionsJSON, actionsJSON json.RawMessage)
 		}
 		actions[i] = a
 	}
+	if err := ValidateSubjectCompatibility(trigger, actions); err != nil {
+		return Spec{}, err
+	}
 
 	return Spec{Trigger: trigger, Conditions: cond, Actions: actions}, nil
 }

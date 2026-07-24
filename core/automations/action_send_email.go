@@ -1,5 +1,7 @@
 package automations
 
+import "github.com/gsarmaonline/kyc/core/resources"
+
 func init() {
 	RegisterActionHandler(sendEmailHandler{})
 }
@@ -16,7 +18,12 @@ func (sendEmailHandler) Info() ActionInfo {
 		Params: []ActionParam{
 			{Key: "template_key", Label: "Template key", Required: true},
 		},
+		Requires: []string{resources.SubjectAppUser},
 	}
+}
+
+func (sendEmailHandler) Requires() []string {
+	return []string{resources.SubjectAppUser}
 }
 
 func (sendEmailHandler) Validate(params map[string]any) error {

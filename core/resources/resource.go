@@ -25,38 +25,6 @@ type AttributeKey struct {
 	Label string
 }
 
-// Resource describes a domain object that can emit automation triggers.
-type Resource struct {
-	Key                string
-	Label              string
-	Lifecycles         []string // created / updated / deleted
-	SupportsAttributes bool     // expand {resource}.attribute.{key}
-}
-
-// Default returns the built-in resource catalog.
-func Default() []Resource {
-	return []Resource{
-		{
-			Key:                AppUser,
-			Label:              "App user",
-			Lifecycles:         []string{LifecycleCreated, LifecycleUpdated, LifecycleDeleted},
-			SupportsAttributes: true,
-		},
-		{
-			Key:                Membership,
-			Label:              "Membership",
-			Lifecycles:         []string{LifecycleCreated, LifecycleUpdated, LifecycleDeleted},
-			SupportsAttributes: false,
-		},
-		{
-			Key:                Subscription,
-			Label:              "Subscription",
-			Lifecycles:         []string{LifecycleCreated, LifecycleUpdated, LifecycleDeleted},
-			SupportsAttributes: false,
-		},
-	}
-}
-
 // ByKey looks up a registered resource.
 func ByKey(key string) (Resource, bool) {
 	key = strings.TrimSpace(key)

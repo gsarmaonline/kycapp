@@ -18,6 +18,9 @@ type ActionHandler interface {
 	Type() string
 	Info() ActionInfo
 	Validate(params map[string]any) error
+	// Requires lists subject kinds that must be available from the trigger
+	// (e.g. send_email needs "app_user" for a recipient email).
+	Requires() []string
 }
 
 var (

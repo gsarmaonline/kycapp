@@ -81,3 +81,30 @@ func TestValidateRejectsUnknownAction(t *testing.T) {
 		t.Fatal("want error")
 	}
 }
+
+func TestValidateSubjectCompatibility(t *testing.T) {
+	_, err := ValidateCreate(
+		"subscription.created",
+		json.RawMessage(`{"all":[]}`),
+		json.RawMessage(`[{"type":"send_email","params":{"template_key":"welcome"}}]`),
+	)
+	if err == nil {
+		t.Fatal("send_email on subscription should fail — no app_user subject")
+	}
+	_, err = ValidateCreate(
+		"membership.created",
+		json.RawMessage(`{"all":[]}`),
+		json.RawMessage(`[{"type":"send_email","params":{"template_key":"welcome"}}]`),
+	)
+	if err == nil {
+		t.Fatal("send_email on membership should fail — provides user, not app_user")
+	}
+	_, err = ValidateCreate(
+		"app_user.created",
+		json.RawMessage(`{"all":[]}`),
+		json.RawMessage(`[{"type":"send_email","params":{"template_key":"welcome"}}]`),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+}

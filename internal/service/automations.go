@@ -99,6 +99,10 @@ func (s *Service) validateAutomationSpec(ctx context.Context, orgID, trigger str
 	if err := automations.ValidateConditionFields(spec.Conditions, automations.AllowedConditionFieldSet(fields)); err != nil {
 		return automations.Spec{}, apperr.Validation(err.Error())
 	}
+	// Subject compatibility is enforced inside ValidateCreate; re-check for clarity in errors.
+	if err := automations.ValidateSubjectCompatibility(spec.Trigger, spec.Actions); err != nil {
+		return automations.Spec{}, apperr.Validation(err.Error())
+	}
 	return spec, nil
 }
 
@@ -278,9 +282,15 @@ func (s *Service) runOneAutomation(ctx context.Context, row sqlc.Automation, tri
 		return s.recordRun(ctx, row, trigger, payloadJSON, "error", "invalid actions: "+err.Error())
 	}
 
+	subjects, err := s.resolveSubjects(ctx, row.OrganisationID, trigger, payload)
+	if err != nil {
+		_ = s.recordRun(ctx, row, trigger, payloadJSON, "error", "resolve subjects: "+err.Error())
+		return err
+	}
+
 	var details []string
 	for _, a := range actions {
-		detail, err := s.executeAction(ctx, row.OrganisationID, a, payload)
+		detail, err := s.executeAction(ctx, row.OrganisationID, a, payload, subjects)
 		if err != nil {
 			_ = s.recordRun(ctx, row, trigger, payloadJSON, "error", err.Error())
 			return err

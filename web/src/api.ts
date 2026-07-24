@@ -783,12 +783,14 @@ export type AutomationCatalog = {
     description: string
     resource?: string
     kind?: string
+    provides?: string[]
   }[]
   actions: {
     type: string
     label: string
     description: string
     params: { key: string; label: string; required: boolean }[]
+    requires?: string[]
   }[]
   ops: { op: string; label: string; needs_value: boolean }[]
   condition_fields: {

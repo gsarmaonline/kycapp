@@ -65,6 +65,22 @@ Lifecycles: `created`, `updated`, `deleted`. Attribute triggers fire when that k
 - Ops: `eq`, `neq`, `exists`, `not_exists` (enough for attributes / status).
 - Fields: base user fields (`id`, `email`, `display_name`, `status`, `external_id`) plus every active attribute definition.
 
+### Subjects (trigger ↔ action)
+
+Actions declare required **subjects** (parent objects). Triggers declare what they **provide** (and what they can **resolve** via relations).
+
+| Action | Requires |
+| --- | --- |
+| `send_email` | `app_user` (recipient email / display name) |
+
+| Trigger resource | Provides | Relations |
+| --- | --- | --- |
+| `app_user` | `app_user` | — |
+| `membership` | `membership` | `user` via `user_id` |
+| `subscription` | `subscription` | — (no recipient yet) |
+
+Save-time validation rejects incompatible pairs (e.g. Subscription created + send_email). At runtime the worker resolves subjects before executing actions; `send_email` reads email from the resolved `app_user` subject, not a bare payload field.
+
 ### Actions
 
 Actions use a generic handler interface (`core/automations.ActionHandler`):
