@@ -677,6 +677,54 @@ button.danger:not(.link-btn):hover {
   padding: 0.35rem;
 }
 
+.color-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.color-field-label {
+  font-size: 0.9rem;
+}
+
+.color-field-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  align-items: flex-start;
+}
+
+.color-field .react-colorful {
+  width: 12rem;
+  height: 10rem;
+}
+
+.color-field-side {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  min-width: 8rem;
+}
+
+.color-field-swatch {
+  display: block;
+  width: 100%;
+  height: 2.5rem;
+  border-radius: 6px;
+  border: 1px solid color-mix(in srgb, CanvasText 18%, transparent);
+}
+
+.color-field-side input {
+  font: inherit;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.9rem;
+  padding: 0.4rem 0.5rem;
+  border-radius: 6px;
+  border: 1px solid color-mix(in srgb, CanvasText 18%, transparent);
+  background: Canvas;
+  color: CanvasText;
+}
+
 .page-header {
   display: flex;
   align-items: center;
@@ -860,6 +908,11 @@ button.link-btn.danger:hover {
   border: 1px solid #e7e5e4;
   border-radius: 6px;
   background: #fff;
+}
+
+.branding-email-preview .preview-html {
+  min-height: 32rem;
+  height: min(70vh, 40rem);
 }
 
 .create.stacked {

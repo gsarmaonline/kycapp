@@ -8,6 +8,7 @@ import {
   uploadOrganisationLogo,
   type Organisation,
 } from '../api'
+import { ColorField, normalizeHex } from '../components/ColorField'
 import { PageHeader } from '../crud/ui'
 import { EMAIL_FONTS } from '../email_fonts'
 import { wrapEmailHtml } from '../email_render'
@@ -62,12 +63,14 @@ export function BrandingPage() {
     setError(null)
     try {
       const o = await updateOrganisation(orgId, {
-        primary_color: primary,
-        accent_color: accent,
+        primary_color: normalizeHex(primary),
+        accent_color: normalizeHex(accent),
         email_footer: footer,
         email_font: font,
       })
       setOrg(o)
+      setPrimary(o.primary_color || normalizeHex(primary))
+      setAccent(o.accent_color || normalizeHex(accent))
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Save failed')
     } finally {
@@ -126,16 +129,8 @@ export function BrandingPage() {
             ) : null}
           </div>
         </label>
-        <label>
-          Primary color
-          <input type="color" value={normalizeColorInput(primary)} onChange={(e) => setPrimary(e.target.value)} />
-          <input value={primary} onChange={(e) => setPrimary(e.target.value)} placeholder="#1f4d3a" />
-        </label>
-        <label>
-          Accent color
-          <input type="color" value={normalizeColorInput(accent)} onChange={(e) => setAccent(e.target.value)} />
-          <input value={accent} onChange={(e) => setAccent(e.target.value)} placeholder="#16382a" />
-        </label>
+        <ColorField label="Primary color" value={primary} onChange={setPrimary} placeholder="#1f4d3a" />
+        <ColorField label="Accent color" value={accent} onChange={setAccent} placeholder="#16382a" />
         <label>
           Email font
           <select value={font} onChange={(e) => setFont(e.target.value)} aria-label="Email font">
@@ -160,22 +155,10 @@ export function BrandingPage() {
         </button>
       </form>
 
-      <fieldset className="perm-group email-preview">
+      <fieldset className="perm-group email-preview branding-email-preview">
         <legend>Email chrome preview</legend>
         <iframe title="Branding preview" className="preview-html" sandbox="" srcDoc={previewHtml} />
       </fieldset>
     </section>
   )
-}
-
-function normalizeColorInput(c: string): string {
-  const s = c.trim()
-  if (/^#[0-9a-fA-F]{6}$/.test(s)) return s
-  if (/^#[0-9a-fA-F]{3}$/.test(s)) {
-    const r = s[1]
-    const g = s[2]
-    const b = s[3]
-    return `#${r}${r}${g}${g}${b}${b}`
-  }
-  return '#1f4d3a'
 }
