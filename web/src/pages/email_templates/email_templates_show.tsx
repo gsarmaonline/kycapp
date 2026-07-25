@@ -7,7 +7,7 @@ import {
   type Organisation,
 } from '../../api'
 import { DetailList, PageHeader } from '../../crud/ui'
-import { renderEmailTemplate, wrapEmailHtml } from '../../email_render'
+import { emailRenderContext, renderEmailTemplate, wrapEmailHtml } from '../../email_render'
 import { resourcePath } from '../../org_nav'
 
 export function EmailTemplatesShow() {
@@ -29,8 +29,17 @@ export function EmailTemplatesShow() {
   }, [orgId])
 
   const vars = useMemo(
-    () => ({ display_name: 'Pat', org_name: org?.name ?? 'Acme' }),
-    [org?.name],
+    () =>
+      emailRenderContext({
+        org_id: orgId,
+        org_name: org?.name ?? 'Acme',
+        app_user: {
+          display_name: 'Pat',
+          email: 'pat@example.com',
+          attributes: { country: 'AU' },
+        },
+      }),
+    [orgId, org?.name],
   )
 
   const previewHtml = useMemo(() => {

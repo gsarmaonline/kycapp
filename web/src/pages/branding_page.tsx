@@ -48,14 +48,20 @@ export function BrandingPage() {
 
   const previewHtml = useMemo(() => {
     if (!org) return ''
-    return wrapEmailHtml('<p>Hi {{display_name}},</p><p>This is how your emails will look.</p>', {
-      org_name: org.name,
-      logo_url: org.logo_url,
-      primary_color: primary,
-      accent_color: accent,
-      footer,
-      typography,
-    }).replace(/\{\{\s*display_name\s*\}\}/g, 'Pat')
+    return wrapEmailHtml(
+      '<p>Hi {{app_user.display_name}},</p><p>This is how your emails will look.</p>'.replace(
+        /\{\{\s*app_user\.display_name\s*\}\}/g,
+        'Pat',
+      ),
+      {
+        org_name: org.name,
+        logo_url: org.logo_url,
+        primary_color: primary,
+        accent_color: accent,
+        footer,
+        typography,
+      },
+    )
   }, [org, primary, accent, footer, typography])
 
   async function onSave(e: FormEvent) {

@@ -107,7 +107,7 @@ func execSendEmail(
 	s *Service,
 	orgID string,
 	params map[string]any,
-	_ map[string]any,
+	payload map[string]any,
 	subjects map[string]map[string]any,
 ) (string, error) {
 	templateKey, err := automations.RequireStringParam(params, "template_key")
@@ -136,14 +136,10 @@ func execSendEmail(
 	if err != nil {
 		return "", err
 	}
-	vars := map[string]string{
-		"display_name": stringifyPayload(appUser["display_name"]),
-		"org_name":     org.Name,
-		"email":        to,
-	}
-	subject := emailtemplates.Render(tmpl.Subject, vars)
-	textBody := emailtemplates.Render(tmpl.BodyText, vars)
-	htmlInner := emailtemplates.Render(tmpl.BodyHtml, vars)
+	data := emailtemplates.RenderContext(orgID, org.Name, appUser, payload)
+	subject := emailtemplates.Render(tmpl.Subject, data)
+	textBody := emailtemplates.Render(tmpl.BodyText, data)
+	htmlInner := emailtemplates.Render(tmpl.BodyHtml, data)
 	if strings.TrimSpace(htmlInner) == "" {
 		htmlInner = "<p>" + html.EscapeString(textBody) + "</p>"
 	}

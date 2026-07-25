@@ -88,10 +88,16 @@ func renderValue(v any, data map[string]any) (any, error) {
 	}
 }
 
-func renderString(s string, data map[string]any) any {
-	trimmed := strings.TrimSpace(s)
-	if m := placeholderRE.FindStringSubmatch(trimmed); len(m) == 2 && m[0] == trimmed {
-		return lookupPathOrNil(data, strings.TrimSpace(m[1]))
+// RenderStringTemplate replaces {{path}} placeholders using the shared field
+// vocabulary (app_user.*, organisation.name, organisation_id, trigger, …).
+// Missing paths become empty strings. Used by webhook JSON string embedding
+// and email template subject/body rendering.
+func RenderStringTemplate(s string, data map[string]any) string {
+	if s == "" {
+		return s
+	}
+	if data == nil {
+		data = map[string]any{}
 	}
 	return placeholderRE.ReplaceAllStringFunc(s, func(match string) string {
 		sub := placeholderRE.FindStringSubmatch(match)
@@ -101,6 +107,14 @@ func renderString(s string, data map[string]any) any {
 		val := lookupPathOrNil(data, strings.TrimSpace(sub[1]))
 		return stringifyTemplateValue(val)
 	})
+}
+
+func renderString(s string, data map[string]any) any {
+	trimmed := strings.TrimSpace(s)
+	if m := placeholderRE.FindStringSubmatch(trimmed); len(m) == 2 && m[0] == trimmed {
+		return lookupPathOrNil(data, strings.TrimSpace(m[1]))
+	}
+	return RenderStringTemplate(s, data)
 }
 
 func lookupPathOrNil(data map[string]any, path string) any {

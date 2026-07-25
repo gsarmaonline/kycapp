@@ -31,16 +31,23 @@ func TestValidateCreate(t *testing.T) {
 }
 
 func TestRender(t *testing.T) {
-	got := Render("Hi {{display_name}} from {{org_name}}", map[string]string{
+	data := RenderContext("org1", "Acme", map[string]any{
 		"display_name": "Pat",
-		"org_name":     "Acme",
-	})
-	want := "Hi Pat from Acme"
+		"email":        "pat@example.com",
+		"attributes":   map[string]any{"country": "AU"},
+	}, nil)
+	got := Render("Hi {{app_user.display_name}} from {{organisation.name}} in {{app_user.country}}", data)
+	want := "Hi Pat from Acme in AU"
 	if got != want {
 		t.Fatalf("got %q want %q", got, want)
 	}
-	if Render("Hi {{missing}}", nil) != "Hi {{missing}}" {
-		t.Fatal("missing vars should stay")
+	// Legacy aliases still resolve.
+	got = Render("Hi {{display_name}} / {{org_name}} / {{email}}", data)
+	if got != "Hi Pat / Acme / pat@example.com" {
+		t.Fatalf("legacy aliases: %q", got)
+	}
+	if Render("Hi {{missing}}", data) != "Hi " {
+		t.Fatal("missing paths should become empty")
 	}
 }
 

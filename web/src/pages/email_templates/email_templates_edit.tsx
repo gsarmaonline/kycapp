@@ -3,7 +3,7 @@ import type { FormEvent } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { getEmailTemplate, getOrganisation, updateEmailTemplate, type Organisation } from '../../api'
 import { FormActions, PageHeader } from '../../crud/ui'
-import { renderEmailTemplate, wrapEmailHtml } from '../../email_render'
+import { emailRenderContext, renderEmailTemplate, wrapEmailHtml } from '../../email_render'
 import { resourcePath } from '../../org_nav'
 
 export function EmailTemplatesEdit() {
@@ -15,6 +15,7 @@ export function EmailTemplatesEdit() {
   const [bodyText, setBodyText] = useState('')
   const [bodyHtml, setBodyHtml] = useState('')
   const [sampleDisplayName, setSampleDisplayName] = useState('Pat')
+  const [sampleEmail, setSampleEmail] = useState('pat@example.com')
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
 
@@ -37,11 +38,17 @@ export function EmailTemplatesEdit() {
   }, [orgId])
 
   const vars = useMemo(
-    () => ({
-      display_name: sampleDisplayName,
-      org_name: org?.name ?? 'Acme',
-    }),
-    [sampleDisplayName, org?.name],
+    () =>
+      emailRenderContext({
+        org_id: orgId,
+        org_name: org?.name ?? 'Acme',
+        app_user: {
+          display_name: sampleDisplayName,
+          email: sampleEmail,
+          attributes: { country: 'AU' },
+        },
+      }),
+    [orgId, org?.name, sampleDisplayName, sampleEmail],
   )
 
   const previewHtml = useMemo(() => {
@@ -86,6 +93,10 @@ export function EmailTemplatesEdit() {
         </label>
         <label>
           Subject
+          <span className="field-hint">
+            Placeholders use the shared path vocabulary (e.g.{' '}
+            <code>{'{{app_user.display_name}}'}</code>, <code>{'{{organisation.name}}'}</code>).
+          </span>
           <input value={subject} onChange={(e) => setSubject(e.target.value)} required />
         </label>
         <label>
@@ -95,7 +106,8 @@ export function EmailTemplatesEdit() {
         <label>
           Body (HTML)
           <span className="field-hint">
-            Inner content only — header, logo, and footer come from Branding.
+            Inner content only — header, logo, and footer come from Branding. Same{' '}
+            <code>{'{{app_user.*}}'}</code> paths as automations and webhooks.
           </span>
           <textarea value={bodyHtml} onChange={(e) => setBodyHtml(e.target.value)} rows={6} />
         </label>
@@ -106,11 +118,15 @@ export function EmailTemplatesEdit() {
         <legend>Preview</legend>
         <div className="create stacked preview-vars">
           <label>
-            Sample {'{{display_name}}'}
+            Sample {'{{app_user.display_name}}'}
             <input
               value={sampleDisplayName}
               onChange={(e) => setSampleDisplayName(e.target.value)}
             />
+          </label>
+          <label>
+            Sample {'{{app_user.email}}'}
+            <input value={sampleEmail} onChange={(e) => setSampleEmail(e.target.value)} />
           </label>
         </div>
         <p className="preview-subject">

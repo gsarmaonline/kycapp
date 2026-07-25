@@ -110,10 +110,11 @@ Operators (filtered by field `value_type` in the catalog):
 | `gt` / `gte` / `lt` / `lte` | yes | number, date |
 | `exists` / `not_exists` | no | any |
 
-Fields use a shared **`app_user.*` vocabulary** (same paths in conditions, webhook templates, and `db_insert` mappings):
+Fields use a shared **`app_user.*` vocabulary** (same paths in conditions, webhook templates, email templates, and `db_insert` mappings):
 
 - Core: `app_user.id`, `app_user.email`, `app_user.display_name`, `app_user.status`, `app_user.external_id`
 - Org attributes: `app_user.<key>` (e.g. `app_user.country`)
+- Organisation: `organisation.id`, `organisation.name` (email templates; also available on webhook renders when injected)
 - Run metadata: `organisation_id`, `trigger`
 
 Catalog fields include `allowed_ops` and optional `enum_values` for dropdown attributes. Legacy paths (`email`, `attributes.country`) still resolve at runtime and are normalized on save.

@@ -7,10 +7,11 @@ import (
 )
 
 // Canonical field paths for app_user event data (conditions, webhook templates,
-// db_insert mappings). Same vocabulary everywhere:
+// email templates, db_insert mappings). Same vocabulary everywhere:
 //
 //	app_user.email              — core column
 //	app_user.country            — org attribute key (not attributes.country)
+//	organisation.name           — org display name (email render context)
 //	organisation_id / trigger   — run metadata
 //
 // Triggers stay event IDs (app_user.created, app_user.attribute.country).
@@ -28,7 +29,8 @@ func AppUserFieldPath(name string) string {
 }
 
 // NormalizeFieldPath rewrites legacy payload-relative paths to canonical refs.
-// email → app_user.email, attributes.country → app_user.country.
+// email → app_user.email, attributes.country → app_user.country,
+// org_name → organisation.name.
 func NormalizeFieldPath(path string) string {
 	path = strings.TrimSpace(path)
 	if path == "" {
@@ -36,6 +38,9 @@ func NormalizeFieldPath(path string) string {
 	}
 	if strings.HasPrefix(path, resources.AppUser+".") {
 		return path
+	}
+	if path == "org_name" {
+		return "organisation.name"
 	}
 	if rest, ok := strings.CutPrefix(path, "attributes."); ok && rest != "" {
 		return AppUserFieldPath(rest)

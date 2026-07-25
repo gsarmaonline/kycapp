@@ -192,7 +192,7 @@ Org-scoped email copy for messaging app users. Seeded system templates per org; 
 | `key` | string | Unique per org; locked when `is_system` |
 | `name` | string | Display label |
 | `description` | string | |
-| `subject` | string | Supports `{{placeholders}}` |
+| `subject` | string | Supports `{{path}}` placeholders (shared `app_user.*` / `organisation.name` vocabulary) |
 | `body_text` | string | Plain text body |
 | `body_html` | string | Inner HTML content (org branding chrome applied at render) |
 | `status` | enum | `active` \| `archived` |

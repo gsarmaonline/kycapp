@@ -60,3 +60,26 @@ func TestValidateJSONTemplate(t *testing.T) {
 		t.Fatal("want error")
 	}
 }
+
+func TestRenderStringTemplate(t *testing.T) {
+	data := map[string]any{
+		"organisation_id": "org1",
+		"organisation":    map[string]any{"id": "org1", "name": "Acme"},
+		"app_user": map[string]any{
+			"display_name": "Pat",
+			"email":        "pat@example.com",
+			"attributes":   map[string]any{"country": "AU"},
+		},
+	}
+	got := RenderStringTemplate(
+		"Hi {{app_user.display_name}} ({{app_user.email}}) at {{organisation.name}} / {{app_user.country}}",
+		data,
+	)
+	want := "Hi Pat (pat@example.com) at Acme / AU"
+	if got != want {
+		t.Fatalf("got %q want %q", got, want)
+	}
+	if RenderStringTemplate("{{org_name}}", data) != "Acme" {
+		t.Fatal("org_name alias")
+	}
+}
