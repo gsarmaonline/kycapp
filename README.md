@@ -188,6 +188,7 @@ Public (no Bearer): `GET /v1/auth/providers`, `GET /v1/auth/google`, `GET /v1/au
 
 ```bash
 make test-go    # Go unit + integration (Docker for Testcontainers)
+make test-e2e   # Local API happy-path e2e (Docker Postgres; noop Stripe + recording mailer)
 make test-web   # Vitest for UI
 make test       # both
 ```

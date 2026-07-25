@@ -21,14 +21,22 @@ const testSvcToken = "test-service-token"
 
 func testServer(t *testing.T, db *store.Store) http.Handler {
 	t.Helper()
+	h, _ := testEnv(t, db)
+	return h
+}
+
+// testEnv returns an HTTP handler and the shared Service (for enqueue / mailer wiring).
+func testEnv(t *testing.T, db *store.Store) (http.Handler, *service.Service) {
+	t.Helper()
 	svc := service.New(db)
-	return httpserver.New(db, httpserver.Options{
+	h := httpserver.New(db, httpserver.Options{
 		Service:             svc,
 		APITokens:           []string{testSvcToken},
 		AuthRateLimitPerMin: 0,
 		AuthDevLogin:        true,
 		AppOrigin:           "http://localhost:8080",
 	}).Handler()
+	return h, svc
 }
 
 func userAuth(token string) map[string]string {

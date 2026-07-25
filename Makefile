@@ -1,4 +1,4 @@
-.PHONY: test test-unit test-store test-web build run sqlc compose-up compose-down compose-logs web worker
+.PHONY: test test-unit test-store test-web test-e2e build run sqlc compose-up compose-down compose-logs web worker
 
 test:
 	go test ./... -count=1 -timeout 5m
@@ -12,6 +12,10 @@ test-unit:
 
 test-store:
 	go test ./internal/store/ -count=1 -timeout 3m -v
+
+# Local API e2e (testcontainers Postgres + noop Stripe + recording mailer). Requires Docker.
+test-e2e:
+	go test ./internal/service/ -run 'TestE2ELocal' -count=1 -timeout 3m -v
 
 test-web:
 	cd web && npm test
