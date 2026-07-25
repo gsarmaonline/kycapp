@@ -846,35 +846,40 @@ a.button:hover,
 
 .table-wrap {
   overflow-x: auto;
-  border: 1px solid #e7e5e4;
+  border: 1px solid var(--app-border);
   border-radius: 6px;
-  background: rgba(255, 253, 248, 0.9);
+  background: var(--app-panel);
+  color: var(--app-fg);
 }
 
 .data-table {
   width: 100%;
   border-collapse: collapse;
   font-size: 0.95rem;
+  background: var(--app-panel);
+  color: var(--app-fg);
 }
 
 .data-table th,
 .data-table td {
   padding: 0.65rem 0.75rem;
   text-align: left;
-  border-bottom: 1px solid #e7e5e4;
+  border-bottom: 1px solid var(--app-border);
   vertical-align: top;
+  background: inherit;
+  color: inherit;
 }
 
 .data-table th {
   font-size: 0.75rem;
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  color: #78716c;
-  background: #fafaf9;
+  color: var(--app-fg-muted);
+  background: var(--app-code-bg);
 }
 
 .data-table td.empty {
-  color: #78716c;
+  color: var(--app-fg-muted);
   text-align: center;
 }
 
@@ -1354,10 +1359,26 @@ button.link-btn.danger:hover {
 [data-theme="dark"] .preview-html,
 [data-theme="dark"] .typography-preview,
 [data-theme="dark"] .typography-field,
-[data-theme="dark"] .perm-group {
+[data-theme="dark"] .perm-group,
+[data-theme="dark"] .table-wrap,
+[data-theme="dark"] .data-table,
+[data-theme="dark"] .prose-docs table {
   background: var(--app-panel);
   border-color: var(--app-border);
   color: var(--app-fg);
+}
+
+[data-theme="dark"] .data-table th,
+[data-theme="dark"] .prose-docs th {
+  background: var(--app-code-bg);
+  color: var(--app-fg-muted);
+}
+
+[data-theme="dark"] .data-table td,
+[data-theme="dark"] .prose-docs td {
+  background: var(--app-panel);
+  color: var(--app-fg);
+  border-color: var(--app-border);
 }
 
 [data-theme="dark"] .lede,
