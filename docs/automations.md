@@ -110,7 +110,7 @@ Operators (filtered by field `value_type` in the catalog):
 | `gt` / `gte` / `lt` / `lte` | yes | number, date |
 | `exists` / `not_exists` | no | any |
 
-Fields use a shared **`app_user.*` vocabulary** (same paths in conditions, webhook templates, email templates, and `db_insert` mappings):
+Fields use a shared **`app_user.*` vocabulary** (same paths in conditions, webhook templates, email templates, and `db_insert` mappings). Full guide: [variables.md](variables.md).
 
 - Core: `app_user.id`, `app_user.email`, `app_user.display_name`, `app_user.status`, `app_user.external_id`
 - Org attributes: `app_user.<key>` (e.g. `app_user.country`)

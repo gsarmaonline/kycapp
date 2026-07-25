@@ -14,6 +14,7 @@ export type OrgSection =
   | 'branding'
   | 'billing'
   | 'settings'
+  | 'docs'
 
 export type NavGroupId = 'product' | 'actions' | 'platform'
 
@@ -42,6 +43,7 @@ export const ORG_SECTIONS: OrgNavItem[] = [
   { id: 'branding', label: 'Branding', path: 'branding' },
   { id: 'billing', label: 'Billing', path: 'billing' },
   { id: 'settings', label: 'Settings', path: 'settings' },
+  { id: 'docs', label: 'Documentation', path: 'docs' },
 ]
 
 /** Sidebar groups: product, action destinations, then KYC platform. */
@@ -78,6 +80,7 @@ export const ORG_NAV_GROUPS: OrgNavGroup[] = [
     items: [
       { id: 'members', label: 'Members', path: 'members' },
       { id: 'settings', label: 'Settings', path: 'settings' },
+      { id: 'docs', label: 'Documentation', path: 'docs' },
     ],
   },
 ]
@@ -102,6 +105,7 @@ export function sectionFromPathname(pathname: string, orgId: string): OrgSection
     case 'branding':
     case 'billing':
     case 'settings':
+    case 'docs':
       return head
     case 'schema':
       return 'attributes'
@@ -118,7 +122,7 @@ export function orgPath(orgId: string, section: OrgSection = 'overview') {
 
 export function resourcePath(
   orgId: string,
-  section: Exclude<OrgSection, 'overview' | 'billing' | 'branding' | 'settings'>,
+  section: Exclude<OrgSection, 'overview' | 'billing' | 'branding' | 'settings' | 'docs'>,
   ...parts: string[]
 ) {
   const base = orgPath(orgId, section)

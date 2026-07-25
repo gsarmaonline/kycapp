@@ -1,8 +1,43 @@
 :root {
-  color: #1c1917;
-  background: #f5f2eb;
+  --app-fg: #1c1917;
+  --app-fg-muted: #78716c;
+  --app-bg: #f5f2eb;
+  --app-bg-grad-a: #e7efe4;
+  --app-bg-grad-b: #f7f4ee;
+  --app-bg-grad-c: #efe8dc;
+  --app-surface: rgba(255, 253, 248, 0.92);
+  --app-surface-solid: #fffdf8;
+  --app-panel: #ffffff;
+  --app-border: #e7e5e4;
+  --app-accent: #1f4d3a;
+  --app-accent-soft: #e7efe4;
+  --app-danger: #b91c1c;
+  --app-input-bg: #ffffff;
+  --app-code-bg: #fafaf9;
+  color: var(--app-fg);
+  background: var(--app-bg);
   font-family: "IBM Plex Sans", "Segoe UI", sans-serif;
   line-height: 1.45;
+  color-scheme: light;
+}
+
+[data-theme="dark"] {
+  --app-fg: #f5f0e8;
+  --app-fg-muted: #a8a29e;
+  --app-bg: #141210;
+  --app-bg-grad-a: #1a2a22;
+  --app-bg-grad-b: #171411;
+  --app-bg-grad-c: #12100e;
+  --app-surface: rgba(28, 25, 23, 0.96);
+  --app-surface-solid: #1c1917;
+  --app-panel: #221f1c;
+  --app-border: #44403c;
+  --app-accent: #6ee7b7;
+  --app-accent-soft: #1a2f26;
+  --app-danger: #f87171;
+  --app-input-bg: #292524;
+  --app-code-bg: #1c1917;
+  color-scheme: dark;
 }
 
 * {
@@ -12,9 +47,10 @@
 body {
   margin: 0;
   min-height: 100vh;
+  color: var(--app-fg);
   background:
-    radial-gradient(circle at top left, #e7efe4 0, transparent 40%),
-    linear-gradient(180deg, #f7f4ee 0%, #efe8dc 100%);
+    radial-gradient(circle at top left, var(--app-bg-grad-a) 0, transparent 40%),
+    linear-gradient(180deg, var(--app-bg-grad-b) 0%, var(--app-bg-grad-c) 100%);
 }
 
 .page {
@@ -47,8 +83,8 @@ body {
   flex-direction: column;
   gap: 0.65rem;
   padding: 0.85rem 0.65rem;
-  border-right: 1px solid #e7e5e4;
-  background: rgba(255, 253, 248, 0.92);
+  border-right: 1px solid var(--app-border);
+  background: var(--app-surface);
   font-size: 0.82rem;
   position: sticky;
   top: 0;
@@ -168,7 +204,7 @@ body {
 .nav-item {
   text-align: left;
   background: transparent;
-  color: #1c1917;
+  color: var(--app-fg);
   padding: 0.3rem 0.45rem;
   border-radius: 3px;
   text-decoration: none;
@@ -182,16 +218,20 @@ body {
 }
 
 .nav-item:hover {
-  background: rgba(31, 77, 58, 0.08);
+  background: color-mix(in srgb, var(--app-accent) 12%, transparent);
 }
 
 .nav-item.active {
-  background: #1f4d3a;
-  color: #f8faf8;
+  background: var(--app-accent);
+  color: var(--app-panel);
+}
+
+[data-theme="dark"] .nav-item.active {
+  color: #141210;
 }
 
 .nav-item.active:hover {
-  background: #16382a;
+  filter: brightness(0.92);
 }
 
 .sidebar-footer {
@@ -199,7 +239,7 @@ body {
   gap: 0.55rem;
   margin-top: auto;
   padding-top: 0.75rem;
-  border-top: 1px solid #e7e5e4;
+  border-top: 1px solid var(--app-border);
 }
 
 .sidebar-footer .org-switcher {
@@ -1220,4 +1260,119 @@ button.link-btn.danger:hover {
     flex-direction: column;
     align-items: stretch;
   }
+}
+
+/* Documentation */
+.docs-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin: 0 0 1.25rem;
+}
+
+.docs-tab {
+  padding: 0.4rem 0.75rem;
+  border-radius: 6px;
+  border: 1px solid var(--app-border);
+  text-decoration: none;
+  color: var(--app-fg);
+  background: var(--app-panel);
+  font-size: 0.9rem;
+}
+
+.docs-tab.active {
+  background: var(--app-accent);
+  border-color: var(--app-accent);
+  color: var(--app-panel);
+}
+
+[data-theme="dark"] .docs-tab.active {
+  color: #141210;
+}
+
+.docs-swagger {
+  margin: 0 -0.25rem;
+  border: 1px solid var(--app-border);
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--app-panel);
+}
+
+.docs-swagger .swagger-ui {
+  font-family: inherit;
+}
+
+.docs-swagger .swagger-ui .info {
+  margin: 1rem 0;
+}
+
+.prose-docs h2 {
+  margin: 1.5rem 0 0.65rem;
+  font-size: 1.15rem;
+}
+
+.prose-docs table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+  margin: 0.75rem 0 1rem;
+}
+
+.prose-docs th,
+.prose-docs td {
+  border: 1px solid var(--app-border);
+  padding: 0.45rem 0.6rem;
+  text-align: left;
+  vertical-align: top;
+}
+
+.prose-docs th {
+  background: var(--app-code-bg);
+}
+
+.variable-docs-hint {
+  display: block;
+  margin: 0.25rem 0 0.5rem;
+}
+
+/* Dark mode: inputs / panels that still use light hex */
+[data-theme="dark"] input,
+[data-theme="dark"] select,
+[data-theme="dark"] textarea {
+  background: var(--app-input-bg);
+  color: var(--app-fg);
+  border-color: var(--app-border);
+}
+
+[data-theme="dark"] .main,
+[data-theme="dark"] .workspace,
+[data-theme="dark"] .empty-state {
+  color: var(--app-fg);
+}
+
+[data-theme="dark"] .preview-text,
+[data-theme="dark"] .preview-html,
+[data-theme="dark"] .typography-preview,
+[data-theme="dark"] .typography-field,
+[data-theme="dark"] .perm-group {
+  background: var(--app-panel);
+  border-color: var(--app-border);
+  color: var(--app-fg);
+}
+
+[data-theme="dark"] .lede,
+[data-theme="dark"] .status,
+[data-theme="dark"] .eyebrow,
+[data-theme="dark"] .field-hint,
+[data-theme="dark"] .sidebar-user,
+[data-theme="dark"] .sidebar-build {
+  color: var(--app-fg-muted);
+}
+
+[data-theme="dark"] .error {
+  color: var(--app-danger);
+}
+
+[data-theme="dark"] .docs-swagger {
+  filter: invert(0.92) hue-rotate(180deg);
 }

@@ -1,5 +1,6 @@
 import { Handle, Position, type Node, type NodeProps } from '@xyflow/react'
 import type { AutomationAction, AutomationCatalog, AutomationCondition } from '../../../api'
+import { VariableDocsHint } from '../../../components/VariableDocsHint'
 import type { ActionNodeData, ConditionNodeData, TriggerNodeData } from './types'
 
 export type TriggerFlowNode = Node<TriggerNodeData, 'trigger'>
@@ -417,6 +418,9 @@ function DBInsertFields({
       </select>
       {mode === 'columns' && (
         <div className="dag-map-rows">
+          <VariableDocsHint>
+            Map DB columns to bare field paths (no braces), e.g. <code>app_user.email</code>.
+          </VariableDocsHint>
           {rows.map((row, i) => (
             <div key={i} className="dag-map-row">
               <input

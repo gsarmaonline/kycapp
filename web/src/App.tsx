@@ -55,6 +55,9 @@ import { InboundWebhooksEdit } from './pages/inbound_webhooks/inbound_webhooks_e
 import { InboundWebhooksIndex } from './pages/inbound_webhooks/inbound_webhooks_index'
 import { InboundWebhooksNew } from './pages/inbound_webhooks/inbound_webhooks_new'
 import { InboundWebhooksShow } from './pages/inbound_webhooks/inbound_webhooks_show'
+import { DocsApiPage } from './pages/docs/docs_api'
+import { DocsLayout } from './pages/docs/docs_layout'
+import { DocsVariablesPage } from './pages/docs/docs_variables'
 import './App.css'
 
 type Gate = 'loading' | 'ready'
@@ -181,6 +184,10 @@ export default function App() {
         <Route path="branding" element={<BrandingPage />} />
         <Route path="billing" element={<BillingPage />} />
         <Route path="settings" element={<SettingsPage />} />
+        <Route path="docs" element={<DocsLayout />}>
+          <Route index element={<DocsApiPage />} />
+          <Route path="variables" element={<DocsVariablesPage />} />
+        </Route>
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

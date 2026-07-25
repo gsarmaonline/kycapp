@@ -2,7 +2,7 @@
 
 Base path: `/v1`. JSON request/response bodies.
 
-Related: [data model](data-model.md) · [flows](flows.md)
+Related: [data model](data-model.md) · [flows](flows.md) · [variable referencing](variables.md) · [OpenAPI](openapi.yaml)
 
 ## Conventions
 
@@ -290,9 +290,8 @@ Org-scoped message copy for **app users** (not KYC member invites). Domain helpe
   Seeds system defaults (`welcome`, `payment_thank_you`, `profile_incomplete`) if missing. Query: `status`
 - `POST /v1/organisations/{id}/email-templates` — requires `email_templates:manage`  
   Custom template: `{ "key", "name", "subject", "body_text"?, "body_html"?, "description"? }`  
-  Placeholders use the same path vocabulary as automations / webhook templates:  
-  `{{app_user.display_name}}`, `{{app_user.email}}`, `{{app_user.<attribute>}}`, `{{organisation.name}}`, `{{organisation_id}}`, `{{trigger}}`.  
-  Legacy aliases (`{{display_name}}`, `{{org_name}}`, `{{email}}`) still resolve.  
+  Placeholders: shared path vocabulary — see [variables.md](variables.md)  
+  (`{{app_user.display_name}}`, `{{organisation.name}}`, …). Legacy aliases still resolve.  
   Store inner HTML only; branding chrome comes from organisation branding (see above). Visual builder deferred.
 - `GET /v1/email-templates/{id}` — requires `email_templates:read`
 - `PATCH /v1/email-templates/{id}` — requires `email_templates:manage`  

@@ -2,6 +2,7 @@ import { useState } from 'react'
 import type { FormEvent } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { createOrgWebhook } from '../../api'
+import { VariableDocsHint } from '../../components/VariableDocsHint'
 import { FormActions, PageHeader } from '../../crud/ui'
 import { resourcePath } from '../../org_nav'
 
@@ -76,11 +77,10 @@ export function WebhooksNew() {
             placeholder="Leave empty to POST { organisation_id, payload }"
           />
         </label>
-        <p className="field-hint">
-          Use <code>{'{{path}}'}</code> placeholders from the shared field vocabulary (e.g.{' '}
-          <code>{'{{app_user.email}}'}</code>, <code>{'{{app_user.country}}'}</code>). Empty template
-          sends the full event dump.
-        </p>
+        <VariableDocsHint>
+          Use <code>{'{{path}}'}</code> placeholders (e.g. <code>{'{{app_user.email}}'}</code>). Empty
+          template sends the full event dump.
+        </VariableDocsHint>
         <button
           type="button"
           className="ghost"

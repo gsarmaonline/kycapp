@@ -1,0 +1,3690 @@
+openapi: 3.0.3
+info:
+  title: KYC API
+  version: 1.0.0
+  description: |
+    JSON API for organisations, members, app users, automations, billing, and platform operations.
+
+    Authenticated routes require `Authorization: Bearer <token>` where the token is either a **session**
+    (`kyc_sess_…` from Google OAuth or dev login) or a **service/platform API key**.
+
+servers:
+  - url: /
+    description: Relative to the web app proxy (paths include `/v1`)
+
+tags:
+  - name: Auth
+    description: Sign-in, session, and current user
+  - name: Organisations
+    description: Tenant hub, settings, integrations, branding
+  - name: Members
+    description: Users, memberships, roles, permissions, authorisation checks
+  - name: App users
+    description: End users of a merchant product
+  - name: Attributes
+    description: App user attribute schema
+  - name: Emails
+    description: Email templates for app users
+  - name: Automations
+    description: Triggered workflows
+  - name: Webhooks
+    description: Outbound and inbound webhooks
+  - name: Databases
+    description: Postgres connections for automations
+  - name: Billing
+    description: Plans, subscriptions, entitlements, Stripe checkout
+  - name: Product
+    description: Merchant product features and plans
+  - name: Platform
+    description: Platform API keys, audit, health
+
+security:
+  - bearerAuth: []
+
+paths:
+  /healthz:
+    get:
+      tags: [Platform]
+      summary: Liveness probe
+      security: []
+      responses:
+        "200":
+          description: Service is alive
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+        default:
+          $ref: "#/components/responses/Error"
+
+  /readyz:
+    get:
+      tags: [Platform]
+      summary: Readiness probe (database ping)
+      security: []
+      responses:
+        "200":
+          description: Ready
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+        "503":
+          description: Not ready
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                  error:
+                    type: string
+        default:
+          $ref: "#/components/responses/Error"
+
+  /v1/auth/providers:
+    get:
+      tags: [Auth]
+      summary: List available auth providers
+      security: []
+      responses:
+        "200":
+          description: Provider flags
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  google:
+                    type: boolean
+                  dev_login:
+                    type: boolean
+        default:
+          $ref: "#/components/responses/Error"
+
+  /v1/auth/google:
+    get:
+      tags: [Auth]
+      summary: Start Google OAuth (redirect)
+      security: []
+      responses:
+        "302":
+          description: Redirect to Google
+        default:
+          $ref: "#/components/responses/Error"
+
+  /v1/auth/google/callback:
+    get:
+      tags: [Auth]
+      summary: Google OAuth callback (redirect with session token)
+      security: []
+      responses:
+        "302":
+          description: Redirect to APP_ORIGIN with `#token=…`
+        default:
+          $ref: "#/components/responses/Error"
+
+  /v1/auth/dev-login:
+    post:
+      tags: [Auth]
+      summary: Dev-only login (when AUTH_DEV_LOGIN=true)
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                email:
+                  type: string
+                  format: email
+                name:
+                  type: string
+      responses:
+        "200":
+          description: Session issued
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+        default:
+          $ref: "#/components/responses/Error"
+
+  /v1/auth/logout:
+    post:
+      tags: [Auth]
+      summary: Revoke current session
+      responses:
+        "200":
+          description: Logged out
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+        default:
+          $ref: "#/components/responses/Error"
+
+  /v1/me:
+    get:
+      tags: [Auth]
+      summary: Current user and memberships
+      responses:
+        "200":
+          description: Current principal
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  user:
+                    $ref: "#/components/schemas/User"
+                  memberships:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Membership"
+                  platform_admin:
+                    type: boolean
+        default:
+          $ref: "#/components/responses/Error"
+
+  /v1/organisations:
+    post:
+      tags: [Organisations]
+      summary: Create organisation
+      description: Authenticated users become owner with active free_plan subscription.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name:
+                  type: string
+                slug:
+                  type: string
+                  description: Optional URL-safe identifier
+      responses:
+        "201":
+          description: Created organisation
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Organisation"
+        default:
+          $ref: "#/components/responses/Error"
+    get:
+      tags: [Organisations]
+      summary: List organisations
+      parameters:
+        - $ref: "#/components/parameters/statusQuery"
+        - $ref: "#/components/parameters/qQuery"
+        - $ref: "#/components/parameters/limitQuery"
+        - $ref: "#/components/parameters/cursorQuery"
+      responses:
+        "200":
+          description: Paginated list
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/PaginatedMeta"
+                  - type: object
+                    properties:
+                      items:
+                        type: array
+                        items:
+                          $ref: "#/components/schemas/Organisation"
+        default:
+          $ref: "#/components/responses/Error"
+
+  /v1/organisations/{id}:
+    parameters:
+      - $ref: "#/components/parameters/orgId"
+    get:
+      tags: [Organisations]
+      summary: Get organisation
+      responses:
+        "200":
+          description: Organisation
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Organisation"
+        default:
+          $ref: "#/components/responses/Error"
+    patch:
+      tags: [Organisations]
+      summary: Update organisation
+      description: Requires organisation:update. Colors must be #RGB or #RRGGBB.
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                status:
+                  type: string
+                  enum: [active, suspended, archived]
+                primary_color:
+                  type: string
+                accent_color:
+                  type: string
+                email_footer:
+                  type: string
+                email_font:
+                  type: string
+                  enum: [arial, helvetica, verdana, trebuchet, georgia, times, courier]
+                email_typography:
+                  $ref: "#/components/schemas/EmailTypography"
+                app_user_authority:
+                  type: string
+                  enum: [kyc, external]
+                app_user_ingest_upsert_key:
+                  type: string
+                  enum: [external_id, email]
+                app_user_attributes_mode:
+                  type: string
+                  enum: [discover, strict]
+      responses:
+        "200":
+          description: Updated organisation
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Organisation"
+        default:
+          $ref: "#/components/responses/Error"
+    delete:
+      tags: [Organisations]
+      summary: Hard-delete organisation
+      description: Cascades tenant data. Requires organisation:update.
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                  id:
+                    type: string
+        default:
+          $ref: "#/components/responses/Error"
+
+  /v1/organisations/{id}/archive:
+    parameters:
+      - $ref: "#/components/parameters/orgId"
+    post:
+      tags: [Organisations]
+      summary: Archive organisation (legacy alias for hard delete)
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                  id:
+                    type: string
+        default:
+          $ref: "#/components/responses/Error"
+
+  /v1/organisations/{id}/integrations:
+    parameters:
+      - $ref: "#/components/parameters/orgId"
+    get:
+      tags: [Organisations]
+      summary: List connected integrations
+      description: Secrets returned as masked hints. Requires organisation:update.
+      responses:
+        "200":
+          description: Integration list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/OrgIntegration"
+        default:
+          $ref: "#/components/responses/Error"
+
+  /v1/organisations/{id}/integrations/stripe:
+    parameters:
+      - $ref: "#/components/parameters/orgId"
+    put:
+      tags: [Organisations]
+      summary: Connect or update Stripe integration
+      description: Omit a field to keep the current value. Requires organisation:update.
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                secret_key:
+                  type: string
+                publishable_key:
+                  type: string
+      responses:
+        "200":
+          description: Integration
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrgIntegration"
+        default:
+          $ref: "#/components/responses/Error"
+
+  /v1/organisations/{id}/integrations/stripe/catalog:
+    parameters:
+      - $ref: "#/components/parameters/orgId"
+    get:
+      tags: [Organisations]
+      summary: List active recurring Stripe Prices
+      responses:
+        "200":
+          description: Stripe catalog
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/StripeCatalogItem"
+        default:
+          $ref: "#/components/responses/Error"
+
+  /v1/organisations/{id}/integrations/stripe/import:
+    parameters:
+      - $ref: "#/components/parameters/orgId"
+    post:
+      tags: [Organisations]
+      summary: Import Stripe Prices as product plans
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [items]
+              properties:
+                items:
+                  type: array
+                  items:
+                    type: object
+                    required: [price_ref]
+                    properties:
+                      price_ref:
+                        type: string
+                      key:
+                        type: string
+                      name:
+                        type: string
+      responses:
+        "200":
+          description: Import result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StripeCatalogSyncResult"
+        default:
+          $ref: "#/components/responses/Error"
+
+  /v1/organisations/{id}/integrations/stripe/sync:
+    parameters:
+      - $ref: "#/components/parameters/orgId"
+    post:
+      tags: [Organisations]
+      summary: Push local product plan prices to Stripe
+      responses:
+        "200":
+          description: Sync result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StripeCatalogSyncResult"
+        default:
+          $ref: "#/components/responses/Error"
+
+  /v1/organisations/{id}/integrations/{provider}:
+    parameters:
+      - $ref: "#/components/parameters/orgId"
+      - name: provider
+        in: path
+        required: true
+        schema:
+          type: string
+    delete:
+      tags: [Organisations]
+      summary: Disconnect integration
+      responses:
+        "200":
+          description: Disconnected
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+        default:
+          $ref: "#/components/responses/Error"
+
+  /v1/organisations/{id}/databases:
+    parameters:
+      - $ref: "#/components/parameters/orgId"
+    get:
+      tags: [Databases]
+      summary: List Postgres connections
+      responses:
+        "200":
+          description: Database list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/OrganisationDatabase"
+        default:
+          $ref: "#/components/responses/Error"
+    post:
+      tags: [Databases]
+      summary: Create Postgres connection
+      description: Saves then probes connectivity (SELECT 1).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, host, database_name, username, password]
+              properties:
+                name:
+                  type: string
+                host:
+                  type: string
+                port:
+                  type: integer
+                  default: 5432
+                database_name:
+                  type: string
+                username:
+                  type: string
+                password:
+                  type: string
+                ssl_mode:
+                  type: string
+                  default: require
+      responses:
+        "201":
+          description: Created connection
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrganisationDatabase"
+        default:
+          $ref: "#/components/responses/Error"
+
+  /v1/organisations/{id}/databases/{dbId}:
+    parameters:
+      - $ref: "#/components/parameters/orgId"
+      - $ref: "#/components/parameters/dbId"
+    get:
+      tags: [Databases]
+      summary: Get database connection
+      responses:
+        "200":
+          description: Database
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrganisationDatabase"
+        default:
+          $ref: "#/components/responses/Error"
+    patch:
+      tags: [Databases]
+      summary: Update database connection
+      description: Omit or empty password to keep current; re-probes after save.
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                host:
+                  type: string
+                port:
+                  type: integer
+                database_name:
+                  type: string
+                username:
+                  type: string
+                password:
+                  type: string
+                ssl_mode:
+                  type: string
+      responses:
+        "200":
+          description: Updated database
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrganisationDatabase"
+        default:
+          $ref: "#/components/responses/Error"
+    delete:
+      tags: [Databases]
+      summary: Delete database connection
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+        default:
+          $ref: "#/components/responses/Error"
+
+  /v1/organisations/{id}/databases/{dbId}/check:
+    parameters:
+      - $ref: "#/components/parameters/orgId"
+      - $ref: "#/components/parameters/dbId"
+    post:
+      tags: [Databases]
+      summary: Re-probe database connectivity
+      responses:
+        "200":
+          description: Updated status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrganisationDatabase"
+        default:
+          $ref: "#/components/responses/Error"
+
+  /v1/organisations/{id}/databases/{dbId}/disconnect:
+    parameters:
+      - $ref: "#/components/parameters/orgId"
+      - $ref: "#/components/parameters/dbId"
+    post:
+      tags: [Databases]
+      summary: Mark database disconnected without probing
+      responses:
+        "200":
+          description: Disconnected
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrganisationDatabase"
+        default:
+          $ref: "#/components/responses/Error"
+
+  /v1/organisations/{id}/webhooks:
+    parameters:
+      - $ref: "#/components/parameters/orgId"
+    get:
+      tags: [Webhooks]
+      summary: List outbound webhooks
+      responses:
+        "200":
+          description: Webhook list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Webhook"
+        default:
+          $ref: "#/components/responses/Error"
+    post:
+      tags: [Webhooks]
+      summary: Create outbound webhook
+      description: |
+        `body_template` is JSON with `{{path}}` placeholders (see Documentation → Variables).
+        Canonical paths include `app_user.email`, `app_user.display_name`, `app_user.<attribute_key>`,
+        `organisation.name`, `organisation_id`, `trigger`. Empty template sends full event dump.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, url]
+              properties:
+                name:
+                  type: string
+                url:
+                  type: string
+                  format: uri
+                secret:
+                  type: string
+                body_template:
+                  type: string
+                  description: JSON string with {{path}} placeholders
+      responses:
+        "201":
+          description: Created webhook
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Webhook"
+        default:
+          $ref: "#/components/responses/Error"
+
+  /v1/organisations/{id}/webhooks/{webhookId}:
+    parameters:
+      - $ref: "#/components/parameters/orgId"
+      - $ref: "#/components/parameters/webhookId"
+    get:
+      tags: [Webhooks]
+      summary: Get outbound webhook
+      responses:
+        "200":
+          description: Webhook
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Webhook"
+        default:
+          $ref: "#/components/responses/Error"
+    patch:
+      tags: [Webhooks]
+      summary: Update outbound webhook
+      description: Omit or empty secret to keep current. body_template uses {{path}} placeholders (Documentation → Variables).
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                url:
+                  type: string
+                secret:
+                  type: string
+                status:
+                  type: string
+                body_template:
+                  type: string
+      responses:
+        "200":
+          description: Updated webhook
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Webhook"
+        default:
+          $ref: "#/components/responses/Error"
+    delete:
+      tags: [Webhooks]
+      summary: Delete outbound webhook
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+        default:
+          $ref: "#/components/responses/Error"
+
+  /v1/organisations/{id}/inbound-webhooks:
+    parameters:
+      - $ref: "#/components/parameters/orgId"
+    get:
+      tags: [Webhooks]
+      summary: List inbound webhooks
+      responses:
+        "200":
+          description: Inbound webhook list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/InboundWebhook"
+        default:
+          $ref: "#/components/responses/Error"
+    post:
+      tags: [Webhooks]
+      summary: Create inbound webhook
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name:
+                  type: string
+                auth_mode:
+                  type: string
+                  enum: [header, query, path]
+                  default: header
+                secret:
+                  type: string
+                status:
+                  type: string
+      responses:
+        "201":
+          description: Created inbound webhook
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InboundWebhook"
+        default:
+          $ref: "#/components/responses/Error"
+
+  /v1/organisations/{id}/inbound-webhooks/{hookId}:
+    parameters:
+      - $ref: "#/components/parameters/orgId"
+      - $ref: "#/components/parameters/hookId"
+    get:
+      tags: [Webhooks]
+      summary: Get inbound webhook
+      responses:
+        "200":
+          description: Inbound webhook
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InboundWebhook"
+        default:
+          $ref: "#/components/responses/Error"
+    patch:
+      tags: [Webhooks]
+      summary: Update inbound webhook
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                auth_mode:
+                  type: string
+                  enum: [header, query, path]
+                status:
+                  type: string
+                rotate:
+                  type: boolean
+                  description: Rotate secret when true
+      responses:
+        "200":
+          description: Updated inbound webhook
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InboundWebhook"
+        default:
+          $ref: "#/components/responses/Error"
+    delete:
+      tags: [Webhooks]
+      summary: Delete inbound webhook
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+        default:
+          $ref: "#/components/responses/Error"
+
+  /v1/hooks/inbound/{hookId}:
+    parameters:
+      - $ref: "#/components/parameters/hookId"
+    post:
+      tags: [Webhooks]
+      summary: Receive inbound webhook (header or query auth)
+      security: []
+      description: Public endpoint. Auth via X-KYC-Webhook-Secret header or ?secret= / ?token= per auth_mode.
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        "200":
+          description: Accepted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+        default:
+          $ref: "#/components/responses/Error"
+
+  /v1/hooks/inbound/{hookId}/{token}:
+    parameters:
+      - $ref: "#/components/parameters/hookId"
+      - name: token
+        in: path
+        required: true
+        schema:
+          type: string
+    post:
+      tags: [Webhooks]
+      summary: Receive inbound webhook (path-token auth)
+      security: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        "200":
+          description: Accepted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+        default:
+          $ref: "#/components/responses/Error"
+
+  /v1/organisations/{id}/api-keys:
+    parameters:
+      - $ref: "#/components/parameters/orgId"
+    get:
+      tags: [Organisations]
+      summary: List organisation API keys
+      responses:
+        "200":
+          description: API key list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/OrgAPIKey"
+        default:
+          $ref: "#/components/responses/Error"
+    post:
+      tags: [Organisations]
+      summary: Create organisation API key
+      description: Token returned once in response.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name:
+                  type: string
+      responses:
+        "201":
+          description: Created key (includes token once)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrgAPIKey"
+        default:
+          $ref: "#/components/responses/Error"
+
+  /v1/organisations/{id}/branding/logo:
+    parameters:
+      - $ref: "#/components/parameters/orgId"
+    post:
+      tags: [Organisations]
+      summary: Upload organisation logo
+      description: Multipart field `logo` (png/jpeg/webp, max 1MB). Requires organisation:update.
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [logo]
+              properties:
+                logo:
+                  type: string
+                  format: binary
+      responses:
+        "200":
+          description: Updated organisation with logo_url
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Organisation"
+        default:
+          $ref: "#/components/responses/Error"
+    delete:
+      tags: [Organisations]
+      summary: Delete organisation logo
+      responses:
+        "200":
+          description: Logo cleared
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Organisation"
+        default:
+          $ref: "#/components/responses/Error"
+
+  /v1/public/organisations/{id}/branding/logo:
+    parameters:
+      - $ref: "#/components/parameters/orgId"
+    get:
+      tags: [Organisations]
+      summary: Public organisation logo image
+      security: []
+      responses:
+        "200":
+          description: Image bytes
+          content:
+            image/*:
+              schema:
+                type: string
+                format: binary
+        default:
+          $ref: "#/components/responses/Error"
+
+  /v1/organisations/{id}/roles:
+    parameters:
+      - $ref: "#/components/parameters/orgId"
+    get:
+      tags: [Members]
+      summary: List organisation roles
+      responses:
+        "200":
+          description: Role list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Role"
+        default:
+          $ref: "#/components/responses/Error"
+    post:
+      tags: [Members]
+      summary: Create role
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [key, name, permission_keys]
+              properties:
+                key:
+                  type: string
+                name:
+                  type: string
+                description:
+                  type: string
+                permission_keys:
+                  type: array
+                  items:
+                    type: string
+      responses:
+        "201":
+          description: Created role
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Role"
+        default:
+          $ref: "#/components/responses/Error"
+
+  /v1/organisations/{id}/memberships:
+    parameters:
+      - $ref: "#/components/parameters/orgId"
+    get:
+      tags: [Members]
+      summary: List organisation memberships
+      responses:
+        "200":
+          description: Membership list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Membership"
+        default:
+          $ref: "#/components/responses/Error"
+    post:
+      tags: [Members]
+      summary: Invite or attach member
+      description: One of user_id or email required. Idempotency-Key header recommended.
+      parameters:
+        - $ref: "#/components/parameters/idempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [role_id]
+              properties:
+                user_id:
+                  type: string
+                email:
+                  type: string
+                  format: email
+                role_id:
+                  type: string
+      responses:
+        "201":
+          description: Created membership
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Membership"
+        default:
+          $ref: "#/components/responses/Error"
+
+  /v1/users:
+    post:
+      tags: [Members]
+      summary: Create user (platform)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, name]
+              properties:
+                email:
+                  type: string
+                  format: email
+                name:
+                  type: string
+      responses:
+        "201":
+          description: Created user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        default:
+          $ref: "#/components/responses/Error"
+    get:
+      tags: [Members]
+      summary: List users (platform)
+      parameters:
+        - $ref: "#/components/parameters/qQuery"
+        - $ref: "#/components/parameters/limitQuery"
+        - $ref: "#/components/parameters/cursorQuery"
+      responses:
+        "200":
+          description: Paginated list
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/PaginatedMeta"
+                  - type: object
+                    properties:
+                      items:
+                        type: array
+                        items:
+                          $ref: "#/components/schemas/User"
+        default:
+          $ref: "#/components/responses/Error"
+
+  /v1/users/{id}:
+    parameters:
+      - $ref: "#/components/parameters/id"
+    get:
+      tags: [Members]
+      summary: Get user
+      responses:
+        "200":
+          description: User
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        default:
+          $ref: "#/components/responses/Error"
+    patch:
+      tags: [Members]
+      summary: Update user
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                status:
+                  type: string
+                  enum: [active, disabled]
+      responses:
+        "200":
+          description: Updated user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        default:
+          $ref: "#/components/responses/Error"
+
+  /v1/users/{id}/memberships:
+    parameters:
+      - $ref: "#/components/parameters/id"
+    get:
+      tags: [Members]
+      summary: List user memberships
+      responses:
+        "200":
+          description: Membership list with org summary
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Membership"
+        default:
+          $ref: "#/components/responses/Error"
+
+  /v1/memberships/{id}/accept:
+    parameters:
+      - $ref: "#/components/parameters/membershipId"
+    post:
+      tags: [Members]
+      summary: Accept membership invite
+      description: Invitee must be logged in as the invited user. Status invited → active.
+      responses:
+        "200":
+          description: Updated membership
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Membership"
+        default:
+          $ref: "#/components/responses/Error"
+
+  /v1/memberships/{id}:
+    parameters:
+      - $ref: "#/components/parameters/membershipId"
+    get:
+      tags: [Members]
+      summary: Get membership
+      responses:
+        "200":
+          description: Membership
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Membership"
+        default:
+          $ref: "#/components/responses/Error"
+    patch:
+      tags: [Members]
+      summary: Update membership
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                role_id:
+                  type: string
+                status:
+                  type: string
+                  enum: [invited, active, revoked]
+      responses:
+        "200":
+          description: Updated membership
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Membership"
+        default:
+          $ref: "#/components/responses/Error"
+    delete:
+      tags: [Members]
+      summary: Revoke membership
+      responses:
+        "200":
+          description: Revoked membership
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Membership"
+        default:
+          $ref: "#/components/responses/Error"
+
+  /v1/permissions:
+    get:
+      tags: [Members]
+      summary: List permission catalog
+      parameters:
+        - name: category
+          in: query
+          schema:
+            type: string
+        - name: resource
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Permission list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Permission"
+        default:
+          $ref: "#/components/responses/Error"
+
+  /v1/permissions/{key}:
+    parameters:
+      - name: key
+        in: path
+        required: true
+        schema:
+          type: string
+        description: Permission key (e.g. members:invite)
+    get:
+      tags: [Members]
+      summary: Get permission by key
+      responses:
+        "200":
+          description: Permission
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Permission"
+        default:
+          $ref: "#/components/responses/Error"
+
+  /v1/roles/{id}:
+    parameters:
+      - $ref: "#/components/parameters/id"
+    get:
+      tags: [Members]
+      summary: Get role
+      responses:
+        "200":
+          description: Role
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Role"
+        default:
+          $ref: "#/components/responses/Error"
+    patch:
+      tags: [Members]
+      summary: Update role
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                description:
+                  type: string
+                permission_keys:
+                  type: array
+                  items:
+                    type: string
+      responses:
+        "200":
+          description: Updated role
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Role"
+        default:
+          $ref: "#/components/responses/Error"
+    delete:
+      tags: [Members]
+      summary: Delete role
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+        default:
+          $ref: "#/components/responses/Error"
+
+  /v1/authz/check:
+    post:
+      tags: [Members]
+      summary: Check user permission in organisation
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              oneOf:
+                - type: object
+                  required: [organisation_id, user_id, permission]
+                  properties:
+                    organisation_id:
+                      type: string
+                    user_id:
+                      type: string
+                    permission:
+                      type: string
+                - type: object
+                  required: [organisation_id, user_id, resource, action]
+                  properties:
+                    organisation_id:
+                      type: string
+                    user_id:
+                      type: string
+                    resource:
+                      type: string
+                    action:
+                      type: string
+      responses:
+        "200":
+          description: Authorisation result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  allowed:
+                    type: boolean
+        default:
+          $ref: "#/components/responses/Error"
+
+  /v1/plans:
+    post:
+      tags: [Billing]
+      summary: Create billing plan (platform)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [key, name]
+              properties:
+                key:
+                  type: string
+                name:
+                  type: string
+      responses:
+        "201":
+          description: Created plan
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BillingPlan"
+        default:
+          $ref: "#/components/responses/Error"
+    get:
+      tags: [Billing]
+      summary: List billing plans
+      responses:
+        "200":
+          description: Plan list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/BillingPlan"
+        default:
+          $ref: "#/components/responses/Error"
+
+  /v1/plans/{id}:
+    parameters:
+      - $ref: "#/components/parameters/id"
+    get:
+      tags: [Billing]
+      summary: Get billing plan
+      responses:
+        "200":
+          description: Plan
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BillingPlan"
+        default:
+          $ref: "#/components/responses/Error"
+
+  /v1/plans/{id}/entitlements:
+    parameters:
+      - $ref: "#/components/parameters/id"
+    put:
+      tags: [Billing]
+      summary: Replace plan entitlements (platform)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [entitlement_keys]
+              properties:
+                entitlement_keys:
+                  type: array
+                  items:
+                    type: string
+      responses:
+        "200":
+          description: Updated plan
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BillingPlan"
+        default:
+          $ref: "#/components/responses/Error"
+
+  /v1/plans/{id}/price:
+    parameters:
+      - $ref: "#/components/parameters/id"
+    put:
+      tags: [Billing]
+      summary: Link Stripe Price to plan (platform)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [interval, unit_amount, processor_price_ref]
+              properties:
+                interval:
+                  type: string
+                  enum: [month, year]
+                currency:
+                  type: string
+                unit_amount:
+                  type: integer
+                  format: int64
+                processor_price_ref:
+                  type: string
+                status:
+                  type: string
+      responses:
+        "200":
+          description: Plan price
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PlanPrice"
+        default:
+          $ref: "#/components/responses/Error"
+
+  /v1/plans/{id}/prices:
+    parameters:
+      - $ref: "#/components/parameters/id"
+    get:
+      tags: [Billing]
+      summary: List plan prices
+      responses:
+        "200":
+          description: Price list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/PlanPrice"
+        default:
+          $ref: "#/components/responses/Error"
+
+  /v1/entitlements:
+    post:
+      tags: [Billing]
+      summary: Create entitlement catalog entry (platform)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [key, description]
+              properties:
+                key:
+                  type: string
+                description:
+                  type: string
+                scope:
+                  type: string
+                  enum: [platform, product]
+                  default: platform
+      responses:
+        "201":
+          description: Created entitlement
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Entitlement"
+        default:
+          $ref: "#/components/responses/Error"
+    get:
+      tags: [Billing]
+      summary: List global entitlement catalog
+      responses:
+        "200":
+          description: Entitlement list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Entitlement"
+        default:
+          $ref: "#/components/responses/Error"
+
+  /v1/organisations/{id}/subscription:
+    parameters:
+      - $ref: "#/components/parameters/orgId"
+    get:
+      tags: [Billing]
+      summary: Get organisation subscription
+      description: Requires billing:read.
+      responses:
+        "200":
+          description: Subscription
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Subscription"
+        default:
+          $ref: "#/components/responses/Error"
+    put:
+      tags: [Billing]
+      summary: Upsert organisation subscription (platform)
+      parameters:
+        - $ref: "#/components/parameters/idempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [plan_id]
+              properties:
+                plan_id:
+                  type: string
+                status:
+                  type: string
+                  enum: [trialing, active, past_due, canceled]
+      responses:
+        "200":
+          description: Subscription
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Subscription"
+        default:
+          $ref: "#/components/responses/Error"
+
+  /v1/organisations/{id}/entitlements:
+    parameters:
+      - $ref: "#/components/parameters/orgId"
+    get:
+      tags: [Billing]
+      summary: Get effective organisation entitlements
+      responses:
+        "200":
+          description: Effective entitlements by scope
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrgEntitlements"
+        default:
+          $ref: "#/components/responses/Error"
+    put:
+      tags: [Billing]
+      summary: Set organisation entitlement overrides (platform)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [overrides]
+              properties:
+                overrides:
+                  type: array
+                  items:
+                    type: object
+                    required: [key, effect]
+                    properties:
+                      key:
+                        type: string
+                      effect:
+                        type: string
+                        enum: [grant, deny]
+      responses:
+        "200":
+          description: Updated overrides
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+        default:
+          $ref: "#/components/responses/Error"
+
+  /v1/entitlements/check:
+    post:
+      tags: [Billing]
+      summary: Check organisation entitlement
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [organisation_id, entitlement]
+              properties:
+                organisation_id:
+                  type: string
+                entitlement:
+                  type: string
+      responses:
+        "200":
+          description: Entitlement check result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  allowed:
+                    type: boolean
+        default:
+          $ref: "#/components/responses/Error"
+
+  /v1/organisations/{id}/billing/checkout:
+    parameters:
+      - $ref: "#/components/parameters/orgId"
+    post:
+      tags: [Billing]
+      summary: Create Stripe checkout session
+      description: Requires billing:manage.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [plan_id]
+              properties:
+                plan_id:
+                  type: string
+                interval:
+                  type: string
+                  enum: [month, year]
+                success_url:
+                  type: string
+                  format: uri
+                cancel_url:
+                  type: string
+                  format: uri
+      responses:
+        "200":
+          description: Checkout URL
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  url:
+                    type: string
+                    format: uri
+        default:
+          $ref: "#/components/responses/Error"
+
+  /v1/organisations/{id}/billing/portal:
+    parameters:
+      - $ref: "#/components/parameters/orgId"
+    post:
+      tags: [Billing]
+      summary: Create Stripe billing portal session
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                return_url:
+                  type: string
+                  format: uri
+      responses:
+        "200":
+          description: Portal URL
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  url:
+                    type: string
+                    format: uri
+        default:
+          $ref: "#/components/responses/Error"
+
+  /v1/billing/webhooks/{provider}:
+    parameters:
+      - name: provider
+        in: path
+        required: true
+        schema:
+          type: string
+          enum: [stripe, noop]
+    post:
+      tags: [Billing]
+      summary: Payment provider webhook
+      security: []
+      responses:
+        "200":
+          description: Processed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+        default:
+          $ref: "#/components/responses/Error"
+
+  /v1/api-keys:
+    post:
+      tags: [Platform]
+      summary: Create platform API key
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name:
+                  type: string
+      responses:
+        "201":
+          description: Created key (includes token once)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PlatformAPIKey"
+        default:
+          $ref: "#/components/responses/Error"
+    get:
+      tags: [Platform]
+      summary: List platform API keys
+      responses:
+        "200":
+          description: API key list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/PlatformAPIKey"
+        default:
+          $ref: "#/components/responses/Error"
+
+  /v1/api-keys/{id}:
+    parameters:
+      - $ref: "#/components/parameters/id"
+    delete:
+      tags: [Platform]
+      summary: Revoke API key
+      description: Org keys require org admin; platform keys require platform auth.
+      responses:
+        "200":
+          description: Revoked
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                  revoked:
+                    type: boolean
+        default:
+          $ref: "#/components/responses/Error"
+
+  /v1/audit-events:
+    get:
+      tags: [Platform]
+      summary: List audit events (platform)
+      responses:
+        "200":
+          description: Recent mutating requests
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/AuditEvent"
+        default:
+          $ref: "#/components/responses/Error"
+
+  /v1/organisations/{id}/attribute-definitions:
+    parameters:
+      - $ref: "#/components/parameters/orgId"
+    post:
+      tags: [Attributes]
+      summary: Create attribute definition
+      description: Requires attributes:manage.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [key, label, value_type]
+              properties:
+                key:
+                  type: string
+                label:
+                  type: string
+                value_type:
+                  type: string
+                  enum: [string, number, boolean, date, dropdown]
+                section:
+                  type: string
+                  default: general
+                sort_order:
+                  type: integer
+                required:
+                  type: boolean
+                enum_values:
+                  type: array
+                  items:
+                    type: string
+                description:
+                  type: string
+                is_pii:
+                  type: boolean
+      responses:
+        "201":
+          description: Created definition
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AttributeDefinition"
+        default:
+          $ref: "#/components/responses/Error"
+    get:
+      tags: [Attributes]
+      summary: List attribute definitions
+      description: Seeds system defaults if missing. Requires attributes:read.
+      parameters:
+        - $ref: "#/components/parameters/statusQuery"
+      responses:
+        "200":
+          description: Definition list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/AttributeDefinition"
+        default:
+          $ref: "#/components/responses/Error"
+
+  /v1/attribute-definitions/{id}:
+    parameters:
+      - $ref: "#/components/parameters/id"
+    get:
+      tags: [Attributes]
+      summary: Get attribute definition
+      responses:
+        "200":
+          description: Definition
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AttributeDefinition"
+        default:
+          $ref: "#/components/responses/Error"
+    patch:
+      tags: [Attributes]
+      summary: Update attribute definition
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                label:
+                  type: string
+                description:
+                  type: string
+                value_type:
+                  type: string
+                  enum: [string, number, boolean, date, dropdown]
+                section:
+                  type: string
+                sort_order:
+                  type: integer
+                required:
+                  type: boolean
+                enum_values:
+                  type: array
+                  items:
+                    type: string
+                is_pii:
+                  type: boolean
+                status:
+                  type: string
+                  enum: [active, archived]
+      responses:
+        "200":
+          description: Updated definition
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AttributeDefinition"
+        default:
+          $ref: "#/components/responses/Error"
+    delete:
+      tags: [Attributes]
+      summary: Archive attribute definition
+      responses:
+        "200":
+          description: Archived definition
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AttributeDefinition"
+        default:
+          $ref: "#/components/responses/Error"
+
+  /v1/organisations/{id}/app-users:
+    parameters:
+      - $ref: "#/components/parameters/orgId"
+    post:
+      tags: [App users]
+      summary: Create app user
+      description: Requires app_users:write. attributes keys must match active definitions.
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email:
+                  type: string
+                  format: email
+                external_id:
+                  type: string
+                display_name:
+                  type: string
+                status:
+                  type: string
+                  enum: [active, disabled, archived]
+                attributes:
+                  type: object
+                  additionalProperties: true
+      responses:
+        "201":
+          description: Created app user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AppUser"
+        default:
+          $ref: "#/components/responses/Error"
+    get:
+      tags: [App users]
+      summary: List app users
+      parameters:
+        - $ref: "#/components/parameters/statusQuery"
+      responses:
+        "200":
+          description: App user list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/AppUser"
+        default:
+          $ref: "#/components/responses/Error"
+
+  /v1/organisations/{id}/app-users/ingest:
+    parameters:
+      - $ref: "#/components/parameters/orgId"
+    put:
+      tags: [App users]
+      summary: Upsert app user from external system
+      description: |
+        Lookup uses org app_user_ingest_upsert_key (external_id or email). attributes are merged.
+        discover mode auto-creates unknown attribute definitions; strict rejects unknown keys.
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                external_id:
+                  type: string
+                email:
+                  type: string
+                display_name:
+                  type: string
+                status:
+                  type: string
+                attributes:
+                  type: object
+                  additionalProperties: true
+      responses:
+        "200":
+          description: Updated app user
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/AppUser"
+                  - type: object
+                    properties:
+                      created:
+                        type: boolean
+                        example: false
+        "201":
+          description: Created app user
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/AppUser"
+                  - type: object
+                    properties:
+                      created:
+                        type: boolean
+                        example: true
+        default:
+          $ref: "#/components/responses/Error"
+
+  /v1/app-users/{id}:
+    parameters:
+      - $ref: "#/components/parameters/id"
+    get:
+      tags: [App users]
+      summary: Get app user
+      responses:
+        "200":
+          description: App user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AppUser"
+        default:
+          $ref: "#/components/responses/Error"
+    patch:
+      tags: [App users]
+      summary: Update app user
+      description: When attributes is sent, replaces the entire attributes map.
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email:
+                  type: string
+                external_id:
+                  type: string
+                display_name:
+                  type: string
+                status:
+                  type: string
+                attributes:
+                  type: object
+                  additionalProperties: true
+      responses:
+        "200":
+          description: Updated app user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AppUser"
+        default:
+          $ref: "#/components/responses/Error"
+    delete:
+      tags: [App users]
+      summary: Delete app user
+      responses:
+        "200":
+          description: Deleted app user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AppUser"
+        default:
+          $ref: "#/components/responses/Error"
+
+  /v1/organisations/{id}/email-templates:
+    parameters:
+      - $ref: "#/components/parameters/orgId"
+    get:
+      tags: [Emails]
+      summary: List email templates
+      description: Seeds system defaults if missing. Requires email_templates:read.
+      parameters:
+        - $ref: "#/components/parameters/statusQuery"
+      responses:
+        "200":
+          description: Template list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/EmailTemplate"
+        default:
+          $ref: "#/components/responses/Error"
+    post:
+      tags: [Emails]
+      summary: Create email template
+      description: |
+        Placeholders use {{path}} syntax (see Documentation → Variables). Canonical paths include
+        `app_user.display_name`, `app_user.email`, `app_user.<attribute_key>`, `organisation.name`,
+        `organisation_id`, `trigger`. Legacy aliases (display_name, org_name, email) still resolve.
+        Store inner HTML only; org branding chrome applied at render.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [key, name, subject]
+              properties:
+                key:
+                  type: string
+                name:
+                  type: string
+                subject:
+                  type: string
+                body_text:
+                  type: string
+                body_html:
+                  type: string
+                description:
+                  type: string
+      responses:
+        "201":
+          description: Created template
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EmailTemplate"
+        default:
+          $ref: "#/components/responses/Error"
+
+  /v1/email-templates/{id}:
+    parameters:
+      - $ref: "#/components/parameters/id"
+    get:
+      tags: [Emails]
+      summary: Get email template
+      responses:
+        "200":
+          description: Template
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EmailTemplate"
+        default:
+          $ref: "#/components/responses/Error"
+    patch:
+      tags: [Emails]
+      summary: Update email template
+      description: Key is immutable. subject/body fields support {{path}} placeholders (Documentation → Variables).
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                description:
+                  type: string
+                subject:
+                  type: string
+                body_text:
+                  type: string
+                body_html:
+                  type: string
+                status:
+                  type: string
+                  enum: [active, archived]
+      responses:
+        "200":
+          description: Updated template
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EmailTemplate"
+        default:
+          $ref: "#/components/responses/Error"
+    delete:
+      tags: [Emails]
+      summary: Archive email template
+      description: System templates cannot be deleted.
+      responses:
+        "200":
+          description: Archived template
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EmailTemplate"
+        default:
+          $ref: "#/components/responses/Error"
+
+  /v1/organisations/{id}/automations/catalog:
+    parameters:
+      - $ref: "#/components/parameters/orgId"
+    get:
+      tags: [Automations]
+      summary: Automation builder catalog
+      description: Returns triggers, actions, ops, condition_fields, databases, webhooks, inbound_webhooks, plans, roles, schedule_presets.
+      responses:
+        "200":
+          description: Catalog
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AutomationCatalog"
+        default:
+          $ref: "#/components/responses/Error"
+
+  /v1/organisations/{id}/automations:
+    parameters:
+      - $ref: "#/components/parameters/orgId"
+    get:
+      tags: [Automations]
+      summary: List automations
+      responses:
+        "200":
+          description: Automation list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Automation"
+        default:
+          $ref: "#/components/responses/Error"
+    post:
+      tags: [Automations]
+      summary: Create automation
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, trigger, conditions, actions]
+              properties:
+                name:
+                  type: string
+                trigger:
+                  type: string
+                trigger_params:
+                  type: object
+                  additionalProperties:
+                    type: string
+                enabled:
+                  type: boolean
+                conditions:
+                  $ref: "#/components/schemas/AutomationConditions"
+                actions:
+                  type: array
+                  items:
+                    $ref: "#/components/schemas/AutomationAction"
+      responses:
+        "201":
+          description: Created automation
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Automation"
+        default:
+          $ref: "#/components/responses/Error"
+
+  /v1/automations/{id}:
+    parameters:
+      - $ref: "#/components/parameters/id"
+    get:
+      tags: [Automations]
+      summary: Get automation
+      responses:
+        "200":
+          description: Automation
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Automation"
+        default:
+          $ref: "#/components/responses/Error"
+    patch:
+      tags: [Automations]
+      summary: Update automation
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                trigger:
+                  type: string
+                trigger_params:
+                  type: object
+                  additionalProperties:
+                    type: string
+                enabled:
+                  type: boolean
+                conditions:
+                  $ref: "#/components/schemas/AutomationConditions"
+                actions:
+                  type: array
+                  items:
+                    $ref: "#/components/schemas/AutomationAction"
+      responses:
+        "200":
+          description: Updated automation
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Automation"
+        default:
+          $ref: "#/components/responses/Error"
+    delete:
+      tags: [Automations]
+      summary: Delete automation
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+        default:
+          $ref: "#/components/responses/Error"
+
+  /v1/organisations/{id}/automation-runs:
+    parameters:
+      - $ref: "#/components/parameters/orgId"
+      - name: automation_id
+        in: query
+        schema:
+          type: string
+    get:
+      tags: [Automations]
+      summary: List automation runs
+      responses:
+        "200":
+          description: Run log
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/AutomationRun"
+        default:
+          $ref: "#/components/responses/Error"
+
+  /v1/organisations/{id}/product-features:
+    parameters:
+      - $ref: "#/components/parameters/orgId"
+    post:
+      tags: [Product]
+      summary: Create product feature
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [key]
+              properties:
+                key:
+                  type: string
+                description:
+                  type: string
+      responses:
+        "201":
+          description: Created feature
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProductFeature"
+        default:
+          $ref: "#/components/responses/Error"
+    get:
+      tags: [Product]
+      summary: List product features
+      responses:
+        "200":
+          description: Feature list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/ProductFeature"
+        default:
+          $ref: "#/components/responses/Error"
+
+  /v1/product-features/{id}:
+    parameters:
+      - $ref: "#/components/parameters/id"
+    get:
+      tags: [Product]
+      summary: Get product feature
+      responses:
+        "200":
+          description: Feature
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProductFeature"
+        default:
+          $ref: "#/components/responses/Error"
+    patch:
+      tags: [Product]
+      summary: Update product feature
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                description:
+                  type: string
+      responses:
+        "200":
+          description: Updated feature
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProductFeature"
+        default:
+          $ref: "#/components/responses/Error"
+    delete:
+      tags: [Product]
+      summary: Delete product feature
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+        default:
+          $ref: "#/components/responses/Error"
+
+  /v1/organisations/{id}/product-plans:
+    parameters:
+      - $ref: "#/components/parameters/orgId"
+    post:
+      tags: [Product]
+      summary: Create product plan
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [key, name]
+              properties:
+                key:
+                  type: string
+                name:
+                  type: string
+                price:
+                  type: object
+                  properties:
+                    interval:
+                      type: string
+                      enum: [month, year]
+                    currency:
+                      type: string
+                    unit_amount:
+                      type: integer
+                      format: int64
+                    status:
+                      type: string
+      responses:
+        "201":
+          description: Created product plan
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProductPlan"
+        default:
+          $ref: "#/components/responses/Error"
+    get:
+      tags: [Product]
+      summary: List product plans
+      responses:
+        "200":
+          description: Product plan list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/ProductPlan"
+        default:
+          $ref: "#/components/responses/Error"
+
+  /v1/product-plans/{id}:
+    parameters:
+      - $ref: "#/components/parameters/id"
+    get:
+      tags: [Product]
+      summary: Get product plan
+      responses:
+        "200":
+          description: Product plan
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProductPlan"
+        default:
+          $ref: "#/components/responses/Error"
+    patch:
+      tags: [Product]
+      summary: Update product plan
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                status:
+                  type: string
+                  enum: [active, archived]
+      responses:
+        "200":
+          description: Updated product plan
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProductPlan"
+        default:
+          $ref: "#/components/responses/Error"
+    delete:
+      tags: [Product]
+      summary: Delete product plan
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+        default:
+          $ref: "#/components/responses/Error"
+
+  /v1/product-plans/{id}/features:
+    parameters:
+      - $ref: "#/components/parameters/id"
+    put:
+      tags: [Product]
+      summary: Set product plan features
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [feature_keys]
+              properties:
+                feature_keys:
+                  type: array
+                  items:
+                    type: string
+      responses:
+        "200":
+          description: Updated product plan
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProductPlan"
+        default:
+          $ref: "#/components/responses/Error"
+
+  /v1/product-plans/{id}/price:
+    parameters:
+      - $ref: "#/components/parameters/id"
+    put:
+      tags: [Product]
+      summary: Create or update product plan price
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [interval, unit_amount]
+              properties:
+                interval:
+                  type: string
+                  enum: [month, year]
+                currency:
+                  type: string
+                unit_amount:
+                  type: integer
+                  format: int64
+                status:
+                  type: string
+      responses:
+        "200":
+          description: Product plan price
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProductPlanPrice"
+        default:
+          $ref: "#/components/responses/Error"
+
+  /v1/product-plans/{id}/prices:
+    parameters:
+      - $ref: "#/components/parameters/id"
+    get:
+      tags: [Product]
+      summary: List product plan prices
+      responses:
+        "200":
+          description: Price list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/ProductPlanPrice"
+        default:
+          $ref: "#/components/responses/Error"
+
+  /v1/organisations/{id}/product-plan:
+    parameters:
+      - $ref: "#/components/parameters/orgId"
+    get:
+      tags: [Product]
+      summary: Get active product plan
+      responses:
+        "200":
+          description: Active product plan
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProductPlan"
+        default:
+          $ref: "#/components/responses/Error"
+    put:
+      tags: [Product]
+      summary: Set active product plan
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                product_plan_id:
+                  type: string
+                  description: Empty string clears active plan
+      responses:
+        "200":
+          description: Active plan updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  product_plan:
+                    nullable: true
+                    allOf:
+                      - $ref: "#/components/schemas/ProductPlan"
+        default:
+          $ref: "#/components/responses/Error"
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Session token (kyc_sess_…) or API key / service token
+
+  parameters:
+    id:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+    orgId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+      description: Organisation id
+    dbId:
+      name: dbId
+      in: path
+      required: true
+      schema:
+        type: string
+    webhookId:
+      name: webhookId
+      in: path
+      required: true
+      schema:
+        type: string
+    hookId:
+      name: hookId
+      in: path
+      required: true
+      schema:
+        type: string
+    membershipId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+    limitQuery:
+      name: limit
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+    cursorQuery:
+      name: cursor
+      in: query
+      schema:
+        type: string
+      description: Opaque pagination cursor
+    qQuery:
+      name: q
+      in: query
+      schema:
+        type: string
+      description: Search query
+    statusQuery:
+      name: status
+      in: query
+      schema:
+        type: string
+    idempotencyKey:
+      name: Idempotency-Key
+      in: header
+      schema:
+        type: string
+
+  responses:
+    Error:
+      description: Error response
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+
+  schemas:
+    Error:
+      type: object
+      required: [code, message]
+      properties:
+        code:
+          type: string
+          description: Machine-readable code (e.g. not_found, validation_error, unauthorized, forbidden, rate_limited)
+        message:
+          type: string
+
+    ErrorResponse:
+      type: object
+      required: [error]
+      properties:
+        error:
+          $ref: "#/components/schemas/Error"
+
+    PaginatedMeta:
+      type: object
+      properties:
+        next_cursor:
+          type: string
+          description: Present when more results exist; pass as ?cursor= on the next request
+
+    HealthResponse:
+      type: object
+      properties:
+        status:
+          type: string
+        time:
+          type: string
+          format: date-time
+
+    AuthResponse:
+      type: object
+      properties:
+        token:
+          type: string
+        expires_at:
+          type: string
+          format: date-time
+        user:
+          $ref: "#/components/schemas/User"
+
+    Organisation:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        slug:
+          type: string
+        status:
+          type: string
+          enum: [active, suspended, archived]
+        logo_url:
+          type: string
+          readOnly: true
+        primary_color:
+          type: string
+        accent_color:
+          type: string
+        email_footer:
+          type: string
+        email_font:
+          type: string
+        email_typography:
+          $ref: "#/components/schemas/EmailTypography"
+        app_user_authority:
+          type: string
+          enum: [kyc, external]
+        app_user_ingest_upsert_key:
+          type: string
+          enum: [external_id, email]
+        app_user_attributes_mode:
+          type: string
+          enum: [discover, strict]
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+        email:
+          type: string
+          format: email
+        name:
+          type: string
+        status:
+          type: string
+          enum: [active, disabled]
+        platform_admin:
+          type: boolean
+        avatar_url:
+          type: string
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    Membership:
+      type: object
+      properties:
+        id:
+          type: string
+        organisation_id:
+          type: string
+        user_id:
+          type: string
+        role_id:
+          type: string
+        status:
+          type: string
+          enum: [invited, active, revoked]
+        user_email:
+          type: string
+        user_name:
+          type: string
+        role_key:
+          type: string
+        organisation_name:
+          type: string
+        organisation_slug:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+
+    AppUser:
+      type: object
+      properties:
+        id:
+          type: string
+        organisation_id:
+          type: string
+        external_id:
+          type: string
+          nullable: true
+        email:
+          type: string
+          nullable: true
+        display_name:
+          type: string
+        status:
+          type: string
+          enum: [active, disabled, archived]
+        attributes:
+          type: object
+          additionalProperties: true
+
+    AttributeDefinition:
+      type: object
+      properties:
+        id:
+          type: string
+        organisation_id:
+          type: string
+        key:
+          type: string
+        label:
+          type: string
+        description:
+          type: string
+        value_type:
+          type: string
+          enum: [string, number, boolean, date, dropdown]
+        section:
+          type: string
+        sort_order:
+          type: integer
+        required:
+          type: boolean
+        enum_values:
+          type: array
+          items:
+            type: string
+        is_pii:
+          type: boolean
+        is_system:
+          type: boolean
+        status:
+          type: string
+          enum: [active, archived]
+
+    EmailTemplate:
+      type: object
+      properties:
+        id:
+          type: string
+        organisation_id:
+          type: string
+        key:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+        subject:
+          type: string
+        body_text:
+          type: string
+        body_html:
+          type: string
+        status:
+          type: string
+          enum: [active, archived]
+        is_system:
+          type: boolean
+
+    EmailTypography:
+      type: object
+      properties:
+        header:
+          $ref: "#/components/schemas/RegionStyle"
+        body:
+          $ref: "#/components/schemas/RegionStyle"
+        footer:
+          $ref: "#/components/schemas/RegionStyle"
+
+    RegionStyle:
+      type: object
+      properties:
+        font:
+          type: string
+          enum: [arial, helvetica, verdana, trebuchet, georgia, times, courier]
+        size:
+          type: integer
+          description: px (10–16, 18, 20, 22, 24, 28, 32)
+        weight:
+          type: integer
+          enum: [400, 500, 600, 700]
+        style:
+          type: string
+          enum: [normal, italic]
+
+    Automation:
+      type: object
+      properties:
+        id:
+          type: string
+        organisation_id:
+          type: string
+        name:
+          type: string
+        trigger:
+          type: string
+        trigger_params:
+          type: object
+          additionalProperties:
+            type: string
+        enabled:
+          type: boolean
+        conditions:
+          $ref: "#/components/schemas/AutomationConditions"
+        actions:
+          type: array
+          items:
+            $ref: "#/components/schemas/AutomationAction"
+
+    AutomationConditions:
+      type: object
+      properties:
+        mode:
+          type: string
+          enum: [all, any]
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/AutomationCondition"
+        all:
+          type: array
+          items:
+            $ref: "#/components/schemas/AutomationCondition"
+        any:
+          type: array
+          items:
+            $ref: "#/components/schemas/AutomationCondition"
+
+    AutomationCondition:
+      type: object
+      properties:
+        field:
+          type: string
+          description: Bare path (e.g. app_user.country) — see Documentation → Variables
+        op:
+          type: string
+        value:
+          oneOf:
+            - type: string
+            - type: number
+            - type: boolean
+            - type: array
+              items:
+                type: string
+
+    AutomationAction:
+      type: object
+      properties:
+        id:
+          type: string
+        type:
+          type: string
+          description: send_email, call_webhook, db_insert, delay, etc.
+        params:
+          type: object
+          additionalProperties:
+            type: string
+        on_success:
+          type: string
+        on_error:
+          type: string
+
+    AutomationRun:
+      type: object
+      properties:
+        id:
+          type: string
+        organisation_id:
+          type: string
+        automation_id:
+          type: string
+        trigger:
+          type: string
+        status:
+          type: string
+          enum: [success, skipped, error]
+        detail:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+
+    AutomationCatalog:
+      type: object
+      additionalProperties: true
+
+    Webhook:
+      type: object
+      properties:
+        id:
+          type: string
+        organisation_id:
+          type: string
+        name:
+          type: string
+        url:
+          type: string
+        secret_hint:
+          type: string
+        has_secret:
+          type: boolean
+        status:
+          type: string
+        body_template:
+          type: string
+          description: JSON with {{path}} placeholders
+
+    InboundWebhook:
+      type: object
+      properties:
+        id:
+          type: string
+        organisation_id:
+          type: string
+        name:
+          type: string
+        url:
+          type: string
+        auth_mode:
+          type: string
+          enum: [header, query, path]
+        secret_hint:
+          type: string
+        has_secret:
+          type: boolean
+        secret:
+          type: string
+          description: Present after create/rotate or embedded in URL for query/path modes
+        status:
+          type: string
+
+    OrganisationDatabase:
+      type: object
+      properties:
+        id:
+          type: string
+        organisation_id:
+          type: string
+        name:
+          type: string
+        driver:
+          type: string
+          enum: [postgres]
+        host:
+          type: string
+        port:
+          type: integer
+        database_name:
+          type: string
+        username:
+          type: string
+        password_hint:
+          type: string
+        has_password:
+          type: boolean
+        ssl_mode:
+          type: string
+        status:
+          type: string
+          enum: [connected, unreachable, disconnected]
+        last_checked_at:
+          type: string
+          format: date-time
+          nullable: true
+        last_error:
+          type: string
+
+    ProductFeature:
+      type: object
+      properties:
+        id:
+          type: string
+        organisation_id:
+          type: string
+        key:
+          type: string
+        description:
+          type: string
+        scope:
+          type: string
+          enum: [product]
+
+    ProductPlan:
+      type: object
+      properties:
+        id:
+          type: string
+        organisation_id:
+          type: string
+        key:
+          type: string
+        name:
+          type: string
+        status:
+          type: string
+          enum: [active, archived]
+        feature_keys:
+          type: array
+          items:
+            type: string
+        prices:
+          type: array
+          items:
+            $ref: "#/components/schemas/ProductPlanPrice"
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    ProductPlanPrice:
+      type: object
+      properties:
+        id:
+          type: string
+        product_plan_id:
+          type: string
+        interval:
+          type: string
+          enum: [month, year]
+        currency:
+          type: string
+        unit_amount:
+          type: integer
+          format: int64
+        processor:
+          type: string
+        processor_product_ref:
+          type: string
+        processor_price_ref:
+          type: string
+        status:
+          type: string
+        synced:
+          type: boolean
+
+    Role:
+      type: object
+      properties:
+        id:
+          type: string
+        key:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+        is_system:
+          type: boolean
+        permission_keys:
+          type: array
+          items:
+            type: string
+
+    Permission:
+      type: object
+      properties:
+        id:
+          type: string
+        key:
+          type: string
+        resource:
+          type: string
+        action:
+          type: string
+        category:
+          type: string
+        description:
+          type: string
+
+    BillingPlan:
+      type: object
+      properties:
+        id:
+          type: string
+        key:
+          type: string
+        name:
+          type: string
+        status:
+          type: string
+        entitlement_keys:
+          type: array
+          items:
+            type: string
+        platform_capability_keys:
+          type: array
+          items:
+            type: string
+        product_feature_keys:
+          type: array
+          items:
+            type: string
+
+    Entitlement:
+      type: object
+      properties:
+        id:
+          type: string
+        key:
+          type: string
+        description:
+          type: string
+        scope:
+          type: string
+          enum: [platform, product]
+
+    OrgEntitlements:
+      type: object
+      properties:
+        entitlements:
+          type: array
+          items:
+            type: string
+        platform_capabilities:
+          type: array
+          items:
+            type: string
+        product_features:
+          type: array
+          items:
+            type: string
+
+    Subscription:
+      type: object
+      properties:
+        id:
+          type: string
+        organisation_id:
+          type: string
+        plan_id:
+          type: string
+        status:
+          type: string
+          enum: [trialing, active, past_due, canceled]
+        current_period_end:
+          type: string
+          format: date-time
+          nullable: true
+        processor:
+          type: string
+        subscription_ref:
+          type: string
+
+    PlanPrice:
+      type: object
+      properties:
+        id:
+          type: string
+        plan_id:
+          type: string
+        interval:
+          type: string
+          enum: [month, year]
+        currency:
+          type: string
+        unit_amount:
+          type: integer
+          format: int64
+        processor:
+          type: string
+        processor_price_ref:
+          type: string
+        status:
+          type: string
+
+    OrgIntegration:
+      type: object
+      properties:
+        provider:
+          type: string
+        status:
+          type: string
+        secret_hint:
+          type: string
+        public_key_hint:
+          type: string
+        has_secret:
+          type: boolean
+        has_public_key:
+          type: boolean
+
+    OrgAPIKey:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        key_prefix:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        revoked:
+          type: boolean
+        revoked_at:
+          type: string
+          format: date-time
+        token:
+          type: string
+          description: Returned once on create
+
+    PlatformAPIKey:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        key_prefix:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        revoked:
+          type: boolean
+        token:
+          type: string
+
+    StripeCatalogItem:
+      type: object
+      properties:
+        product_ref:
+          type: string
+        product_name:
+          type: string
+        price_ref:
+          type: string
+        interval:
+          type: string
+        currency:
+          type: string
+        unit_amount:
+          type: integer
+        active:
+          type: boolean
+
+    StripeCatalogSyncResult:
+      type: object
+      properties:
+        imported:
+          type: array
+          items:
+            $ref: "#/components/schemas/ProductPlan"
+        pushed:
+          type: array
+          items:
+            $ref: "#/components/schemas/ProductPlan"
+        skipped:
+          type: integer
+
+    AuditEvent:
+      type: object
+      properties:
+        id:
+          type: string
+        actor:
+          type: string
+        method:
+          type: string
+        path:
+          type: string
+        status_code:
+          type: integer
+        created_at:
+          type: string
+          format: date-time

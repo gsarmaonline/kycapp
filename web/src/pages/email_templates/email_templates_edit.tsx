@@ -3,6 +3,7 @@ import type { FormEvent } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { getEmailTemplate, getOrganisation, updateEmailTemplate, type Organisation } from '../../api'
 import { FormActions, PageHeader } from '../../crud/ui'
+import { VariableDocsHint } from '../../components/VariableDocsHint'
 import { emailRenderContext, renderEmailTemplate, wrapEmailHtml } from '../../email_render'
 import { resourcePath } from '../../org_nav'
 
@@ -93,10 +94,10 @@ export function EmailTemplatesEdit() {
         </label>
         <label>
           Subject
-          <span className="field-hint">
-            Placeholders use the shared path vocabulary (e.g.{' '}
-            <code>{'{{app_user.display_name}}'}</code>, <code>{'{{organisation.name}}'}</code>).
-          </span>
+          <VariableDocsHint>
+            Placeholders e.g. <code>{'{{app_user.display_name}}'}</code>,{' '}
+            <code>{'{{organisation.name}}'}</code>.
+          </VariableDocsHint>
           <input value={subject} onChange={(e) => setSubject(e.target.value)} required />
         </label>
         <label>
@@ -105,10 +106,9 @@ export function EmailTemplatesEdit() {
         </label>
         <label>
           Body (HTML)
-          <span className="field-hint">
-            Inner content only — header, logo, and footer come from Branding. Same{' '}
-            <code>{'{{app_user.*}}'}</code> paths as automations and webhooks.
-          </span>
+          <VariableDocsHint>
+            Inner content only — header, logo, and footer come from Branding.
+          </VariableDocsHint>
           <textarea value={bodyHtml} onChange={(e) => setBodyHtml(e.target.value)} rows={6} />
         </label>
         <FormActions cancelTo={resourcePath(orgId, 'email-templates', id)} submitLabel="Save" />

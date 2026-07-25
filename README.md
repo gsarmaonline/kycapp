@@ -107,7 +107,7 @@ sequenceDiagram
 
 **App login + API tenancy complete:** Google OAuth, sessions, membership-scoped org APIs, org-scoped API keys (Settings), login-gated UI.
 
-**Merchant product surface:** app users, attributes, product features/plans, branding, email templates, automations (River + Resend), KYC billing via Stripe executor.
+**Merchant product surface:** app users, attributes, product features/plans, branding, email templates, automations (River + Resend), KYC billing via Stripe executor. In-app **Documentation** (OpenAPI + [variable referencing](docs/variables.md)) is under each organisation sidebar.
 
 Still later: headless SDK + settings embed, invite email polish, full platform-admin UI.
 

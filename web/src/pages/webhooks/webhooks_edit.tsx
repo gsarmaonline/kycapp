@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { getOrgWebhook, updateOrgWebhook } from '../../api'
+import { VariableDocsHint } from '../../components/VariableDocsHint'
 import { FormActions, PageHeader } from '../../crud/ui'
 import { resourcePath } from '../../org_nav'
 
@@ -97,10 +98,9 @@ export function WebhooksEdit() {
             placeholder="Leave empty to POST { organisation_id, payload }"
           />
         </label>
-        <p className="field-hint">
-          Use <code>{'{{app_user.email}}'}</code>-style paths (same as automation conditions). Empty
-          template sends the full event dump.
-        </p>
+        <VariableDocsHint>
+          Use <code>{'{{app_user.email}}'}</code>-style paths. Empty template sends the full event dump.
+        </VariableDocsHint>
         <button type="button" className="ghost" onClick={() => setBodyTemplate(EXAMPLE_BODY)}>
           Use example template
         </button>
