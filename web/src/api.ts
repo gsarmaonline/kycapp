@@ -1,3 +1,5 @@
+import type { EmailTypography } from './email_fonts'
+
 const API_BASE = import.meta.env.VITE_API_BASE ?? ''
 const TOKEN_KEY = 'kyc_session_token'
 
@@ -11,6 +13,7 @@ export type Organisation = {
   accent_color?: string
   email_footer?: string
   email_font?: string
+  email_typography?: EmailTypography
   app_user_authority?: 'kyc' | 'external'
   app_user_ingest_upsert_key?: 'external_id' | 'email'
   app_user_attributes_mode?: 'strict' | 'discover'
@@ -172,6 +175,7 @@ export function updateOrganisation(
     accent_color?: string
     email_footer?: string
     email_font?: string
+    email_typography?: EmailTypography
     app_user_authority?: 'kyc' | 'external'
     app_user_ingest_upsert_key?: 'external_id' | 'email'
     app_user_attributes_mode?: 'strict' | 'discover'

@@ -14,7 +14,8 @@ type Branding struct {
 	PrimaryColor string
 	AccentColor  string
 	Footer       string
-	Font         string // key from FontStacks (e.g. "arial")
+	Font         string     // legacy single font key; used when Typography is empty
+	Typography   Typography // per-region styles (preferred)
 }
 
 // FontOption is a selectable email-safe font stack.
@@ -97,7 +98,16 @@ func Wrap(content string, b Branding) string {
 	if accent == "" {
 		accent = primary
 	}
-	font := FontStack(b.Font)
+	ty := b.Typography
+	if ty.Header.Size == 0 && ty.Body.Size == 0 && ty.Footer.Size == 0 {
+		ty = DefaultTypography(b.Font)
+	} else {
+		ty = mergeTypography(DefaultTypography(b.Font), ty)
+	}
+	bodyFont := FontStack(ty.Body.Font)
+	headerCSS := ty.Header.InlineCSS()
+	bodyCSS := ty.Body.InlineCSS()
+	footerCSS := ty.Footer.InlineCSS()
 	orgName := html.EscapeString(strings.TrimSpace(b.OrgName))
 	footer := html.EscapeString(strings.TrimSpace(b.Footer))
 	if footer == "" && orgName != "" {
@@ -136,16 +146,16 @@ func Wrap(content string, b Branding) string {
         <tr>
           <td style="padding:28px 28px 12px;text-align:center;font-family:%s;">
             %s
-            <div style="font-size:20px;font-weight:700;color:%s;letter-spacing:0.01em;font-family:%s;">%s</div>
+            <div style="%scolor:%s;letter-spacing:0.01em;">%s</div>
           </td>
         </tr>
         <tr>
-          <td style="padding:8px 28px 28px;font-size:16px;line-height:1.55;color:#1c1917;text-align:left;font-family:%s;">
+          <td style="padding:8px 28px 28px;%sline-height:1.55;color:#1c1917;text-align:left;">
             %s
           </td>
         </tr>
         <tr>
-          <td style="padding:16px 28px;background:%s;color:#f8faf8;font-size:12px;line-height:1.4;text-align:center;font-family:%s;">
+          <td style="padding:16px 28px;background:%s;color:#f8faf8;%sline-height:1.4;text-align:center;">
             %s
           </td>
         </tr>
@@ -156,17 +166,17 @@ func Wrap(content string, b Branding) string {
 </body>
 </html>`,
 		orgName,
-		font, font, font,
+		bodyFont, bodyFont, bodyFont,
 		html.EscapeString(primary),
-		font,
+		bodyFont,
 		logoBlock,
+		headerCSS,
 		html.EscapeString(accent),
-		font,
 		orgName,
-		font,
+		bodyCSS,
 		inner,
 		html.EscapeString(primary),
-		font,
+		footerCSS,
 		footer,
 	)
 }

@@ -53,7 +53,8 @@ Tenant hub. Everything else hangs off this record.
 | `primary_color` | string | Hex `#RGB` / `#RRGGBB`; default `#1f4d3a` |
 | `accent_color` | string | Optional hex for header title |
 | `email_footer` | string | Footer text for branded email chrome |
-| `email_font` | string | Font key: `arial`, `helvetica`, `verdana`, `trebuchet`, `georgia`, `times`, `courier` |
+| `email_font` | string | Legacy / body font key: `arial`, `helvetica`, `verdana`, `trebuchet`, `georgia`, `times`, `courier` |
+| `email_typography` | jsonb | Per-region styles: `header` / `body` / `footer` each with `font`, `size`, `weight`, `style` |
 | `app_user_authority` | enum | `kyc` (default) \| `external` — primary source for customer profiles; KYC UI create stays allowed either way |
 | `app_user_ingest_upsert_key` | enum | `external_id` (default) \| `email` — which field ingest matches on |
 | `app_user_attributes_mode` | enum | `discover` (default) \| `strict` — whether ingest auto-creates attribute definitions for unknown keys |

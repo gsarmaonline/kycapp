@@ -4,6 +4,7 @@ import (
 	"io"
 	"net/http"
 
+	"github.com/gsarmaonline/kyc/core/emailtemplates"
 	"github.com/gsarmaonline/kyc/internal/apperr"
 	"github.com/gsarmaonline/kyc/internal/authn"
 	"github.com/gsarmaonline/kyc/internal/service"
@@ -95,15 +96,16 @@ func (s *Server) handlePatchOrganisation(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	var body struct {
-		Name                   *string `json:"name"`
-		Status                 *string `json:"status"`
-		PrimaryColor           *string `json:"primary_color"`
-		AccentColor            *string `json:"accent_color"`
-		EmailFooter            *string `json:"email_footer"`
-		EmailFont              *string `json:"email_font"`
-		AppUserAuthority       *string `json:"app_user_authority"`
-		AppUserIngestUpsertKey *string `json:"app_user_ingest_upsert_key"`
-		AppUserAttributesMode  *string `json:"app_user_attributes_mode"`
+		Name                   *string                      `json:"name"`
+		Status                 *string                      `json:"status"`
+		PrimaryColor           *string                      `json:"primary_color"`
+		AccentColor            *string                      `json:"accent_color"`
+		EmailFooter            *string                      `json:"email_footer"`
+		EmailFont              *string                      `json:"email_font"`
+		EmailTypography        *emailtemplates.Typography   `json:"email_typography"`
+		AppUserAuthority       *string                      `json:"app_user_authority"`
+		AppUserIngestUpsertKey *string                      `json:"app_user_ingest_upsert_key"`
+		AppUserAttributesMode  *string                      `json:"app_user_attributes_mode"`
 	}
 	if err := decodeJSON(r, &body); err != nil {
 		writeError(w, apperr.Validation("invalid JSON body"))
@@ -113,6 +115,7 @@ func (s *Server) handlePatchOrganisation(w http.ResponseWriter, r *http.Request)
 		Name: body.Name, Status: body.Status,
 		PrimaryColor: body.PrimaryColor, AccentColor: body.AccentColor,
 		EmailFooter: body.EmailFooter, EmailFont: body.EmailFont,
+		EmailTypography:        body.EmailTypography,
 		AppUserAuthority:       body.AppUserAuthority,
 		AppUserIngestUpsertKey: body.AppUserIngestUpsertKey,
 		AppUserAttributesMode:  body.AppUserAttributesMode,

@@ -95,6 +95,26 @@ func TestWrapFont(t *testing.T) {
 	}
 }
 
+func TestWrapTypography(t *testing.T) {
+	got := Wrap(`<p>Hi</p>`, Branding{
+		OrgName: "Acme",
+		Typography: Typography{
+			Header: RegionStyle{Font: "georgia", Size: 24, Weight: 700, Style: "italic"},
+			Body:   RegionStyle{Font: "verdana", Size: 14, Weight: 400, Style: "normal"},
+			Footer: RegionStyle{Font: "courier", Size: 11, Weight: 400, Style: "normal"},
+		},
+	})
+	for _, want := range []string{
+		"Georgia", "Verdana", "Courier New",
+		"font-size:24px", "font-style:italic",
+		"font-size:14px", "font-size:11px",
+	} {
+		if !strings.Contains(got, want) {
+			t.Fatalf("missing %q in:\n%s", want, got)
+		}
+	}
+}
+
 func TestNormalizeFont(t *testing.T) {
 	k, err := NormalizeFont(" Georgia ")
 	if err != nil || k != "georgia" {
@@ -102,5 +122,25 @@ func TestNormalizeFont(t *testing.T) {
 	}
 	if _, err := NormalizeFont("comic-sans"); err == nil {
 		t.Fatal("expected error")
+	}
+}
+
+func TestNormalizeTypography(t *testing.T) {
+	ty, err := NormalizeTypography(Typography{
+		Header: RegionStyle{Font: "georgia", Size: 22, Weight: 600, Style: "italic"},
+	}, "arial")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if ty.Header.Font != "georgia" || ty.Header.Size != 22 || ty.Header.Style != "italic" {
+		t.Fatalf("header %+v", ty.Header)
+	}
+	if ty.Body.Font != "arial" || ty.Body.Size != 16 {
+		t.Fatalf("body defaults %+v", ty.Body)
+	}
+	if _, err := NormalizeTypography(Typography{
+		Body: RegionStyle{Font: "arial", Size: 99, Weight: 400, Style: "normal"},
+	}, "arial"); err == nil {
+		t.Fatal("expected size error")
 	}
 }

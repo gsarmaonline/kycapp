@@ -63,9 +63,28 @@ Get one.
 
 ### `PATCH /v1/organisations/{id}`
 
-Update `{ "name"?, "status"?, "primary_color"?, "accent_color"?, "email_footer"?, "email_font"?, "app_user_authority"?, "app_user_ingest_upsert_key"?, "app_user_attributes_mode"? }`.  
+Update `{ "name"?, "status"?, "primary_color"?, "accent_color"?, "email_footer"?, "email_font"?, "email_typography"?, "app_user_authority"?, "app_user_ingest_upsert_key"?, "app_user_attributes_mode"? }`.  
 Colors must be `#RGB` or `#RRGGBB`.  
-`email_font` is one of: `arial`, `helvetica`, `verdana`, `trebuchet`, `georgia`, `times`, `courier` (email-safe stacks). Requires `organisation:update`.
+`email_font` is one of: `arial`, `helvetica`, `verdana`, `trebuchet`, `georgia`, `times`, `courier` (email-safe stacks). Prefer `email_typography` for per-region styles; patching `email_font` alone sets the font family on header, body, and footer. Requires `organisation:update`.
+
+`email_typography` shape:
+
+```json
+{
+  "header": { "font": "georgia", "size": 20, "weight": 700, "style": "normal" },
+  "body":   { "font": "arial",   "size": 16, "weight": 400, "style": "normal" },
+  "footer": { "font": "arial",   "size": 12, "weight": 400, "style": "normal" }
+}
+```
+
+| Field | Values |
+| --- | --- |
+| `font` | same keys as `email_font` |
+| `size` | `10`–`16`, `18`, `20`, `22`, `24`, `28`, `32` (px) |
+| `weight` | `400`, `500`, `600`, `700` |
+| `style` | `normal` \| `italic` |
+
+Omitted regions inherit defaults (header 20/700, body 16/400, footer 12/400). Saving typography also syncs `email_font` to the body font.
 
 App user profile settings:
 
@@ -75,7 +94,7 @@ App user profile settings:
 | `app_user_ingest_upsert_key` | `external_id` \| `email` | `external_id` |
 | `app_user_attributes_mode` | `discover` \| `strict` | `discover` |
 
-Organisation JSON also includes `logo_url` (read-only; set via logo upload), `email_font`, and the app user settings above.
+Organisation JSON also includes `logo_url` (read-only; set via logo upload), `email_font`, `email_typography`, and the app user settings above.
 
 ### `DELETE /v1/organisations/{id}`
 

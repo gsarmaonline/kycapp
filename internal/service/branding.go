@@ -64,13 +64,46 @@ func (s *Service) UpdateOrganisationBranding(ctx context.Context, id string, in 
 	if in.EmailFooter != nil {
 		params.EmailFooter = pgtype.Text{String: *in.EmailFooter, Valid: true}
 	}
-	if in.EmailFont != nil {
-		font, err := emailtemplates.NormalizeFont(*in.EmailFont)
+
+	if in.EmailTypography != nil || in.EmailFont != nil {
+		existing, err := s.db.Q().GetOrganisation(ctx, id)
 		if err != nil {
-			return sqlc.Organisation{}, apperr.Validation(err.Error())
+			return sqlc.Organisation{}, mapNotFound(err, "organisation not found")
 		}
-		params.EmailFont = pgtype.Text{String: font, Valid: true}
+		switch {
+		case in.EmailTypography != nil:
+			ty, err := emailtemplates.NormalizeTypography(*in.EmailTypography, existing.EmailFont)
+			if err != nil {
+				return sqlc.Organisation{}, apperr.Validation(err.Error())
+			}
+			raw, err := emailtemplates.MarshalTypography(ty)
+			if err != nil {
+				return sqlc.Organisation{}, fmt.Errorf("marshal email typography: %w", err)
+			}
+			params.EmailTypography = []byte(raw)
+			params.EmailFont = pgtype.Text{String: ty.Body.Font, Valid: true}
+		case in.EmailFont != nil:
+			font, err := emailtemplates.NormalizeFont(*in.EmailFont)
+			if err != nil {
+				return sqlc.Organisation{}, apperr.Validation(err.Error())
+			}
+			params.EmailFont = pgtype.Text{String: font, Valid: true}
+			ty := emailtemplates.ResolveTypography(existing.EmailTypography, font)
+			ty.Header.Font = font
+			ty.Body.Font = font
+			ty.Footer.Font = font
+			ty, err = emailtemplates.NormalizeTypography(ty, font)
+			if err != nil {
+				return sqlc.Organisation{}, apperr.Validation(err.Error())
+			}
+			raw, err := emailtemplates.MarshalTypography(ty)
+			if err != nil {
+				return sqlc.Organisation{}, fmt.Errorf("marshal email typography: %w", err)
+			}
+			params.EmailTypography = []byte(raw)
+		}
 	}
+
 	if in.AppUserAuthority != nil {
 		v := strings.TrimSpace(*in.AppUserAuthority)
 		switch v {
@@ -206,5 +239,6 @@ func BrandingFromOrg(o sqlc.Organisation) emailtemplates.Branding {
 		AccentColor:  o.AccentColor,
 		Footer:       o.EmailFooter,
 		Font:         o.EmailFont,
+		Typography:   emailtemplates.ResolveTypography(o.EmailTypography, o.EmailFont),
 	}
 }

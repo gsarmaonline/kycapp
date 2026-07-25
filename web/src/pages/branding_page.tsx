@@ -9,8 +9,9 @@ import {
   type Organisation,
 } from '../api'
 import { ColorField, normalizeHex } from '../components/ColorField'
+import { TypographyField } from '../components/TypographyField'
 import { PageHeader } from '../crud/ui'
-import { EMAIL_FONTS } from '../email_fonts'
+import { defaultTypography, resolveTypography, type EmailTypography } from '../email_fonts'
 import { wrapEmailHtml } from '../email_render'
 
 export function BrandingPage() {
@@ -19,7 +20,7 @@ export function BrandingPage() {
   const [primary, setPrimary] = useState('#1f4d3a')
   const [accent, setAccent] = useState('#16382a')
   const [footer, setFooter] = useState('')
-  const [font, setFont] = useState('arial')
+  const [typography, setTypography] = useState<EmailTypography>(defaultTypography())
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [loading, setLoading] = useState(true)
@@ -33,7 +34,7 @@ export function BrandingPage() {
       setPrimary(o.primary_color || '#1f4d3a')
       setAccent(o.accent_color || o.primary_color || '#16382a')
       setFooter(o.email_footer || '')
-      setFont(o.email_font || 'arial')
+      setTypography(resolveTypography(o.email_typography, o.email_font || 'arial'))
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to load branding')
     } finally {
@@ -53,9 +54,9 @@ export function BrandingPage() {
       primary_color: primary,
       accent_color: accent,
       footer,
-      font,
+      typography,
     }).replace(/\{\{\s*display_name\s*\}\}/g, 'Pat')
-  }, [org, primary, accent, footer, font])
+  }, [org, primary, accent, footer, typography])
 
   async function onSave(e: FormEvent) {
     e.preventDefault()
@@ -66,11 +67,12 @@ export function BrandingPage() {
         primary_color: normalizeHex(primary),
         accent_color: normalizeHex(accent),
         email_footer: footer,
-        email_font: font,
+        email_typography: typography,
       })
       setOrg(o)
       setPrimary(o.primary_color || normalizeHex(primary))
       setAccent(o.accent_color || normalizeHex(accent))
+      setTypography(resolveTypography(o.email_typography, o.email_font || 'arial'))
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Save failed')
     } finally {
@@ -105,7 +107,8 @@ export function BrandingPage() {
     <section>
       <PageHeader title="Branding" />
       <p className="lede">
-        Logo, colors, font, and footer are applied to all email templates at preview (and send) time.
+        Logo, colors, typography, and footer are applied to all email templates at preview (and send)
+        time. Fonts are email-safe stacks so clients render them reliably.
       </p>
       {error && <p className="error">{error}</p>}
       <form className="create stacked" onSubmit={onSave}>
@@ -131,16 +134,21 @@ export function BrandingPage() {
         </label>
         <ColorField label="Primary color" value={primary} onChange={setPrimary} placeholder="#1f4d3a" />
         <ColorField label="Accent color" value={accent} onChange={setAccent} placeholder="#16382a" />
-        <label>
-          Email font
-          <select value={font} onChange={(e) => setFont(e.target.value)} aria-label="Email font">
-            {EMAIL_FONTS.map((f) => (
-              <option key={f.key} value={f.key} style={{ fontFamily: f.stack }}>
-                {f.label}
-              </option>
-            ))}
-          </select>
-        </label>
+        <TypographyField
+          label="Header typography"
+          value={typography.header}
+          onChange={(header) => setTypography({ ...typography, header })}
+        />
+        <TypographyField
+          label="Body typography"
+          value={typography.body}
+          onChange={(body) => setTypography({ ...typography, body })}
+        />
+        <TypographyField
+          label="Footer typography"
+          value={typography.footer}
+          onChange={(footerStyle) => setTypography({ ...typography, footer: footerStyle })}
+        />
         <label>
           Email footer
           <textarea

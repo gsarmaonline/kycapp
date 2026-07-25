@@ -688,6 +688,42 @@ button.danger:not(.link-btn):hover {
   padding: 0.35rem;
 }
 
+.typography-field {
+  border: 1px solid #e7e5e4;
+  border-radius: 8px;
+  padding: 0.75rem 1rem 1rem;
+  margin: 0;
+}
+
+.typography-field legend {
+  padding: 0 0.35rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.typography-field-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(8rem, 1fr));
+  gap: 0.75rem;
+}
+
+.typography-field-row label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  font-size: 0.85rem;
+}
+
+.typography-preview {
+  margin: 0.85rem 0 0;
+  padding: 0.65rem 0.75rem;
+  border-radius: 6px;
+  background: #fafaf9;
+  border: 1px solid #e7e5e4;
+  color: #1c1917;
+  line-height: 1.4;
+}
+
 .color-field {
   display: flex;
   flex-direction: column;
@@ -915,15 +951,11 @@ button.link-btn.danger:hover {
 .email-preview .preview-html {
   display: block;
   width: 100%;
-  min-height: 10rem;
+  min-height: 32rem;
+  height: min(70vh, 40rem);
   border: 1px solid #e7e5e4;
   border-radius: 6px;
   background: #fff;
-}
-
-.branding-email-preview .preview-html {
-  min-height: 32rem;
-  height: min(70vh, 40rem);
 }
 
 .create.stacked {

@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/gsarmaonline/kyc/core/emailtemplates"
 	"github.com/gsarmaonline/kyc/internal/apperr"
 	"github.com/gsarmaonline/kyc/internal/service"
 	"github.com/gsarmaonline/kyc/internal/store/sqlc"
@@ -65,6 +66,7 @@ func queryLimit(r *http.Request) int32 {
 }
 
 func orgJSON(o sqlc.Organisation) map[string]any {
+	ty := emailtemplates.ResolveTypography(o.EmailTypography, o.EmailFont)
 	return map[string]any{
 		"id":                          o.ID,
 		"name":                        o.Name,
@@ -75,6 +77,7 @@ func orgJSON(o sqlc.Organisation) map[string]any {
 		"accent_color":                o.AccentColor,
 		"email_footer":                o.EmailFooter,
 		"email_font":                  o.EmailFont,
+		"email_typography":            ty,
 		"app_user_authority":          o.AppUserAuthority,
 		"app_user_ingest_upsert_key":  o.AppUserIngestUpsertKey,
 		"app_user_attributes_mode":    o.AppUserAttributesMode,

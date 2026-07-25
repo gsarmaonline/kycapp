@@ -35,6 +35,7 @@ sql:
       - "internal/store/migrations/000030_automation_trigger_params.up.sql"
       - "internal/store/migrations/000031_schedule_cron.up.sql"
       - "internal/store/migrations/000032_free_plan.up.sql"
+      - "internal/store/migrations/000033_email_typography.up.sql"
     gen:
       go:
         package: "sqlc"

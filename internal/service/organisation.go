@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/gsarmaonline/kyc/core/billing"
+	"github.com/gsarmaonline/kyc/core/emailtemplates"
 	"github.com/gsarmaonline/kyc/core/organisation"
 	"github.com/gsarmaonline/kyc/internal/apperr"
 	"github.com/gsarmaonline/kyc/internal/ids"
@@ -135,6 +136,7 @@ type UpdateOrganisationInput struct {
 	AccentColor            *string
 	EmailFooter            *string
 	EmailFont              *string
+	EmailTypography        *emailtemplates.Typography
 	AppUserAuthority       *string
 	AppUserIngestUpsertKey *string
 	AppUserAttributesMode  *string
