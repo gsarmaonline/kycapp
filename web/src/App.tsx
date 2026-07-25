@@ -58,7 +58,10 @@ import { InboundWebhooksShow } from './pages/inbound_webhooks/inbound_webhooks_s
 import { DocsApiPage } from './pages/docs/docs_api'
 import { DocsLayout } from './pages/docs/docs_layout'
 import { DocsVariablesPage } from './pages/docs/docs_variables'
+import { initTheme } from './theme'
 import './App.css'
+
+initTheme()
 
 type Gate = 'loading' | 'ready'
 

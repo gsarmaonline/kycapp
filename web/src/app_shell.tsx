@@ -17,6 +17,7 @@ import {
 } from './api'
 import { GIT_SHA, GIT_SHA_SHORT } from './build_info'
 import { ORG_NAV_GROUPS, orgPath, sectionFromPathname } from './org_nav'
+import { getStoredTheme, toggleTheme, type ThemeMode } from './theme'
 
 function userInitials(label: string): string {
   const parts = label.trim().split(/\s+/).filter(Boolean)
@@ -39,6 +40,7 @@ export function AppShell({ user, onLogout }: { user: User | null; onLogout: () =
   const [orgsLoading, setOrgsLoading] = useState(true)
   const [creating, setCreating] = useState(false)
   const [newOrgName, setNewOrgName] = useState('')
+  const [theme, setThemeMode] = useState<ThemeMode>(() => getStoredTheme())
 
   const selected = orgs.find((o) => o.id === routeOrgId) ?? null
 
@@ -203,6 +205,14 @@ export function AppShell({ user, onLogout }: { user: User | null; onLogout: () =
               </div>
             </div>
           )}
+          <button
+            type="button"
+            className="ghost full"
+            onClick={() => setThemeMode(toggleTheme())}
+            aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+          >
+            {theme === 'dark' ? 'Light mode' : 'Dark mode'}
+          </button>
           <button type="button" className="ghost full" onClick={() => void onLogout()}>
             Log out
           </button>
