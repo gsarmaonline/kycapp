@@ -6,6 +6,7 @@ import (
 
 	"github.com/gsarmaonline/kyc/internal/apperr"
 	"github.com/gsarmaonline/kyc/internal/service"
+	"github.com/gsarmaonline/kyc/internal/store/sqlc"
 )
 
 func (s *Server) handleCreateAPIKey(w http.ResponseWriter, r *http.Request) {
@@ -25,13 +26,9 @@ func (s *Server) handleCreateAPIKey(w http.ResponseWriter, r *http.Request) {
 		writeError(w, err)
 		return
 	}
-	writeJSON(w, http.StatusCreated, map[string]any{
-		"id":         created.Key.ID,
-		"name":       created.Key.Name,
-		"key_prefix": created.Key.KeyPrefix,
-		"token":      created.Raw,
-		"created_at": created.Key.CreatedAt.UTC().Format(time.RFC3339Nano),
-	})
+	item := apiKeyJSON(created.Key)
+	item["token"] = created.Raw
+	writeJSON(w, http.StatusCreated, item)
 }
 
 func (s *Server) handleListAPIKeys(w http.ResponseWriter, r *http.Request) {
@@ -46,17 +43,7 @@ func (s *Server) handleListAPIKeys(w http.ResponseWriter, r *http.Request) {
 	}
 	items := make([]map[string]any, 0, len(keys))
 	for _, k := range keys {
-		item := map[string]any{
-			"id":         k.ID,
-			"name":       k.Name,
-			"key_prefix": k.KeyPrefix,
-			"created_at": k.CreatedAt.UTC().Format(time.RFC3339Nano),
-			"revoked":    k.RevokedAt.Valid,
-		}
-		if k.RevokedAt.Valid {
-			item["revoked_at"] = k.RevokedAt.Time.UTC().Format(time.RFC3339Nano)
-		}
-		items = append(items, item)
+		items = append(items, apiKeyJSON(k))
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"items": items})
 }
@@ -68,7 +55,7 @@ func (s *Server) handleRevokeAPIKey(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if existing.OrganisationID.Valid {
-		if _, err := s.svc.RequireOrgPermission(r.Context(), existing.OrganisationID.String, "organisation:update"); err != nil {
+		if _, err := s.svc.RequireOrgPermission(r.Context(), existing.OrganisationID.String, "api_keys:manage"); err != nil {
 			writeError(w, err)
 			return
 		}
@@ -81,42 +68,42 @@ func (s *Server) handleRevokeAPIKey(w http.ResponseWriter, r *http.Request) {
 		writeError(w, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{
-		"id": key.ID, "name": key.Name, "key_prefix": key.KeyPrefix, "revoked": true,
-	})
+	item := apiKeyJSON(key)
+	item["revoked"] = true
+	writeJSON(w, http.StatusOK, item)
 }
 
 func (s *Server) handleCreateOrgAPIKey(w http.ResponseWriter, r *http.Request) {
 	orgID := r.PathValue("id")
-	if _, err := s.svc.RequireOrgPermission(r.Context(), orgID, "organisation:update"); err != nil {
+	if _, err := s.svc.RequireOrgPermission(r.Context(), orgID, "api_keys:manage"); err != nil {
 		writeError(w, err)
 		return
 	}
 	var body struct {
-		Name string `json:"name"`
+		Name   string   `json:"name"`
+		Scopes []string `json:"scopes"`
 	}
 	if err := decodeJSON(r, &body); err != nil {
 		writeError(w, apperr.Validation("invalid JSON body"))
 		return
 	}
-	created, err := s.svc.CreateOrganisationAPIKey(r.Context(), orgID, service.CreateAPIKeyInput{Name: body.Name})
+	created, err := s.svc.CreateOrganisationAPIKey(r.Context(), orgID, service.CreateAPIKeyInput{
+		Name:   body.Name,
+		Scopes: body.Scopes,
+	})
 	if err != nil {
 		writeError(w, err)
 		return
 	}
-	writeJSON(w, http.StatusCreated, map[string]any{
-		"id":              created.Key.ID,
-		"name":            created.Key.Name,
-		"key_prefix":      created.Key.KeyPrefix,
-		"organisation_id": orgID,
-		"token":           created.Raw,
-		"created_at":      created.Key.CreatedAt.UTC().Format(time.RFC3339Nano),
-	})
+	item := apiKeyJSON(created.Key)
+	item["organisation_id"] = orgID
+	item["token"] = created.Raw
+	writeJSON(w, http.StatusCreated, item)
 }
 
 func (s *Server) handleListOrgAPIKeys(w http.ResponseWriter, r *http.Request) {
 	orgID := r.PathValue("id")
-	if _, err := s.svc.RequireOrgPermission(r.Context(), orgID, "organisation:update"); err != nil {
+	if _, err := s.svc.RequireOrgPermission(r.Context(), orgID, "api_keys:read"); err != nil {
 		writeError(w, err)
 		return
 	}
@@ -127,17 +114,7 @@ func (s *Server) handleListOrgAPIKeys(w http.ResponseWriter, r *http.Request) {
 	}
 	items := make([]map[string]any, 0, len(keys))
 	for _, k := range keys {
-		item := map[string]any{
-			"id":         k.ID,
-			"name":       k.Name,
-			"key_prefix": k.KeyPrefix,
-			"created_at": k.CreatedAt.UTC().Format(time.RFC3339Nano),
-			"revoked":    k.RevokedAt.Valid,
-		}
-		if k.RevokedAt.Valid {
-			item["revoked_at"] = k.RevokedAt.Time.UTC().Format(time.RFC3339Nano)
-		}
-		items = append(items, item)
+		items = append(items, apiKeyJSON(k))
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"items": items})
 }
@@ -164,4 +141,26 @@ func (s *Server) handleListAuditEvents(w http.ResponseWriter, r *http.Request) {
 		items = append(items, item)
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"items": items})
+}
+
+func apiKeyJSON(k sqlc.ApiKey) map[string]any {
+	scopes := k.Scopes
+	if scopes == nil {
+		scopes = []string{}
+	}
+	item := map[string]any{
+		"id":         k.ID,
+		"name":       k.Name,
+		"key_prefix": k.KeyPrefix,
+		"scopes":     scopes,
+		"created_at": k.CreatedAt.UTC().Format(time.RFC3339Nano),
+		"revoked":    k.RevokedAt.Valid,
+	}
+	if k.RevokedAt.Valid {
+		item["revoked_at"] = k.RevokedAt.Time.UTC().Format(time.RFC3339Nano)
+	}
+	if k.LastUsedAt.Valid {
+		item["last_used_at"] = k.LastUsedAt.Time.UTC().Format(time.RFC3339Nano)
+	}
+	return item
 }

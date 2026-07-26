@@ -204,7 +204,9 @@ export type OrgAPIKey = {
   id: string
   name: string
   key_prefix: string
+  scopes: string[]
   created_at: string
+  last_used_at?: string
   revoked: boolean
   revoked_at?: string
   token?: string
@@ -414,10 +416,10 @@ export function listOrgAPIKeys(orgId: string) {
   return request<{ items: OrgAPIKey[] }>(`/v1/organisations/${orgId}/api-keys`)
 }
 
-export function createOrgAPIKey(orgId: string, name: string) {
+export function createOrgAPIKey(orgId: string, input: { name: string; scopes?: string[] }) {
   return request<OrgAPIKey>(`/v1/organisations/${orgId}/api-keys`, {
     method: 'POST',
-    body: JSON.stringify({ name }),
+    body: JSON.stringify(input),
   })
 }
 

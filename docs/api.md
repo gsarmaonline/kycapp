@@ -2,7 +2,15 @@
 
 Base path: `/v1`. JSON request/response bodies.
 
-Related: [data model](data-model.md) · [flows](flows.md) · [variable referencing](variables.md) · [OpenAPI](openapi.yaml)
+Related: [data model](data-model.md) · [flows](flows.md) · [variable referencing](variables.md) · [Operator OpenAPI](openapi.yaml) · Integration OpenAPI (in-app **Documentation → Integration API**)
+
+### Merchant Integration vs Operator API
+
+| Audience | Auth | Use for | In-app docs |
+| --- | --- | --- | --- |
+| Merchant backend | Org API key `kyc_…` | App users, attributes, product plans, entitlement checks, inbound webhook receive | **Integration API** |
+| KYC operator UI | Session `kyc_sess_…` | Google OAuth, members, roles, permissions, settings, automations, email templates | **Operator API** |
+| Platform ops | Unscoped service token / `platform_admin` | Plan catalog writes, platform API keys, audit, entitlement overrides | **Operator API** (Platform / Billing admin routes) |
 
 ## Conventions
 
@@ -33,7 +41,7 @@ All other `/v1/*` require `Authorization: Bearer <token>`.
 
 **Session response** includes `token`, `expires_at`, `user`.
 
-**Tenancy:** user sessions may only access organisations with an **active** membership (plus RBAC on mutations). Unscoped service tokens and `platform_admin` users bypass membership for platform ops. Org-scoped API keys act only within their organisation. Plan catalog writes, platform API keys, audit, and entitlement overrides are **platform-only**.
+**Tenancy:** user sessions may only access organisations with an **active** membership (plus RBAC on mutations). Unscoped service tokens and `platform_admin` users bypass membership for platform ops. Org-scoped API keys (`kyc_…`) act only within their organisation, require the `api_access` entitlement, and may be limited by permission scopes (empty scopes = full org access). Plan catalog writes, platform API keys, audit, and entitlement overrides are **platform-only**.
 
 **Onboarding:** sign in with Google, then `POST /v1/organisations` (caller becomes owner + `free_plan`). Invited users sign in with Google using the invited email to link `google_sub` and accept the invite.
 
@@ -102,9 +110,9 @@ Hard-deletes the organisation and cascaded tenant data (members, roles, app user
 
 `POST /v1/organisations/{id}/archive` remains as a legacy alias for the same hard delete.
 
-### Settings / integrations / org API keys
+### Settings / integrations
 
-Requires `organisation:update`.
+Requires `organisation:update` unless noted.
 
 - `GET /v1/organisations/{id}/integrations` — connected tools (secrets masked as hints)
 - `PUT /v1/organisations/{id}/integrations/stripe` — `{ "secret_key"?, "publishable_key"? }` (omit a field to keep the current value)
@@ -131,11 +139,21 @@ Requires `organisation:update`.
 - `DELETE /v1/organisations/{id}/inbound-webhooks/{hookId}`
 - `POST /v1/hooks/inbound/{hookId}` — **public**; auth via header or `?secret=` / `?token=` per `auth_mode`
 - `POST /v1/hooks/inbound/{hookId}/{token}` — **public**; path-token `auth_mode`
-- `POST /v1/organisations/{id}/api-keys` — `{ "name" }` → includes `token` once
-- `GET /v1/organisations/{id}/api-keys`
-- `DELETE /v1/api-keys/{id}` — revoke (org keys: org admin; platform keys: platform)
 
-Org-scoped API keys authenticate as a service principal for that organisation only (not platform admin). Platform `POST /v1/api-keys` remains for ops.
+### Org API keys
+
+Merchant backends authenticate with org-scoped keys (`Authorization: Bearer kyc_…`). Keys are hashed at rest; the raw token is returned once on create.
+
+| Permission | Endpoints |
+| --- | --- |
+| `api_keys:read` | `GET /v1/organisations/{id}/api-keys` |
+| `api_keys:manage` | `POST /v1/organisations/{id}/api-keys`, `DELETE /v1/api-keys/{id}` (org keys) |
+
+- `POST /v1/organisations/{id}/api-keys` — `{ "name", "scopes"?: string[] }` → includes `token` once. Requires org `api_access` entitlement. `scopes` are RBAC permission keys (e.g. `app_users:write`); omit or `[]` for full org access.
+- `GET /v1/organisations/{id}/api-keys` — list with `scopes`, `last_used_at`, revoke status
+- `DELETE /v1/api-keys/{id}` — revoke (org keys: `api_keys:manage`; platform keys: platform)
+
+At request time, org keys fail auth if the org lacks `api_access`. Scoped keys may only pass `RequireOrgPermission` checks for permissions listed in `scopes` (empty scopes keep full access). Platform `POST /v1/api-keys` remains for ops and is unscoped.
 
 ### Branding / logo
 

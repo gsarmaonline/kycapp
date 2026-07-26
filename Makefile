@@ -1,4 +1,4 @@
-.PHONY: test test-unit test-store test-web test-e2e build run sqlc compose-up compose-down compose-logs web worker
+.PHONY: test test-unit test-store test-web test-e2e build run sqlc openapi compose-up compose-down compose-logs web worker
 
 test:
 	go test ./... -count=1 -timeout 5m
@@ -22,6 +22,11 @@ test-web:
 
 sqlc:
 	$$(go env GOPATH)/bin/sqlc generate
+
+# Sync full OpenAPI to the web app and generate the merchant Integration subset.
+openapi:
+	cp docs/openapi.yaml web/public/openapi.yaml
+	go run ./cmd/openapi-filter -in docs/openapi.yaml -out web/public/openapi-integration.yaml
 
 build:
 	go build -o bin/api ./cmd/api

@@ -2,25 +2,21 @@ import { useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import {
-  createOrgAPIKey,
   deleteOrganisation,
   deleteOrgIntegration,
   getOrganisation,
   importStripeCatalog,
-  listOrgAPIKeys,
   listOrgIntegrations,
   listStripeCatalog,
-  revokeAPIKey,
   syncProductPlansToStripe,
   updateOrganisation,
   upsertStripeIntegration,
-  type OrgAPIKey,
   type OrgIntegration,
   type Organisation,
   type StripeCatalogItem,
 } from '../api'
 import { PageHeader } from '../crud/ui'
-import { resourcePath } from '../org_nav'
+import { orgPath, resourcePath } from '../org_nav'
 
 export function SettingsPage() {
   const { orgId = '' } = useParams()
@@ -33,13 +29,10 @@ export function SettingsPage() {
     'discover',
   )
   const [integrations, setIntegrations] = useState<OrgIntegration[]>([])
-  const [apiKeys, setApiKeys] = useState<OrgAPIKey[]>([])
   const [stripeSecret, setStripeSecret] = useState('')
   const [stripePublishable, setStripePublishable] = useState('')
   const [catalog, setCatalog] = useState<StripeCatalogItem[] | null>(null)
   const [selectedPrices, setSelectedPrices] = useState<Record<string, boolean>>({})
-  const [newKeyName, setNewKeyName] = useState('Default')
-  const [createdToken, setCreatedToken] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [message, setMessage] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
@@ -51,18 +44,13 @@ export function SettingsPage() {
     setLoading(true)
     setError(null)
     try {
-      const [o, ints, keys] = await Promise.all([
-        getOrganisation(orgId),
-        listOrgIntegrations(orgId),
-        listOrgAPIKeys(orgId),
-      ])
+      const [o, ints] = await Promise.all([getOrganisation(orgId), listOrgIntegrations(orgId)])
       setOrg(o)
       setName(o.name)
       setAppUserAuthority(o.app_user_authority ?? 'kyc')
       setAppUserUpsertKey(o.app_user_ingest_upsert_key ?? 'external_id')
       setAppUserAttributesMode(o.app_user_attributes_mode ?? 'discover')
       setIntegrations(ints.items)
-      setApiKeys(keys.items)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to load settings')
     } finally {
@@ -236,40 +224,6 @@ export function SettingsPage() {
     }
   }
 
-  async function onCreateKey(e: FormEvent) {
-    e.preventDefault()
-    setBusy(true)
-    setError(null)
-    setMessage(null)
-    setCreatedToken(null)
-    try {
-      const key = await createOrgAPIKey(orgId, newKeyName)
-      setCreatedToken(key.token ?? null)
-      setNewKeyName('Default')
-      await refresh()
-      setMessage('API key created — copy the token now; it will not be shown again')
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Create key failed')
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  async function onRevokeKey(id: string) {
-    if (!confirm('Revoke this API key?')) return
-    setBusy(true)
-    setError(null)
-    try {
-      await revokeAPIKey(id)
-      await refresh()
-      setMessage('API key revoked')
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Revoke failed')
-    } finally {
-      setBusy(false)
-    }
-  }
-
   async function onDelete() {
     if (!org) return
     const typed = window.prompt(
@@ -295,7 +249,7 @@ export function SettingsPage() {
   return (
     <section className="settings">
       <PageHeader title="Settings" />
-      <p className="lede">Organisation profile, integrations, API keys, and danger zone.</p>
+      <p className="lede">Organisation profile, integrations, and danger zone.</p>
       {error && (
         <p className="error" role="alert">
           {error}
@@ -450,40 +404,11 @@ export function SettingsPage() {
       </section>
 
       <section className="settings-block">
-        <h3>KYC API keys</h3>
+        <h3>API keys</h3>
         <p className="status">
-          Org-scoped keys for calling KYC from your product backend. Shown once at creation.
+          Manage org-scoped keys for calling KYC from your product backend on the{' '}
+          <Link to={orgPath(orgId, 'api-keys')}>API keys</Link> page.
         </p>
-        {createdToken && (
-          <p className="settings-token" role="status">
-            <code>{createdToken}</code>
-          </p>
-        )}
-        <form className="create stacked" onSubmit={onCreateKey}>
-          <label>
-            Name
-            <input value={newKeyName} onChange={(e) => setNewKeyName(e.target.value)} required />
-          </label>
-          <button type="submit" disabled={busy}>
-            Create API key
-          </button>
-        </form>
-        <ul className="settings-key-list">
-          {apiKeys.length === 0 && <li className="status">No API keys yet</li>}
-          {apiKeys.map((k) => (
-            <li key={k.id}>
-              <span>
-                <strong>{k.name}</strong> · <code>{k.key_prefix}…</code>
-                {k.revoked ? ' · revoked' : ''}
-              </span>
-              {!k.revoked && (
-                <button type="button" className="ghost" disabled={busy} onClick={() => void onRevokeKey(k.id)}>
-                  Revoke
-                </button>
-              )}
-            </li>
-          ))}
-        </ul>
       </section>
 
       <section className="settings-block settings-danger">

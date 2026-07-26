@@ -143,6 +143,26 @@ Constraints: unique `key`; unique `(resource, action)`.
 | `app_users:write` | app_users | write | Users |
 | `email_templates:read` | email_templates | read | Messaging |
 | `email_templates:manage` | email_templates | manage | Messaging |
+| `api_keys:read` | api_keys | read | Admin |
+| `api_keys:manage` | api_keys | manage | Admin |
+
+### APIKey
+
+Machine credentials for calling KYC. Platform keys have null `organisation_id`; org keys are scoped to one tenant. Raw tokens are never stored (SHA-256 hash + prefix only).
+
+| Field | Type | Notes |
+| --- | --- | --- |
+| `id` | string | PK |
+| `name` | string | Label for operators |
+| `key_prefix` | string | First characters for UI identification |
+| `key_hash` | string | Unique SHA-256 hex of raw token |
+| `organisation_id` | string? | Null = platform key; set = org-scoped service principal |
+| `scopes` | text[] | RBAC permission keys; empty = full org access |
+| `last_used_at` | timestamptz? | Updated on successful Bearer auth |
+| `created_at` | timestamptz | |
+| `revoked_at` | timestamptz? | Soft revoke; excluded from auth lookup |
+
+Org keys require the organisation `api_access` entitlement to create and to authenticate.
 
 ### AttributeDefinition
 

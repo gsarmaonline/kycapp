@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
+	"sort"
 	"strings"
 
 	"github.com/gsarmaonline/kyc/internal/apperr"
@@ -29,7 +30,8 @@ func (s *Service) AuthenticateToken(ctx context.Context, raw string, envTokens [
 }
 
 type CreateAPIKeyInput struct {
-	Name string
+	Name   string
+	Scopes []string
 }
 
 type CreatedAPIKey struct {
@@ -45,6 +47,13 @@ func (s *Service) CreateOrganisationAPIKey(ctx context.Context, orgID string, in
 	if _, err := s.GetOrganisation(ctx, orgID); err != nil {
 		return CreatedAPIKey{}, err
 	}
+	allowed, err := s.CheckEntitlement(ctx, orgID, "api_access")
+	if err != nil {
+		return CreatedAPIKey{}, err
+	}
+	if !allowed {
+		return CreatedAPIKey{}, apperr.Forbidden("organisation lacks api_access entitlement")
+	}
 	return s.createAPIKey(ctx, orgID, in)
 }
 
@@ -52,6 +61,14 @@ func (s *Service) createAPIKey(ctx context.Context, orgID string, in CreateAPIKe
 	name := strings.TrimSpace(in.Name)
 	if name == "" {
 		return CreatedAPIKey{}, apperr.Validation("name is required")
+	}
+	scopes, err := s.normalizeAPIKeyScopes(ctx, in.Scopes)
+	if err != nil {
+		return CreatedAPIKey{}, err
+	}
+	// Platform keys ignore scopes.
+	if orgID == "" {
+		scopes = []string{}
 	}
 	raw, err := newAPIToken()
 	if err != nil {
@@ -67,11 +84,52 @@ func (s *Service) createAPIKey(ctx context.Context, orgID string, in CreateAPIKe
 		KeyPrefix:      prefix,
 		KeyHash:        HashAPIToken(raw),
 		OrganisationID: textArg(orgID),
+		Scopes:         scopes,
 	})
 	if err != nil {
 		return CreatedAPIKey{}, err
 	}
 	return CreatedAPIKey{Key: row, Raw: raw}, nil
+}
+
+func (s *Service) normalizeAPIKeyScopes(ctx context.Context, scopes []string) ([]string, error) {
+	if len(scopes) == 0 {
+		return []string{}, nil
+	}
+	seen := make(map[string]struct{}, len(scopes))
+	clean := make([]string, 0, len(scopes))
+	for _, raw := range scopes {
+		key := strings.TrimSpace(raw)
+		if key == "" {
+			continue
+		}
+		if _, ok := seen[key]; ok {
+			continue
+		}
+		seen[key] = struct{}{}
+		clean = append(clean, key)
+	}
+	if len(clean) == 0 {
+		return []string{}, nil
+	}
+	rows, err := s.db.Q().ListPermissionIDsByKeys(ctx, clean)
+	if err != nil {
+		return nil, err
+	}
+	if len(rows) != len(clean) {
+		known := make(map[string]struct{}, len(rows))
+		for _, r := range rows {
+			known[r.Key] = struct{}{}
+		}
+		for _, key := range clean {
+			if _, ok := known[key]; !ok {
+				return nil, apperr.Validation("unknown scope " + key)
+			}
+		}
+		return nil, apperr.Validation("unknown scope")
+	}
+	sort.Strings(clean)
+	return clean, nil
 }
 
 func (s *Service) ListAPIKeys(ctx context.Context) ([]sqlc.ApiKey, error) {

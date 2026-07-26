@@ -60,14 +60,21 @@ func (s *Service) AuthenticateBearer(ctx context.Context, raw string, envTokens 
 		return authn.Principal{}, false
 	}
 	p := authn.Principal{
-		Kind:  authn.KindService,
-		Actor: "api-key:" + key.Name,
+		Kind:     authn.KindService,
+		APIKeyID: key.ID,
+		Scopes:   append([]string(nil), key.Scopes...),
+		Actor:    "api-key:" + key.Name,
 	}
 	if key.OrganisationID.Valid {
 		p.OrganisationID = key.OrganisationID.String
+		allowed, entErr := s.CheckEntitlement(ctx, p.OrganisationID, "api_access")
+		if entErr != nil || !allowed {
+			return authn.Principal{}, false
+		}
 	} else {
 		p.PlatformAdmin = true
 	}
+	_ = s.db.Q().TouchAPIKeyLastUsed(ctx, key.ID)
 	return p, true
 }
 

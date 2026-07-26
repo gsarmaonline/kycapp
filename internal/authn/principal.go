@@ -15,6 +15,8 @@ type Principal struct {
 	Kind           Kind
 	UserID         string
 	OrganisationID string // set for org-scoped service API keys
+	APIKeyID       string
+	Scopes         []string // org API key permission scopes; empty = full org access
 	PlatformAdmin  bool
 	SessionID      string
 	Actor          string // audit label

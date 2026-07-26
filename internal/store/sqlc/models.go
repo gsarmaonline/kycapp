@@ -19,6 +19,8 @@ type ApiKey struct {
 	CreatedAt      time.Time          `json:"created_at"`
 	RevokedAt      pgtype.Timestamptz `json:"revoked_at"`
 	OrganisationID pgtype.Text        `json:"organisation_id"`
+	Scopes         []string           `json:"scopes"`
+	LastUsedAt     pgtype.Timestamptz `json:"last_used_at"`
 }
 
 type AppUser struct {

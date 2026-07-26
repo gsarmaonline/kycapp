@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"errors"
+	"slices"
 
 	"github.com/gsarmaonline/kyc/internal/apperr"
 	"github.com/gsarmaonline/kyc/internal/authn"
@@ -91,7 +92,9 @@ func (s *Service) requireOrgMember(ctx context.Context, orgID string, requireAct
 	return p, nil
 }
 
-// RequireOrgPermission requires org membership plus an RBAC permission (platform and org API keys bypass).
+// RequireOrgPermission requires org membership plus an RBAC permission.
+// Platform principals bypass. Org API keys succeed when scopes are empty (full access)
+// or explicitly include the requested permission.
 func (s *Service) RequireOrgPermission(ctx context.Context, orgID, permissionKey string) (authn.Principal, error) {
 	return s.requireOrgPermission(ctx, orgID, permissionKey, true)
 }
@@ -110,7 +113,10 @@ func (s *Service) requireOrgPermission(ctx context.Context, orgID, permissionKey
 		return p, nil
 	}
 	if p.Kind == authn.KindService && p.OrganisationID == orgID {
-		return p, nil
+		if len(p.Scopes) == 0 || slices.Contains(p.Scopes, permissionKey) {
+			return p, nil
+		}
+		return authn.Principal{}, apperr.Forbidden("missing permission " + permissionKey)
 	}
 	allowed, err := s.CheckAuthz(ctx, AuthzCheckInput{
 		OrganisationID: orgID,

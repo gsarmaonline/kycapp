@@ -37,6 +37,7 @@ sql:
       - "internal/store/migrations/000032_free_plan.up.sql"
       - "internal/store/migrations/000033_email_typography.up.sql"
       - "internal/store/migrations/000034_email_shared_placeholders.up.sql"
+      - "internal/store/migrations/000035_api_key_scopes.up.sql"
     gen:
       go:
         package: "sqlc"

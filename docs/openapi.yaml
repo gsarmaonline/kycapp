@@ -1,12 +1,18 @@
 openapi: 3.0.3
 info:
-  title: KYC API
+  title: KYC Operator API
   version: 1.0.0
   description: |
-    JSON API for organisations, members, app users, automations, billing, and platform operations.
+    Full JSON API for the KYC operator UI and platform operations (sessions, members, roles,
+    permissions, org settings, automations, billing admin, and more).
 
-    Authenticated routes require `Authorization: Bearer <token>` where the token is either a **session**
-    (`kyc_sess_…` from Google OAuth or dev login) or a **service/platform API key**.
+    Authenticated routes require `Authorization: Bearer <token>`:
+    - **Session** (`kyc_sess_…`) from Google OAuth or dev login — operator UI
+    - **Organisation API key** (`kyc_…`) — merchant backends (see Integration API for the subset)
+    - **Platform / env service token** — ops only
+
+    Merchants integrating their product with KYC should use the **Integration API** docs tab
+    (app users, attributes, product plans, entitlement checks), not Auth or Members/permissions routes.
 
 servers:
   - url: /
@@ -938,6 +944,7 @@ paths:
     get:
       tags: [Organisations]
       summary: List organisation API keys
+      description: Requires api_keys:read. Includes scopes and last_used_at.
       responses:
         "200":
           description: API key list
@@ -955,7 +962,9 @@ paths:
     post:
       tags: [Organisations]
       summary: Create organisation API key
-      description: Token returned once in response.
+      description: >
+        Token returned once in response. Requires api_keys:manage and the organisation
+        api_access entitlement. Empty scopes means full organisation access.
       requestBody:
         required: true
         content:
@@ -966,6 +975,11 @@ paths:
               properties:
                 name:
                   type: string
+                scopes:
+                  type: array
+                  items:
+                    type: string
+                  description: RBAC permission keys; omit or [] for full access
       responses:
         "201":
           description: Created key (includes token once)
@@ -3611,7 +3625,15 @@ components:
           type: string
         key_prefix:
           type: string
+        scopes:
+          type: array
+          items:
+            type: string
+          description: Empty array means full organisation access
         created_at:
+          type: string
+          format: date-time
+        last_used_at:
           type: string
           format: date-time
         revoked:

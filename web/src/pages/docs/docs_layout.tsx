@@ -10,12 +10,18 @@ export function DocsLayout() {
     <section className="docs-section">
       <PageHeader title="Documentation" />
       <p className="lede">
-        API reference (OpenAPI) and the shared variable path vocabulary used in emails, webhooks,
-        automations, and database mappings.
+        Integration APIs for merchant backends, the full operator/platform OpenAPI, and the shared
+        variable path vocabulary.
       </p>
       <nav className="docs-tabs" aria-label="Documentation sections">
         <NavLink to={base} end className={({ isActive }) => (isActive ? 'docs-tab active' : 'docs-tab')}>
-          API reference
+          Integration API
+        </NavLink>
+        <NavLink
+          to={`${base}/operator`}
+          className={({ isActive }) => (isActive ? 'docs-tab active' : 'docs-tab')}
+        >
+          Operator API
         </NavLink>
         <NavLink
           to={`${base}/variables`}

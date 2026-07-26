@@ -64,7 +64,7 @@ sequenceDiagram
   participant Cust as Customer
 
   Op->>KYC: Create org, attributes, features, plan, automation
-  Op->>KYC: Create org API key (Settings)
+  Op->>KYC: Create org API key (API keys)
   App->>KYC: Integrate with key / SDK
 
   Cust->>App: Sign up (merchant auth)
@@ -105,7 +105,7 @@ sequenceDiagram
 
 ## Status
 
-**App login + API tenancy complete:** Google OAuth, sessions, membership-scoped org APIs, org-scoped API keys (Settings), login-gated UI.
+**App login + API tenancy complete:** Google OAuth, sessions, membership-scoped org APIs, org-scoped API keys (Platform → API keys), login-gated UI.
 
 **Merchant product surface:** app users, attributes, product features/plans, branding, email templates, automations (River + Resend), KYC billing via Stripe executor. In-app **Documentation** (OpenAPI + [variable referencing](docs/variables.md)) is under each organisation sidebar.
 
@@ -177,7 +177,7 @@ cd web && npm run dev
 | Principal | Can do |
 | --- | --- |
 | User session (Google or dev-login) | Own profile, orgs they belong to, RBAC-gated mutations |
-| Org API key (Settings) | That organisation only — app users, checks, integrations |
+| Org API key (Platform → API keys) | That organisation only — scoped by permissions; requires `api_access` |
 | Platform admin / unscoped service token | All orgs, plan catalog, platform API keys, audit, entitlement overrides |
 
 Public (no Bearer): `GET /v1/auth/providers`, `GET /v1/auth/google`, `GET /v1/auth/google/callback`, `POST /v1/auth/dev-login` (if enabled), `GET /v1/public/organisations/{id}/branding/logo`, health endpoints.
