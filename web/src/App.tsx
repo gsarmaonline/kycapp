@@ -34,7 +34,8 @@ import { MembersIndex } from './pages/members/members_index'
 import { MembersNew } from './pages/members/members_new'
 import { MembersShow } from './pages/members/members_show'
 import { OverviewPage } from './pages/overview_page'
-import { APIKeysPage } from './pages/api_keys/api_keys_page'
+import { APIKeysIndex } from './pages/api_keys/api_keys_index'
+import { APIKeysNew } from './pages/api_keys/api_keys_new'
 import { SettingsPage } from './pages/settings_page'
 import { ProductFeaturesEdit } from './pages/product_features/product_features_edit'
 import { ProductFeaturesIndex } from './pages/product_features/product_features_index'
@@ -188,7 +189,8 @@ export default function App() {
         <Route path="branding" element={<BrandingPage />} />
         <Route path="billing" element={<BillingPage />} />
         <Route path="settings" element={<SettingsPage />} />
-        <Route path="api-keys" element={<APIKeysPage />} />
+        <Route path="api-keys" element={<APIKeysIndex />} />
+        <Route path="api-keys/new" element={<APIKeysNew />} />
         <Route path="docs" element={<DocsLayout />}>
           <Route index element={<DocsIntegrationApiPage />} />
           <Route path="operator" element={<DocsOperatorApiPage />} />
