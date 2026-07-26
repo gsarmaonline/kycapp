@@ -529,8 +529,8 @@ body {
 
 .overview-stats li {
   padding: 0;
-  background: rgba(255, 253, 248, 0.9);
-  border: 1px solid #e7e5e4;
+  background: var(--app-panel);
+  border: 1px solid var(--app-border);
   border-radius: 4px;
   display: grid;
 }
@@ -547,11 +547,11 @@ body {
 }
 
 a.overview-tile:hover {
-  background: rgba(31, 77, 58, 0.08);
+  background: var(--app-accent-soft);
 }
 
 a.overview-tile:focus-visible {
-  outline: 2px solid #1f4d3a;
+  outline: 2px solid var(--app-accent);
   outline-offset: 2px;
 }
 
@@ -560,12 +560,12 @@ a.overview-tile:focus-visible {
 }
 
 .overview-stats span {
-  color: #57534e;
+  color: var(--app-fg-muted);
   font-size: 0.85rem;
 }
 
 .lede {
-  color: #57534e;
+  color: var(--app-fg-muted);
   margin: 0 0 1rem;
 }
 
