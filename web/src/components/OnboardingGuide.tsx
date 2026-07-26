@@ -63,11 +63,36 @@ export function OnboardingGuide({
   busy?: boolean
   onDismiss: () => void
 }) {
-  if (!onboarding.visible) return null
+  if (onboarding.steps.length === 0) return null
+  if (onboarding.completed_count >= onboarding.total_count) return null
 
   const pending = onboarding.steps.filter((s) => !s.done)
   const done = onboarding.steps.filter((s) => s.done)
   const firstPendingKey = pending[0]?.key ?? null
+  const next = pending[0]
+
+  if (onboarding.dismissed) {
+    if (!next) return null
+    return (
+      <section className="onboarding onboarding--compact" aria-labelledby="onboarding-title">
+        <div className="onboarding-compact-row">
+          <div>
+            <h2 id="onboarding-title" className="onboarding-title">
+              Getting started
+            </h2>
+            <p className="onboarding-compact-meta">
+              {onboarding.completed_count} of {onboarding.total_count} ready · Next: {next.label}
+            </p>
+          </div>
+          <Link className="onboarding-cta" to={orgPath(orgId, next.href as OrgSection)}>
+            {guideFor(next).cta}
+          </Link>
+        </div>
+      </section>
+    )
+  }
+
+  if (!onboarding.visible) return null
 
   return (
     <OnboardingGuideBody
