@@ -93,6 +93,8 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /v1/organisations", s.handleListOrganisations)
 	s.mux.HandleFunc("GET /v1/organisations/{id}", s.handleGetOrganisation)
 	s.mux.HandleFunc("PATCH /v1/organisations/{id}", s.handlePatchOrganisation)
+	s.mux.HandleFunc("GET /v1/organisations/{id}/onboarding", s.handleGetOrgOnboarding)
+	s.mux.HandleFunc("PATCH /v1/organisations/{id}/onboarding", s.handlePatchOrgOnboarding)
 	s.mux.HandleFunc("POST /v1/organisations/{id}/archive", s.handleArchiveOrganisation)
 	s.mux.HandleFunc("DELETE /v1/organisations/{id}", s.handleDeleteOrganisation)
 	s.mux.HandleFunc("GET /v1/organisations/{id}/integrations", s.handleListOrgIntegrations)

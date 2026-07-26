@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import {
+  dismissOrgOnboarding,
+  getOrgOnboarding,
   listAppUsers,
   listAttributeDefinitions,
   listAutomations,
@@ -8,6 +10,7 @@ import {
   listMemberships,
   listProductFeatures,
   listProductPlans,
+  type OrgOnboarding,
 } from '../api'
 import { OverviewPanel } from '../panels/overview_panel'
 
@@ -21,20 +24,26 @@ export function OverviewPage() {
   const [automationCount, setAutomationCount] = useState(0)
   const [featureCount, setFeatureCount] = useState(0)
   const [productPlanCount, setProductPlanCount] = useState(0)
+  const [onboarding, setOnboarding] = useState<OrgOnboarding | null>(null)
+  const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     void (async () => {
+      setReady(false)
+      setError(null)
       try {
-        const [m, users, attrs, templates, automations, features, productPlans] = await Promise.all([
-          listMemberships(orgId),
-          listAppUsers(orgId),
-          listAttributeDefinitions(orgId),
-          listEmailTemplates(orgId),
-          listAutomations(orgId),
-          listProductFeatures(orgId),
-          listProductPlans(orgId),
-        ])
+        const [m, users, attrs, templates, automations, features, productPlans, onboard] =
+          await Promise.all([
+            listMemberships(orgId),
+            listAppUsers(orgId),
+            listAttributeDefinitions(orgId),
+            listEmailTemplates(orgId),
+            listAutomations(orgId),
+            listProductFeatures(orgId),
+            listProductPlans(orgId),
+            getOrgOnboarding(orgId),
+          ])
         setMemberCount(m.items.length)
         setUserCount(users.items.length)
         setAttributeCount(attrs.items.length)
@@ -42,6 +51,7 @@ export function OverviewPage() {
         setAutomationCount(automations.items.length)
         setFeatureCount(features.items.length)
         setProductPlanCount(productPlans.items.length)
+        setOnboarding(onboard)
         setReady(true)
       } catch (e) {
         setError(e instanceof Error ? e.message : 'Failed to load')
@@ -49,21 +59,39 @@ export function OverviewPage() {
     })()
   }, [orgId])
 
-  if (error) return <p className="error">{error}</p>
+  async function onDismiss() {
+    setBusy(true)
+    setError(null)
+    try {
+      setOnboarding(await dismissOrgOnboarding(orgId))
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Dismiss failed')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  if (error && !ready) return <p className="error">{error}</p>
   if (!ready) return <p>Loading…</p>
 
   return (
-    <OverviewPanel
-      orgId={orgId}
-      tiles={[
-        { label: 'Members', value: memberCount, to: 'members' },
-        { label: 'Users', value: userCount, to: 'users' },
-        { label: 'User Attributes', value: attributeCount, to: 'attributes' },
-        { label: 'Emails', value: templateCount, to: 'email-templates' },
-        { label: 'Automations', value: automationCount, to: 'automations' },
-        { label: 'Features', value: featureCount, to: 'product-features' },
-        { label: 'Plans', value: productPlanCount, to: 'product-plans' },
-      ]}
-    />
+    <>
+      {error && <p className="error">{error}</p>}
+      <OverviewPanel
+        orgId={orgId}
+        onboarding={onboarding}
+        onboardingBusy={busy}
+        onDismissOnboarding={() => void onDismiss()}
+        tiles={[
+          { label: 'Members', value: memberCount, to: 'members' },
+          { label: 'Users', value: userCount, to: 'users' },
+          { label: 'User Attributes', value: attributeCount, to: 'attributes' },
+          { label: 'Emails', value: templateCount, to: 'email-templates' },
+          { label: 'Automations', value: automationCount, to: 'automations' },
+          { label: 'Features', value: featureCount, to: 'product-features' },
+          { label: 'Plans', value: productPlanCount, to: 'product-plans' },
+        ]}
+      />
+    </>
   )
 }

@@ -69,6 +69,28 @@ List. Users see only orgs they belong to; platform/service see all. Query: `stat
 
 Get one.
 
+### Getting started / onboarding
+
+Org-scoped checklist for the Overview dashboard. Step completion is **derived** from live data (branding customized, ≥1 product feature, plan, automation, active API key, app user). Only dismiss is stored.
+
+- `GET /v1/organisations/{id}/onboarding` — requires org membership. Callers without `organisation:update` get `{ "visible": false, "steps": [] }`. Owners/admins receive:
+
+```json
+{
+  "visible": true,
+  "dismissed": false,
+  "completed_count": 2,
+  "total_count": 6,
+  "steps": [
+    { "key": "branding", "label": "Brand your emails", "done": false, "href": "branding" }
+  ]
+}
+```
+
+`visible` is false when dismissed, when all steps are done, or when the caller cannot manage the org.
+
+- `PATCH /v1/organisations/{id}/onboarding` — `{ "dismissed": true }` hides the panel for the organisation. Requires `organisation:update`.
+
 ### `PATCH /v1/organisations/{id}`
 
 Update `{ "name"?, "status"?, "primary_color"?, "accent_color"?, "email_footer"?, "email_font"?, "email_typography"?, "app_user_authority"?, "app_user_ingest_upsert_key"?, "app_user_attributes_mode"? }`.  

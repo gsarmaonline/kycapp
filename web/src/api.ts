@@ -166,6 +166,32 @@ export function getOrganisation(id: string) {
   return request<Organisation>(`/v1/organisations/${id}`)
 }
 
+export type OnboardingStep = {
+  key: string
+  label: string
+  done: boolean
+  href: string
+}
+
+export type OrgOnboarding = {
+  visible: boolean
+  dismissed: boolean
+  completed_count: number
+  total_count: number
+  steps: OnboardingStep[]
+}
+
+export function getOrgOnboarding(orgId: string) {
+  return request<OrgOnboarding>(`/v1/organisations/${orgId}/onboarding`)
+}
+
+export function dismissOrgOnboarding(orgId: string) {
+  return request<OrgOnboarding>(`/v1/organisations/${orgId}/onboarding`, {
+    method: 'PATCH',
+    body: JSON.stringify({ dismissed: true }),
+  })
+}
+
 export function updateOrganisation(
   id: string,
   input: {

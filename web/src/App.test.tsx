@@ -48,6 +48,14 @@ vi.mock('./api', () => ({
   listAutomations: vi.fn(async () => ({ items: [] })),
   listProductFeatures: vi.fn(async () => ({ items: [] })),
   listProductPlans: vi.fn(async () => ({ items: [] })),
+  getOrgOnboarding: vi.fn(async () => ({
+    visible: false,
+    dismissed: false,
+    completed_count: 0,
+    total_count: 6,
+    steps: [],
+  })),
+  dismissOrgOnboarding: vi.fn(),
   getActiveProductPlan: vi.fn(async () => {
     throw new Error('not found')
   }),

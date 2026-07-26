@@ -164,6 +164,16 @@ Machine credentials for calling KYC. Platform keys have null `organisation_id`; 
 
 Org keys require the organisation `api_access` entitlement to create and to authenticate.
 
+### OrganisationOnboarding
+
+UI state for the Overview “Getting started” checklist. Step completion is derived from organisation data; this table only stores dismiss.
+
+| Field | Type | Notes |
+| --- | --- | --- |
+| `organisation_id` | string | PK, FK → Organisation |
+| `dismissed_at` | timestamptz? | Set when an admin dismisses the panel |
+| `updated_at` | timestamptz | |
+
 ### AttributeDefinition
 
 Org-scoped schema for end-user profile fields. Used by the merchant UI to group inputs via `section`.
