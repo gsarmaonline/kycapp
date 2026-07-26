@@ -14,7 +14,7 @@ import (
 
 const defaultPrimaryColor = "#1f4d3a"
 
-// OnboardingStep is one Getting started checklist item.
+// OnboardingStep is one Getting started setup step.
 type OnboardingStep struct {
 	Key   string `json:"key"`
 	Label string `json:"label"`
