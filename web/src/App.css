@@ -365,6 +365,73 @@ body {
   justify-self: start;
 }
 
+.onboarding {
+  margin: 0 0 1.5rem;
+  padding: 1rem 1.1rem;
+  border: 1px solid var(--app-border);
+  border-radius: 8px;
+  background: var(--app-panel);
+}
+
+.onboarding-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem 1rem;
+  margin-bottom: 0.75rem;
+}
+
+.onboarding-title {
+  margin: 0 0 0.25rem;
+  font-size: 1.05rem;
+  font-weight: 600;
+}
+
+.onboarding-progress {
+  margin: 0;
+}
+
+.onboarding-steps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.35rem;
+}
+
+.onboarding-steps li {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  font-size: 0.95rem;
+}
+
+.onboarding-marker {
+  width: 1.1rem;
+  text-align: center;
+  color: var(--app-fg-muted);
+  flex-shrink: 0;
+}
+
+.onboarding-steps li.done .onboarding-marker {
+  color: var(--app-accent);
+}
+
+.onboarding-label {
+  color: var(--app-fg);
+  text-decoration: none;
+}
+
+a.onboarding-label:hover {
+  text-decoration: underline;
+}
+
+.onboarding-done-label {
+  color: var(--app-fg-muted);
+  text-decoration: line-through;
+}
+
 .overview-stats {
   list-style: none;
   padding: 0;

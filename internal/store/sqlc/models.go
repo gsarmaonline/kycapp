@@ -199,6 +199,12 @@ type OrganisationIntegration struct {
 	UpdatedAt      time.Time `json:"updated_at"`
 }
 
+type OrganisationOnboarding struct {
+	OrganisationID string             `json:"organisation_id"`
+	DismissedAt    pgtype.Timestamptz `json:"dismissed_at"`
+	UpdatedAt      time.Time          `json:"updated_at"`
+}
+
 type OrganisationProductPlan struct {
 	OrganisationID string    `json:"organisation_id"`
 	ProductPlanID  string    `json:"product_plan_id"`
