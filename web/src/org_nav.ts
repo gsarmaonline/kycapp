@@ -126,7 +126,7 @@ export function orgPath(orgId: string, section: OrgSection = 'overview') {
 
 export function resourcePath(
   orgId: string,
-  section: Exclude<OrgSection, 'overview' | 'billing' | 'branding' | 'settings' | 'api-keys' | 'docs'>,
+  section: Exclude<OrgSection, 'overview' | 'billing' | 'branding' | 'settings' | 'docs'>,
   ...parts: string[]
 ) {
   const base = orgPath(orgId, section)

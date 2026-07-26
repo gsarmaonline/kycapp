@@ -373,6 +373,34 @@ body {
   background: var(--app-panel);
 }
 
+.onboarding--compact {
+  padding: 0.75rem 1rem;
+}
+
+.onboarding-compact-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.65rem 1rem;
+}
+
+.onboarding--compact .onboarding-title {
+  margin: 0 0 0.15rem;
+  font-size: 1rem;
+}
+
+.onboarding-compact-meta {
+  margin: 0;
+  font-size: 0.88rem;
+  color: var(--app-fg-muted);
+}
+
+.onboarding--compact .onboarding-cta {
+  padding: 0.35rem 0.7rem;
+  font-size: 0.85rem;
+}
+
 .onboarding-header {
   display: flex;
   flex-wrap: wrap;
