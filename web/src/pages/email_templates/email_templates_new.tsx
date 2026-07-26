@@ -1,9 +1,9 @@
 import { useState } from 'react'
 import type { FormEvent } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams } from 'react-router-dom'
 import { createEmailTemplate } from '../../api'
 import { FormActions, PageHeader } from '../../crud/ui'
-import { resourcePath } from '../../org_nav'
+import { orgPath, resourcePath } from '../../org_nav'
 
 export function EmailTemplatesNew() {
   const { orgId = '' } = useParams()
@@ -50,7 +50,8 @@ export function EmailTemplatesNew() {
         <label>
           Body
           <span className="field-hint">
-            Inner content only — header, logo, and footer come from Branding.
+            Inner content only — header, logo, footer, and other styling are carried over from{' '}
+            <Link to={orgPath(orgId, 'branding')}>Branding</Link>.
           </span>
           <textarea value={bodyText} onChange={(e) => setBodyText(e.target.value)} rows={5} required />
         </label>

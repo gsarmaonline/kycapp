@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { FormEvent } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams } from 'react-router-dom'
 import { getEmailTemplate, getOrganisation, updateEmailTemplate, type Organisation } from '../../api'
 import { FormActions, PageHeader } from '../../crud/ui'
 import { VariableDocsHint } from '../../components/VariableDocsHint'
 import { emailRenderContext, renderEmailTemplate, wrapEmailHtml } from '../../email_render'
-import { resourcePath } from '../../org_nav'
+import { orgPath, resourcePath } from '../../org_nav'
 
 export function EmailTemplatesEdit() {
   const { orgId = '', id = '' } = useParams()
@@ -107,7 +107,8 @@ export function EmailTemplatesEdit() {
         <label>
           Body (HTML)
           <VariableDocsHint>
-            Inner content only — header, logo, and footer come from Branding.
+            Inner content only — header, logo, footer, and other styling are carried over from{' '}
+            <Link to={orgPath(orgId, 'branding')}>Branding</Link>.
           </VariableDocsHint>
           <textarea value={bodyHtml} onChange={(e) => setBodyHtml(e.target.value)} rows={6} />
         </label>
