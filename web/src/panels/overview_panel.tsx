@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom'
 import type { OrgOnboarding } from '../api'
-import { OnboardingChecklist } from '../components/OnboardingChecklist'
+import { OnboardingGuide } from '../components/OnboardingGuide'
 import { orgPath, type OrgSection } from '../org_nav'
 
 type Tile = {
@@ -25,7 +25,7 @@ export function OverviewPanel({
   return (
     <section className="overview">
       {onboarding && onDismissOnboarding && (
-        <OnboardingChecklist
+        <OnboardingGuide
           orgId={orgId}
           onboarding={onboarding}
           busy={onboardingBusy}
