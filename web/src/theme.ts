@@ -21,6 +21,8 @@ export function getStoredTheme(): ThemeMode {
 
 export function applyTheme(mode: ThemeMode) {
   document.documentElement.dataset.theme = mode
+  // swagger-ui-react ≥5.31 gates its dark stylesheet on html.dark-mode
+  document.documentElement.classList.toggle('dark-mode', mode === 'dark')
 }
 
 export function setTheme(mode: ThemeMode) {
