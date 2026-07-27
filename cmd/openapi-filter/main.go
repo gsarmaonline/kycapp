@@ -21,6 +21,7 @@ var integrationPaths = map[string][]string{
 	"/v1/attribute-definitions/{id}":                 nil,
 	"/v1/organisations/{id}/product-features":        nil,
 	"/v1/product-features/{id}":                      nil,
+	"/v1/product-features/{id}/overrides":            {"put"},
 	"/v1/organisations/{id}/product-plans":           nil,
 	"/v1/product-plans/{id}":                         nil,
 	"/v1/product-plans/{id}/features":                nil,

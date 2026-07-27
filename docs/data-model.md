@@ -296,6 +296,20 @@ Each entitlement has a **scope**:
 | `description` | string | |
 | `scope` | enum | `platform` \| `product` |
 | `organisation_id` | string? | Null = global (platform) catalog; set = org-owned **product** feature |
+| `enabled` | bool | Kill switch (product features; ignored at check for platform) |
+| `rollout_percentage` | int | 0–100 progressive rollout among entitled end users (product features) |
+
+### ProductFeatureOverride
+
+Force include/exclude a subject for an org-owned product feature regardless of percentage.
+
+| Field | Type | Notes |
+| --- | --- | --- |
+| `entitlement_id` | string | FK → Entitlement (product scope) |
+| `subject_id` | string | Opaque id from merchant product (e.g. app user external id) |
+| `effect` | enum | `include` \| `exclude` |
+
+Runtime check: `POST /v1/entitlements/check` with `{ organisation_id, entitlement, subject_id? }` after plan entitlement passes.
 
 ### OrganisationWebhook
 
@@ -445,6 +459,12 @@ Product services often need both permission and entitlement:
 
 ```text
 allowed = org_has_entitlement("sso") && user_has_permission("roles:manage")
+```
+
+Progressive delivery for product features uses rollout on the same entitlement key:
+
+```text
+allowed = entitlement_check("premium_reports", subject_id)
 ```
 
 ---

@@ -39,7 +39,8 @@ sql:
       - "internal/store/migrations/000034_email_shared_placeholders.up.sql"
       - "internal/store/migrations/000035_api_key_scopes.up.sql"
       - "internal/store/migrations/000036_org_onboarding.up.sql"
-      - "internal/store/migrations/000037_product_feature_rollout.up.sql"
+      - "internal/store/migrations/000037_feature_flags.up.sql"
+      - "internal/store/migrations/000038_product_feature_rollout.up.sql"
     gen:
       go:
         package: "sqlc"

@@ -12,7 +12,7 @@ info:
     - **Platform / env service token** — ops only
 
     Merchants integrating their product with KYC should use the **Integration API** docs tab
-    (app users, attributes, product plans, entitlement checks), not Auth or Members/permissions routes.
+    (app users, attributes, product plans, entitlement checks, feature flags), not Auth or Members/permissions routes.
 
 servers:
   - url: /
@@ -40,7 +40,7 @@ tags:
   - name: Billing
     description: Plans, subscriptions, entitlements, Stripe checkout
   - name: Product
-    description: Merchant product features and plans
+    description: Merchant product features, plans, and feature flags
   - name: Platform
     description: Platform API keys, audit, health
 
@@ -1778,6 +1778,9 @@ paths:
                   type: string
                 entitlement:
                   type: string
+                subject_id:
+                  type: string
+                  description: Required for product features with rollout between 1 and 99
       responses:
         "200":
           description: Entitlement check result
@@ -1788,6 +1791,9 @@ paths:
                 properties:
                   allowed:
                     type: boolean
+                  reason:
+                    type: string
+                    enum: [disabled, override_include, override_exclude, percentage, full, off]
         default:
           $ref: "#/components/responses/Error"
 
@@ -2573,6 +2579,12 @@ paths:
                   type: string
                 description:
                   type: string
+                enabled:
+                  type: boolean
+                rollout_percentage:
+                  type: integer
+                  minimum: 0
+                  maximum: 100
       responses:
         "201":
           description: Created feature
@@ -2626,6 +2638,12 @@ paths:
               properties:
                 description:
                   type: string
+                enabled:
+                  type: boolean
+                rollout_percentage:
+                  type: integer
+                  minimum: 0
+                  maximum: 100
       responses:
         "200":
           description: Updated feature
@@ -2648,6 +2666,41 @@ paths:
                 properties:
                   ok:
                     type: boolean
+        default:
+          $ref: "#/components/responses/Error"
+
+  /v1/product-features/{id}/overrides:
+    parameters:
+      - $ref: "#/components/parameters/id"
+    put:
+      tags: [Product]
+      summary: Replace product feature subject overrides
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [overrides]
+              properties:
+                overrides:
+                  type: array
+                  items:
+                    type: object
+                    required: [subject_id, effect]
+                    properties:
+                      subject_id:
+                        type: string
+                      effect:
+                        type: string
+                        enum: [include, exclude]
+      responses:
+        "200":
+          description: Updated feature with overrides
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProductFeature"
         default:
           $ref: "#/components/responses/Error"
 
@@ -3414,6 +3467,20 @@ components:
         scope:
           type: string
           enum: [product]
+        enabled:
+          type: boolean
+        rollout_percentage:
+          type: integer
+        overrides:
+          type: array
+          items:
+            type: object
+            properties:
+              subject_id:
+                type: string
+              effect:
+                type: string
+                enum: [include, exclude]
 
     ProductPlan:
       type: object
