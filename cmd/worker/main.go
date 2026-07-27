@@ -11,6 +11,7 @@ import (
 	"github.com/gsarmaonline/kyc/internal/config"
 	"github.com/gsarmaonline/kyc/internal/jobs"
 	"github.com/gsarmaonline/kyc/internal/mailer"
+	"github.com/gsarmaonline/kyc/internal/observability"
 	"github.com/gsarmaonline/kyc/internal/service"
 	"github.com/gsarmaonline/kyc/internal/store"
 )
@@ -32,7 +33,14 @@ func main() {
 		log.Fatalf("migrate: %v", err)
 	}
 
+	obs, err := observability.NewFromURL(ctx, cfg.ObservabilityDatabaseURL)
+	if err != nil {
+		log.Fatalf("observability: %v", err)
+	}
+	defer obs.Close()
+
 	svc := service.New(db)
+	svc.SetObservability(obs)
 	svc.ConfigureAssets(cfg.UploadDir, cfg.PublicBaseURL)
 	mail, err := mailer.NewFromConfig(mailer.Config{
 		Provider: cfg.EmailProvider,
@@ -60,7 +68,7 @@ func main() {
 	if err := riverClient.Start(runCtx); err != nil {
 		log.Fatalf("river start: %v", err)
 	}
-	log.Printf("automation worker running (river, email=%s, schedules=UTC)", mail.Name())
+	log.Printf("automation worker running (river, email=%s, schedules=UTC, obs=%v)", mail.Name(), cfg.ObservabilityDatabaseURL != "")
 
 	stop := make(chan os.Signal, 1)
 	signal.Notify(stop, syscall.SIGINT, syscall.SIGTERM)

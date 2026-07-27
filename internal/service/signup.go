@@ -9,6 +9,7 @@ import (
 	"github.com/gsarmaonline/kyc/internal/ids"
 	"github.com/gsarmaonline/kyc/internal/jobs"
 	"github.com/gsarmaonline/kyc/internal/mailer"
+	"github.com/gsarmaonline/kyc/internal/observability"
 	"github.com/gsarmaonline/kyc/internal/payments"
 	"github.com/gsarmaonline/kyc/internal/store"
 	"github.com/gsarmaonline/kyc/internal/store/sqlc"
@@ -19,6 +20,7 @@ import (
 // Service implements domain operations.
 type Service struct {
 	db                 *store.Store
+	obs                observability.Store
 	uploadDir          string
 	publicBaseURL      string
 	enqueue            Enqueuer
@@ -37,6 +39,7 @@ type Enqueuer interface {
 func New(db *store.Store) *Service {
 	return &Service{
 		db:            db,
+		obs:           observability.NewNoop(),
 		uploadDir:     "data/uploads",
 		publicBaseURL: "http://localhost:8080",
 		mailer:        mailer.NewNoop(),
@@ -121,6 +124,8 @@ func seedSystemRoles(ctx context.Context, q *sqlc.Queries, orgID string) (owner,
 		"email_templates:read":  true,
 		"automations:read":      true,
 		"product_features:read": true,
+		"activity:read":         true,
+		"usage:read":            true,
 	}
 	for _, p := range perms {
 		if memberKeys[p.Key] {

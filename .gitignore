@@ -9,3 +9,6 @@ dist/
 web/node_modules/
 web/dist/
 data/uploads/
+
+# Local git worktrees (agent isolation)
+.worktrees/

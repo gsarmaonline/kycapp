@@ -39,10 +39,32 @@ sql:
       - "internal/store/migrations/000034_email_shared_placeholders.up.sql"
       - "internal/store/migrations/000035_api_key_scopes.up.sql"
       - "internal/store/migrations/000036_org_onboarding.up.sql"
+      - "internal/store/migrations/000038_activity_usage_permissions.up.sql"
     gen:
       go:
         package: "sqlc"
         out: "internal/store/sqlc"
+        sql_package: "pgx/v5"
+        emit_json_tags: true
+        emit_empty_slices: true
+        overrides:
+          - db_type: "timestamptz"
+            go_type: "time.Time"
+          - db_type: "pg_catalog.timestamptz"
+            go_type: "time.Time"
+          - db_type: "jsonb"
+            go_type: "encoding/json.RawMessage"
+          - db_type: "pg_catalog.jsonb"
+            go_type: "encoding/json.RawMessage"
+
+  - engine: "postgresql"
+    queries: "internal/obsstore/queries"
+    schema:
+      - "internal/obsstore/migrations/000001_init.up.sql"
+    gen:
+      go:
+        package: "sqlc"
+        out: "internal/obsstore/sqlc"
         sql_package: "pgx/v5"
         emit_json_tags: true
         emit_empty_slices: true

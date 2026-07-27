@@ -9,6 +9,7 @@ import (
 	"github.com/gsarmaonline/kyc/core/resources"
 	"github.com/gsarmaonline/kyc/internal/apperr"
 	"github.com/gsarmaonline/kyc/internal/ids"
+	"github.com/gsarmaonline/kyc/internal/observability"
 	"github.com/gsarmaonline/kyc/internal/store"
 	"github.com/gsarmaonline/kyc/internal/store/sqlc"
 	"github.com/jackc/pgx/v5"
@@ -215,9 +216,12 @@ func (s *Service) UpsertSubscription(ctx context.Context, orgID string, in Upser
 	default:
 		return sqlc.Subscription{}, apperr.Validation("invalid subscription status")
 	}
-	_, existingErr := s.db.Q().GetSubscriptionByOrganisation(ctx, orgID)
+	existing, existingErr := s.db.Q().GetSubscriptionByOrganisation(ctx, orgID)
 	created := errors.Is(existingErr, pgx.ErrNoRows)
-	if existingErr != nil && !created {
+	var prevStatus string
+	if existingErr == nil {
+		prevStatus = existing.Status
+	} else if !created {
 		return sqlc.Subscription{}, existingErr
 	}
 	sub, err := s.db.Q().UpsertSubscription(ctx, sqlc.UpsertSubscriptionParams{
@@ -231,10 +235,23 @@ func (s *Service) UpsertSubscription(ctx context.Context, orgID string, in Upser
 		return sqlc.Subscription{}, err
 	}
 	lifecycle := resources.LifecycleUpdated
+	action := observability.ActionSubscriptionUpdated
+	summary := "Subscription updated"
 	if created {
 		lifecycle = resources.LifecycleCreated
+		action = observability.ActionSubscriptionCreated
+		summary = "Subscription created"
 	}
 	s.EnqueueResourceLifecycle(ctx, orgID, resources.Subscription, lifecycle, subscriptionEventPayload(sub))
+	org, _ := s.db.Q().GetOrganisation(ctx, orgID)
+	payload := map[string]any{}
+	if prevStatus != "" && prevStatus != sub.Status {
+		action = observability.ActionSubscriptionStatusChanged
+		summary = "Subscription status changed"
+		payload["from_status"] = prevStatus
+		payload["to_status"] = sub.Status
+	}
+	s.recordActivity(ctx, activityForSubscription(org, sub, action, summary, payload))
 	return sub, nil
 }
 
@@ -416,5 +433,15 @@ func (s *Service) CheckEntitlement(ctx context.Context, orgID, entitlementKey st
 	if err != nil {
 		return false, err
 	}
-	return billing.Has(effective, entitlementKey), nil
+	allowed := billing.Has(effective, entitlementKey)
+	s.incrUsage(ctx, observability.UsageDelta{
+		OrganisationID: orgID,
+		MeterKey:       observability.MeterEntitlementCheck,
+		Dim1Key:        "entitlement",
+		Dim1Value:      entitlementKey,
+		Dim2Key:        "result",
+		Dim2Value:      entitlementResultLabel(allowed),
+		Delta:          1,
+	})
+	return allowed, nil
 }

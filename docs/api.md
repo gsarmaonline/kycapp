@@ -471,6 +471,11 @@ Env `API_TOKENS` are bootstrap service principals (same privilege as platform).
 
 - `GET /v1/audit-events` — recent mutating `/v1` requests (`actor`, `method`, `path`, `status_code`)
 
+### Observability (org-scoped; separate DB)
+
+- `GET /v1/organisations/{id}/activity` — semantic activity timeline (`activity:read`)
+- `GET /v1/organisations/{id}/usage` — usage meter rollups (`usage:read`; query `from`/`to` RFC3339)
+
 ### Rate limits
 
 - Check endpoints: `CHECK_RATE_LIMIT_PER_MIN` per actor

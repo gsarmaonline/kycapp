@@ -9,13 +9,14 @@ import (
 
 // Config holds runtime configuration loaded from the environment.
 type Config struct {
-	HTTPAddr             string
-	DatabaseURL          string
-	CORSOrigin           string
-	APITokens            []string
-	PlatformAdminEmails  []string
-	CheckRateLimitPerMin int
-	AuthRateLimitPerMin  int
+	HTTPAddr                 string
+	DatabaseURL              string
+	ObservabilityDatabaseURL string
+	CORSOrigin               string
+	APITokens                []string
+	PlatformAdminEmails      []string
+	CheckRateLimitPerMin     int
+	AuthRateLimitPerMin      int
 
 	GoogleClientID     string
 	GoogleClientSecret string
@@ -41,34 +42,38 @@ type Config struct {
 // Load reads configuration from environment variables.
 func Load() (Config, error) {
 	cfg := Config{
-		HTTPAddr:             httpListenAddr(),
-		DatabaseURL:          os.Getenv("DATABASE_URL"),
-		CORSOrigin:           os.Getenv("CORS_ORIGIN"),
-		APITokens:            splitCSV(os.Getenv("API_TOKENS")),
-		PlatformAdminEmails:  splitCSV(os.Getenv("PLATFORM_ADMIN_EMAILS")),
-		CheckRateLimitPerMin: envInt("CHECK_RATE_LIMIT_PER_MIN", 120),
-		AuthRateLimitPerMin:  envInt("AUTH_RATE_LIMIT_PER_MIN", 20),
-		GoogleClientID:       os.Getenv("GOOGLE_CLIENT_ID"),
-		GoogleClientSecret:   os.Getenv("GOOGLE_CLIENT_SECRET"),
-		OAuthRedirectURL:     envOr("OAUTH_REDIRECT_URL", "http://localhost:8080/v1/auth/google/callback"),
-		AppOrigin:            envOr("APP_ORIGIN", "http://localhost:8080"),
-		OAuthStateSecret:     envOr("OAUTH_STATE_SECRET", os.Getenv("API_TOKENS")),
-		AuthDevLogin:         envBool("AUTH_DEV_LOGIN", false),
-		UploadDir:            envOr("UPLOAD_DIR", "data/uploads"),
-		PublicBaseURL:        envOr("PUBLIC_BASE_URL", envOr("APP_ORIGIN", "http://localhost:8080")),
-		PaymentsProvider:     envOr("PAYMENTS_PROVIDER", "noop"),
-		StripeSecretKey:      os.Getenv("STRIPE_SECRET_KEY"),
-		StripeWebhookSecret:  os.Getenv("STRIPE_WEBHOOK_SECRET"),
-		StripeSuccessURL:     os.Getenv("STRIPE_SUCCESS_URL"),
-		StripeCancelURL:      os.Getenv("STRIPE_CANCEL_URL"),
-		EmailProvider:        envOr("EMAIL_PROVIDER", "noop"),
-		ResendAPIKey:         os.Getenv("RESEND_API_KEY"),
-		EmailFrom:            os.Getenv("EMAIL_FROM"),
+		HTTPAddr:                 httpListenAddr(),
+		DatabaseURL:              os.Getenv("DATABASE_URL"),
+		ObservabilityDatabaseURL: os.Getenv("OBSERVABILITY_DATABASE_URL"),
+		CORSOrigin:               os.Getenv("CORS_ORIGIN"),
+		APITokens:                splitCSV(os.Getenv("API_TOKENS")),
+		PlatformAdminEmails:      splitCSV(os.Getenv("PLATFORM_ADMIN_EMAILS")),
+		CheckRateLimitPerMin:     envInt("CHECK_RATE_LIMIT_PER_MIN", 120),
+		AuthRateLimitPerMin:      envInt("AUTH_RATE_LIMIT_PER_MIN", 20),
+		GoogleClientID:           os.Getenv("GOOGLE_CLIENT_ID"),
+		GoogleClientSecret:       os.Getenv("GOOGLE_CLIENT_SECRET"),
+		OAuthRedirectURL:         envOr("OAUTH_REDIRECT_URL", "http://localhost:8080/v1/auth/google/callback"),
+		AppOrigin:                envOr("APP_ORIGIN", "http://localhost:8080"),
+		OAuthStateSecret:         envOr("OAUTH_STATE_SECRET", os.Getenv("API_TOKENS")),
+		AuthDevLogin:             envBool("AUTH_DEV_LOGIN", false),
+		UploadDir:                envOr("UPLOAD_DIR", "data/uploads"),
+		PublicBaseURL:            envOr("PUBLIC_BASE_URL", envOr("APP_ORIGIN", "http://localhost:8080")),
+		PaymentsProvider:         envOr("PAYMENTS_PROVIDER", "noop"),
+		StripeSecretKey:          os.Getenv("STRIPE_SECRET_KEY"),
+		StripeWebhookSecret:      os.Getenv("STRIPE_WEBHOOK_SECRET"),
+		StripeSuccessURL:         os.Getenv("STRIPE_SUCCESS_URL"),
+		StripeCancelURL:          os.Getenv("STRIPE_CANCEL_URL"),
+		EmailProvider:            envOr("EMAIL_PROVIDER", "noop"),
+		ResendAPIKey:             os.Getenv("RESEND_API_KEY"),
+		EmailFrom:                os.Getenv("EMAIL_FROM"),
 	}
 	if cfg.DatabaseURL == "" {
 		return Config{}, fmt.Errorf("DATABASE_URL is required")
 	}
 	cfg.DatabaseURL = normalizeDatabaseURL(cfg.DatabaseURL)
+	if cfg.ObservabilityDatabaseURL != "" {
+		cfg.ObservabilityDatabaseURL = normalizeDatabaseURL(cfg.ObservabilityDatabaseURL)
+	}
 	if cfg.OAuthStateSecret == "" {
 		cfg.OAuthStateSecret = "dev-insecure-oauth-state"
 	}

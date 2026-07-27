@@ -10,6 +10,7 @@ import (
 
 	"github.com/gsarmaonline/kyc/internal/apperr"
 	"github.com/gsarmaonline/kyc/internal/ids"
+	"github.com/gsarmaonline/kyc/internal/observability"
 	"github.com/gsarmaonline/kyc/internal/store/sqlc"
 	"github.com/jackc/pgx/v5/pgtype"
 )
@@ -89,6 +90,19 @@ func (s *Service) createAPIKey(ctx context.Context, orgID string, in CreateAPIKe
 	if err != nil {
 		return CreatedAPIKey{}, err
 	}
+	if orgID != "" {
+		s.recordActivity(ctx, observability.Activity{
+			OrganisationID: orgID,
+			Action:         observability.ActionAPIKeyCreated,
+			ResourceType:   "api_key",
+			ResourceID:     row.ID,
+			Summary:        "API key created",
+			Payload: map[string]any{
+				"name":       row.Name,
+				"key_prefix": row.KeyPrefix,
+			},
+		})
+	}
 	return CreatedAPIKey{Key: row, Raw: raw}, nil
 }
 
@@ -145,7 +159,23 @@ func (s *Service) ListOrganisationAPIKeys(ctx context.Context, orgID string) ([]
 
 func (s *Service) RevokeAPIKey(ctx context.Context, id string) (sqlc.ApiKey, error) {
 	key, err := s.db.Q().RevokeAPIKey(ctx, id)
-	return key, mapNotFound(err, "api key not found")
+	if err != nil {
+		return key, mapNotFound(err, "api key not found")
+	}
+	if key.OrganisationID.Valid && key.OrganisationID.String != "" {
+		s.recordActivity(ctx, observability.Activity{
+			OrganisationID: key.OrganisationID.String,
+			Action:         observability.ActionAPIKeyRevoked,
+			ResourceType:   "api_key",
+			ResourceID:     key.ID,
+			Summary:        "API key revoked",
+			Payload: map[string]any{
+				"name":       key.Name,
+				"key_prefix": key.KeyPrefix,
+			},
+		})
+	}
+	return key, nil
 }
 
 func (s *Service) GetAPIKey(ctx context.Context, id string) (sqlc.ApiKey, error) {
