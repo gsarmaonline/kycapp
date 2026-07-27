@@ -370,6 +370,31 @@ Which product plan is active for the organisation’s end users.
 
 **Effective entitlements** = KYC plan entitlements ∪ active product plan features ∪ grants − denies.
 
+### FeatureFlag
+
+Org-owned progressive delivery flag (separate from Entitlement / product features).
+
+| Field | Type | Notes |
+| --- | --- | --- |
+| `id` | string | PK |
+| `organisation_id` | string | FK → Organisation |
+| `key` | string | Unique per org |
+| `description` | string | |
+| `enabled` | bool | Master kill switch |
+| `rollout_percentage` | int | 0–100 |
+
+### FeatureFlagOverride
+
+Force include/exclude a subject regardless of percentage.
+
+| Field | Type | Notes |
+| --- | --- | --- |
+| `feature_flag_id` | string | FK → FeatureFlag |
+| `subject_id` | string | Opaque id from merchant product (e.g. app user external id) |
+| `effect` | enum | `include` \| `exclude` |
+
+Runtime check: `POST /v1/feature-flags/check` with `{ organisation_id, flag, subject_id? }`.
+
 ### PlanEntitlement
 
 Join: Plan ↔ Entitlement.
@@ -440,11 +465,18 @@ Per-org overrides on top of KYC plan + active product plan.
 | --- | --- |
 | Platform capability | “May Acme use SSO / this KYC feature?” |
 | Product feature | “May Acme unlock this feature in its own product?” |
+| Feature flag | “Is this subject in the progressive rollout for X?” |
 
 Product services often need both permission and entitlement:
 
 ```text
 allowed = org_has_entitlement("sso") && user_has_permission("roles:manage")
+```
+
+Progressive delivery is separate:
+
+```text
+flag_on = feature_flag_enabled("new_checkout", subject_id)
 ```
 
 ---

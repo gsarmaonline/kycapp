@@ -91,6 +91,7 @@ When a merchant uses the product:
 
 1. Resolve session → `user_id` + current `organisation_id`.
 2. `POST /v1/entitlements/check` — is the org allowed this platform capability or product feature?
-3. `POST /v1/authz/check` — is this user allowed this action?
+3. `POST /v1/feature-flags/check` — is this subject in the progressive rollout? (optional)
+4. `POST /v1/authz/check` — is this user allowed this action?
 
-Both must pass when a feature is gated by plan **and** role.
+Entitlement + role must pass when a feature is gated by plan **and** role. Feature flags gate gradual release independently.

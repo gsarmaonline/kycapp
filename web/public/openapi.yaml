@@ -12,7 +12,7 @@ info:
     - **Platform / env service token** — ops only
 
     Merchants integrating their product with KYC should use the **Integration API** docs tab
-    (app users, attributes, product plans, entitlement checks), not Auth or Members/permissions routes.
+    (app users, attributes, product plans, entitlement checks, feature flags), not Auth or Members/permissions routes.
 
 servers:
   - url: /
@@ -40,7 +40,7 @@ tags:
   - name: Billing
     description: Plans, subscriptions, entitlements, Stripe checkout
   - name: Product
-    description: Merchant product features and plans
+    description: Merchant product features, plans, and feature flags
   - name: Platform
     description: Platform API keys, audit, health
 
@@ -2651,6 +2651,184 @@ paths:
         default:
           $ref: "#/components/responses/Error"
 
+  /v1/organisations/{id}/feature-flags:
+    parameters:
+      - $ref: "#/components/parameters/orgId"
+    post:
+      tags: [Product]
+      summary: Create feature flag
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [key]
+              properties:
+                key:
+                  type: string
+                description:
+                  type: string
+                enabled:
+                  type: boolean
+                rollout_percentage:
+                  type: integer
+                  minimum: 0
+                  maximum: 100
+      responses:
+        "201":
+          description: Created flag
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FeatureFlag"
+        default:
+          $ref: "#/components/responses/Error"
+    get:
+      tags: [Product]
+      summary: List feature flags
+      responses:
+        "200":
+          description: Flag list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/FeatureFlag"
+        default:
+          $ref: "#/components/responses/Error"
+
+  /v1/feature-flags/{id}:
+    parameters:
+      - $ref: "#/components/parameters/id"
+    get:
+      tags: [Product]
+      summary: Get feature flag
+      responses:
+        "200":
+          description: Flag
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FeatureFlag"
+        default:
+          $ref: "#/components/responses/Error"
+    patch:
+      tags: [Product]
+      summary: Update feature flag
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                description:
+                  type: string
+                enabled:
+                  type: boolean
+                rollout_percentage:
+                  type: integer
+                  minimum: 0
+                  maximum: 100
+      responses:
+        "200":
+          description: Updated flag
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FeatureFlag"
+        default:
+          $ref: "#/components/responses/Error"
+    delete:
+      tags: [Product]
+      summary: Delete feature flag
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+        default:
+          $ref: "#/components/responses/Error"
+
+  /v1/feature-flags/{id}/overrides:
+    parameters:
+      - $ref: "#/components/parameters/id"
+    put:
+      tags: [Product]
+      summary: Replace feature flag subject overrides
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [overrides]
+              properties:
+                overrides:
+                  type: array
+                  items:
+                    type: object
+                    required: [subject_id, effect]
+                    properties:
+                      subject_id:
+                        type: string
+                      effect:
+                        type: string
+                        enum: [include, exclude]
+      responses:
+        "200":
+          description: Updated flag with overrides
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FeatureFlag"
+        default:
+          $ref: "#/components/responses/Error"
+
+  /v1/feature-flags/check:
+    post:
+      tags: [Product]
+      summary: Check feature flag for a subject
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [organisation_id, flag]
+              properties:
+                organisation_id:
+                  type: string
+                flag:
+                  type: string
+                subject_id:
+                  type: string
+                  description: Required when rollout_percentage is between 1 and 99
+      responses:
+        "200":
+          description: Flag check result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  enabled:
+                    type: boolean
+                  reason:
+                    type: string
+                    enum: [disabled, override_include, override_exclude, percentage, full, off]
+        default:
+          $ref: "#/components/responses/Error"
+
   /v1/organisations/{id}/product-plans:
     parameters:
       - $ref: "#/components/parameters/orgId"
@@ -3414,6 +3592,38 @@ components:
         scope:
           type: string
           enum: [product]
+
+    FeatureFlag:
+      type: object
+      properties:
+        id:
+          type: string
+        organisation_id:
+          type: string
+        key:
+          type: string
+        description:
+          type: string
+        enabled:
+          type: boolean
+        rollout_percentage:
+          type: integer
+        overrides:
+          type: array
+          items:
+            type: object
+            properties:
+              subject_id:
+                type: string
+              effect:
+                type: string
+                enum: [include, exclude]
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
 
     ProductPlan:
       type: object

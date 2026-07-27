@@ -41,6 +41,10 @@ import { ProductFeaturesEdit } from './pages/product_features/product_features_e
 import { ProductFeaturesIndex } from './pages/product_features/product_features_index'
 import { ProductFeaturesNew } from './pages/product_features/product_features_new'
 import { ProductFeaturesShow } from './pages/product_features/product_features_show'
+import { FeatureFlagsEdit } from './pages/feature_flags/feature_flags_edit'
+import { FeatureFlagsIndex } from './pages/feature_flags/feature_flags_index'
+import { FeatureFlagsNew } from './pages/feature_flags/feature_flags_new'
+import { FeatureFlagsShow } from './pages/feature_flags/feature_flags_show'
 import { ProductPlansEdit } from './pages/product_plans/product_plans_edit'
 import { ProductPlansIndex } from './pages/product_plans/product_plans_index'
 import { ProductPlansNew } from './pages/product_plans/product_plans_new'
@@ -182,6 +186,10 @@ export default function App() {
         <Route path="product-features/new" element={<ProductFeaturesNew />} />
         <Route path="product-features/:id" element={<ProductFeaturesShow />} />
         <Route path="product-features/:id/edit" element={<ProductFeaturesEdit />} />
+        <Route path="feature-flags" element={<FeatureFlagsIndex />} />
+        <Route path="feature-flags/new" element={<FeatureFlagsNew />} />
+        <Route path="feature-flags/:id" element={<FeatureFlagsShow />} />
+        <Route path="feature-flags/:id/edit" element={<FeatureFlagsEdit />} />
         <Route path="product-plans" element={<ProductPlansIndex />} />
         <Route path="product-plans/new" element={<ProductPlansNew />} />
         <Route path="product-plans/:id" element={<ProductPlansShow />} />

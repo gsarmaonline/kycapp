@@ -120,6 +120,24 @@ type Entitlement struct {
 	OrganisationID pgtype.Text `json:"organisation_id"`
 }
 
+type FeatureFlag struct {
+	ID                string    `json:"id"`
+	OrganisationID    string    `json:"organisation_id"`
+	Key               string    `json:"key"`
+	Description       string    `json:"description"`
+	Enabled           bool      `json:"enabled"`
+	RolloutPercentage int32     `json:"rollout_percentage"`
+	CreatedAt         time.Time `json:"created_at"`
+	UpdatedAt         time.Time `json:"updated_at"`
+}
+
+type FeatureFlagOverride struct {
+	FeatureFlagID string    `json:"feature_flag_id"`
+	SubjectID     string    `json:"subject_id"`
+	Effect        string    `json:"effect"`
+	CreatedAt     time.Time `json:"created_at"`
+}
+
 type IdempotencyKey struct {
 	Key            string          `json:"key"`
 	RequestHash    string          `json:"request_hash"`
