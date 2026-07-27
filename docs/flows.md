@@ -90,8 +90,7 @@ Same data model as self-serve; different entrypoint.
 When a merchant uses the product:
 
 1. Resolve session → `user_id` + current `organisation_id`.
-2. `POST /v1/entitlements/check` — is the org allowed this platform capability or product feature?
-3. `POST /v1/feature-flags/check` — is this subject in the progressive rollout? (optional)
-4. `POST /v1/authz/check` — is this user allowed this action?
+2. `POST /v1/entitlements/check` — is the org allowed this platform capability or product feature? For product features with partial rollout, include `subject_id` (end-user id) to evaluate percentage buckets and overrides.
+3. `POST /v1/authz/check` — is this user allowed this action?
 
-Entitlement + role must pass when a feature is gated by plan **and** role. Feature flags gate gradual release independently.
+Entitlement + role must pass when a feature is gated by plan **and** role. Rollout controls gradual release among entitled end users on the same feature key.

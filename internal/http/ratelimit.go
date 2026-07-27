@@ -50,7 +50,7 @@ func rateLimitMiddleware(limiter *rateLimiter, next http.Handler) http.Handler {
 		return next
 	}
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/v1/authz/check" || r.URL.Path == "/v1/entitlements/check" || r.URL.Path == "/v1/feature-flags/check" {
+		if r.URL.Path == "/v1/authz/check" || r.URL.Path == "/v1/entitlements/check" {
 			key := ActorFrom(r.Context())
 			if key == "" {
 				key = r.RemoteAddr

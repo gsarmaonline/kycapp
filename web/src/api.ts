@@ -608,12 +608,20 @@ export function getOrgEntitlements(orgId: string) {
   return request<OrgEntitlements>(`/v1/organisations/${orgId}/entitlements`)
 }
 
+export type ProductFeatureOverride = {
+  subject_id: string
+  effect: 'include' | 'exclude'
+}
+
 export type ProductFeature = {
   id: string
   organisation_id?: string
   key: string
   description: string
   scope: 'product'
+  enabled: boolean
+  rollout_percentage: number
+  overrides: ProductFeatureOverride[]
 }
 
 export type ProductPlanPrice = {
@@ -661,7 +669,10 @@ export function listProductFeatures(orgId: string) {
   return request<{ items: ProductFeature[] }>(`/v1/organisations/${orgId}/product-features`)
 }
 
-export function createProductFeature(orgId: string, input: { key: string; description?: string }) {
+export function createProductFeature(
+  orgId: string,
+  input: { key: string; description?: string; enabled?: boolean; rollout_percentage?: number },
+) {
   return request<ProductFeature>(`/v1/organisations/${orgId}/product-features`, {
     method: 'POST',
     body: JSON.stringify(input),
@@ -672,87 +683,28 @@ export function getProductFeature(id: string) {
   return request<ProductFeature>(`/v1/product-features/${id}`)
 }
 
-export function updateProductFeature(id: string, input: { description: string }) {
+export function updateProductFeature(
+  id: string,
+  input: { description?: string; enabled?: boolean; rollout_percentage?: number },
+) {
   return request<ProductFeature>(`/v1/product-features/${id}`, {
     method: 'PATCH',
     body: JSON.stringify(input),
   })
 }
 
-export function deleteProductFeature(id: string) {
-  return request<{ ok: boolean }>(`/v1/product-features/${id}`, { method: 'DELETE' })
-}
-
-export type FeatureFlagOverride = {
-  subject_id: string
-  effect: 'include' | 'exclude'
-}
-
-export type FeatureFlag = {
-  id: string
-  organisation_id: string
-  key: string
-  description: string
-  enabled: boolean
-  rollout_percentage: number
-  overrides: FeatureFlagOverride[]
-  created_at?: string
-  updated_at?: string
-}
-
-export function listFeatureFlags(orgId: string) {
-  return request<{ items: FeatureFlag[] }>(`/v1/organisations/${orgId}/feature-flags`)
-}
-
-export function createFeatureFlag(
-  orgId: string,
-  input: {
-    key: string
-    description?: string
-    enabled?: boolean
-    rollout_percentage?: number
-  },
-) {
-  return request<FeatureFlag>(`/v1/organisations/${orgId}/feature-flags`, {
-    method: 'POST',
-    body: JSON.stringify(input),
-  })
-}
-
-export function getFeatureFlag(id: string) {
-  return request<FeatureFlag>(`/v1/feature-flags/${id}`)
-}
-
-export function updateFeatureFlag(
+export function setProductFeatureOverrides(
   id: string,
-  input: { description?: string; enabled?: boolean; rollout_percentage?: number },
+  input: { overrides: ProductFeatureOverride[] },
 ) {
-  return request<FeatureFlag>(`/v1/feature-flags/${id}`, {
-    method: 'PATCH',
-    body: JSON.stringify(input),
-  })
-}
-
-export function deleteFeatureFlag(id: string) {
-  return request<{ ok: boolean }>(`/v1/feature-flags/${id}`, { method: 'DELETE' })
-}
-
-export function setFeatureFlagOverrides(id: string, input: { overrides: FeatureFlagOverride[] }) {
-  return request<FeatureFlag>(`/v1/feature-flags/${id}/overrides`, {
+  return request<ProductFeature>(`/v1/product-features/${id}/overrides`, {
     method: 'PUT',
     body: JSON.stringify(input),
   })
 }
 
-export function checkFeatureFlag(input: {
-  organisation_id: string
-  flag: string
-  subject_id?: string
-}) {
-  return request<{ enabled: boolean; reason: string }>('/v1/feature-flags/check', {
-    method: 'POST',
-    body: JSON.stringify(input),
-  })
+export function deleteProductFeature(id: string) {
+  return request<{ ok: boolean }>(`/v1/product-features/${id}`, { method: 'DELETE' })
 }
 
 export function listProductPlans(orgId: string) {

@@ -16,7 +16,6 @@ func TestBucketSticky(t *testing.T) {
 	}
 	c := Bucket("new_checkout", "user_2")
 	if a == c {
-		// Unlikely but possible; just ensure different flags diverge from same subject.
 		_ = c
 	}
 	d := Bucket("other_flag", "user_1")

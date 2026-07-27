@@ -21,10 +21,7 @@ var integrationPaths = map[string][]string{
 	"/v1/attribute-definitions/{id}":                 nil,
 	"/v1/organisations/{id}/product-features":        nil,
 	"/v1/product-features/{id}":                      nil,
-	"/v1/organisations/{id}/feature-flags":           nil,
-	"/v1/feature-flags/{id}":                         nil,
-	"/v1/feature-flags/{id}/overrides":               {"put"},
-	"/v1/feature-flags/check":                        {"post"},
+	"/v1/product-features/{id}/overrides":            {"put"},
 	"/v1/organisations/{id}/product-plans":           nil,
 	"/v1/product-plans/{id}":                         nil,
 	"/v1/product-plans/{id}/features":                nil,
@@ -135,7 +132,7 @@ func main() {
 	}
 	info["title"] = "KYC Integration API"
 	info["description"] = strings.TrimSpace(`
-JSON API for merchant backends integrating with KYC (app users, attributes, product plans, entitlements, feature flags).
+JSON API for merchant backends integrating with KYC (app users, attributes, product plans, entitlements).
 
 Authenticate with an **organisation API key**: ` + "`Authorization: Bearer kyc_…`" + ` (create keys under Platform → API keys).
 Keys may be scoped to RBAC permissions; empty scopes grant full organisation access. The organisation must have the ` + "`api_access`" + ` entitlement.

@@ -7,12 +7,12 @@ import (
 
 // Reasons returned by Evaluate.
 const (
-	ReasonDisabled   = "disabled"
-	ReasonOverrideOn = "override_include"
+	ReasonDisabled    = "disabled"
+	ReasonOverrideOn  = "override_include"
 	ReasonOverrideOff = "override_exclude"
-	ReasonPercentage = "percentage"
-	ReasonFull       = "full"
-	ReasonOff        = "off"
+	ReasonPercentage  = "percentage"
+	ReasonFull        = "full"
+	ReasonOff         = "off"
 )
 
 // Bucket returns a sticky 0–99 bucket for flagKey + subjectID.

@@ -113,29 +113,13 @@ type EmailTemplate struct {
 }
 
 type Entitlement struct {
-	ID             string      `json:"id"`
-	Key            string      `json:"key"`
-	Description    string      `json:"description"`
-	Scope          string      `json:"scope"`
-	OrganisationID pgtype.Text `json:"organisation_id"`
-}
-
-type FeatureFlag struct {
-	ID                string    `json:"id"`
-	OrganisationID    string    `json:"organisation_id"`
-	Key               string    `json:"key"`
-	Description       string    `json:"description"`
-	Enabled           bool      `json:"enabled"`
-	RolloutPercentage int32     `json:"rollout_percentage"`
-	CreatedAt         time.Time `json:"created_at"`
-	UpdatedAt         time.Time `json:"updated_at"`
-}
-
-type FeatureFlagOverride struct {
-	FeatureFlagID string    `json:"feature_flag_id"`
-	SubjectID     string    `json:"subject_id"`
-	Effect        string    `json:"effect"`
-	CreatedAt     time.Time `json:"created_at"`
+	ID                string      `json:"id"`
+	Key               string      `json:"key"`
+	Description       string      `json:"description"`
+	Scope             string      `json:"scope"`
+	OrganisationID    pgtype.Text `json:"organisation_id"`
+	Enabled           bool        `json:"enabled"`
+	RolloutPercentage int32       `json:"rollout_percentage"`
 }
 
 type IdempotencyKey struct {
@@ -282,6 +266,13 @@ type ProcessorEvent struct {
 	Payload     json.RawMessage    `json:"payload"`
 	ProcessedAt pgtype.Timestamptz `json:"processed_at"`
 	CreatedAt   time.Time          `json:"created_at"`
+}
+
+type ProductFeatureOverride struct {
+	EntitlementID string    `json:"entitlement_id"`
+	SubjectID     string    `json:"subject_id"`
+	Effect        string    `json:"effect"`
+	CreatedAt     time.Time `json:"created_at"`
 }
 
 type ProductPlan struct {

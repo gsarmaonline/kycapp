@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/gsarmaonline/kyc/core/billing"
+	"github.com/gsarmaonline/kyc/core/featureflags"
 	"github.com/gsarmaonline/kyc/core/resources"
 	"github.com/gsarmaonline/kyc/internal/apperr"
 	"github.com/gsarmaonline/kyc/internal/ids"
@@ -394,27 +395,61 @@ func (s *Service) splitEntitlementKeysByScope(ctx context.Context, orgID string,
 	return platform, product, nil
 }
 
+type CheckEntitlementResult struct {
+	Allowed bool   `json:"allowed"`
+	Reason  string `json:"reason,omitempty"`
+}
+
 func (s *Service) CheckEntitlement(ctx context.Context, orgID, entitlementKey string) (bool, error) {
+	res, err := s.CheckEntitlementWithSubject(ctx, orgID, entitlementKey, "")
+	return res.Allowed, err
+}
+
+func (s *Service) CheckEntitlementWithSubject(ctx context.Context, orgID, entitlementKey, subjectID string) (CheckEntitlementResult, error) {
 	entitlementKey = strings.TrimSpace(entitlementKey)
+	subjectID = strings.TrimSpace(subjectID)
 	if orgID == "" || entitlementKey == "" {
-		return false, apperr.Validation("organisation_id and entitlement are required")
+		return CheckEntitlementResult{}, apperr.Validation("organisation_id and entitlement are required")
 	}
 	org, err := s.GetOrganisation(ctx, orgID)
 	if err != nil {
-		return false, err
+		return CheckEntitlementResult{}, err
 	}
 	if org.Status != "active" {
-		return false, nil
+		return CheckEntitlementResult{Allowed: false}, nil
 	}
-	if _, err := s.db.Q().GetEntitlementForOrgCheck(ctx, sqlc.GetEntitlementForOrgCheckParams{
+	ent, err := s.db.Q().GetEntitlementForOrgCheck(ctx, sqlc.GetEntitlementForOrgCheckParams{
 		Key:            entitlementKey,
 		OrganisationID: textArg(orgID),
-	}); err != nil {
-		return false, mapNotFound(err, "entitlement not found")
+	})
+	if err != nil {
+		return CheckEntitlementResult{}, mapNotFound(err, "entitlement not found")
 	}
 	effective, err := s.EffectiveEntitlements(ctx, orgID)
 	if err != nil {
-		return false, err
+		return CheckEntitlementResult{}, err
 	}
-	return billing.Has(effective, entitlementKey), nil
+	if !billing.Has(effective, entitlementKey) {
+		return CheckEntitlementResult{Allowed: false}, nil
+	}
+	if ent.Scope != "product" || !ent.OrganisationID.Valid {
+		return CheckEntitlementResult{Allowed: true}, nil
+	}
+	if ent.Enabled && ent.RolloutPercentage > 0 && ent.RolloutPercentage < 100 && subjectID == "" {
+		return CheckEntitlementResult{}, apperr.Validation("subject_id is required for percentage rollouts")
+	}
+	overrideEffect := ""
+	if subjectID != "" {
+		row, err := s.db.Q().GetProductFeatureOverride(ctx, sqlc.GetProductFeatureOverrideParams{
+			EntitlementID: ent.ID,
+			SubjectID:     subjectID,
+		})
+		if err == nil {
+			overrideEffect = row.Effect
+		} else if !errors.Is(err, pgx.ErrNoRows) {
+			return CheckEntitlementResult{}, err
+		}
+	}
+	allowed, reason := featureflags.Evaluate(ent.Enabled, int(ent.RolloutPercentage), ent.Key, subjectID, overrideEffect)
+	return CheckEntitlementResult{Allowed: allowed, Reason: reason}, nil
 }

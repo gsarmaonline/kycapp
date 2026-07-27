@@ -224,6 +224,7 @@ func (s *Server) handleEntitlementsCheck(w http.ResponseWriter, r *http.Request)
 	var body struct {
 		OrganisationID string `json:"organisation_id"`
 		Entitlement    string `json:"entitlement"`
+		SubjectID      string `json:"subject_id"`
 	}
 	if err := decodeJSON(r, &body); err != nil {
 		writeError(w, apperr.Validation("invalid JSON body"))
@@ -235,12 +236,16 @@ func (s *Server) handleEntitlementsCheck(w http.ResponseWriter, r *http.Request)
 			return
 		}
 	}
-	allowed, err := s.svc.CheckEntitlement(r.Context(), body.OrganisationID, body.Entitlement)
+	result, err := s.svc.CheckEntitlementWithSubject(r.Context(), body.OrganisationID, body.Entitlement, body.SubjectID)
 	if err != nil {
 		writeError(w, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"allowed": allowed})
+	out := map[string]any{"allowed": result.Allowed}
+	if result.Reason != "" {
+		out["reason"] = result.Reason
+	}
+	writeJSON(w, http.StatusOK, out)
 }
 
 func (s *Server) handleUpsertPlanPrice(w http.ResponseWriter, r *http.Request) {
