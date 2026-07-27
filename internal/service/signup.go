@@ -121,6 +121,7 @@ func seedSystemRoles(ctx context.Context, q *sqlc.Queries, orgID string) (owner,
 		"email_templates:read":  true,
 		"automations:read":      true,
 		"product_features:read": true,
+		"feature_flags:read":    true,
 	}
 	for _, p := range perms {
 		if memberKeys[p.Key] {

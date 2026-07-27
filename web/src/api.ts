@@ -683,6 +683,78 @@ export function deleteProductFeature(id: string) {
   return request<{ ok: boolean }>(`/v1/product-features/${id}`, { method: 'DELETE' })
 }
 
+export type FeatureFlagOverride = {
+  subject_id: string
+  effect: 'include' | 'exclude'
+}
+
+export type FeatureFlag = {
+  id: string
+  organisation_id: string
+  key: string
+  description: string
+  enabled: boolean
+  rollout_percentage: number
+  overrides: FeatureFlagOverride[]
+  created_at?: string
+  updated_at?: string
+}
+
+export function listFeatureFlags(orgId: string) {
+  return request<{ items: FeatureFlag[] }>(`/v1/organisations/${orgId}/feature-flags`)
+}
+
+export function createFeatureFlag(
+  orgId: string,
+  input: {
+    key: string
+    description?: string
+    enabled?: boolean
+    rollout_percentage?: number
+  },
+) {
+  return request<FeatureFlag>(`/v1/organisations/${orgId}/feature-flags`, {
+    method: 'POST',
+    body: JSON.stringify(input),
+  })
+}
+
+export function getFeatureFlag(id: string) {
+  return request<FeatureFlag>(`/v1/feature-flags/${id}`)
+}
+
+export function updateFeatureFlag(
+  id: string,
+  input: { description?: string; enabled?: boolean; rollout_percentage?: number },
+) {
+  return request<FeatureFlag>(`/v1/feature-flags/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(input),
+  })
+}
+
+export function deleteFeatureFlag(id: string) {
+  return request<{ ok: boolean }>(`/v1/feature-flags/${id}`, { method: 'DELETE' })
+}
+
+export function setFeatureFlagOverrides(id: string, input: { overrides: FeatureFlagOverride[] }) {
+  return request<FeatureFlag>(`/v1/feature-flags/${id}/overrides`, {
+    method: 'PUT',
+    body: JSON.stringify(input),
+  })
+}
+
+export function checkFeatureFlag(input: {
+  organisation_id: string
+  flag: string
+  subject_id?: string
+}) {
+  return request<{ enabled: boolean; reason: string }>('/v1/feature-flags/check', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  })
+}
+
 export function listProductPlans(orgId: string) {
   return request<{ items: ProductPlan[] }>(`/v1/organisations/${orgId}/product-plans`)
 }

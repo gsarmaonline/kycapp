@@ -10,6 +10,7 @@ export type OrgSection =
   | 'inbound-webhooks'
   | 'automations'
   | 'product-features'
+  | 'feature-flags'
   | 'product-plans'
   | 'branding'
   | 'billing'
@@ -40,6 +41,7 @@ export const ORG_SECTIONS: OrgNavItem[] = [
   { id: 'inbound-webhooks', label: 'Inbound webhooks', path: 'inbound-webhooks' },
   { id: 'automations', label: 'Automations', path: 'automations' },
   { id: 'product-features', label: 'Features', path: 'product-features' },
+  { id: 'feature-flags', label: 'Flags', path: 'feature-flags' },
   { id: 'product-plans', label: 'Plans', path: 'product-plans' },
   { id: 'branding', label: 'Branding', path: 'branding' },
   { id: 'billing', label: 'Billing', path: 'billing' },
@@ -60,6 +62,7 @@ export const ORG_NAV_GROUPS: OrgNavGroup[] = [
       { id: 'automations', label: 'Automations', path: 'automations' },
       { id: 'branding', label: 'Branding', path: 'branding' },
       { id: 'product-features', label: 'Features', path: 'product-features' },
+      { id: 'feature-flags', label: 'Flags', path: 'feature-flags' },
       { id: 'product-plans', label: 'Plans', path: 'product-plans' },
       { id: 'billing', label: 'Billing', path: 'billing' },
     ],
@@ -104,6 +107,7 @@ export function sectionFromPathname(pathname: string, orgId: string): OrgSection
     case 'inbound-webhooks':
     case 'automations':
     case 'product-features':
+    case 'feature-flags':
     case 'product-plans':
     case 'branding':
     case 'billing':
