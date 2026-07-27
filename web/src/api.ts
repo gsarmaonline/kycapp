@@ -608,12 +608,20 @@ export function getOrgEntitlements(orgId: string) {
   return request<OrgEntitlements>(`/v1/organisations/${orgId}/entitlements`)
 }
 
+export type ProductFeatureOverride = {
+  subject_id: string
+  effect: 'include' | 'exclude'
+}
+
 export type ProductFeature = {
   id: string
   organisation_id?: string
   key: string
   description: string
   scope: 'product'
+  enabled: boolean
+  rollout_percentage: number
+  overrides: ProductFeatureOverride[]
 }
 
 export type ProductPlanPrice = {
@@ -661,7 +669,10 @@ export function listProductFeatures(orgId: string) {
   return request<{ items: ProductFeature[] }>(`/v1/organisations/${orgId}/product-features`)
 }
 
-export function createProductFeature(orgId: string, input: { key: string; description?: string }) {
+export function createProductFeature(
+  orgId: string,
+  input: { key: string; description?: string; enabled?: boolean; rollout_percentage?: number },
+) {
   return request<ProductFeature>(`/v1/organisations/${orgId}/product-features`, {
     method: 'POST',
     body: JSON.stringify(input),
@@ -672,9 +683,22 @@ export function getProductFeature(id: string) {
   return request<ProductFeature>(`/v1/product-features/${id}`)
 }
 
-export function updateProductFeature(id: string, input: { description: string }) {
+export function updateProductFeature(
+  id: string,
+  input: { description?: string; enabled?: boolean; rollout_percentage?: number },
+) {
   return request<ProductFeature>(`/v1/product-features/${id}`, {
     method: 'PATCH',
+    body: JSON.stringify(input),
+  })
+}
+
+export function setProductFeatureOverrides(
+  id: string,
+  input: { overrides: ProductFeatureOverride[] },
+) {
+  return request<ProductFeature>(`/v1/product-features/${id}/overrides`, {
+    method: 'PUT',
     body: JSON.stringify(input),
   })
 }

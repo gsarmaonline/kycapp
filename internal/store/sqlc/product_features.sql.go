@@ -38,16 +38,18 @@ func (q *Queries) ClearOrganisationProductPlan(ctx context.Context, organisation
 }
 
 const createProductFeature = `-- name: CreateProductFeature :one
-INSERT INTO entitlements (id, key, description, scope, organisation_id)
-VALUES ($1, $2, $3, 'product', $4)
-RETURNING id, key, description, scope, organisation_id
+INSERT INTO entitlements (id, key, description, scope, organisation_id, enabled, rollout_percentage)
+VALUES ($1, $2, $3, 'product', $4, $5, $6)
+RETURNING id, key, description, scope, organisation_id, enabled, rollout_percentage
 `
 
 type CreateProductFeatureParams struct {
-	ID             string      `json:"id"`
-	Key            string      `json:"key"`
-	Description    string      `json:"description"`
-	OrganisationID pgtype.Text `json:"organisation_id"`
+	ID                string      `json:"id"`
+	Key               string      `json:"key"`
+	Description       string      `json:"description"`
+	OrganisationID    pgtype.Text `json:"organisation_id"`
+	Enabled           bool        `json:"enabled"`
+	RolloutPercentage int32       `json:"rollout_percentage"`
 }
 
 func (q *Queries) CreateProductFeature(ctx context.Context, arg CreateProductFeatureParams) (Entitlement, error) {
@@ -56,6 +58,8 @@ func (q *Queries) CreateProductFeature(ctx context.Context, arg CreateProductFea
 		arg.Key,
 		arg.Description,
 		arg.OrganisationID,
+		arg.Enabled,
+		arg.RolloutPercentage,
 	)
 	var i Entitlement
 	err := row.Scan(
@@ -64,6 +68,8 @@ func (q *Queries) CreateProductFeature(ctx context.Context, arg CreateProductFea
 		&i.Description,
 		&i.Scope,
 		&i.OrganisationID,
+		&i.Enabled,
+		&i.RolloutPercentage,
 	)
 	return i, err
 }
@@ -120,6 +126,16 @@ func (q *Queries) DeleteProductFeature(ctx context.Context, arg DeleteProductFea
 	return err
 }
 
+const deleteProductFeatureOverrides = `-- name: DeleteProductFeatureOverrides :exec
+DELETE FROM product_feature_overrides
+WHERE entitlement_id = $1
+`
+
+func (q *Queries) DeleteProductFeatureOverrides(ctx context.Context, entitlementID string) error {
+	_, err := q.db.Exec(ctx, deleteProductFeatureOverrides, entitlementID)
+	return err
+}
+
 const deleteProductPlan = `-- name: DeleteProductPlan :exec
 DELETE FROM product_plans
 WHERE id = $1
@@ -147,7 +163,7 @@ func (q *Queries) DeleteProductPlanFeatures(ctx context.Context, productPlanID s
 }
 
 const getEntitlement = `-- name: GetEntitlement :one
-SELECT id, key, description, scope, organisation_id FROM entitlements
+SELECT id, key, description, scope, organisation_id, enabled, rollout_percentage FROM entitlements
 WHERE id = $1
 `
 
@@ -160,12 +176,14 @@ func (q *Queries) GetEntitlement(ctx context.Context, id string) (Entitlement, e
 		&i.Description,
 		&i.Scope,
 		&i.OrganisationID,
+		&i.Enabled,
+		&i.RolloutPercentage,
 	)
 	return i, err
 }
 
 const getEntitlementForOrgCheck = `-- name: GetEntitlementForOrgCheck :one
-SELECT id, key, description, scope, organisation_id
+SELECT id, key, description, scope, organisation_id, enabled, rollout_percentage
 FROM entitlements
 WHERE key = $1
   AND (organisation_id IS NULL OR organisation_id = $2)
@@ -187,6 +205,8 @@ func (q *Queries) GetEntitlementForOrgCheck(ctx context.Context, arg GetEntitlem
 		&i.Description,
 		&i.Scope,
 		&i.OrganisationID,
+		&i.Enabled,
+		&i.RolloutPercentage,
 	)
 	return i, err
 }
@@ -200,6 +220,29 @@ func (q *Queries) GetOrganisationProductPlan(ctx context.Context, organisationID
 	row := q.db.QueryRow(ctx, getOrganisationProductPlan, organisationID)
 	var i OrganisationProductPlan
 	err := row.Scan(&i.OrganisationID, &i.ProductPlanID, &i.UpdatedAt)
+	return i, err
+}
+
+const getProductFeatureOverride = `-- name: GetProductFeatureOverride :one
+SELECT entitlement_id, subject_id, effect, created_at FROM product_feature_overrides
+WHERE entitlement_id = $1
+  AND subject_id = $2
+`
+
+type GetProductFeatureOverrideParams struct {
+	EntitlementID string `json:"entitlement_id"`
+	SubjectID     string `json:"subject_id"`
+}
+
+func (q *Queries) GetProductFeatureOverride(ctx context.Context, arg GetProductFeatureOverrideParams) (ProductFeatureOverride, error) {
+	row := q.db.QueryRow(ctx, getProductFeatureOverride, arg.EntitlementID, arg.SubjectID)
+	var i ProductFeatureOverride
+	err := row.Scan(
+		&i.EntitlementID,
+		&i.SubjectID,
+		&i.Effect,
+		&i.CreatedAt,
+	)
 	return i, err
 }
 
@@ -299,8 +342,39 @@ func (q *Queries) ListEntitlementScopesByKeysForOrg(ctx context.Context, arg Lis
 	return items, nil
 }
 
+const listProductFeatureOverrides = `-- name: ListProductFeatureOverrides :many
+SELECT entitlement_id, subject_id, effect, created_at FROM product_feature_overrides
+WHERE entitlement_id = $1
+ORDER BY subject_id
+`
+
+func (q *Queries) ListProductFeatureOverrides(ctx context.Context, entitlementID string) ([]ProductFeatureOverride, error) {
+	rows, err := q.db.Query(ctx, listProductFeatureOverrides, entitlementID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ProductFeatureOverride{}
+	for rows.Next() {
+		var i ProductFeatureOverride
+		if err := rows.Scan(
+			&i.EntitlementID,
+			&i.SubjectID,
+			&i.Effect,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listProductFeaturesByOrg = `-- name: ListProductFeaturesByOrg :many
-SELECT id, key, description, scope, organisation_id FROM entitlements
+SELECT id, key, description, scope, organisation_id, enabled, rollout_percentage FROM entitlements
 WHERE organisation_id = $1
   AND scope = 'product'
 ORDER BY key
@@ -321,6 +395,8 @@ func (q *Queries) ListProductFeaturesByOrg(ctx context.Context, organisationID p
 			&i.Description,
 			&i.Scope,
 			&i.OrganisationID,
+			&i.Enabled,
+			&i.RolloutPercentage,
 		); err != nil {
 			return nil, err
 		}
@@ -396,21 +472,31 @@ func (q *Queries) ListProductPlansByOrg(ctx context.Context, organisationID stri
 
 const updateProductFeature = `-- name: UpdateProductFeature :one
 UPDATE entitlements
-SET description = $2
+SET description = COALESCE($3, description),
+    enabled = COALESCE($4, enabled),
+    rollout_percentage = COALESCE($5, rollout_percentage)
 WHERE id = $1
-  AND organisation_id = $3
+  AND organisation_id = $2
   AND scope = 'product'
-RETURNING id, key, description, scope, organisation_id
+RETURNING id, key, description, scope, organisation_id, enabled, rollout_percentage
 `
 
 type UpdateProductFeatureParams struct {
-	ID             string      `json:"id"`
-	Description    string      `json:"description"`
-	OrganisationID pgtype.Text `json:"organisation_id"`
+	ID                string      `json:"id"`
+	OrganisationID    pgtype.Text `json:"organisation_id"`
+	Description       pgtype.Text `json:"description"`
+	Enabled           pgtype.Bool `json:"enabled"`
+	RolloutPercentage pgtype.Int4 `json:"rollout_percentage"`
 }
 
 func (q *Queries) UpdateProductFeature(ctx context.Context, arg UpdateProductFeatureParams) (Entitlement, error) {
-	row := q.db.QueryRow(ctx, updateProductFeature, arg.ID, arg.Description, arg.OrganisationID)
+	row := q.db.QueryRow(ctx, updateProductFeature,
+		arg.ID,
+		arg.OrganisationID,
+		arg.Description,
+		arg.Enabled,
+		arg.RolloutPercentage,
+	)
 	var i Entitlement
 	err := row.Scan(
 		&i.ID,
@@ -418,6 +504,8 @@ func (q *Queries) UpdateProductFeature(ctx context.Context, arg UpdateProductFea
 		&i.Description,
 		&i.Scope,
 		&i.OrganisationID,
+		&i.Enabled,
+		&i.RolloutPercentage,
 	)
 	return i, err
 }
@@ -471,4 +559,22 @@ func (q *Queries) UpsertOrganisationProductPlan(ctx context.Context, arg UpsertO
 	var i OrganisationProductPlan
 	err := row.Scan(&i.OrganisationID, &i.ProductPlanID, &i.UpdatedAt)
 	return i, err
+}
+
+const upsertProductFeatureOverride = `-- name: UpsertProductFeatureOverride :exec
+INSERT INTO product_feature_overrides (entitlement_id, subject_id, effect)
+VALUES ($1, $2, $3)
+ON CONFLICT (entitlement_id, subject_id) DO UPDATE
+SET effect = EXCLUDED.effect
+`
+
+type UpsertProductFeatureOverrideParams struct {
+	EntitlementID string `json:"entitlement_id"`
+	SubjectID     string `json:"subject_id"`
+	Effect        string `json:"effect"`
+}
+
+func (q *Queries) UpsertProductFeatureOverride(ctx context.Context, arg UpsertProductFeatureOverrideParams) error {
+	_, err := q.db.Exec(ctx, upsertProductFeatureOverride, arg.EntitlementID, arg.SubjectID, arg.Effect)
+	return err
 }

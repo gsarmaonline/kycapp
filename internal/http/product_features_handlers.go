@@ -9,12 +9,23 @@ import (
 	"github.com/gsarmaonline/kyc/internal/store/sqlc"
 )
 
-func productFeatureJSON(e sqlc.Entitlement) map[string]any {
+func productFeatureJSON(v service.ProductFeatureView) map[string]any {
+	e := v.Feature
+	overrides := make([]map[string]any, 0, len(v.Overrides))
+	for _, o := range v.Overrides {
+		overrides = append(overrides, map[string]any{
+			"subject_id": o.SubjectID,
+			"effect":     o.Effect,
+		})
+	}
 	out := map[string]any{
-		"id":          e.ID,
-		"key":         e.Key,
-		"description": e.Description,
-		"scope":       e.Scope,
+		"id":                  e.ID,
+		"key":                 e.Key,
+		"description":         e.Description,
+		"scope":               e.Scope,
+		"enabled":             e.Enabled,
+		"rollout_percentage":  e.RolloutPercentage,
+		"overrides":           overrides,
 	}
 	if e.OrganisationID.Valid {
 		out["organisation_id"] = e.OrganisationID.String
@@ -62,21 +73,26 @@ func (s *Server) handleCreateProductFeature(w http.ResponseWriter, r *http.Reque
 		return
 	}
 	var body struct {
-		Key         string `json:"key"`
-		Description string `json:"description"`
+		Key               string `json:"key"`
+		Description       string `json:"description"`
+		Enabled           *bool  `json:"enabled"`
+		RolloutPercentage *int32 `json:"rollout_percentage"`
 	}
 	if err := decodeJSON(r, &body); err != nil {
 		writeError(w, apperr.Validation("invalid JSON body"))
 		return
 	}
-	ent, err := s.svc.CreateProductFeature(r.Context(), orgID, service.CreateProductFeatureInput{
-		Key: body.Key, Description: body.Description,
+	view, err := s.svc.CreateProductFeature(r.Context(), orgID, service.CreateProductFeatureInput{
+		Key:               body.Key,
+		Description:       body.Description,
+		Enabled:           body.Enabled,
+		RolloutPercentage: body.RolloutPercentage,
 	})
 	if err != nil {
 		writeError(w, err)
 		return
 	}
-	writeJSON(w, http.StatusCreated, productFeatureJSON(ent))
+	writeJSON(w, http.StatusCreated, productFeatureJSON(view))
 }
 
 func (s *Server) handleListProductFeatures(w http.ResponseWriter, r *http.Request) {
@@ -91,23 +107,23 @@ func (s *Server) handleListProductFeatures(w http.ResponseWriter, r *http.Reques
 		return
 	}
 	out := make([]map[string]any, 0, len(items))
-	for _, e := range items {
-		out = append(out, productFeatureJSON(e))
+	for _, v := range items {
+		out = append(out, productFeatureJSON(v))
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"items": out})
 }
 
 func (s *Server) handleGetProductFeature(w http.ResponseWriter, r *http.Request) {
-	ent, err := s.svc.GetProductFeature(r.Context(), r.PathValue("id"))
+	view, err := s.svc.GetProductFeature(r.Context(), r.PathValue("id"))
 	if err != nil {
 		writeError(w, err)
 		return
 	}
-	if _, err := s.svc.RequireOrgPermission(r.Context(), ent.OrganisationID.String, "product_features:read"); err != nil {
+	if _, err := s.svc.RequireOrgPermission(r.Context(), view.Feature.OrganisationID.String, "product_features:read"); err != nil {
 		writeError(w, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, productFeatureJSON(ent))
+	writeJSON(w, http.StatusOK, productFeatureJSON(view))
 }
 
 func (s *Server) handlePatchProductFeature(w http.ResponseWriter, r *http.Request) {
@@ -116,25 +132,66 @@ func (s *Server) handlePatchProductFeature(w http.ResponseWriter, r *http.Reques
 		writeError(w, err)
 		return
 	}
-	if _, err := s.svc.RequireOrgPermission(r.Context(), existing.OrganisationID.String, "product_features:manage"); err != nil {
+	if _, err := s.svc.RequireOrgPermission(r.Context(), existing.Feature.OrganisationID.String, "product_features:manage"); err != nil {
 		writeError(w, err)
 		return
 	}
 	var body struct {
-		Description string `json:"description"`
+		Description       *string `json:"description"`
+		Enabled           *bool   `json:"enabled"`
+		RolloutPercentage *int32  `json:"rollout_percentage"`
 	}
 	if err := decodeJSON(r, &body); err != nil {
 		writeError(w, apperr.Validation("invalid JSON body"))
 		return
 	}
-	ent, err := s.svc.UpdateProductFeature(r.Context(), r.PathValue("id"), service.UpdateProductFeatureInput{
-		Description: body.Description,
+	view, err := s.svc.UpdateProductFeature(r.Context(), r.PathValue("id"), service.UpdateProductFeatureInput{
+		Description:       body.Description,
+		Enabled:           body.Enabled,
+		RolloutPercentage: body.RolloutPercentage,
 	})
 	if err != nil {
 		writeError(w, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, productFeatureJSON(ent))
+	writeJSON(w, http.StatusOK, productFeatureJSON(view))
+}
+
+func (s *Server) handleSetProductFeatureOverrides(w http.ResponseWriter, r *http.Request) {
+	existing, err := s.svc.GetProductFeature(r.Context(), r.PathValue("id"))
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	if _, err := s.svc.RequireOrgPermission(r.Context(), existing.Feature.OrganisationID.String, "product_features:manage"); err != nil {
+		writeError(w, err)
+		return
+	}
+	var body struct {
+		Overrides []struct {
+			SubjectID string `json:"subject_id"`
+			Effect    string `json:"effect"`
+		} `json:"overrides"`
+	}
+	if err := decodeJSON(r, &body); err != nil {
+		writeError(w, apperr.Validation("invalid JSON body"))
+		return
+	}
+	overrides := make([]service.ProductFeatureOverrideInput, 0, len(body.Overrides))
+	for _, o := range body.Overrides {
+		overrides = append(overrides, service.ProductFeatureOverrideInput{
+			SubjectID: o.SubjectID,
+			Effect:    o.Effect,
+		})
+	}
+	view, err := s.svc.SetProductFeatureOverrides(r.Context(), r.PathValue("id"), service.SetProductFeatureOverridesInput{
+		Overrides: overrides,
+	})
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, productFeatureJSON(view))
 }
 
 func (s *Server) handleDeleteProductFeature(w http.ResponseWriter, r *http.Request) {
@@ -143,7 +200,7 @@ func (s *Server) handleDeleteProductFeature(w http.ResponseWriter, r *http.Reque
 		writeError(w, err)
 		return
 	}
-	if _, err := s.svc.RequireOrgPermission(r.Context(), existing.OrganisationID.String, "product_features:manage"); err != nil {
+	if _, err := s.svc.RequireOrgPermission(r.Context(), existing.Feature.OrganisationID.String, "product_features:manage"); err != nil {
 		writeError(w, err)
 		return
 	}

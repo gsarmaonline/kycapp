@@ -13,6 +13,11 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+type ProductFeatureView struct {
+	Feature   sqlc.Entitlement
+	Overrides []sqlc.ProductFeatureOverride
+}
+
 type ProductPlanView struct {
 	Plan        sqlc.ProductPlan
 	FeatureKeys []string
@@ -20,12 +25,25 @@ type ProductPlanView struct {
 }
 
 type CreateProductFeatureInput struct {
-	Key         string
-	Description string
+	Key                string
+	Description        string
+	Enabled            *bool
+	RolloutPercentage  *int32
 }
 
 type UpdateProductFeatureInput struct {
-	Description string
+	Description       *string
+	Enabled           *bool
+	RolloutPercentage *int32
+}
+
+type ProductFeatureOverrideInput struct {
+	SubjectID string
+	Effect    string
+}
+
+type SetProductFeatureOverridesInput struct {
+	Overrides []ProductFeatureOverrideInput
 }
 
 type CreateProductPlanInput struct {
@@ -43,61 +61,149 @@ type SetProductPlanFeaturesInput struct {
 	FeatureKeys []string
 }
 
-func (s *Service) CreateProductFeature(ctx context.Context, orgID string, in CreateProductFeatureInput) (sqlc.Entitlement, error) {
+func (s *Service) CreateProductFeature(ctx context.Context, orgID string, in CreateProductFeatureInput) (ProductFeatureView, error) {
 	if _, err := s.GetOrganisation(ctx, orgID); err != nil {
-		return sqlc.Entitlement{}, err
+		return ProductFeatureView{}, err
 	}
 	key := strings.TrimSpace(in.Key)
 	if key == "" {
-		return sqlc.Entitlement{}, apperr.Validation("key is required")
+		return ProductFeatureView{}, apperr.Validation("key is required")
+	}
+	enabled := true
+	if in.Enabled != nil {
+		enabled = *in.Enabled
+	}
+	pct := int32(100)
+	if in.RolloutPercentage != nil {
+		pct = *in.RolloutPercentage
+		if pct < 0 || pct > 100 {
+			return ProductFeatureView{}, apperr.Validation("rollout_percentage must be between 0 and 100")
+		}
 	}
 	ent, err := s.db.Q().CreateProductFeature(ctx, sqlc.CreateProductFeatureParams{
-		ID:             ids.New(),
-		Key:            key,
-		Description:    strings.TrimSpace(in.Description),
-		OrganisationID: textArg(orgID),
+		ID:                ids.New(),
+		Key:               key,
+		Description:       strings.TrimSpace(in.Description),
+		OrganisationID:    textArg(orgID),
+		Enabled:           enabled,
+		RolloutPercentage: pct,
 	})
 	if err != nil {
 		if store.IsUniqueViolation(err) {
-			return sqlc.Entitlement{}, apperr.Conflict("product feature key already exists")
+			return ProductFeatureView{}, apperr.Conflict("product feature key already exists")
 		}
-		return sqlc.Entitlement{}, err
+		return ProductFeatureView{}, err
 	}
-	return ent, nil
+	return s.productFeatureView(ctx, ent)
 }
 
-func (s *Service) ListProductFeatures(ctx context.Context, orgID string) ([]sqlc.Entitlement, error) {
+func (s *Service) ListProductFeatures(ctx context.Context, orgID string) ([]ProductFeatureView, error) {
 	if _, err := s.GetOrganisation(ctx, orgID); err != nil {
 		return nil, err
 	}
-	return s.db.Q().ListProductFeaturesByOrg(ctx, textArg(orgID))
+	items, err := s.db.Q().ListProductFeaturesByOrg(ctx, textArg(orgID))
+	if err != nil {
+		return nil, err
+	}
+	out := make([]ProductFeatureView, 0, len(items))
+	for _, e := range items {
+		view, err := s.productFeatureView(ctx, e)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, view)
+	}
+	return out, nil
 }
 
-func (s *Service) GetProductFeature(ctx context.Context, id string) (sqlc.Entitlement, error) {
+func (s *Service) GetProductFeature(ctx context.Context, id string) (ProductFeatureView, error) {
 	ent, err := s.db.Q().GetEntitlement(ctx, id)
 	if err != nil {
-		return sqlc.Entitlement{}, mapNotFound(err, "product feature not found")
+		return ProductFeatureView{}, mapNotFound(err, "product feature not found")
 	}
 	if ent.Scope != "product" || !ent.OrganisationID.Valid {
-		return sqlc.Entitlement{}, apperr.NotFound("product feature not found")
+		return ProductFeatureView{}, apperr.NotFound("product feature not found")
 	}
-	return ent, nil
+	return s.productFeatureView(ctx, ent)
 }
 
-func (s *Service) UpdateProductFeature(ctx context.Context, id string, in UpdateProductFeatureInput) (sqlc.Entitlement, error) {
+func (s *Service) UpdateProductFeature(ctx context.Context, id string, in UpdateProductFeatureInput) (ProductFeatureView, error) {
 	existing, err := s.GetProductFeature(ctx, id)
 	if err != nil {
-		return sqlc.Entitlement{}, err
+		return ProductFeatureView{}, err
 	}
-	ent, err := s.db.Q().UpdateProductFeature(ctx, sqlc.UpdateProductFeatureParams{
+	params := sqlc.UpdateProductFeatureParams{
 		ID:             id,
-		Description:    strings.TrimSpace(in.Description),
-		OrganisationID: existing.OrganisationID,
+		OrganisationID: existing.Feature.OrganisationID,
+	}
+	if in.Description != nil {
+		params.Description = pgtype.Text{String: strings.TrimSpace(*in.Description), Valid: true}
+	}
+	if in.Enabled != nil {
+		params.Enabled = pgtype.Bool{Bool: *in.Enabled, Valid: true}
+	}
+	if in.RolloutPercentage != nil {
+		if *in.RolloutPercentage < 0 || *in.RolloutPercentage > 100 {
+			return ProductFeatureView{}, apperr.Validation("rollout_percentage must be between 0 and 100")
+		}
+		params.RolloutPercentage = pgtype.Int4{Int32: *in.RolloutPercentage, Valid: true}
+	}
+	ent, err := s.db.Q().UpdateProductFeature(ctx, params)
+	if err != nil {
+		return ProductFeatureView{}, mapNotFound(err, "product feature not found")
+	}
+	return s.productFeatureView(ctx, ent)
+}
+
+func (s *Service) SetProductFeatureOverrides(ctx context.Context, id string, in SetProductFeatureOverridesInput) (ProductFeatureView, error) {
+	existing, err := s.GetProductFeature(ctx, id)
+	if err != nil {
+		return ProductFeatureView{}, err
+	}
+	seen := make(map[string]struct{}, len(in.Overrides))
+	for _, o := range in.Overrides {
+		subj := strings.TrimSpace(o.SubjectID)
+		if subj == "" {
+			return ProductFeatureView{}, apperr.Validation("override subject_id is required")
+		}
+		effect := strings.TrimSpace(o.Effect)
+		switch effect {
+		case "include", "exclude":
+		default:
+			return ProductFeatureView{}, apperr.Validation("override effect must be include or exclude")
+		}
+		if _, ok := seen[subj]; ok {
+			return ProductFeatureView{}, apperr.Validation("duplicate override subject_id")
+		}
+		seen[subj] = struct{}{}
+	}
+	err = s.db.WithTx(ctx, func(q *sqlc.Queries) error {
+		if err := q.DeleteProductFeatureOverrides(ctx, id); err != nil {
+			return err
+		}
+		for _, o := range in.Overrides {
+			if err := q.UpsertProductFeatureOverride(ctx, sqlc.UpsertProductFeatureOverrideParams{
+				EntitlementID: id,
+				SubjectID:     strings.TrimSpace(o.SubjectID),
+				Effect:        strings.TrimSpace(o.Effect),
+			}); err != nil {
+				return err
+			}
+		}
+		return nil
 	})
 	if err != nil {
-		return sqlc.Entitlement{}, mapNotFound(err, "product feature not found")
+		return ProductFeatureView{}, err
 	}
-	return ent, nil
+	return s.GetProductFeature(ctx, existing.Feature.ID)
+}
+
+func (s *Service) productFeatureView(ctx context.Context, ent sqlc.Entitlement) (ProductFeatureView, error) {
+	overrides, err := s.db.Q().ListProductFeatureOverrides(ctx, ent.ID)
+	if err != nil {
+		return ProductFeatureView{}, err
+	}
+	return ProductFeatureView{Feature: ent, Overrides: overrides}, nil
 }
 
 func (s *Service) DeleteProductFeature(ctx context.Context, id string) error {
@@ -107,7 +213,7 @@ func (s *Service) DeleteProductFeature(ctx context.Context, id string) error {
 	}
 	return s.db.Q().DeleteProductFeature(ctx, sqlc.DeleteProductFeatureParams{
 		ID:             id,
-		OrganisationID: existing.OrganisationID,
+		OrganisationID: existing.Feature.OrganisationID,
 	})
 }
 

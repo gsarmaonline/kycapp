@@ -202,6 +202,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /v1/organisations/{id}/product-features", s.handleListProductFeatures)
 	s.mux.HandleFunc("GET /v1/product-features/{id}", s.handleGetProductFeature)
 	s.mux.HandleFunc("PATCH /v1/product-features/{id}", s.handlePatchProductFeature)
+	s.mux.HandleFunc("PUT /v1/product-features/{id}/overrides", s.handleSetProductFeatureOverrides)
 	s.mux.HandleFunc("DELETE /v1/product-features/{id}", s.handleDeleteProductFeature)
 	s.mux.HandleFunc("POST /v1/organisations/{id}/product-plans", s.handleCreateProductPlan)
 	s.mux.HandleFunc("GET /v1/organisations/{id}/product-plans", s.handleListProductPlans)

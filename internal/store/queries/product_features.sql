@@ -1,6 +1,6 @@
 -- name: CreateProductFeature :one
-INSERT INTO entitlements (id, key, description, scope, organisation_id)
-VALUES ($1, $2, $3, 'product', $4)
+INSERT INTO entitlements (id, key, description, scope, organisation_id, enabled, rollout_percentage)
+VALUES ($1, $2, $3, 'product', $4, $5, $6)
 RETURNING *;
 
 -- name: GetEntitlement :one
@@ -15,9 +15,11 @@ ORDER BY key;
 
 -- name: UpdateProductFeature :one
 UPDATE entitlements
-SET description = $2
+SET description = COALESCE(sqlc.narg('description'), description),
+    enabled = COALESCE(sqlc.narg('enabled'), enabled),
+    rollout_percentage = COALESCE(sqlc.narg('rollout_percentage'), rollout_percentage)
 WHERE id = $1
-  AND organisation_id = $3
+  AND organisation_id = $2
   AND scope = 'product'
 RETURNING *;
 
@@ -42,12 +44,32 @@ WHERE key = ANY(sqlc.arg('keys')::text[])
 ORDER BY key, (organisation_id IS NOT NULL) DESC;
 
 -- name: GetEntitlementForOrgCheck :one
-SELECT id, key, description, scope, organisation_id
+SELECT id, key, description, scope, organisation_id, enabled, rollout_percentage
 FROM entitlements
 WHERE key = sqlc.arg('key')
   AND (organisation_id IS NULL OR organisation_id = sqlc.arg('organisation_id'))
 ORDER BY (organisation_id IS NOT NULL) DESC
 LIMIT 1;
+
+-- name: ListProductFeatureOverrides :many
+SELECT * FROM product_feature_overrides
+WHERE entitlement_id = $1
+ORDER BY subject_id;
+
+-- name: DeleteProductFeatureOverrides :exec
+DELETE FROM product_feature_overrides
+WHERE entitlement_id = $1;
+
+-- name: UpsertProductFeatureOverride :exec
+INSERT INTO product_feature_overrides (entitlement_id, subject_id, effect)
+VALUES ($1, $2, $3)
+ON CONFLICT (entitlement_id, subject_id) DO UPDATE
+SET effect = EXCLUDED.effect;
+
+-- name: GetProductFeatureOverride :one
+SELECT * FROM product_feature_overrides
+WHERE entitlement_id = $1
+  AND subject_id = $2;
 
 -- name: CreateProductPlan :one
 INSERT INTO product_plans (id, organisation_id, key, name, status)
