@@ -348,7 +348,7 @@ export function SettingsPage() {
               autoComplete="off"
             />
           </label>
-          <div className="row" style={{ gap: '0.75rem', flexWrap: 'wrap' }}>
+          <div className="row">
             <button type="submit" disabled={busy}>
               {stripe?.has_secret ? 'Update Stripe' : 'Connect Stripe'}
             </button>

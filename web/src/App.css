@@ -1129,10 +1129,18 @@ button.link-btn.danger:hover {
   margin: 0;
 }
 
+.row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
 .form-actions {
   display: flex;
   gap: 0.75rem;
   align-items: center;
+  flex-wrap: wrap;
   margin-top: 0.75rem;
 }
 

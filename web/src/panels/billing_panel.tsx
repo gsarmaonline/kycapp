@@ -161,7 +161,7 @@ export function BillingPanel({
               ))}
             </ul>
           )}
-          <p className="row" style={{ gap: '0.75rem', flexWrap: 'wrap', marginTop: '0.75rem' }}>
+          <p className="row" style={{ marginTop: '0.75rem' }}>
             <Link className="button ghost" to={resourcePath(orgId, 'product-features')}>
               Manage features
             </Link>
@@ -172,7 +172,7 @@ export function BillingPanel({
         </div>
       </div>
 
-      <div className="row" style={{ gap: '0.75rem', flexWrap: 'wrap', marginTop: '1rem' }}>
+      <div className="row" style={{ marginTop: '1rem' }}>
         {sellable.map((plan) => {
           const isCurrent = plan.id === subscription?.plan_id
           return (
