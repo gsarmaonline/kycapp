@@ -59,14 +59,14 @@ export function ProductFeaturesShow() {
   return (
     <section>
       <PageHeader title={item.key} />
-      <p className="row" style={{ gap: '0.75rem' }}>
+      <div className="form-actions" style={{ marginTop: 0 }}>
         <Link className="button ghost" to={resourcePath(orgId, 'product-features', item.id, 'edit')}>
           Edit
         </Link>
         <Link className="button ghost" to={resourcePath(orgId, 'product-features')}>
           Back
         </Link>
-      </p>
+      </div>
       {error && <p className="error">{error}</p>}
       <DetailList
         items={[
@@ -85,7 +85,7 @@ export function ProductFeaturesShow() {
       ) : (
         <ul>
           {item.overrides.map((o) => (
-            <li key={o.subject_id} className="row" style={{ gap: '0.75rem', marginBottom: '0.35rem' }}>
+            <li key={o.subject_id} className="row" style={{ marginBottom: '0.35rem' }}>
               <code>{o.subject_id}</code>
               <span>{o.effect}</span>
               <button

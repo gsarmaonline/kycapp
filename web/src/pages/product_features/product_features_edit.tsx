@@ -57,7 +57,7 @@ export function ProductFeaturesEdit() {
           Description
           <input value={description} onChange={(e) => setDescription(e.target.value)} />
         </label>
-        <label className="row" style={{ gap: '0.5rem', alignItems: 'center' }}>
+        <label className="row" style={{ gap: '0.5rem' }}>
           <input type="checkbox" checked={enabled} onChange={(e) => setEnabled(e.target.checked)} />
           Enabled
         </label>
