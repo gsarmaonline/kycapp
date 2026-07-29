@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
@@ -11,6 +12,7 @@ import (
 	"github.com/gsarmaonline/kyc/core/organisation"
 	"github.com/gsarmaonline/kyc/internal/apperr"
 	"github.com/gsarmaonline/kyc/internal/ids"
+	"github.com/gsarmaonline/kyc/internal/observability"
 	"github.com/gsarmaonline/kyc/internal/store"
 	"github.com/gsarmaonline/kyc/internal/store/sqlc"
 	"github.com/jackc/pgx/v5/pgtype"
@@ -92,7 +94,22 @@ func (s *Service) CreateOrganisation(ctx context.Context, in CreateOrganisationI
 		}
 		return nil
 	})
-	return org, err
+	if err != nil {
+		return org, err
+	}
+	s.recordActivity(ctx, observability.Activity{
+		OrganisationID:   org.ID,
+		OrganisationSlug: org.Slug,
+		OrganisationName: org.Name,
+		Action:           observability.ActionOrgCreated,
+		ResourceType:     "organisation",
+		ResourceID:       org.ID,
+		Summary:          "Organisation created",
+		Payload: map[string]any{
+			"slug": org.Slug,
+		},
+	})
+	return org, nil
 }
 
 func (s *Service) GetOrganisation(ctx context.Context, id string) (sqlc.Organisation, error) {
@@ -162,6 +179,9 @@ func (s *Service) DeleteOrganisation(ctx context.Context, id string) error {
 	}
 	if err := s.db.Q().DeleteOrganisation(ctx, id); err != nil {
 		return err
+	}
+	if err := s.Observability().DeleteOrganisation(ctx, id); err != nil {
+		slog.Warn("observability delete organisation failed", "org_id", id, "err", err)
 	}
 	return nil
 }

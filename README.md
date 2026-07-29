@@ -121,7 +121,7 @@ docker compose up --build -d
 
 - **App + API:** http://localhost:8080  
   Sign up (creates org + session) or sign in. The UI stores a session Bearer token; nginx forwards `Authorization`.
-- Postgres: `localhost:5432`
+- Postgres: `localhost:5432` (primary), `localhost:5433` (observability)
 - Optional service token for platform/ops scripts: `API_TOKENS` (default `dev-local-token`)
 - Local compose enables `AUTH_DEV_LOGIN=true` so you can sign in without Google credentials. Set `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` for real OAuth.
 
@@ -132,9 +132,10 @@ docker compose down
 ### Local (without Docker for the app)
 
 ```bash
-docker compose up -d postgres
+docker compose up -d postgres postgres-obs
 
 export DATABASE_URL='postgres://kyc:kyc@localhost:5432/kyc?sslmode=disable'
+export OBSERVABILITY_DATABASE_URL='postgres://kyc:kyc@localhost:5433/kyc_obs?sslmode=disable'
 # Google OAuth (required for production human login):
 # export GOOGLE_CLIENT_ID=...
 # export GOOGLE_CLIENT_SECRET=...
@@ -155,6 +156,8 @@ cd web && npm run dev
 
 | Env | Purpose |
 | --- | --- |
+| `DATABASE_URL` | Primary Postgres (orgs, plans, entitlements) |
+| `OBSERVABILITY_DATABASE_URL` | Separate Postgres for activity + usage meters (optional; noop if unset) |
 | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | Google OAuth app credentials |
 | `OAUTH_REDIRECT_URL` | Must match Google console (default `http://localhost:8080/v1/auth/google/callback`) |
 | `APP_ORIGIN` | Where to redirect after login with `#token=` |

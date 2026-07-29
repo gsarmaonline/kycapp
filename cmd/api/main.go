@@ -13,6 +13,7 @@ import (
 	httpserver "github.com/gsarmaonline/kyc/internal/http"
 	"github.com/gsarmaonline/kyc/internal/jobs"
 	"github.com/gsarmaonline/kyc/internal/mailer"
+	"github.com/gsarmaonline/kyc/internal/observability"
 	"github.com/gsarmaonline/kyc/internal/payments"
 	"github.com/gsarmaonline/kyc/internal/service"
 	"github.com/gsarmaonline/kyc/internal/store"
@@ -35,7 +36,14 @@ func main() {
 		log.Fatalf("migrate: %v", err)
 	}
 
+	obs, err := observability.NewFromURL(ctx, cfg.ObservabilityDatabaseURL)
+	if err != nil {
+		log.Fatalf("observability: %v", err)
+	}
+	defer obs.Close()
+
 	svc := service.New(db)
+	svc.SetObservability(obs)
 	svc.ConfigureAssets(cfg.UploadDir, cfg.PublicBaseURL)
 	pay, err := payments.NewFromConfig(payments.Config{
 		Provider:      cfg.PaymentsProvider,
@@ -68,8 +76,13 @@ func main() {
 		corsOrigin = cfg.AppOrigin
 	}
 
+	var obsPinger httpserver.DBPinger
+	if cfg.ObservabilityDatabaseURL != "" {
+		obsPinger = obs
+	}
 	srv := httpserver.New(db, httpserver.Options{
 		Service:              svc,
+		Observability:        obsPinger,
 		CORSOrigin:           corsOrigin,
 		APITokens:            cfg.APITokens,
 		PlatformAdminEmails:  cfg.PlatformAdminEmails,
@@ -90,8 +103,9 @@ func main() {
 
 	go func() {
 		log.Printf(
-			"listening on %s (google_oauth=%v dev_login=%v service_tokens=%d payments=%s email=%s)",
+			"listening on %s (google_oauth=%v dev_login=%v service_tokens=%d payments=%s email=%s obs=%v)",
 			cfg.HTTPAddr, cfg.GoogleConfigured(), cfg.AuthDevLogin, len(cfg.APITokens), pay.Name(), mail.Name(),
+			cfg.ObservabilityDatabaseURL != "",
 		)
 		if err := httpServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			log.Fatalf("http: %v", err)

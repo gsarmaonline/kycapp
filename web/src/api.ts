@@ -1179,3 +1179,44 @@ export function listAutomationRuns(orgId: string, automationId?: string) {
     `/v1/organisations/${orgId}/automation-runs${q}`,
   )
 }
+
+export type ActivityEvent = {
+  id: string
+  organisation_id: string
+  organisation_slug?: string
+  organisation_name?: string
+  actor_type?: string
+  actor_id?: string
+  actor_label?: string
+  action: string
+  resource_type?: string
+  resource_id?: string
+  summary: string
+  payload?: Record<string, unknown>
+  created_at: string
+}
+
+export type UsageCounter = {
+  organisation_id: string
+  meter_key: string
+  period_start: string
+  dim1_key: string
+  dim1_value: string
+  dim2_key: string
+  dim2_value: string
+  count: number
+  updated_at: string
+}
+
+export function listOrgActivity(orgId: string, limit = 50) {
+  const q = limit ? `?limit=${encodeURIComponent(String(limit))}` : ''
+  return request<{ items: ActivityEvent[] }>(`/v1/organisations/${orgId}/activity${q}`)
+}
+
+export function listOrgUsage(orgId: string, opts?: { from?: string; to?: string }) {
+  const params = new URLSearchParams()
+  if (opts?.from) params.set('from', opts.from)
+  if (opts?.to) params.set('to', opts.to)
+  const q = params.toString() ? `?${params}` : ''
+  return request<{ items: UsageCounter[] }>(`/v1/organisations/${orgId}/usage${q}`)
+}

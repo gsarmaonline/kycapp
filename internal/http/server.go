@@ -17,6 +17,7 @@ type DBPinger interface {
 // Server serves HTTP endpoints for the KYC API.
 type Server struct {
 	db                  DBPinger
+	obs                 DBPinger
 	svc                 *service.Service
 	mux                 *http.ServeMux
 	now                 func() time.Time
@@ -34,6 +35,7 @@ type Server struct {
 // Options configures the HTTP server.
 type Options struct {
 	Service              *service.Service
+	Observability        DBPinger // optional; when set, /readyz also pings obs DB
 	CORSOrigin           string
 	APITokens            []string
 	PlatformAdminEmails  []string
@@ -51,6 +53,7 @@ type Options struct {
 func New(db DBPinger, opts Options) *Server {
 	s := &Server{
 		db:                  db,
+		obs:                 opts.Observability,
 		svc:                 opts.Service,
 		mux:                 http.NewServeMux(),
 		now:                 time.Now,
@@ -95,6 +98,8 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("PATCH /v1/organisations/{id}", s.handlePatchOrganisation)
 	s.mux.HandleFunc("GET /v1/organisations/{id}/onboarding", s.handleGetOrgOnboarding)
 	s.mux.HandleFunc("PATCH /v1/organisations/{id}/onboarding", s.handlePatchOrgOnboarding)
+	s.mux.HandleFunc("GET /v1/organisations/{id}/activity", s.handleListOrgActivity)
+	s.mux.HandleFunc("GET /v1/organisations/{id}/usage", s.handleListOrgUsage)
 	s.mux.HandleFunc("POST /v1/organisations/{id}/archive", s.handleArchiveOrganisation)
 	s.mux.HandleFunc("DELETE /v1/organisations/{id}", s.handleDeleteOrganisation)
 	s.mux.HandleFunc("GET /v1/organisations/{id}/integrations", s.handleListOrgIntegrations)
@@ -274,6 +279,15 @@ func (s *Server) handleReadyz(w http.ResponseWriter, r *http.Request) {
 			"error":  "database unreachable",
 		})
 		return
+	}
+	if s.obs != nil {
+		if err := s.obs.Ping(ctx); err != nil {
+			writeJSON(w, http.StatusServiceUnavailable, map[string]string{
+				"status": "not_ready",
+				"error":  "observability database unreachable",
+			})
+			return
+		}
 	}
 	writeJSON(w, http.StatusOK, healthResponse{
 		Status: "ok",

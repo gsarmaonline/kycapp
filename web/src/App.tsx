@@ -34,6 +34,7 @@ import { MembersIndex } from './pages/members/members_index'
 import { MembersNew } from './pages/members/members_new'
 import { MembersShow } from './pages/members/members_show'
 import { OverviewPage } from './pages/overview_page'
+import { ActivityPage } from './pages/activity/activity_page'
 import { APIKeysIndex } from './pages/api_keys/api_keys_index'
 import { APIKeysNew } from './pages/api_keys/api_keys_new'
 import { SettingsPage } from './pages/settings_page'
@@ -191,6 +192,7 @@ export default function App() {
         <Route path="settings" element={<SettingsPage />} />
         <Route path="api-keys" element={<APIKeysIndex />} />
         <Route path="api-keys/new" element={<APIKeysNew />} />
+        <Route path="activity" element={<ActivityPage />} />
         <Route path="docs" element={<DocsLayout />}>
           <Route index element={<DocsIntegrationApiPage />} />
           <Route path="operator" element={<DocsOperatorApiPage />} />

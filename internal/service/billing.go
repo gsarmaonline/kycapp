@@ -10,6 +10,7 @@ import (
 	"github.com/gsarmaonline/kyc/core/resources"
 	"github.com/gsarmaonline/kyc/internal/apperr"
 	"github.com/gsarmaonline/kyc/internal/ids"
+	"github.com/gsarmaonline/kyc/internal/observability"
 	"github.com/gsarmaonline/kyc/internal/store"
 	"github.com/gsarmaonline/kyc/internal/store/sqlc"
 	"github.com/jackc/pgx/v5"
@@ -216,9 +217,12 @@ func (s *Service) UpsertSubscription(ctx context.Context, orgID string, in Upser
 	default:
 		return sqlc.Subscription{}, apperr.Validation("invalid subscription status")
 	}
-	_, existingErr := s.db.Q().GetSubscriptionByOrganisation(ctx, orgID)
+	existing, existingErr := s.db.Q().GetSubscriptionByOrganisation(ctx, orgID)
 	created := errors.Is(existingErr, pgx.ErrNoRows)
-	if existingErr != nil && !created {
+	var prevStatus string
+	if existingErr == nil {
+		prevStatus = existing.Status
+	} else if !created {
 		return sqlc.Subscription{}, existingErr
 	}
 	sub, err := s.db.Q().UpsertSubscription(ctx, sqlc.UpsertSubscriptionParams{
@@ -232,10 +236,23 @@ func (s *Service) UpsertSubscription(ctx context.Context, orgID string, in Upser
 		return sqlc.Subscription{}, err
 	}
 	lifecycle := resources.LifecycleUpdated
+	action := observability.ActionSubscriptionUpdated
+	summary := "Subscription updated"
 	if created {
 		lifecycle = resources.LifecycleCreated
+		action = observability.ActionSubscriptionCreated
+		summary = "Subscription created"
 	}
 	s.EnqueueResourceLifecycle(ctx, orgID, resources.Subscription, lifecycle, subscriptionEventPayload(sub))
+	org, _ := s.db.Q().GetOrganisation(ctx, orgID)
+	payload := map[string]any{}
+	if prevStatus != "" && prevStatus != sub.Status {
+		action = observability.ActionSubscriptionStatusChanged
+		summary = "Subscription status changed"
+		payload["from_status"] = prevStatus
+		payload["to_status"] = sub.Status
+	}
+	s.recordActivity(ctx, activityForSubscription(org, sub, action, summary, payload))
 	return sub, nil
 }
 
@@ -429,27 +446,38 @@ func (s *Service) CheckEntitlementWithSubject(ctx context.Context, orgID, entitl
 	if err != nil {
 		return CheckEntitlementResult{}, err
 	}
+	var result CheckEntitlementResult
 	if !billing.Has(effective, entitlementKey) {
-		return CheckEntitlementResult{Allowed: false}, nil
-	}
-	if ent.Scope != "product" || !ent.OrganisationID.Valid {
-		return CheckEntitlementResult{Allowed: true}, nil
-	}
-	if ent.Enabled && ent.RolloutPercentage > 0 && ent.RolloutPercentage < 100 && subjectID == "" {
-		return CheckEntitlementResult{}, apperr.Validation("subject_id is required for percentage rollouts")
-	}
-	overrideEffect := ""
-	if subjectID != "" {
-		row, err := s.db.Q().GetProductFeatureOverride(ctx, sqlc.GetProductFeatureOverrideParams{
-			EntitlementID: ent.ID,
-			SubjectID:     subjectID,
-		})
-		if err == nil {
-			overrideEffect = row.Effect
-		} else if !errors.Is(err, pgx.ErrNoRows) {
-			return CheckEntitlementResult{}, err
+		result = CheckEntitlementResult{Allowed: false}
+	} else if ent.Scope != "product" || !ent.OrganisationID.Valid {
+		result = CheckEntitlementResult{Allowed: true}
+	} else {
+		if ent.Enabled && ent.RolloutPercentage > 0 && ent.RolloutPercentage < 100 && subjectID == "" {
+			return CheckEntitlementResult{}, apperr.Validation("subject_id is required for percentage rollouts")
 		}
+		overrideEffect := ""
+		if subjectID != "" {
+			row, err := s.db.Q().GetProductFeatureOverride(ctx, sqlc.GetProductFeatureOverrideParams{
+				EntitlementID: ent.ID,
+				SubjectID:     subjectID,
+			})
+			if err == nil {
+				overrideEffect = row.Effect
+			} else if !errors.Is(err, pgx.ErrNoRows) {
+				return CheckEntitlementResult{}, err
+			}
+		}
+		allowed, reason := featureflags.Evaluate(ent.Enabled, int(ent.RolloutPercentage), ent.Key, subjectID, overrideEffect)
+		result = CheckEntitlementResult{Allowed: allowed, Reason: reason}
 	}
-	allowed, reason := featureflags.Evaluate(ent.Enabled, int(ent.RolloutPercentage), ent.Key, subjectID, overrideEffect)
-	return CheckEntitlementResult{Allowed: allowed, Reason: reason}, nil
+	s.incrUsage(ctx, observability.UsageDelta{
+		OrganisationID: orgID,
+		MeterKey:       observability.MeterEntitlementCheck,
+		Dim1Key:        "entitlement",
+		Dim1Value:      entitlementKey,
+		Dim2Key:        "result",
+		Dim2Value:      entitlementResultLabel(result.Allowed),
+		Delta:          1,
+	})
+	return result, nil
 }

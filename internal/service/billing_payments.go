@@ -9,6 +9,7 @@ import (
 
 	"github.com/gsarmaonline/kyc/internal/apperr"
 	"github.com/gsarmaonline/kyc/internal/ids"
+	"github.com/gsarmaonline/kyc/internal/observability"
 	"github.com/gsarmaonline/kyc/internal/payments"
 	"github.com/gsarmaonline/kyc/internal/store"
 	"github.com/gsarmaonline/kyc/internal/store/sqlc"
@@ -364,7 +365,18 @@ func (s *Service) applyPaymentEvent(ctx context.Context, processor string, ev pa
 		Processor:        pgtype.Text{String: processor, Valid: true},
 		SubscriptionRef:  subRef,
 	})
-	return err
+	if err != nil {
+		return err
+	}
+	org, _ := s.db.Q().GetOrganisation(ctx, orgID)
+	sub, _ := s.db.Q().GetSubscriptionByOrganisation(ctx, orgID)
+	s.recordActivity(ctx, activityForSubscription(org, sub, observability.ActionSubscriptionUpdated, "Subscription reconciled from processor", map[string]any{
+		"processor":        processor,
+		"subscription_ref": ev.SubscriptionRef,
+		"status":           status,
+		"plan_id":          planID,
+	}))
+	return nil
 }
 
 func firstNonEmpty(vals ...string) string {

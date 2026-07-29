@@ -55,6 +55,7 @@ For each service: **Settings → Config-as-code** → set the config file path t
 | Variable | Value |
 | --- | --- |
 | `DATABASE_URL` | `${{Postgres.DATABASE_URL}}` (Railway reference) |
+| `OBSERVABILITY_DATABASE_URL` | `${{Postgres-Obs.DATABASE_URL}}` (second Postgres service) |
 | `AUTH_DEV_LOGIN` | `false` |
 | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | from Google Cloud Console |
 | `OAUTH_STATE_SECRET` | long random string |

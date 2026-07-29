@@ -7,6 +7,7 @@ import {
   type ProductFeature,
   type ProductFeatureOverride,
 } from '../../api'
+import { EntitlementUsageChart } from '../../components/EntitlementUsageChart'
 import { DetailList, PageHeader } from '../../crud/ui'
 import { resourcePath } from '../../org_nav'
 
@@ -121,6 +122,15 @@ export function ProductFeaturesShow() {
           Add override
         </button>
       </form>
+
+      <div className="obs-show-block">
+        <EntitlementUsageChart
+          orgId={orgId}
+          entitlementKey={item.key}
+          days={14}
+          title={`Checks for ${item.key}`}
+        />
+      </div>
     </section>
   )
 }
