@@ -1655,11 +1655,26 @@ button.link-btn.danger:hover {
 }
 
 /* Documentation */
+.docs-section {
+  min-width: 0;
+}
+
+.docs-section > .lede {
+  max-width: 52rem;
+}
+
 .docs-tabs {
   display: flex;
   flex-wrap: wrap;
   gap: 0.5rem;
   margin: 0 0 1.25rem;
+}
+
+.public-docs {
+  width: 100%;
+  max-width: 68rem;
+  margin: 0 auto;
+  padding: 2rem clamp(1.25rem, 4vw, 3rem) 4rem;
 }
 
 .public-docs-top {
@@ -1804,6 +1819,7 @@ html.dark-mode .docs-swagger {
 
 .prose-docs {
   color: var(--app-fg);
+  max-width: 52rem;
 }
 
 .prose-docs h2 {
