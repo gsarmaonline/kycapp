@@ -78,6 +78,9 @@ func (r *Resend) Send(ctx context.Context, msg Message) (string, error) {
 		HTML:    msg.HTML,
 		Text:    msg.Text,
 	}
+	if from := strings.TrimSpace(msg.From); from != "" {
+		body.From = from
+	}
 	if rt := strings.TrimSpace(msg.ReplyTo); rt != "" {
 		body.ReplyTo = []string{rt}
 	}

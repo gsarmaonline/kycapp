@@ -1117,6 +1117,14 @@ button.danger:not(.link-btn):hover {
   font-size: 0.85rem;
 }
 
+.typography-field-colors {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+  gap: 0.75rem;
+  margin-top: 0.85rem;
+  align-items: start;
+}
+
 .typography-preview {
   margin: 0.85rem 0 0;
   padding: 0.65rem 0.75rem;
@@ -1125,6 +1133,25 @@ button.danger:not(.link-btn):hover {
   border: 1px solid #e7e5e4;
   color: #1c1917;
   line-height: 1.4;
+}
+
+.email-body-sections {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.email-body-section legend {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  width: 100%;
+}
+
+.email-section-actions {
+  margin-left: auto;
+  display: inline-flex;
+  gap: 0.35rem;
 }
 
 .color-field {

@@ -63,6 +63,54 @@ func TestDefaults(t *testing.T) {
 	}
 }
 
+func TestComposeBodyHTML(t *testing.T) {
+	base := DefaultTypography("arial").Body
+	got := ComposeBodyHTML([]BodySection{
+		{ID: "a", ContentHTML: "<p>Hi {{app_user.display_name}}</p>", Style: RegionStyle{TextAlign: "center"}},
+		{ID: "b", ContentHTML: "<p>Bye</p>", Style: RegionStyle{PaddingLeft: 16}},
+	}, base, RenderContext("o", "Acme", map[string]any{"display_name": "Pat"}, nil))
+	for _, want := range []string{"Hi Pat", "Bye", "text-align:center", "padding-left:16px"} {
+		if !strings.Contains(got, want) {
+			t.Fatalf("missing %q in:\n%s", want, got)
+		}
+	}
+}
+
+func TestResolveFrom(t *testing.T) {
+	got := ResolveFrom("Tpl", "tpl@ex.com", "Org", "org@ex.com", "env@ex.com")
+	if got != "Tpl <tpl@ex.com>" {
+		t.Fatalf("got %q", got)
+	}
+	got = ResolveFrom("", "", "Org", "org@ex.com", "env@ex.com")
+	if got != "Org <org@ex.com>" {
+		t.Fatalf("org fallback: %q", got)
+	}
+	got = ResolveFrom("", "", "", "", "KYC <env@ex.com>")
+	if got != "KYC <env@ex.com>" {
+		t.Fatalf("env fallback: %q", got)
+	}
+	got = ResolveFrom("", "Name <already@ex.com>", "", "", "env@ex.com")
+	if got != "Name <already@ex.com>" {
+		t.Fatalf("passthrough: %q", got)
+	}
+}
+
+func TestWrapSectionStyle(t *testing.T) {
+	got := Wrap(`<p>Hi</p>`, Branding{
+		OrgName: "Acme",
+		Typography: Typography{
+			Header: RegionStyle{Font: "arial", Size: 20, Weight: 700, Style: "normal", TextAlign: "right", TextColor: "#112233"},
+			Body:   RegionStyle{Font: "arial", Size: 16, Weight: 400, Style: "normal", TextAlign: "left", PaddingLeft: 12},
+			Footer: RegionStyle{Font: "arial", Size: 12, Weight: 400, Style: "normal", TextAlign: "left", BackgroundColor: "#abcdef"},
+		},
+	})
+	for _, want := range []string{`align="right"`, "#112233", "padding-left:12px", "#abcdef"} {
+		if !strings.Contains(got, want) {
+			t.Fatalf("missing %q in:\n%s", want, got)
+		}
+	}
+}
+
 func TestWrapBranding(t *testing.T) {
 	got := Wrap(`<p>Hello</p>`, Branding{
 		OrgName: "Acme <Corp>", LogoURL: "https://example.com/l.png",

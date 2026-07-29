@@ -288,13 +288,34 @@ components:
                 status:
                     type: string
             type: object
+        EmailBodySection:
+            properties:
+                content_html:
+                    type: string
+                id:
+                    type: string
+                style:
+                    $ref: '#/components/schemas/RegionStyle'
+            required:
+                - id
+                - content_html
+            type: object
         EmailTemplate:
             properties:
                 body_html:
+                    description: Deprecated synced field; prefer body_sections
                     type: string
+                body_sections:
+                    items:
+                        $ref: '#/components/schemas/EmailBodySection'
+                    type: array
                 body_text:
                     type: string
                 description:
+                    type: string
+                from_address:
+                    type: string
+                from_name:
                     type: string
                 id:
                     type: string
@@ -502,6 +523,10 @@ components:
                 email_font:
                     type: string
                 email_footer:
+                    type: string
+                email_from_address:
+                    type: string
+                email_from_name:
                     type: string
                 email_typography:
                     $ref: '#/components/schemas/EmailTypography'
@@ -715,6 +740,9 @@ components:
             type: object
         RegionStyle:
             properties:
+                background_color:
+                    description: Hex color
+                    type: string
                 font:
                     enum:
                         - arial
@@ -725,6 +753,9 @@ components:
                         - times
                         - courier
                     type: string
+                padding_left:
+                    description: Paragraph indent in px (0, 4, 8, 12, 16, 20, 24, 32, 40, 48)
+                    type: integer
                 size:
                     description: px (10–16, 18, 20, 22, 24, 28, 32)
                     type: integer
@@ -732,6 +763,15 @@ components:
                     enum:
                         - normal
                         - italic
+                    type: string
+                text_align:
+                    enum:
+                        - left
+                        - center
+                        - right
+                    type: string
+                text_color:
+                    description: Hex color e.g.
                     type: string
                 weight:
                     enum:

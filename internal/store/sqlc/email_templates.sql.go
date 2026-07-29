@@ -7,6 +7,7 @@ package sqlc
 
 import (
 	"context"
+	"encoding/json"
 
 	"github.com/jackc/pgx/v5/pgtype"
 )
@@ -15,7 +16,7 @@ const archiveEmailTemplate = `-- name: ArchiveEmailTemplate :one
 UPDATE email_templates
 SET status = 'archived', updated_at = now()
 WHERE id = $1
-RETURNING id, organisation_id, key, name, description, subject, body_text, body_html, status, is_system, created_at, updated_at
+RETURNING id, organisation_id, key, name, description, subject, body_text, body_html, status, is_system, created_at, updated_at, body_sections, from_name, from_address
 `
 
 func (q *Queries) ArchiveEmailTemplate(ctx context.Context, id string) (EmailTemplate, error) {
@@ -34,6 +35,9 @@ func (q *Queries) ArchiveEmailTemplate(ctx context.Context, id string) (EmailTem
 		&i.IsSystem,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.BodySections,
+		&i.FromName,
+		&i.FromAddress,
 	)
 	return i, err
 }
@@ -41,25 +45,28 @@ func (q *Queries) ArchiveEmailTemplate(ctx context.Context, id string) (EmailTem
 const createEmailTemplate = `-- name: CreateEmailTemplate :one
 INSERT INTO email_templates (
     id, organisation_id, key, name, description,
-    subject, body_text, body_html, status, is_system
+    subject, body_text, body_html, body_sections, from_name, from_address, status, is_system
 ) VALUES (
     $1, $2, $3, $4, $5,
-    $6, $7, $8, $9, $10
+    $6, $7, $8, $9, $10, $11, $12, $13
 )
-RETURNING id, organisation_id, key, name, description, subject, body_text, body_html, status, is_system, created_at, updated_at
+RETURNING id, organisation_id, key, name, description, subject, body_text, body_html, status, is_system, created_at, updated_at, body_sections, from_name, from_address
 `
 
 type CreateEmailTemplateParams struct {
-	ID             string `json:"id"`
-	OrganisationID string `json:"organisation_id"`
-	Key            string `json:"key"`
-	Name           string `json:"name"`
-	Description    string `json:"description"`
-	Subject        string `json:"subject"`
-	BodyText       string `json:"body_text"`
-	BodyHtml       string `json:"body_html"`
-	Status         string `json:"status"`
-	IsSystem       bool   `json:"is_system"`
+	ID             string          `json:"id"`
+	OrganisationID string          `json:"organisation_id"`
+	Key            string          `json:"key"`
+	Name           string          `json:"name"`
+	Description    string          `json:"description"`
+	Subject        string          `json:"subject"`
+	BodyText       string          `json:"body_text"`
+	BodyHtml       string          `json:"body_html"`
+	BodySections   json.RawMessage `json:"body_sections"`
+	FromName       string          `json:"from_name"`
+	FromAddress    string          `json:"from_address"`
+	Status         string          `json:"status"`
+	IsSystem       bool            `json:"is_system"`
 }
 
 func (q *Queries) CreateEmailTemplate(ctx context.Context, arg CreateEmailTemplateParams) (EmailTemplate, error) {
@@ -72,6 +79,9 @@ func (q *Queries) CreateEmailTemplate(ctx context.Context, arg CreateEmailTempla
 		arg.Subject,
 		arg.BodyText,
 		arg.BodyHtml,
+		arg.BodySections,
+		arg.FromName,
+		arg.FromAddress,
 		arg.Status,
 		arg.IsSystem,
 	)
@@ -89,12 +99,15 @@ func (q *Queries) CreateEmailTemplate(ctx context.Context, arg CreateEmailTempla
 		&i.IsSystem,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.BodySections,
+		&i.FromName,
+		&i.FromAddress,
 	)
 	return i, err
 }
 
 const getEmailTemplate = `-- name: GetEmailTemplate :one
-SELECT id, organisation_id, key, name, description, subject, body_text, body_html, status, is_system, created_at, updated_at FROM email_templates WHERE id = $1
+SELECT id, organisation_id, key, name, description, subject, body_text, body_html, status, is_system, created_at, updated_at, body_sections, from_name, from_address FROM email_templates WHERE id = $1
 `
 
 func (q *Queries) GetEmailTemplate(ctx context.Context, id string) (EmailTemplate, error) {
@@ -113,12 +126,15 @@ func (q *Queries) GetEmailTemplate(ctx context.Context, id string) (EmailTemplat
 		&i.IsSystem,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.BodySections,
+		&i.FromName,
+		&i.FromAddress,
 	)
 	return i, err
 }
 
 const getEmailTemplateByOrgKey = `-- name: GetEmailTemplateByOrgKey :one
-SELECT id, organisation_id, key, name, description, subject, body_text, body_html, status, is_system, created_at, updated_at FROM email_templates
+SELECT id, organisation_id, key, name, description, subject, body_text, body_html, status, is_system, created_at, updated_at, body_sections, from_name, from_address FROM email_templates
 WHERE organisation_id = $1 AND key = $2
 `
 
@@ -143,12 +159,15 @@ func (q *Queries) GetEmailTemplateByOrgKey(ctx context.Context, arg GetEmailTemp
 		&i.IsSystem,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.BodySections,
+		&i.FromName,
+		&i.FromAddress,
 	)
 	return i, err
 }
 
 const listEmailTemplates = `-- name: ListEmailTemplates :many
-SELECT id, organisation_id, key, name, description, subject, body_text, body_html, status, is_system, created_at, updated_at FROM email_templates
+SELECT id, organisation_id, key, name, description, subject, body_text, body_html, status, is_system, created_at, updated_at, body_sections, from_name, from_address FROM email_templates
 WHERE organisation_id = $1
   AND ($2::text IS NULL OR status = $2)
 ORDER BY is_system DESC, key ASC
@@ -181,6 +200,9 @@ func (q *Queries) ListEmailTemplates(ctx context.Context, arg ListEmailTemplates
 			&i.IsSystem,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.BodySections,
+			&i.FromName,
+			&i.FromAddress,
 		); err != nil {
 			return nil, err
 		}
@@ -199,20 +221,26 @@ UPDATE email_templates SET
     subject = COALESCE($4, subject),
     body_text = COALESCE($5, body_text),
     body_html = COALESCE($6, body_html),
-    status = COALESCE($7, status),
+    body_sections = COALESCE($7, body_sections),
+    from_name = COALESCE($8, from_name),
+    from_address = COALESCE($9, from_address),
+    status = COALESCE($10, status),
     updated_at = now()
 WHERE id = $1
-RETURNING id, organisation_id, key, name, description, subject, body_text, body_html, status, is_system, created_at, updated_at
+RETURNING id, organisation_id, key, name, description, subject, body_text, body_html, status, is_system, created_at, updated_at, body_sections, from_name, from_address
 `
 
 type UpdateEmailTemplateParams struct {
-	ID          string      `json:"id"`
-	Name        pgtype.Text `json:"name"`
-	Description pgtype.Text `json:"description"`
-	Subject     pgtype.Text `json:"subject"`
-	BodyText    pgtype.Text `json:"body_text"`
-	BodyHtml    pgtype.Text `json:"body_html"`
-	Status      pgtype.Text `json:"status"`
+	ID           string      `json:"id"`
+	Name         pgtype.Text `json:"name"`
+	Description  pgtype.Text `json:"description"`
+	Subject      pgtype.Text `json:"subject"`
+	BodyText     pgtype.Text `json:"body_text"`
+	BodyHtml     pgtype.Text `json:"body_html"`
+	BodySections []byte      `json:"body_sections"`
+	FromName     pgtype.Text `json:"from_name"`
+	FromAddress  pgtype.Text `json:"from_address"`
+	Status       pgtype.Text `json:"status"`
 }
 
 func (q *Queries) UpdateEmailTemplate(ctx context.Context, arg UpdateEmailTemplateParams) (EmailTemplate, error) {
@@ -223,6 +251,9 @@ func (q *Queries) UpdateEmailTemplate(ctx context.Context, arg UpdateEmailTempla
 		arg.Subject,
 		arg.BodyText,
 		arg.BodyHtml,
+		arg.BodySections,
+		arg.FromName,
+		arg.FromAddress,
 		arg.Status,
 	)
 	var i EmailTemplate
@@ -239,6 +270,9 @@ func (q *Queries) UpdateEmailTemplate(ctx context.Context, arg UpdateEmailTempla
 		&i.IsSystem,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.BodySections,
+		&i.FromName,
+		&i.FromAddress,
 	)
 	return i, err
 }

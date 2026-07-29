@@ -105,9 +105,30 @@ func Wrap(content string, b Branding) string {
 		ty = mergeTypography(DefaultTypography(b.Font), ty)
 	}
 	bodyFont := FontStack(ty.Body.Font)
-	headerCSS := ty.Header.InlineCSS()
-	bodyCSS := ty.Body.InlineCSS()
-	footerCSS := ty.Footer.InlineCSS()
+
+	headerStyle := ty.Header
+	if headerStyle.TextColor == "" {
+		headerStyle.TextColor = accent
+	}
+	footerStyle := ty.Footer
+	if footerStyle.TextColor == "" {
+		footerStyle.TextColor = "#f8faf8"
+	}
+	if footerStyle.BackgroundColor == "" {
+		footerStyle.BackgroundColor = primary
+	}
+	bodyStyle := ty.Body
+	if bodyStyle.TextColor == "" {
+		bodyStyle.TextColor = "#1c1917"
+	}
+
+	headerCSS := headerStyle.InlineCSS()
+	bodyCSS := bodyStyle.InlineCSS()
+	footerCSS := footerStyle.InlineCSS()
+	headerAlign := headerStyle.AlignAttr()
+	bodyAlign := bodyStyle.AlignAttr()
+	footerAlign := footerStyle.AlignAttr()
+
 	orgName := html.EscapeString(strings.TrimSpace(b.OrgName))
 	footer := html.EscapeString(strings.TrimSpace(b.Footer))
 	if footer == "" && orgName != "" {
@@ -144,18 +165,18 @@ func Wrap(content string, b Branding) string {
           <td style="background:%s;height:6px;font-size:0;line-height:0;">&nbsp;</td>
         </tr>
         <tr>
-          <td style="padding:28px 28px 12px;text-align:center;font-family:%s;">
+          <td align="%s" style="padding:28px 28px 12px;%s">
             %s
-            <div style="%scolor:%s;letter-spacing:0.01em;">%s</div>
+            <div style="letter-spacing:0.01em;">%s</div>
           </td>
         </tr>
         <tr>
-          <td style="padding:8px 28px 28px;%sline-height:1.55;color:#1c1917;text-align:left;">
+          <td align="%s" style="padding:8px 28px 28px;%sline-height:1.55;">
             %s
           </td>
         </tr>
         <tr>
-          <td style="padding:16px 28px;background:%s;color:#f8faf8;%sline-height:1.4;text-align:center;">
+          <td align="%s" style="padding:16px 28px;%sline-height:1.4;">
             %s
           </td>
         </tr>
@@ -168,14 +189,14 @@ func Wrap(content string, b Branding) string {
 		orgName,
 		bodyFont, bodyFont, bodyFont,
 		html.EscapeString(primary),
-		bodyFont,
-		logoBlock,
+		headerAlign,
 		headerCSS,
-		html.EscapeString(accent),
+		logoBlock,
 		orgName,
+		bodyAlign,
 		bodyCSS,
 		inner,
-		html.EscapeString(primary),
+		footerAlign,
 		footerCSS,
 		footer,
 	)

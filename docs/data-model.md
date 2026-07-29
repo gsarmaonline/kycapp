@@ -54,7 +54,9 @@ Tenant hub. Everything else hangs off this record.
 | `accent_color` | string | Optional hex for header title |
 | `email_footer` | string | Footer text for branded email chrome |
 | `email_font` | string | Legacy / body font key: `arial`, `helvetica`, `verdana`, `trebuchet`, `georgia`, `times`, `courier` |
-| `email_typography` | jsonb | Per-region styles: `header` / `body` / `footer` each with `font`, `size`, `weight`, `style` |
+| `email_typography` | jsonb | Per-region styles: `header` / `body` / `footer` each with `font`, `size`, `weight`, `style`, plus optional `text_color`, `background_color`, `text_align`, `padding_left` |
+| `email_from_name` | string | Default From display name (empty → fall through to `EMAIL_FROM`) |
+| `email_from_address` | string | Default From address (empty → fall through to `EMAIL_FROM`) |
 | `app_user_authority` | enum | `kyc` (default) \| `external` — primary source for customer profiles; KYC UI create stays allowed either way |
 | `app_user_ingest_upsert_key` | enum | `external_id` (default) \| `email` — which field ingest matches on |
 | `app_user_attributes_mode` | enum | `discover` (default) \| `strict` — whether ingest auto-creates attribute definitions for unknown keys |
@@ -224,7 +226,10 @@ Org-scoped email copy for messaging app users. Seeded system templates per org; 
 | `description` | string | |
 | `subject` | string | Supports `{{path}}` placeholders (shared `app_user.*` / `organisation.name` vocabulary) |
 | `body_text` | string | Plain text body |
-| `body_html` | string | Inner HTML content (org branding chrome applied at render) |
+| `body_html` | string | Legacy/synced concatenation of section HTML (prefer `body_sections`) |
+| `body_sections` | jsonb | Ordered sections: `{ id, content_html, style? }` — style inherits org body defaults |
+| `from_name` | string | Optional From name override (empty → org default) |
+| `from_address` | string | Optional From address override (empty → org default) |
 | `status` | enum | `active` \| `archived` |
 | `is_system` | bool | Seeded defaults |
 

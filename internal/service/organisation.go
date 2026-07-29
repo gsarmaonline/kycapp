@@ -154,6 +154,8 @@ type UpdateOrganisationInput struct {
 	EmailFooter            *string
 	EmailFont              *string
 	EmailTypography        *emailtemplates.Typography
+	EmailFromName          *string
+	EmailFromAddress       *string
 	AppUserAuthority       *string
 	AppUserIngestUpsertKey *string
 	AppUserAttributesMode  *string

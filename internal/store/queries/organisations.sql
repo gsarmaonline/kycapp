@@ -45,6 +45,8 @@ SET
   email_footer = COALESCE(sqlc.narg('email_footer'), email_footer),
   email_font = COALESCE(sqlc.narg('email_font'), email_font),
   email_typography = COALESCE(sqlc.narg('email_typography'), email_typography),
+  email_from_name = COALESCE(sqlc.narg('email_from_name'), email_from_name),
+  email_from_address = COALESCE(sqlc.narg('email_from_address'), email_from_address),
   app_user_authority = COALESCE(sqlc.narg('app_user_authority'), app_user_authority),
   app_user_ingest_upsert_key = COALESCE(sqlc.narg('app_user_ingest_upsert_key'), app_user_ingest_upsert_key),
   app_user_attributes_mode = COALESCE(sqlc.narg('app_user_attributes_mode'), app_user_attributes_mode),

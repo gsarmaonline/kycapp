@@ -64,6 +64,14 @@ func (s *Service) UpdateOrganisationBranding(ctx context.Context, id string, in 
 	if in.EmailFooter != nil {
 		params.EmailFooter = pgtype.Text{String: *in.EmailFooter, Valid: true}
 	}
+	if in.EmailFromName != nil {
+		name, _ := emailtemplates.NormalizeFromFields(*in.EmailFromName, "")
+		params.EmailFromName = pgtype.Text{String: name, Valid: true}
+	}
+	if in.EmailFromAddress != nil {
+		_, addr := emailtemplates.NormalizeFromFields("", *in.EmailFromAddress)
+		params.EmailFromAddress = pgtype.Text{String: addr, Valid: true}
+	}
 
 	if in.EmailTypography != nil || in.EmailFont != nil {
 		existing, err := s.db.Q().GetOrganisation(ctx, id)

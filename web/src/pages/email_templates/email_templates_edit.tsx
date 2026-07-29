@@ -2,9 +2,22 @@ import { useEffect, useMemo, useState } from 'react'
 import type { FormEvent } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { getEmailTemplate, getOrganisation, updateEmailTemplate, type Organisation } from '../../api'
+import { EmailBodySectionsEditor } from '../../components/EmailBodySectionsEditor'
 import { FormActions, PageHeader } from '../../crud/ui'
 import { VariableDocsHint } from '../../components/VariableDocsHint'
-import { emailRenderContext, renderEmailTemplate, wrapEmailHtml } from '../../email_render'
+import {
+  newBodySection,
+  resolveTypography,
+  sectionsFromLegacyHtml,
+  type EmailBodySection,
+} from '../../email_fonts'
+import {
+  composeBodySectionsHtml,
+  emailRenderContext,
+  renderEmailTemplate,
+  resolveFrom,
+  wrapEmailHtml,
+} from '../../email_render'
 import { orgPath, resourcePath } from '../../org_nav'
 
 export function EmailTemplatesEdit() {
@@ -14,7 +27,9 @@ export function EmailTemplatesEdit() {
   const [name, setName] = useState('')
   const [subject, setSubject] = useState('')
   const [bodyText, setBodyText] = useState('')
-  const [bodyHtml, setBodyHtml] = useState('')
+  const [sections, setSections] = useState<EmailBodySection[]>([newBodySection()])
+  const [fromName, setFromName] = useState('')
+  const [fromAddress, setFromAddress] = useState('')
   const [sampleDisplayName, setSampleDisplayName] = useState('Pat')
   const [sampleEmail, setSampleEmail] = useState('pat@example.com')
   const [error, setError] = useState<string | null>(null)
@@ -26,7 +41,13 @@ export function EmailTemplatesEdit() {
         setName(t.name)
         setSubject(t.subject)
         setBodyText(t.body_text)
-        setBodyHtml(t.body_html)
+        setFromName(t.from_name || '')
+        setFromAddress(t.from_address || '')
+        if (t.body_sections && t.body_sections.length > 0) {
+          setSections(t.body_sections)
+        } else {
+          setSections(sectionsFromLegacyHtml(t.body_html || t.body_text || ''))
+        }
       })
       .catch((e) => setError(e instanceof Error ? e.message : 'Failed to load'))
       .finally(() => setLoading(false))
@@ -52,9 +73,14 @@ export function EmailTemplatesEdit() {
     [orgId, org?.name, sampleDisplayName, sampleEmail],
   )
 
+  const ty = useMemo(
+    () => resolveTypography(org?.email_typography, org?.email_font || 'arial'),
+    [org],
+  )
+
   const previewHtml = useMemo(() => {
-    const rendered = renderEmailTemplate(bodyHtml, vars)
-    return wrapEmailHtml(rendered, {
+    const inner = composeBodySectionsHtml(sections, ty.body, vars)
+    return wrapEmailHtml(inner, {
       org_name: org?.name ?? 'Acme',
       logo_url: org?.logo_url,
       primary_color: org?.primary_color,
@@ -63,7 +89,19 @@ export function EmailTemplatesEdit() {
       font: org?.email_font,
       typography: org?.email_typography,
     })
-  }, [bodyHtml, vars, org])
+  }, [sections, vars, org, ty.body])
+
+  const previewFrom = useMemo(
+    () =>
+      resolveFrom(
+        fromName,
+        fromAddress,
+        org?.email_from_name || '',
+        org?.email_from_address || '',
+        'EMAIL_FROM',
+      ),
+    [fromName, fromAddress, org],
+  )
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault()
@@ -73,7 +111,9 @@ export function EmailTemplatesEdit() {
         name,
         subject,
         body_text: bodyText,
-        body_html: bodyHtml,
+        body_sections: sections,
+        from_name: fromName,
+        from_address: fromAddress,
       })
       navigate(resourcePath(orgId, 'email-templates', id))
     } catch (err) {
@@ -100,33 +140,43 @@ export function EmailTemplatesEdit() {
           </VariableDocsHint>
           <input value={subject} onChange={(e) => setSubject(e.target.value)} required />
         </label>
+        <fieldset className="settings-block">
+          <legend>From (optional override)</legend>
+          <p className="field-hint">
+            Leave blank to use the org default from{' '}
+            <Link to={orgPath(orgId, 'branding')}>Branding</Link>.
+          </p>
+          <label>
+            From name
+            <input value={fromName} onChange={(e) => setFromName(e.target.value)} placeholder="Acme" />
+          </label>
+          <label>
+            From address
+            <input
+              value={fromAddress}
+              onChange={(e) => setFromAddress(e.target.value)}
+              placeholder="hello@acme.com"
+            />
+          </label>
+        </fieldset>
         <label>
           Body (text)
-          <textarea value={bodyText} onChange={(e) => setBodyText(e.target.value)} rows={6} />
+          <textarea value={bodyText} onChange={(e) => setBodyText(e.target.value)} rows={4} />
         </label>
-        <label>
-          Body (HTML)
-          <VariableDocsHint>
-            Inner content only — header, logo, footer, and other styling are carried over from{' '}
-            <Link to={orgPath(orgId, 'branding')}>Branding</Link>.
-          </VariableDocsHint>
-          <textarea value={bodyHtml} onChange={(e) => setBodyHtml(e.target.value)} rows={6} />
-        </label>
+        <EmailBodySectionsEditor sections={sections} onChange={setSections} brandingHint />
         <FormActions cancelTo={resourcePath(orgId, 'email-templates', id)} submitLabel="Save" />
       </form>
 
       <fieldset className="perm-group email-preview">
         <legend>Preview</legend>
+        <p className="field-hint">From: {previewFrom}</p>
         <div className="create stacked preview-vars">
           <label>
-            Sample {'{{app_user.display_name}}'}
-            <input
-              value={sampleDisplayName}
-              onChange={(e) => setSampleDisplayName(e.target.value)}
-            />
+            Sample display name
+            <input value={sampleDisplayName} onChange={(e) => setSampleDisplayName(e.target.value)} />
           </label>
           <label>
-            Sample {'{{app_user.email}}'}
+            Sample email
             <input value={sampleEmail} onChange={(e) => setSampleEmail(e.target.value)} />
           </label>
         </div>
@@ -134,7 +184,6 @@ export function EmailTemplatesEdit() {
           <span className="preview-label">Subject</span>
           {renderEmailTemplate(subject, vars)}
         </p>
-        <pre className="preview-text">{renderEmailTemplate(bodyText, vars) || '—'}</pre>
         <iframe title="HTML preview" className="preview-html" sandbox="" srcDoc={previewHtml} />
       </fieldset>
     </section>

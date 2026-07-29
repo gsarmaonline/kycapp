@@ -139,16 +139,27 @@ func execSendEmail(
 	data := emailtemplates.RenderContext(orgID, org.Name, appUser, payload)
 	subject := emailtemplates.Render(tmpl.Subject, data)
 	textBody := emailtemplates.Render(tmpl.BodyText, data)
-	htmlInner := emailtemplates.Render(tmpl.BodyHtml, data)
+	branding := BrandingFromOrg(org)
+	sections, err := emailtemplates.BodySectionsOrLegacy(tmpl.BodySections, tmpl.BodyHtml)
+	if err != nil {
+		return "", fmt.Errorf("send_email: body_sections: %w", err)
+	}
+	htmlInner := emailtemplates.ComposeBodyHTML(sections, branding.Typography.Body, data)
 	if strings.TrimSpace(htmlInner) == "" {
 		htmlInner = "<p>" + html.EscapeString(textBody) + "</p>"
 	}
-	htmlBody := emailtemplates.Wrap(htmlInner, BrandingFromOrg(org))
+	htmlBody := emailtemplates.Wrap(htmlInner, branding)
+	from := emailtemplates.ResolveFrom(
+		tmpl.FromName, tmpl.FromAddress,
+		org.EmailFromName, org.EmailFromAddress,
+		"",
+	)
 	ref, err := s.mailer.Send(ctx, mailer.Message{
 		To:      []string{to},
 		Subject: subject,
 		HTML:    htmlBody,
 		Text:    textBody,
+		From:    from,
 		Tags: map[string]string{
 			"org_id":       orgID,
 			"template_key": templateKey,
