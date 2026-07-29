@@ -6,6 +6,19 @@ One place to create and manage organisations, their users, authorisation, and bi
 
 **For merchants:** configure in KYC, enforce in your backend, collect customer profile data with your UI or ours — we store the record. See [How merchants integrate](#how-merchants-integrate).
 
+## Contents
+
+1. [What this is](#what-this-is)
+2. [How merchants integrate](#how-merchants-integrate)
+3. [Design principles](#design-principles)
+4. [Specs](#specs)
+5. [Deploy](#deploy)
+6. [Status](#status)
+7. [Run locally](#run-locally)
+8. [Test](#test)
+9. [Non-goals (v1)](#non-goals-v1)
+10. [Layout](#layout)
+
 ## What this is
 
 KYC owns the organisation lifecycle:
@@ -113,43 +126,56 @@ Still later: headless SDK + settings embed, invite email polish, full platform-a
 
 ## Run locally
 
-### Docker (recommended)
+### Prerequisites
+
+- [Docker](https://docs.docker.com/get-docker/) (recommended path)
+- Or: Go **1.26+**, Node **20+**, and Docker only for Postgres
+
+### 1. Clone and configure env
+
+```bash
+git clone https://github.com/gsarmaonline/kycapp.git
+cd kycapp
+cp .env.example .env   # optional; compose has local defaults
+```
+
+Fill `.env` only when you need Google OAuth, Stripe, or Resend. See [Auth & security](#auth--security) for the full variable list.
+
+### 2. Docker (recommended)
 
 ```bash
 docker compose up --build -d
 ```
 
-- **App + API:** http://localhost:8080  
-  Sign up (creates org + session) or sign in. The UI stores a session Bearer token; nginx forwards `Authorization`.
-- Postgres: `localhost:5432` (primary), `localhost:5433` (observability)
-- Optional service token for platform/ops scripts: `API_TOKENS` (default `dev-local-token`)
-- Local compose enables `AUTH_DEV_LOGIN=true` so you can sign in without Google credentials. Set `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` for real OAuth.
+| What | Where |
+| --- | --- |
+| App + API | http://localhost:8080 |
+| Postgres (primary) | `localhost:5432` |
+| Postgres (observability) | `localhost:5433` |
+
+- Sign in with **dev login** (compose sets `AUTH_DEV_LOGIN=true`) or set `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` for real OAuth.
+- Platform/ops scripts can use `API_TOKENS` (default `dev-local-token`).
+- The UI stores a session Bearer token; nginx forwards `Authorization`.
 
 ```bash
 docker compose down
 ```
 
-### Local (without Docker for the app)
+### 3. Local (API + UI without Docker for the app)
 
 ```bash
+# Postgres only
 docker compose up -d postgres postgres-obs
 
 export DATABASE_URL='postgres://kyc:kyc@localhost:5432/kyc?sslmode=disable'
 export OBSERVABILITY_DATABASE_URL='postgres://kyc:kyc@localhost:5433/kyc_obs?sslmode=disable'
-# Google OAuth (required for production human login):
-# export GOOGLE_CLIENT_ID=...
-# export GOOGLE_CLIENT_SECRET=...
-# export OAUTH_REDIRECT_URL='http://localhost:8080/v1/auth/google/callback'
-# export APP_ORIGIN='http://localhost:8080'
-# Local-only bypass when Google is not configured:
 export AUTH_DEV_LOGIN=true
-# Optional platform/service tokens:
-# export API_TOKENS='my-secret'
-# export PLATFORM_ADMIN_EMAILS='you@example.com'
+# Optional: source .env instead, or set Google OAuth / API_TOKENS / PLATFORM_ADMIN_EMAILS
+
 go run ./cmd/api
 
-# App UI — http://localhost:5173
-cd web && npm run dev
+# Separate terminal — UI at http://localhost:5173
+cd web && npm install && npm run dev
 ```
 
 ### Auth & security
