@@ -15,6 +15,7 @@ export type OrgSection =
   | 'billing'
   | 'settings'
   | 'api-keys'
+  | 'activity'
   | 'docs'
 
 export type NavGroupId = 'product' | 'actions' | 'platform'
@@ -45,6 +46,7 @@ export const ORG_SECTIONS: OrgNavItem[] = [
   { id: 'billing', label: 'Billing', path: 'billing' },
   { id: 'settings', label: 'Settings', path: 'settings' },
   { id: 'api-keys', label: 'API keys', path: 'api-keys' },
+  { id: 'activity', label: 'Activity', path: 'activity' },
   { id: 'docs', label: 'Documentation', path: 'docs' },
 ]
 
@@ -83,6 +85,7 @@ export const ORG_NAV_GROUPS: OrgNavGroup[] = [
       { id: 'members', label: 'Members', path: 'members' },
       { id: 'settings', label: 'Settings', path: 'settings' },
       { id: 'api-keys', label: 'API keys', path: 'api-keys' },
+      { id: 'activity', label: 'Activity', path: 'activity' },
       { id: 'docs', label: 'Documentation', path: 'docs' },
     ],
   },
@@ -109,6 +112,7 @@ export function sectionFromPathname(pathname: string, orgId: string): OrgSection
     case 'billing':
     case 'settings':
     case 'api-keys':
+    case 'activity':
     case 'docs':
       return head
     case 'schema':
@@ -126,7 +130,7 @@ export function orgPath(orgId: string, section: OrgSection = 'overview') {
 
 export function resourcePath(
   orgId: string,
-  section: Exclude<OrgSection, 'overview' | 'billing' | 'branding' | 'settings' | 'docs'>,
+  section: Exclude<OrgSection, 'overview' | 'billing' | 'branding' | 'settings' | 'docs' | 'activity'>,
   ...parts: string[]
 ) {
   const base = orgPath(orgId, section)

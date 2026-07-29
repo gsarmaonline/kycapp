@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { getProductFeature, type ProductFeature } from '../../api'
+import { EntitlementUsageChart } from '../../components/EntitlementUsageChart'
 import { DetailList, PageHeader } from '../../crud/ui'
 import { resourcePath } from '../../org_nav'
 
@@ -36,6 +37,14 @@ export function ProductFeaturesShow() {
           { label: 'Scope', value: item.scope },
         ]}
       />
+      <div className="obs-show-block">
+        <EntitlementUsageChart
+          orgId={orgId}
+          entitlementKey={item.key}
+          days={14}
+          title={`Checks for ${item.key}`}
+        />
+      </div>
     </section>
   )
 }
