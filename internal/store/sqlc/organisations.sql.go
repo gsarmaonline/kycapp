@@ -15,7 +15,7 @@ const archiveOrganisation = `-- name: ArchiveOrganisation :one
 UPDATE organisations
 SET status = 'archived', updated_at = now()
 WHERE id = $1
-RETURNING id, name, slug, status, created_at, updated_at, logo_url, primary_color, accent_color, email_footer, email_font, app_user_authority, app_user_ingest_upsert_key, app_user_attributes_mode, email_typography
+RETURNING id, name, slug, status, created_at, updated_at, logo_url, primary_color, accent_color, email_footer, email_font, app_user_authority, app_user_ingest_upsert_key, app_user_attributes_mode, email_typography, email_from_name, email_from_address
 `
 
 func (q *Queries) ArchiveOrganisation(ctx context.Context, id string) (Organisation, error) {
@@ -37,6 +37,8 @@ func (q *Queries) ArchiveOrganisation(ctx context.Context, id string) (Organisat
 		&i.AppUserIngestUpsertKey,
 		&i.AppUserAttributesMode,
 		&i.EmailTypography,
+		&i.EmailFromName,
+		&i.EmailFromAddress,
 	)
 	return i, err
 }
@@ -44,7 +46,7 @@ func (q *Queries) ArchiveOrganisation(ctx context.Context, id string) (Organisat
 const createOrganisation = `-- name: CreateOrganisation :one
 INSERT INTO organisations (id, name, slug, status)
 VALUES ($1, $2, $3, $4)
-RETURNING id, name, slug, status, created_at, updated_at, logo_url, primary_color, accent_color, email_footer, email_font, app_user_authority, app_user_ingest_upsert_key, app_user_attributes_mode, email_typography
+RETURNING id, name, slug, status, created_at, updated_at, logo_url, primary_color, accent_color, email_footer, email_font, app_user_authority, app_user_ingest_upsert_key, app_user_attributes_mode, email_typography, email_from_name, email_from_address
 `
 
 type CreateOrganisationParams struct {
@@ -78,6 +80,8 @@ func (q *Queries) CreateOrganisation(ctx context.Context, arg CreateOrganisation
 		&i.AppUserIngestUpsertKey,
 		&i.AppUserAttributesMode,
 		&i.EmailTypography,
+		&i.EmailFromName,
+		&i.EmailFromAddress,
 	)
 	return i, err
 }
@@ -93,7 +97,7 @@ func (q *Queries) DeleteOrganisation(ctx context.Context, id string) error {
 }
 
 const getOrganisation = `-- name: GetOrganisation :one
-SELECT id, name, slug, status, created_at, updated_at, logo_url, primary_color, accent_color, email_footer, email_font, app_user_authority, app_user_ingest_upsert_key, app_user_attributes_mode, email_typography FROM organisations
+SELECT id, name, slug, status, created_at, updated_at, logo_url, primary_color, accent_color, email_footer, email_font, app_user_authority, app_user_ingest_upsert_key, app_user_attributes_mode, email_typography, email_from_name, email_from_address FROM organisations
 WHERE id = $1
 `
 
@@ -116,12 +120,14 @@ func (q *Queries) GetOrganisation(ctx context.Context, id string) (Organisation,
 		&i.AppUserIngestUpsertKey,
 		&i.AppUserAttributesMode,
 		&i.EmailTypography,
+		&i.EmailFromName,
+		&i.EmailFromAddress,
 	)
 	return i, err
 }
 
 const listOrganisations = `-- name: ListOrganisations :many
-SELECT id, name, slug, status, created_at, updated_at, logo_url, primary_color, accent_color, email_footer, email_font, app_user_authority, app_user_ingest_upsert_key, app_user_attributes_mode, email_typography FROM organisations
+SELECT id, name, slug, status, created_at, updated_at, logo_url, primary_color, accent_color, email_footer, email_font, app_user_authority, app_user_ingest_upsert_key, app_user_attributes_mode, email_typography, email_from_name, email_from_address FROM organisations
 WHERE ($1::text IS NULL OR status = $1)
   AND (
     $2::text IS NULL
@@ -170,6 +176,8 @@ func (q *Queries) ListOrganisations(ctx context.Context, arg ListOrganisationsPa
 			&i.AppUserIngestUpsertKey,
 			&i.AppUserAttributesMode,
 			&i.EmailTypography,
+			&i.EmailFromName,
+			&i.EmailFromAddress,
 		); err != nil {
 			return nil, err
 		}
@@ -182,7 +190,7 @@ func (q *Queries) ListOrganisations(ctx context.Context, arg ListOrganisationsPa
 }
 
 const listOrganisationsForUser = `-- name: ListOrganisationsForUser :many
-SELECT o.id, o.name, o.slug, o.status, o.created_at, o.updated_at, o.logo_url, o.primary_color, o.accent_color, o.email_footer, o.email_font, o.app_user_authority, o.app_user_ingest_upsert_key, o.app_user_attributes_mode, o.email_typography
+SELECT o.id, o.name, o.slug, o.status, o.created_at, o.updated_at, o.logo_url, o.primary_color, o.accent_color, o.email_footer, o.email_font, o.app_user_authority, o.app_user_ingest_upsert_key, o.app_user_attributes_mode, o.email_typography, o.email_from_name, o.email_from_address
 FROM organisations o
 JOIN memberships m ON m.organisation_id = o.id
 WHERE m.user_id = $1
@@ -237,6 +245,8 @@ func (q *Queries) ListOrganisationsForUser(ctx context.Context, arg ListOrganisa
 			&i.AppUserIngestUpsertKey,
 			&i.AppUserAttributesMode,
 			&i.EmailTypography,
+			&i.EmailFromName,
+			&i.EmailFromAddress,
 		); err != nil {
 			return nil, err
 		}
@@ -252,7 +262,7 @@ const setOrganisationLogoURL = `-- name: SetOrganisationLogoURL :one
 UPDATE organisations
 SET logo_url = $2, updated_at = now()
 WHERE id = $1
-RETURNING id, name, slug, status, created_at, updated_at, logo_url, primary_color, accent_color, email_footer, email_font, app_user_authority, app_user_ingest_upsert_key, app_user_attributes_mode, email_typography
+RETURNING id, name, slug, status, created_at, updated_at, logo_url, primary_color, accent_color, email_footer, email_font, app_user_authority, app_user_ingest_upsert_key, app_user_attributes_mode, email_typography, email_from_name, email_from_address
 `
 
 type SetOrganisationLogoURLParams struct {
@@ -279,6 +289,8 @@ func (q *Queries) SetOrganisationLogoURL(ctx context.Context, arg SetOrganisatio
 		&i.AppUserIngestUpsertKey,
 		&i.AppUserAttributesMode,
 		&i.EmailTypography,
+		&i.EmailFromName,
+		&i.EmailFromAddress,
 	)
 	return i, err
 }
@@ -293,12 +305,14 @@ SET
   email_footer = COALESCE($5, email_footer),
   email_font = COALESCE($6, email_font),
   email_typography = COALESCE($7, email_typography),
-  app_user_authority = COALESCE($8, app_user_authority),
-  app_user_ingest_upsert_key = COALESCE($9, app_user_ingest_upsert_key),
-  app_user_attributes_mode = COALESCE($10, app_user_attributes_mode),
+  email_from_name = COALESCE($8, email_from_name),
+  email_from_address = COALESCE($9, email_from_address),
+  app_user_authority = COALESCE($10, app_user_authority),
+  app_user_ingest_upsert_key = COALESCE($11, app_user_ingest_upsert_key),
+  app_user_attributes_mode = COALESCE($12, app_user_attributes_mode),
   updated_at = now()
-WHERE id = $11
-RETURNING id, name, slug, status, created_at, updated_at, logo_url, primary_color, accent_color, email_footer, email_font, app_user_authority, app_user_ingest_upsert_key, app_user_attributes_mode, email_typography
+WHERE id = $13
+RETURNING id, name, slug, status, created_at, updated_at, logo_url, primary_color, accent_color, email_footer, email_font, app_user_authority, app_user_ingest_upsert_key, app_user_attributes_mode, email_typography, email_from_name, email_from_address
 `
 
 type UpdateOrganisationParams struct {
@@ -309,6 +323,8 @@ type UpdateOrganisationParams struct {
 	EmailFooter            pgtype.Text `json:"email_footer"`
 	EmailFont              pgtype.Text `json:"email_font"`
 	EmailTypography        []byte      `json:"email_typography"`
+	EmailFromName          pgtype.Text `json:"email_from_name"`
+	EmailFromAddress       pgtype.Text `json:"email_from_address"`
 	AppUserAuthority       pgtype.Text `json:"app_user_authority"`
 	AppUserIngestUpsertKey pgtype.Text `json:"app_user_ingest_upsert_key"`
 	AppUserAttributesMode  pgtype.Text `json:"app_user_attributes_mode"`
@@ -324,6 +340,8 @@ func (q *Queries) UpdateOrganisation(ctx context.Context, arg UpdateOrganisation
 		arg.EmailFooter,
 		arg.EmailFont,
 		arg.EmailTypography,
+		arg.EmailFromName,
+		arg.EmailFromAddress,
 		arg.AppUserAuthority,
 		arg.AppUserIngestUpsertKey,
 		arg.AppUserAttributesMode,
@@ -346,6 +364,8 @@ func (q *Queries) UpdateOrganisation(ctx context.Context, arg UpdateOrganisation
 		&i.AppUserIngestUpsertKey,
 		&i.AppUserAttributesMode,
 		&i.EmailTypography,
+		&i.EmailFromName,
+		&i.EmailFromAddress,
 	)
 	return i, err
 }

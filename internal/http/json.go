@@ -78,6 +78,8 @@ func orgJSON(o sqlc.Organisation) map[string]any {
 		"email_footer":                o.EmailFooter,
 		"email_font":                  o.EmailFont,
 		"email_typography":            ty,
+		"email_from_name":             o.EmailFromName,
+		"email_from_address":          o.EmailFromAddress,
 		"app_user_authority":          o.AppUserAuthority,
 		"app_user_ingest_upsert_key":  o.AppUserIngestUpsertKey,
 		"app_user_attributes_mode":    o.AppUserAttributesMode,
@@ -270,6 +272,10 @@ func appUserJSON(u sqlc.AppUser) map[string]any {
 }
 
 func emailTemplateJSON(t sqlc.EmailTemplate) map[string]any {
+	sections, err := emailtemplates.BodySectionsOrLegacy(t.BodySections, t.BodyHtml)
+	if err != nil {
+		sections = nil
+	}
 	return map[string]any{
 		"id":              t.ID,
 		"organisation_id": t.OrganisationID,
@@ -279,6 +285,9 @@ func emailTemplateJSON(t sqlc.EmailTemplate) map[string]any {
 		"subject":         t.Subject,
 		"body_text":       t.BodyText,
 		"body_html":       t.BodyHtml,
+		"body_sections":   sections,
+		"from_name":       t.FromName,
+		"from_address":    t.FromAddress,
 		"status":          t.Status,
 		"is_system":       t.IsSystem,
 		"created_at":      t.CreatedAt.UTC().Format(time.RFC3339Nano),

@@ -1,10 +1,10 @@
 -- name: CreateEmailTemplate :one
 INSERT INTO email_templates (
     id, organisation_id, key, name, description,
-    subject, body_text, body_html, status, is_system
+    subject, body_text, body_html, body_sections, from_name, from_address, status, is_system
 ) VALUES (
     $1, $2, $3, $4, $5,
-    $6, $7, $8, $9, $10
+    $6, $7, $8, $9, $10, $11, $12, $13
 )
 RETURNING *;
 
@@ -28,6 +28,9 @@ UPDATE email_templates SET
     subject = COALESCE(sqlc.narg('subject'), subject),
     body_text = COALESCE(sqlc.narg('body_text'), body_text),
     body_html = COALESCE(sqlc.narg('body_html'), body_html),
+    body_sections = COALESCE(sqlc.narg('body_sections'), body_sections),
+    from_name = COALESCE(sqlc.narg('from_name'), from_name),
+    from_address = COALESCE(sqlc.narg('from_address'), from_address),
     status = COALESCE(sqlc.narg('status'), status),
     updated_at = now()
 WHERE id = $1

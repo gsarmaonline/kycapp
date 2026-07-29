@@ -7,7 +7,14 @@ import {
   type Organisation,
 } from '../../api'
 import { DetailList, PageHeader } from '../../crud/ui'
-import { emailRenderContext, renderEmailTemplate, wrapEmailHtml } from '../../email_render'
+import { resolveTypography, sectionsFromLegacyHtml } from '../../email_fonts'
+import {
+  composeBodySectionsHtml,
+  emailRenderContext,
+  renderEmailTemplate,
+  resolveFrom,
+  wrapEmailHtml,
+} from '../../email_render'
 import { resourcePath } from '../../org_nav'
 
 export function EmailTemplatesShow() {
@@ -42,9 +49,19 @@ export function EmailTemplatesShow() {
     [orgId, org?.name],
   )
 
+  const ty = useMemo(
+    () => resolveTypography(org?.email_typography, org?.email_font || 'arial'),
+    [org],
+  )
+
   const previewHtml = useMemo(() => {
     if (!item) return ''
-    return wrapEmailHtml(renderEmailTemplate(item.body_html, vars), {
+    const sections =
+      item.body_sections && item.body_sections.length > 0
+        ? item.body_sections
+        : sectionsFromLegacyHtml(item.body_html)
+    const inner = composeBodySectionsHtml(sections, ty.body, vars)
+    return wrapEmailHtml(inner, {
       org_name: org?.name ?? 'Acme',
       logo_url: org?.logo_url,
       primary_color: org?.primary_color,
@@ -53,7 +70,18 @@ export function EmailTemplatesShow() {
       font: org?.email_font,
       typography: org?.email_typography,
     })
-  }, [item, vars, org])
+  }, [item, vars, org, ty.body])
+
+  const previewFrom = useMemo(() => {
+    if (!item) return ''
+    return resolveFrom(
+      item.from_name || '',
+      item.from_address || '',
+      org?.email_from_name || '',
+      org?.email_from_address || '',
+      'EMAIL_FROM',
+    )
+  }, [item, org])
 
   if (error) return <p className="error">{error}</p>
   if (!item) return <p>Loading…</p>
@@ -68,11 +96,17 @@ export function EmailTemplatesShow() {
           { label: 'System', value: item.is_system ? 'yes' : 'no' },
           { label: 'Status', value: item.status },
           { label: 'Subject', value: item.subject },
+          {
+            label: 'From',
+            value: previewFrom || '—',
+          },
+          { label: 'Body sections', value: String(item.body_sections?.length || 1) },
           { label: 'Body (text)', value: <pre className="preview-text">{item.body_text || '—'}</pre> },
         ]}
       />
       <fieldset className="perm-group email-preview">
         <legend>Preview (with branding)</legend>
+        <p className="field-hint">From: {previewFrom}</p>
         <p className="preview-subject">
           <span className="preview-label">Subject</span>
           {renderEmailTemplate(item.subject, vars)}

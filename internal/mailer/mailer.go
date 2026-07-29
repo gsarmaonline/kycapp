@@ -8,6 +8,7 @@ type Message struct {
 	Subject string
 	HTML    string
 	Text    string
+	From    string // optional; provider default used when empty
 	ReplyTo string
 	Tags    map[string]string
 }

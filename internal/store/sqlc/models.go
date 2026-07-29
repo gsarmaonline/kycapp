@@ -98,18 +98,21 @@ type BillingCustomer struct {
 }
 
 type EmailTemplate struct {
-	ID             string    `json:"id"`
-	OrganisationID string    `json:"organisation_id"`
-	Key            string    `json:"key"`
-	Name           string    `json:"name"`
-	Description    string    `json:"description"`
-	Subject        string    `json:"subject"`
-	BodyText       string    `json:"body_text"`
-	BodyHtml       string    `json:"body_html"`
-	Status         string    `json:"status"`
-	IsSystem       bool      `json:"is_system"`
-	CreatedAt      time.Time `json:"created_at"`
-	UpdatedAt      time.Time `json:"updated_at"`
+	ID             string          `json:"id"`
+	OrganisationID string          `json:"organisation_id"`
+	Key            string          `json:"key"`
+	Name           string          `json:"name"`
+	Description    string          `json:"description"`
+	Subject        string          `json:"subject"`
+	BodyText       string          `json:"body_text"`
+	BodyHtml       string          `json:"body_html"`
+	Status         string          `json:"status"`
+	IsSystem       bool            `json:"is_system"`
+	CreatedAt      time.Time       `json:"created_at"`
+	UpdatedAt      time.Time       `json:"updated_at"`
+	BodySections   json.RawMessage `json:"body_sections"`
+	FromName       string          `json:"from_name"`
+	FromAddress    string          `json:"from_address"`
 }
 
 type Entitlement struct {
@@ -155,6 +158,8 @@ type Organisation struct {
 	AppUserIngestUpsertKey string          `json:"app_user_ingest_upsert_key"`
 	AppUserAttributesMode  string          `json:"app_user_attributes_mode"`
 	EmailTypography        json.RawMessage `json:"email_typography"`
+	EmailFromName          string          `json:"email_from_name"`
+	EmailFromAddress       string          `json:"email_from_address"`
 }
 
 type OrganisationDatabase struct {

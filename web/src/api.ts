@@ -1,4 +1,4 @@
-import type { EmailTypography } from './email_fonts'
+import type { EmailBodySection, EmailTypography } from './email_fonts'
 
 const API_BASE = import.meta.env.VITE_API_BASE ?? ''
 const TOKEN_KEY = 'kyc_session_token'
@@ -14,6 +14,8 @@ export type Organisation = {
   email_footer?: string
   email_font?: string
   email_typography?: EmailTypography
+  email_from_name?: string
+  email_from_address?: string
   app_user_authority?: 'kyc' | 'external'
   app_user_ingest_upsert_key?: 'external_id' | 'email'
   app_user_attributes_mode?: 'strict' | 'discover'
@@ -202,6 +204,8 @@ export function updateOrganisation(
     email_footer?: string
     email_font?: string
     email_typography?: EmailTypography
+    email_from_name?: string
+    email_from_address?: string
     app_user_authority?: 'kyc' | 'external'
     app_user_ingest_upsert_key?: 'external_id' | 'email'
     app_user_attributes_mode?: 'strict' | 'discover'
@@ -946,6 +950,9 @@ export type EmailTemplate = {
   subject: string
   body_text: string
   body_html: string
+  body_sections?: EmailBodySection[]
+  from_name?: string
+  from_address?: string
   status: string
   is_system: boolean
 }
@@ -966,6 +973,9 @@ export function createEmailTemplate(
     subject: string
     body_text?: string
     body_html?: string
+    body_sections?: EmailBodySection[]
+    from_name?: string
+    from_address?: string
   },
 ) {
   return request<EmailTemplate>(`/v1/organisations/${orgId}/email-templates`, {
@@ -982,6 +992,9 @@ export function updateEmailTemplate(
     subject?: string
     body_text?: string
     body_html?: string
+    body_sections?: EmailBodySection[]
+    from_name?: string
+    from_address?: string
     status?: string
   },
 ) {

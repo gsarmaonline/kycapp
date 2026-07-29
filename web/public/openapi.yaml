@@ -292,6 +292,10 @@ paths:
                   enum: [arial, helvetica, verdana, trebuchet, georgia, times, courier]
                 email_typography:
                   $ref: "#/components/schemas/EmailTypography"
+                email_from_name:
+                  type: string
+                email_from_address:
+                  type: string
                 app_user_authority:
                   type: string
                   enum: [kyc, external]
@@ -2324,6 +2328,14 @@ paths:
                   type: string
                 body_html:
                   type: string
+                body_sections:
+                  type: array
+                  items:
+                    $ref: "#/components/schemas/EmailBodySection"
+                from_name:
+                  type: string
+                from_address:
+                  type: string
                 description:
                   type: string
       responses:
@@ -2370,6 +2382,14 @@ paths:
                 body_text:
                   type: string
                 body_html:
+                  type: string
+                body_sections:
+                  type: array
+                  items:
+                    $ref: "#/components/schemas/EmailBodySection"
+                from_name:
+                  type: string
+                from_address:
                   type: string
                 status:
                   type: string
@@ -3095,6 +3115,10 @@ components:
           type: string
         email_typography:
           $ref: "#/components/schemas/EmailTypography"
+        email_from_name:
+          type: string
+        email_from_address:
+          type: string
         app_user_authority:
           type: string
           enum: [kyc, external]
@@ -3239,11 +3263,31 @@ components:
           type: string
         body_html:
           type: string
+          description: Deprecated synced field; prefer body_sections
+        body_sections:
+          type: array
+          items:
+            $ref: "#/components/schemas/EmailBodySection"
+        from_name:
+          type: string
+        from_address:
+          type: string
         status:
           type: string
           enum: [active, archived]
         is_system:
           type: boolean
+
+    EmailBodySection:
+      type: object
+      required: [id, content_html]
+      properties:
+        id:
+          type: string
+        content_html:
+          type: string
+        style:
+          $ref: "#/components/schemas/RegionStyle"
 
     EmailTypography:
       type: object
@@ -3270,6 +3314,18 @@ components:
         style:
           type: string
           enum: [normal, italic]
+        text_color:
+          type: string
+          description: Hex color e.g. #1c1917
+        background_color:
+          type: string
+          description: Hex color
+        text_align:
+          type: string
+          enum: [left, center, right]
+        padding_left:
+          type: integer
+          description: Paragraph indent in px (0, 4, 8, 12, 16, 20, 24, 32, 40, 48)
 
     Automation:
       type: object

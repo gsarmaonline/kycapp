@@ -42,6 +42,8 @@ sql:
       - "internal/store/migrations/000037_feature_flags.up.sql"
       - "internal/store/migrations/000038_product_feature_rollout.up.sql"
       - "internal/store/migrations/000039_activity_usage_permissions.up.sql"
+      - "internal/store/migrations/000040_email_from.up.sql"
+      - "internal/store/migrations/000041_email_template_sections.up.sql"
     gen:
       go:
         package: "sqlc"

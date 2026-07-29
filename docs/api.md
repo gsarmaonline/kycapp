@@ -93,17 +93,19 @@ Org-scoped checklist for the Overview dashboard. Step completion is **derived** 
 
 ### `PATCH /v1/organisations/{id}`
 
-Update `{ "name"?, "status"?, "primary_color"?, "accent_color"?, "email_footer"?, "email_font"?, "email_typography"?, "app_user_authority"?, "app_user_ingest_upsert_key"?, "app_user_attributes_mode"? }`.  
+Update `{ "name"?, "status"?, "primary_color"?, "accent_color"?, "email_footer"?, "email_font"?, "email_typography"?, "email_from_name"?, "email_from_address"?, "app_user_authority"?, "app_user_ingest_upsert_key"?, "app_user_attributes_mode"? }`.  
 Colors must be `#RGB` or `#RRGGBB`.  
 `email_font` is one of: `arial`, `helvetica`, `verdana`, `trebuchet`, `georgia`, `times`, `courier` (email-safe stacks). Prefer `email_typography` for per-region styles; patching `email_font` alone sets the font family on header, body, and footer. Requires `organisation:update`.
+
+`email_from_name` / `email_from_address` set the org default From (template override → org → deployment `EMAIL_FROM`). Addresses must be verified with the email provider.
 
 `email_typography` shape:
 
 ```json
 {
-  "header": { "font": "georgia", "size": 20, "weight": 700, "style": "normal" },
-  "body":   { "font": "arial",   "size": 16, "weight": 400, "style": "normal" },
-  "footer": { "font": "arial",   "size": 12, "weight": 400, "style": "normal" }
+  "header": { "font": "georgia", "size": 20, "weight": 700, "style": "normal", "text_align": "center" },
+  "body":   { "font": "arial",   "size": 16, "weight": 400, "style": "normal", "text_align": "left" },
+  "footer": { "font": "arial",   "size": 12, "weight": 400, "style": "normal", "text_align": "center" }
 }
 ```
 
@@ -113,6 +115,9 @@ Colors must be `#RGB` or `#RRGGBB`.
 | `size` | `10`–`16`, `18`, `20`, `22`, `24`, `28`, `32` (px) |
 | `weight` | `400`, `500`, `600`, `700` |
 | `style` | `normal` \| `italic` |
+| `text_color` / `background_color` | optional `#RGB` / `#RRGGBB` |
+| `text_align` | `left` \| `center` \| `right` |
+| `padding_left` | `0`, `4`, `8`, `12`, `16`, `20`, `24`, `32`, `40`, `48` (px) |
 
 Omitted regions inherit defaults (header 20/700, body 16/400, footer 12/400). Saving typography also syncs `email_font` to the body font.
 
@@ -124,7 +129,7 @@ App user profile settings:
 | `app_user_ingest_upsert_key` | `external_id` \| `email` | `external_id` |
 | `app_user_attributes_mode` | `discover` \| `strict` | `discover` |
 
-Organisation JSON also includes `logo_url` (read-only; set via logo upload), `email_font`, `email_typography`, and the app user settings above.
+Organisation JSON also includes `logo_url` (read-only; set via logo upload), `email_font`, `email_typography`, `email_from_name`, `email_from_address`, and the app user settings above.
 
 ### `DELETE /v1/organisations/{id}`
 
@@ -184,7 +189,7 @@ At request time, org keys fail auth if the org lacks `api_access`. Scoped keys m
 - `GET /v1/public/organisations/{id}/branding/logo` — **unauthenticated** image bytes for email clients.  
   Configure `PUBLIC_BASE_URL` (and `UPLOAD_DIR`) so `logo_url` is reachable from outside.
 
-Email template `body_html` is **inner content**. Preview/send wrap it with org chrome (header, logo, colors, footer) via `emailtemplates.Wrap` unless the body is already a full HTML document.
+Email templates prefer `body_sections` (styled blocks). `body_html` remains a synced/legacy field. Preview/send compose sections then wrap with org chrome (header, logo, colors, footer) via `emailtemplates.Wrap` unless the body is already a full HTML document. From resolves as template → org → `EMAIL_FROM`.
 
 ---
 
@@ -329,13 +334,13 @@ Org-scoped message copy for **app users** (not KYC member invites). Domain helpe
 - `GET /v1/organisations/{id}/email-templates` — requires `email_templates:read`  
   Seeds system defaults (`welcome`, `payment_thank_you`, `profile_incomplete`) if missing. Query: `status`
 - `POST /v1/organisations/{id}/email-templates` — requires `email_templates:manage`  
-  Custom template: `{ "key", "name", "subject", "body_text"?, "body_html"?, "description"? }`  
+  Custom template: `{ "key", "name", "subject", "body_text"?, "body_html"?, "body_sections"?, "from_name"?, "from_address"?, "description"? }`  
   Placeholders: shared path vocabulary — see [variables.md](variables.md)  
   (`{{app_user.display_name}}`, `{{organisation.name}}`, …). Legacy aliases still resolve.  
-  Store inner HTML only; branding chrome comes from organisation branding (see above). Visual builder deferred.
+  Prefer `body_sections` (array of `{ id, content_html, style? }`); each section inherits org body default style and may override it. `body_html` remains a synced/legacy field. Header/footer chrome and default From come from organisation branding; templates may override From.
 - `GET /v1/email-templates/{id}` — requires `email_templates:read`
 - `PATCH /v1/email-templates/{id}` — requires `email_templates:manage`  
-  `{ "name"?, "description"?, "subject"?, "body_text"?, "body_html"?, "status"? }`  
+  `{ "name"?, "description"?, "subject"?, "body_text"?, "body_html"?, "body_sections"?, "from_name"?, "from_address"?, "status"? }`  
   Key is immutable (including system templates).
 - `DELETE /v1/email-templates/{id}` — archive; requires `email_templates:manage` (system templates cannot be deleted)
 
