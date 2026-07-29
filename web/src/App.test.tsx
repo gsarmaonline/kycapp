@@ -61,6 +61,12 @@ vi.mock('./api', () => ({
   }),
 }))
 
+vi.mock('swagger-ui-react', () => ({
+  default: () => <div data-testid="swagger-ui-mock">OpenAPI</div>,
+}))
+
+vi.mock('swagger-ui-react/swagger-ui.css', () => ({}))
+
 describe('App', () => {
   beforeEach(() => {
     vi.mocked(getToken).mockReturnValue('test-token')
@@ -104,6 +110,22 @@ describe('App', () => {
     ).toBeInTheDocument()
     const signIns = screen.getAllByRole('link', { name: 'Sign in' })
     expect(signIns.some((el) => el.getAttribute('href') === '/login')).toBe(true)
+    const docs = screen.getAllByRole('link', { name: 'Docs' })
+    expect(docs.some((el) => el.getAttribute('href') === '/docs')).toBe(true)
+  })
+
+  it('shows public docs without requiring a session', async () => {
+    vi.mocked(getToken).mockReturnValue(null)
+    render(
+      <MemoryRouter initialEntries={['/docs']}>
+        <App />
+      </MemoryRouter>,
+    )
+    expect(await screen.findByRole('heading', { name: 'Documentation' })).toBeInTheDocument()
+    const tabs = screen.getByRole('navigation', { name: 'Documentation sections' })
+    expect(tabs.querySelector('a[href="/docs"]')).toBeTruthy()
+    expect(tabs.querySelector('a[href="/docs/operator"]')).toBeTruthy()
+    expect(screen.queryByLabelText('Organisation navigation')).not.toBeInTheDocument()
   })
 
   it('shows Dashboard on the landing page when signed in', async () => {

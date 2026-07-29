@@ -2,6 +2,39 @@ import { Link } from 'react-router-dom'
 import type { User } from '../api'
 import './landing.css'
 
+const FEATURES = [
+  {
+    id: 'organisations',
+    title: 'Organisations, members, and roles',
+    body: 'Tenants are first-class. Invite operators, assign permissions, and keep every membership scoped to the organisation.',
+  },
+  {
+    id: 'customers',
+    title: 'App users and profile schema',
+    body: 'Store end-customer profiles with typed attributes, or ingest from your auth provider by external id — KYC stays the system of record.',
+  },
+  {
+    id: 'packaging',
+    title: 'Features, plans, and entitlement checks',
+    body: 'Package product features into plans, then gate access from your backend with a single entitlements check.',
+  },
+  {
+    id: 'lifecycle',
+    title: 'Email, branding, and automations',
+    body: 'Branded templates and rule-based automations run off the same customer events — welcome mail, follow-ups, and lifecycle hooks.',
+  },
+  {
+    id: 'connect',
+    title: 'API keys, webhooks, and databases',
+    body: 'Connect your app with org API keys, fire outbound webhooks, accept inbound triggers, and write to connected databases from automations.',
+  },
+  {
+    id: 'billing',
+    title: 'Billing that owns access state',
+    body: 'Stripe runs Checkout and Portal; KYC owns subscription and entitlement state so access stays consistent with the plan.',
+  },
+] as const
+
 export function LandingPage({ user }: { user: User | null }) {
   const primaryTo = user ? '/app' : '/login'
   const primaryLabel = user ? 'Dashboard' : 'Sign in'
@@ -12,9 +45,14 @@ export function LandingPage({ user }: { user: User | null }) {
         <span className="landing-mark" aria-hidden="true">
           KYC
         </span>
-        <Link className="landing-top-link" to={primaryTo}>
-          {primaryLabel}
-        </Link>
+        <nav className="landing-top-nav" aria-label="Site">
+          <Link className="landing-top-link" to="/docs">
+            Docs
+          </Link>
+          <Link className="landing-top-link" to={primaryTo}>
+            {primaryLabel}
+          </Link>
+        </nav>
       </header>
 
       <section className="landing-hero" aria-label="KYC">
@@ -28,46 +66,53 @@ export function LandingPage({ user }: { user: User | null }) {
           <p className="landing-brand">KYC</p>
           <h1 className="landing-headline">The system of record for organisations.</h1>
           <p className="landing-support">
-            Members, end users, messaging, and billing — one place, not five dashboards.
+            Configure orgs, customers, packaging, and lifecycle in one place — enforce in your
+            backend.
           </p>
           <div className="landing-cta">
             <Link className="landing-cta-primary" to={primaryTo}>
               {primaryLabel}
             </Link>
-            <a className="landing-cta-secondary" href="#what-it-holds">
-              See what it holds
+            <a className="landing-cta-secondary" href="#features">
+              See features
             </a>
           </div>
         </div>
       </section>
 
-      <section className="landing-section" id="what-it-holds">
-        <h2>Organisation is the hub</h2>
-        <p>
-          Every membership, permission, app-user profile, and plan hangs off the organisation —
-          so tenant state stops living in auth providers, Stripe tabs, and spreadsheets.
-        </p>
+      <section className="landing-features" id="features" aria-label="Features">
+        {FEATURES.map((feature, index) => (
+          <section
+            key={feature.id}
+            className={
+              index % 2 === 1 ? 'landing-section landing-section-alt' : 'landing-section'
+            }
+            id={feature.id}
+          >
+            <h2>{feature.title}</h2>
+            <p>{feature.body}</p>
+          </section>
+        ))}
       </section>
 
-      <section className="landing-section landing-section-alt">
-        <h2>Access that matches how you work</h2>
+      <section className="landing-section landing-section-close">
+        <h2>Configure here. Enforce in your API.</h2>
         <p>
-          Platform capabilities gate KYC itself; product features gate what the organisation
-          unlocks in its own app.
-        </p>
-      </section>
-
-      <section className="landing-section">
-        <h2>Operate the customer lifecycle</h2>
-        <p>
-          Schema for end users, branded email, and simple automations — so onboarding and follow-ups
-          run from the same record that owns the org.
+          Merchants keep login where it belongs. KYC stores the record, runs the automations, and
+          answers entitlement checks — start with the{' '}
+          <Link className="landing-inline-link" to="/docs">
+            Integration API docs
+          </Link>
+          .
         </p>
       </section>
 
       <footer className="landing-footer">
         <span className="landing-mark">KYC</span>
-        <Link to={primaryTo}>{user ? 'Go to dashboard' : 'Sign in to continue'}</Link>
+        <nav className="landing-footer-nav" aria-label="Footer">
+          <Link to="/docs">Docs</Link>
+          <Link to={primaryTo}>{user ? 'Go to dashboard' : 'Sign in to continue'}</Link>
+        </nav>
       </footer>
     </div>
   )
@@ -80,30 +125,30 @@ function ProductStage() {
         <strong>KYC</strong>
         <span>Acme Logistics</span>
         <ul>
-          <li className="is-active">Overview</li>
-          <li>Members</li>
-          <li>Users</li>
+          <li className="is-active">Users</li>
+          <li>Features</li>
           <li>Automations</li>
           <li>Billing</li>
+          <li>API keys</li>
         </ul>
       </aside>
       <div className="landing-stage-main">
         <header>
-          <span>Overview</span>
+          <span>Users</span>
           <em>Acme Logistics</em>
         </header>
         <div className="landing-stage-grid">
           <div>
-            <b>12</b>
-            <span>Members</span>
-          </div>
-          <div>
             <b>48</b>
-            <span>Users</span>
+            <span>App users</span>
           </div>
           <div>
             <b>6</b>
-            <span>Automations</span>
+            <span>Features</span>
+          </div>
+          <div>
+            <b>3</b>
+            <span>Plans</span>
           </div>
         </div>
         <div className="landing-stage-flow">

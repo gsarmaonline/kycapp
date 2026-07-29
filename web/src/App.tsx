@@ -133,6 +133,18 @@ export default function App() {
         }
       />
       <Route
+        path="/docs"
+        element={
+          <div className="app public-docs">
+            <DocsLayout publicChrome user={user} />
+          </div>
+        }
+      >
+        <Route index element={<DocsIntegrationApiPage />} />
+        <Route path="operator" element={<DocsOperatorApiPage />} />
+        <Route path="variables" element={<DocsVariablesPage />} />
+      </Route>
+      <Route
         path="/app"
         element={
           user ? <AppShell user={user} onLogout={onLogout} /> : <Navigate to="/login" replace />

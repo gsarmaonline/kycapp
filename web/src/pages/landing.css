@@ -30,8 +30,15 @@
 }
 
 .landing-top a,
-.landing-top .landing-mark {
+.landing-top .landing-mark,
+.landing-top-nav {
   pointer-events: auto;
+}
+
+.landing-top-nav {
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
 }
 
 .landing-mark {
@@ -294,6 +301,10 @@
 }
 
 /* —— Below-fold: one job per section —— */
+.landing-features {
+  border-top: 1px solid rgba(232, 240, 234, 0.08);
+}
+
 .landing-section {
   padding: clamp(3.5rem, 8vw, 6rem) clamp(1.25rem, 5vw, 4rem);
   max-width: 40rem;
@@ -321,6 +332,22 @@
   background: linear-gradient(90deg, transparent, rgba(15, 46, 34, 0.65));
 }
 
+.landing-section-close {
+  max-width: 42rem;
+  border-top: 1px solid rgba(232, 240, 234, 0.08);
+}
+
+.landing-inline-link {
+  color: var(--land-flare);
+  font-weight: 600;
+  text-decoration: none;
+  border-bottom: 1px solid color-mix(in srgb, var(--land-flare) 45%, transparent);
+}
+
+.landing-inline-link:hover {
+  border-bottom-color: var(--land-flare);
+}
+
 .landing-footer {
   display: flex;
   justify-content: space-between;
@@ -328,6 +355,12 @@
   gap: 1rem;
   padding: 2rem clamp(1.25rem, 5vw, 4rem) 2.5rem;
   border-top: 1px solid rgba(232, 240, 234, 0.1);
+}
+
+.landing-footer-nav {
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
 }
 
 .landing-footer a {

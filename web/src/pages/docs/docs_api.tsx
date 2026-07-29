@@ -1,11 +1,12 @@
 import { Link, useParams } from 'react-router-dom'
 import { orgPath } from '../../org_nav'
-import { variablesDocsPath } from '../../templates/paths'
+import { docsBasePath, variablesDocsPath } from '../../templates/paths'
 import { DocsSwagger } from './docs_swagger'
 
 /** Merchant Integration API — org API key surface. */
 export function DocsIntegrationApiPage() {
-  const { orgId = '' } = useParams()
+  const { orgId } = useParams()
+  const base = docsBasePath(orgId)
 
   return (
     <DocsSwagger
@@ -14,11 +15,15 @@ export function DocsIntegrationApiPage() {
       hint={
         <>
           APIs for merchant backends calling KYC with an{' '}
-          <Link to={orgPath(orgId, 'api-keys')}>organisation API key</Link> (
-          <code>Authorization: Bearer kyc_…</code>): app users, attributes, product plans, and
+          {orgId ? (
+            <Link to={orgPath(orgId, 'api-keys')}>organisation API key</Link>
+          ) : (
+            <>organisation API key</>
+          )}{' '}
+          (<code>Authorization: Bearer kyc_…</code>): app users, attributes, product plans, and
           entitlement checks. Placeholder syntax is under{' '}
           <Link to={variablesDocsPath(orgId)}>Variables</Link>. Operator UI routes (OAuth, members,
-          permissions) are under <Link to={`${orgPath(orgId, 'docs')}/operator`}>Operator API</Link>.
+          permissions) are under <Link to={`${base}/operator`}>Operator API</Link>.
         </>
       }
     />
@@ -27,7 +32,8 @@ export function DocsIntegrationApiPage() {
 
 /** Full operator / platform OpenAPI. */
 export function DocsOperatorApiPage() {
-  const { orgId = '' } = useParams()
+  const { orgId } = useParams()
+  const base = docsBasePath(orgId)
 
   return (
     <DocsSwagger
@@ -37,7 +43,7 @@ export function DocsOperatorApiPage() {
         <>
           Full OpenAPI for the KYC operator UI and platform ops (sessions, members, roles,
           permissions, settings, automations, billing admin). For merchant backends, prefer the{' '}
-          <Link to={orgPath(orgId, 'docs')}>Integration API</Link>.
+          <Link to={base}>Integration API</Link>.
         </>
       }
     />

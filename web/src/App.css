@@ -1662,6 +1662,40 @@ button.link-btn.danger:hover {
   margin: 0 0 1.25rem;
 }
 
+.public-docs-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  margin: 0 0 1.5rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid var(--app-border);
+}
+
+.public-docs-brand {
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  text-decoration: none;
+  color: var(--app-fg);
+  font-size: 1.1rem;
+}
+
+.public-docs-top-nav {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+}
+
+.public-docs-top-nav a {
+  color: var(--app-fg-muted);
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.public-docs-top-nav a:hover {
+  color: var(--app-fg);
+}
+
 .docs-tab {
   padding: 0.4rem 0.75rem;
   border-radius: 6px;

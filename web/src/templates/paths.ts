@@ -17,9 +17,14 @@ const APP_USER_CORE = new Set([
 
 export type TemplateData = Record<string, unknown>
 
-/** Canonical docs path inside an organisation workspace. */
-export function variablesDocsPath(orgId: string): string {
-  return `/orgs/${orgId}/docs/variables`
+/** Docs root: public `/docs` or org-scoped `/orgs/:id/docs`. */
+export function docsBasePath(orgId?: string): string {
+  return orgId ? `/orgs/${orgId}/docs` : '/docs'
+}
+
+/** Canonical variables docs path (public or org workspace). */
+export function variablesDocsPath(orgId?: string): string {
+  return `${docsBasePath(orgId)}/variables`
 }
 
 export function normalizeFieldPath(path: string): string {

@@ -1,15 +1,15 @@
 import { Link, useParams } from 'react-router-dom'
-import { orgPath } from '../../org_nav'
+import { docsBasePath } from '../../templates/paths'
 
 export function DocsVariablesPage() {
-  const { orgId = '' } = useParams()
+  const { orgId } = useParams()
 
   return (
     <article className="docs-variables prose-docs">
       <p>
         One shared path vocabulary powers emails, outbound webhook templates, automation
         conditions, <code>db_insert</code> mappings, and trigger-parameter matching. See also the{' '}
-        <Link to={orgPath(orgId, 'docs')}>API reference</Link>.
+        <Link to={docsBasePath(orgId)}>API reference</Link>.
       </p>
 
       <h2>Syntax</h2>
