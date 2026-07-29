@@ -388,9 +388,10 @@ Global catalog (platform-owned, `organisation_id` null):
 
 Org-owned product feature catalog and packaging for end-user gating. Requires `product_features:read` / `product_features:manage`.
 
-- `POST /v1/organisations/{id}/product-features` — `{ "key", "description"? }`
+- `POST /v1/organisations/{id}/product-features` — `{ "key", "description"?, "enabled"?, "rollout_percentage"? }`
 - `GET /v1/organisations/{id}/product-features`
-- `GET|PATCH|DELETE /v1/product-features/{id}` — PATCH `{ "description" }`
+- `GET|PATCH|DELETE /v1/product-features/{id}` — PATCH `{ "description"?, "enabled"?, "rollout_percentage"? }`
+- `PUT /v1/product-features/{id}/overrides` — `{ "overrides": [{ "subject_id", "effect": "include"|"exclude" }] }`
 - `POST /v1/organisations/{id}/product-plans` — `{ "key", "name", "price"? }` where `price` is `{ "interval", "currency"?, "unit_amount", "status"? }` (pushes to Stripe when connected)
 - `GET /v1/organisations/{id}/product-plans`
 - `GET|PATCH|DELETE /v1/product-plans/{id}` — PATCH `{ "name"?, "status"? }` (name syncs to Stripe Product when linked)
@@ -403,7 +404,7 @@ Org-owned product feature catalog and packaging for end-user gating. Requires `p
 Product plan JSON includes `prices[]` with `processor_product_ref`, `processor_price_ref`, and `synced`.
 
 **Effective product features** = KYC plan product keys ∪ active product plan features ∪ grants − denies.  
-`POST /v1/entitlements/check` gates both platform capabilities and product features.
+`POST /v1/entitlements/check` gates both platform capabilities and product features. For org-owned product features, pass optional `subject_id` to evaluate rollout percentage and per-subject overrides after the org entitlement passes.
 
 ### Organisation subscription
 
@@ -438,14 +439,18 @@ Plans also expose `platform_capability_keys` and `product_feature_keys` alongsid
 **Request**
 
 ```json
-{ "organisation_id": "...", "entitlement": "sso" }
+{ "organisation_id": "...", "entitlement": "sso", "subject_id": "user_123" }
 ```
+
+`subject_id` is optional. Required for product features with rollout between 1–99% (after the org is entitled).
 
 **Response** `200`
 
 ```json
-{ "allowed": true }
+{ "allowed": true, "reason": "full" }
 ```
+
+`reason` is set for org-owned product features (`disabled`, `off`, `full`, `percentage`, `override_include`, `override_exclude`).
 
 ---
 

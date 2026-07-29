@@ -10,6 +10,8 @@ export function ProductFeaturesEdit() {
   const navigate = useNavigate()
   const [key, setKey] = useState('')
   const [description, setDescription] = useState('')
+  const [enabled, setEnabled] = useState(true)
+  const [rollout, setRollout] = useState(100)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
 
@@ -18,6 +20,8 @@ export function ProductFeaturesEdit() {
       .then((f) => {
         setKey(f.key)
         setDescription(f.description)
+        setEnabled(f.enabled)
+        setRollout(f.rollout_percentage)
       })
       .catch((e) => setError(e instanceof Error ? e.message : 'Failed to load'))
       .finally(() => setLoading(false))
@@ -27,7 +31,11 @@ export function ProductFeaturesEdit() {
     e.preventDefault()
     setError(null)
     try {
-      await updateProductFeature(id, { description })
+      await updateProductFeature(id, {
+        description,
+        enabled,
+        rollout_percentage: rollout,
+      })
       navigate(resourcePath(orgId, 'product-features', id))
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Update failed')
@@ -48,6 +56,21 @@ export function ProductFeaturesEdit() {
         <label>
           Description
           <input value={description} onChange={(e) => setDescription(e.target.value)} />
+        </label>
+        <label className="row" style={{ gap: '0.5rem' }}>
+          <input type="checkbox" checked={enabled} onChange={(e) => setEnabled(e.target.checked)} />
+          Enabled
+        </label>
+        <label>
+          Rollout percentage
+          <input
+            type="number"
+            min={0}
+            max={100}
+            value={rollout}
+            onChange={(e) => setRollout(Number(e.target.value))}
+            required
+          />
         </label>
         <FormActions cancelTo={resourcePath(orgId, 'product-features', id)} submitLabel="Save" />
       </form>

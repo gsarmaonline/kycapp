@@ -45,18 +45,22 @@ export function ProductFeaturesIndex() {
       />
       <p className="lede">
         Named capabilities your product can gate for end users. Package them into plans, then activate a
-        plan on Billing.
+        plan on Billing. Use rollout percentage and subject overrides for gradual release.
       </p>
       {error && <p className="error">{error}</p>}
       {loading ? (
         <p>Loading…</p>
       ) : (
         <ResourceTable
-          columns={['Key', 'Description']}
+          columns={['Key', 'Description', 'Rollout']}
           empty="No product features yet."
           rows={items.map((f) => ({
             key: f.id,
-            cells: [f.key, f.description || '—'],
+            cells: [
+              f.key,
+              f.description || '—',
+              f.enabled ? `${f.rollout_percentage}%` : 'Off',
+            ],
             actions: (
               <RowActions
                 viewTo={resourcePath(orgId, 'product-features', f.id)}

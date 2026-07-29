@@ -629,12 +629,28 @@ components:
             properties:
                 description:
                     type: string
+                enabled:
+                    type: boolean
                 id:
                     type: string
                 key:
                     type: string
                 organisation_id:
                     type: string
+                overrides:
+                    items:
+                        properties:
+                            effect:
+                                enum:
+                                    - include
+                                    - exclude
+                                type: string
+                            subject_id:
+                                type: string
+                        type: object
+                    type: array
+                rollout_percentage:
+                    type: integer
                 scope:
                     enum:
                         - product
@@ -1027,6 +1043,9 @@ paths:
                                     type: string
                                 organisation_id:
                                     type: string
+                                subject_id:
+                                    description: Required for product features with rollout between 1 and 99
+                                    type: string
                             required:
                                 - organisation_id
                                 - entitlement
@@ -1040,6 +1059,15 @@ paths:
                                 properties:
                                     allowed:
                                         type: boolean
+                                    reason:
+                                        enum:
+                                            - disabled
+                                            - override_include
+                                            - override_exclude
+                                            - percentage
+                                            - full
+                                            - "off"
+                                        type: string
                                 type: object
                     description: Entitlement check result
                 default:
@@ -1355,8 +1383,14 @@ paths:
                             properties:
                                 description:
                                     type: string
+                                enabled:
+                                    type: boolean
                                 key:
                                     type: string
+                                rollout_percentage:
+                                    maximum: 100
+                                    minimum: 0
+                                    type: integer
                             required:
                                 - key
                             type: object
@@ -1593,6 +1627,12 @@ paths:
                             properties:
                                 description:
                                     type: string
+                                enabled:
+                                    type: boolean
+                                rollout_percentage:
+                                    maximum: 100
+                                    minimum: 0
+                                    type: integer
                             type: object
             responses:
                 "200":
@@ -1604,6 +1644,46 @@ paths:
                 default:
                     $ref: '#/components/responses/Error'
             summary: Update product feature
+            tags:
+                - Product
+    /v1/product-features/{id}/overrides:
+        parameters:
+            - $ref: '#/components/parameters/id'
+        put:
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            properties:
+                                overrides:
+                                    items:
+                                        properties:
+                                            effect:
+                                                enum:
+                                                    - include
+                                                    - exclude
+                                                type: string
+                                            subject_id:
+                                                type: string
+                                        required:
+                                            - subject_id
+                                            - effect
+                                        type: object
+                                    type: array
+                            required:
+                                - overrides
+                            type: object
+                required: true
+            responses:
+                "200":
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/ProductFeature'
+                    description: Updated feature with overrides
+                default:
+                    $ref: '#/components/responses/Error'
+            summary: Replace product feature subject overrides
             tags:
                 - Product
     /v1/product-plans/{id}:
@@ -1786,5 +1866,5 @@ tags:
       name: Webhooks
     - description: Plans, subscriptions, entitlements, Stripe checkout
       name: Billing
-    - description: Merchant product features and plans
+    - description: Merchant product features, plans, and feature flags
       name: Product

@@ -51,7 +51,7 @@ export function ProductPlansShow() {
     <section>
       <PageHeader title={item.name} />
       {error && <p className="error">{error}</p>}
-      <p className="row" style={{ gap: '0.75rem', flexWrap: 'wrap' }}>
+      <div className="form-actions" style={{ marginTop: 0 }}>
         <Link className="button ghost" to={resourcePath(orgId, 'product-plans', item.id, 'edit')}>
           Edit
         </Link>
@@ -64,7 +64,7 @@ export function ProductPlansShow() {
         <Link className="button ghost" to={resourcePath(orgId, 'product-plans')}>
           Back
         </Link>
-      </p>
+      </div>
       <DetailList
         items={[
           { label: 'Key', value: item.key },
