@@ -9,7 +9,8 @@ export function DocsVariablesPage() {
       <p>
         One shared path vocabulary powers emails, outbound webhook templates, automation
         conditions, <code>db_insert</code> mappings, and trigger-parameter matching. See also the{' '}
-        <Link to={docsBasePath(orgId)}>API reference</Link>.
+        <Link to={docsBasePath(orgId)}>concepts</Link> and the{' '}
+        <Link to={`${docsBasePath(orgId)}/api`}>API reference</Link>.
       </p>
 
       <h2>Syntax</h2>

@@ -101,9 +101,13 @@ export function LandingPage({ user }: { user: User | null }) {
           Merchants keep login where it belongs. KYC stores the record, runs the automations, and
           answers entitlement checks — start with the{' '}
           <Link className="landing-inline-link" to="/docs">
-            Integration API docs
+            docs
+          </Link>{' '}
+          (concepts and the{' '}
+          <Link className="landing-inline-link" to="/docs/api">
+            Integration API
           </Link>
-          .
+          ).
         </p>
       </section>
 

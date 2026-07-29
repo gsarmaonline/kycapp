@@ -1696,6 +1696,67 @@ button.link-btn.danger:hover {
   color: var(--app-fg);
 }
 
+.docs-subtabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin: -0.5rem 0 1.25rem;
+}
+
+.docs-concept-group {
+  margin-top: 1.75rem;
+}
+
+.docs-concept-group-hint {
+  margin: -0.35rem 0 0.75rem !important;
+  font-size: 0.95rem !important;
+  color: var(--app-fg-muted) !important;
+}
+
+.docs-concept-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+
+.docs-concept-list a {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  padding: 0.75rem 0;
+  border-bottom: 1px solid var(--app-border);
+  text-decoration: none;
+  color: inherit;
+}
+
+.docs-concept-list a:hover strong {
+  text-decoration: underline;
+}
+
+.docs-concept-list strong {
+  color: var(--app-fg);
+  font-size: 1rem;
+}
+
+.docs-concept-list span {
+  color: var(--app-fg-muted);
+  font-size: 0.92rem;
+  line-height: 1.45;
+}
+
+.docs-concept-crumb {
+  font-size: 0.9rem;
+  color: var(--app-fg-muted);
+}
+
+.docs-concept-summary {
+  font-size: 1.05rem !important;
+  color: var(--app-fg) !important;
+}
+
 .docs-tab {
   padding: 0.4rem 0.75rem;
   border-radius: 6px;

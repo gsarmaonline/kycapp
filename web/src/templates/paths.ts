@@ -22,6 +22,12 @@ export function docsBasePath(orgId?: string): string {
   return orgId ? `/orgs/${orgId}/docs` : '/docs'
 }
 
+/** Integration / Operator OpenAPI under Documentation → API reference. */
+export function docsApiPath(orgId?: string, which: 'integration' | 'operator' = 'integration'): string {
+  const base = `${docsBasePath(orgId)}/api`
+  return which === 'operator' ? `${base}/operator` : base
+}
+
 /** Canonical variables docs path (public or org workspace). */
 export function variablesDocsPath(orgId?: string): string {
   return `${docsBasePath(orgId)}/variables`

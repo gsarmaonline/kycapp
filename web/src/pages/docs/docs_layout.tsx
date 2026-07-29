@@ -1,4 +1,4 @@
-import { Link, NavLink, Outlet, useParams } from 'react-router-dom'
+import { Link, NavLink, Outlet, useLocation, useParams } from 'react-router-dom'
 import type { User } from '../../api'
 import { PageHeader } from '../../crud/ui'
 import { docsBasePath } from '../../templates/paths'
@@ -11,7 +11,13 @@ export function DocsLayout({
   user?: User | null
 }) {
   const { orgId } = useParams()
+  const location = useLocation()
   const base = docsBasePath(orgId)
+  const onApi = /\/docs\/api(\/|$)/.test(location.pathname)
+  const onConcepts =
+    location.pathname === base ||
+    location.pathname.endsWith('/docs') ||
+    /\/docs\/concepts(\/|$)/.test(location.pathname)
 
   return (
     <section className="docs-section">
@@ -28,18 +34,22 @@ export function DocsLayout({
       )}
       <PageHeader title="Documentation" />
       <p className="lede">
-        Integration APIs for merchant backends, the full operator/platform OpenAPI, and the shared
+        Concepts for workspace elements, the Integration and Operator API references, and the shared
         variable path vocabulary.
       </p>
       <nav className="docs-tabs" aria-label="Documentation sections">
-        <NavLink to={base} end className={({ isActive }) => (isActive ? 'docs-tab active' : 'docs-tab')}>
-          Integration API
+        <NavLink
+          to={base}
+          end={!onConcepts}
+          className={() => (onConcepts ? 'docs-tab active' : 'docs-tab')}
+        >
+          Concepts
         </NavLink>
         <NavLink
-          to={`${base}/operator`}
-          className={({ isActive }) => (isActive ? 'docs-tab active' : 'docs-tab')}
+          to={`${base}/api`}
+          className={() => (onApi ? 'docs-tab active' : 'docs-tab')}
         >
-          Operator API
+          API reference
         </NavLink>
         <NavLink
           to={`${base}/variables`}
@@ -48,6 +58,23 @@ export function DocsLayout({
           Variables
         </NavLink>
       </nav>
+      {onApi && (
+        <nav className="docs-subtabs" aria-label="API reference">
+          <NavLink
+            to={`${base}/api`}
+            end
+            className={({ isActive }) => (isActive ? 'docs-tab active' : 'docs-tab')}
+          >
+            Integration API
+          </NavLink>
+          <NavLink
+            to={`${base}/api/operator`}
+            className={({ isActive }) => (isActive ? 'docs-tab active' : 'docs-tab')}
+          >
+            Operator API
+          </NavLink>
+        </nav>
+      )}
       <Outlet />
     </section>
   )

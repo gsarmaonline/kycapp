@@ -58,6 +58,7 @@ import { InboundWebhooksEdit } from './pages/inbound_webhooks/inbound_webhooks_e
 import { InboundWebhooksIndex } from './pages/inbound_webhooks/inbound_webhooks_index'
 import { InboundWebhooksNew } from './pages/inbound_webhooks/inbound_webhooks_new'
 import { InboundWebhooksShow } from './pages/inbound_webhooks/inbound_webhooks_show'
+import { DocsConceptPage, DocsConceptsIndex } from './pages/docs/docs_concepts'
 import { DocsIntegrationApiPage, DocsOperatorApiPage } from './pages/docs/docs_api'
 import { DocsLayout } from './pages/docs/docs_layout'
 import { DocsVariablesPage } from './pages/docs/docs_variables'
@@ -140,9 +141,12 @@ export default function App() {
           </div>
         }
       >
-        <Route index element={<DocsIntegrationApiPage />} />
-        <Route path="operator" element={<DocsOperatorApiPage />} />
+        <Route index element={<DocsConceptsIndex />} />
+        <Route path="concepts/:slug" element={<DocsConceptPage />} />
+        <Route path="api" element={<DocsIntegrationApiPage />} />
+        <Route path="api/operator" element={<DocsOperatorApiPage />} />
         <Route path="variables" element={<DocsVariablesPage />} />
+        <Route path="operator" element={<Navigate to="api/operator" replace />} />
       </Route>
       <Route
         path="/app"
@@ -206,9 +210,12 @@ export default function App() {
         <Route path="api-keys/new" element={<APIKeysNew />} />
         <Route path="activity" element={<ActivityPage />} />
         <Route path="docs" element={<DocsLayout />}>
-          <Route index element={<DocsIntegrationApiPage />} />
-          <Route path="operator" element={<DocsOperatorApiPage />} />
+          <Route index element={<DocsConceptsIndex />} />
+          <Route path="concepts/:slug" element={<DocsConceptPage />} />
+          <Route path="api" element={<DocsIntegrationApiPage />} />
+          <Route path="api/operator" element={<DocsOperatorApiPage />} />
           <Route path="variables" element={<DocsVariablesPage />} />
+          <Route path="operator" element={<Navigate to="api/operator" replace />} />
         </Route>
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />

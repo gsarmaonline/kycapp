@@ -23,7 +23,8 @@ export function DocsIntegrationApiPage() {
           (<code>Authorization: Bearer kyc_…</code>): app users, attributes, product plans, and
           entitlement checks. Placeholder syntax is under{' '}
           <Link to={variablesDocsPath(orgId)}>Variables</Link>. Operator UI routes (OAuth, members,
-          permissions) are under <Link to={`${base}/operator`}>Operator API</Link>.
+          permissions) are under <Link to={`${base}/api/operator`}>Operator API</Link>. Start with{' '}
+          <Link to={base}>concepts</Link> for workspace elements.
         </>
       }
     />
@@ -43,7 +44,7 @@ export function DocsOperatorApiPage() {
         <>
           Full OpenAPI for the KYC operator UI and platform ops (sessions, members, roles,
           permissions, settings, automations, billing admin). For merchant backends, prefer the{' '}
-          <Link to={base}>Integration API</Link>.
+          <Link to={`${base}/api`}>Integration API</Link>.
         </>
       }
     />

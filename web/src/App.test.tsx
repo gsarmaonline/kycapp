@@ -124,8 +124,26 @@ describe('App', () => {
     expect(await screen.findByRole('heading', { name: 'Documentation' })).toBeInTheDocument()
     const tabs = screen.getByRole('navigation', { name: 'Documentation sections' })
     expect(tabs.querySelector('a[href="/docs"]')).toBeTruthy()
-    expect(tabs.querySelector('a[href="/docs/operator"]')).toBeTruthy()
+    expect(tabs.querySelector('a[href="/docs/api"]')).toBeTruthy()
+    expect(tabs.querySelector('a[href="/docs/variables"]')).toBeTruthy()
+    expect(await screen.findByRole('heading', { name: 'Core ideas' })).toBeInTheDocument()
+    expect(
+      document.querySelector('a[href="/docs/concepts/organisation"]'),
+    ).toBeTruthy()
     expect(screen.queryByLabelText('Organisation navigation')).not.toBeInTheDocument()
+  })
+
+  it('shows API reference nested under docs', async () => {
+    vi.mocked(getToken).mockReturnValue(null)
+    render(
+      <MemoryRouter initialEntries={['/docs/api']}>
+        <App />
+      </MemoryRouter>,
+    )
+    expect(await screen.findByRole('navigation', { name: 'API reference' })).toBeInTheDocument()
+    const apiNav = screen.getByRole('navigation', { name: 'API reference' })
+    expect(apiNav.querySelector('a[href="/docs/api"]')).toBeTruthy()
+    expect(apiNav.querySelector('a[href="/docs/api/operator"]')).toBeTruthy()
   })
 
   it('shows Dashboard on the landing page when signed in', async () => {

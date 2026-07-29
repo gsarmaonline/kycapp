@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { listOrgAPIKeys, revokeAPIKey, type OrgAPIKey } from '../../api'
 import { PageHeader, ResourceTable } from '../../crud/ui'
-import { orgPath, resourcePath } from '../../org_nav'
+import { resourcePath } from '../../org_nav'
+import { docsApiPath } from '../../templates/paths'
 
 function formatWhen(iso?: string) {
   if (!iso) return '—'
@@ -67,7 +68,7 @@ export function APIKeysIndex() {
         Org-scoped keys for calling KYC from your product backend. Send{' '}
         <code>Authorization: Bearer kyc_…</code> on <code>/v1</code> requests. Requires the{' '}
         <code>api_access</code> entitlement. See the{' '}
-        <Link to={orgPath(orgId, 'docs')}>Integration API</Link>.
+        <Link to={docsApiPath(orgId)}>Integration API</Link>.
       </p>
       {error && <p className="error">{error}</p>}
       {loading ? (
