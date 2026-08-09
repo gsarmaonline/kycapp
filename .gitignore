@@ -14,3 +14,6 @@ data/uploads/
 
 # Local git worktrees (agent isolation)
 .worktrees/
+
+# Agent worktrees
+.claude/worktrees/

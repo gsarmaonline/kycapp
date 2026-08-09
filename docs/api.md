@@ -2,7 +2,7 @@
 
 Base path: `/v1`. JSON request/response bodies.
 
-Related: [data model](data-model.md) · [flows](flows.md) · [variable referencing](variables.md) · [Operator OpenAPI](openapi.yaml) · Integration OpenAPI (in-app **Documentation → Integration API**)
+Related: [access control](access-control.md) · [data model](data-model.md) · [flows](flows.md) · [variable referencing](variables.md) · [Operator OpenAPI](openapi.yaml) · Integration OpenAPI (in-app **Documentation → Integration API**)
 
 ### Merchant Integration vs Operator API
 

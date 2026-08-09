@@ -114,6 +114,8 @@ Unique `(organisation_id, key)`. Default system roles: `owner`, `admin`, `member
 
 Global catalog of what a **user** may do inside an organisation (RBAC). Not the same as Entitlement.
 
+> How permissions are evaluated at runtime, and the proposed grant model that replaces this shape, are in [access-control.md](access-control.md).
+
 | Field | Type | Notes |
 | --- | --- | --- |
 | `id` | string | PK |
