@@ -122,7 +122,9 @@ sequenceDiagram
 
 **Merchant product surface:** app users, attributes, product features/plans, branding, email templates, automations (River + Resend), KYC billing via Stripe executor. In-app **Documentation** (OpenAPI + [variable referencing](docs/variables.md)) is under each organisation sidebar.
 
-Still later: headless SDK + settings embed, invite email polish, full platform-admin UI.
+**Merchant SDK:** the generated **transport layer** ships for Go and TypeScript ([sdk/](sdk/README.md)) — types plus a typed client for the 25 Integration API paths, regenerated from the spec by `make sdk` and drift-checked in CI.
+
+Still later: the SDK ergonomic facade, settings embed, invite email polish, full platform-admin UI.
 
 ## Run locally
 
@@ -246,5 +248,6 @@ internal/http/           # HTTP handlers + auth middleware
 internal/service/        # application services
 internal/store/          # Postgres, migrations, sqlc queries
 web/                     # Vite + React app (login-gated)
+sdk/go/ sdk/ts/          # merchant SDK transport (generated from the spec)
 docs/                    # data model, API, flows, testing
 ```

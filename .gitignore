@@ -9,6 +9,7 @@ dist/
 .vscode/
 web/node_modules/
 web/dist/
+sdk/ts/node_modules/
 data/uploads/
 
 # Local git worktrees (agent isolation)

@@ -1,0 +1,10 @@
+# Config for `go tool oapi-codegen`. Run it via `make sdk` from the repo root.
+# Source spec: web/public/openapi-integration.yaml (produced by cmd/openapi-filter).
+package: kyc
+output: kyc/generated.go
+generate:
+  models: true
+  client: true
+output-options:
+  skip-prune: true
+  user-templates: {}
