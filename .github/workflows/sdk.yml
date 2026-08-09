@@ -1,0 +1,50 @@
+name: SDK
+
+# The merchant SDK transport layers are generated from docs/openapi.yaml and
+# committed. This workflow proves the committed output still matches the spec,
+# so a spec change can never ship without its regenerated client.
+on:
+  push:
+    branches: [main]
+  pull_request:
+    paths:
+      - "docs/openapi.yaml"
+      - "cmd/openapi-filter/**"
+      - "sdk/**"
+      - "web/public/openapi*.yaml"
+      - "Makefile"
+      - ".github/workflows/sdk.yml"
+
+jobs:
+  sdk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: |
+            go.sum
+            sdk/go/go.sum
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: sdk/ts/package-lock.json
+
+      # Guards the spec itself: every Integration operation needs a unique
+      # operationId and a $ref request body, or codegen produces unusable names.
+      - name: Validate Integration spec
+        run: go test ./cmd/openapi-filter/ -count=1
+
+      - name: Install TypeScript SDK dependencies
+        run: npm ci
+        working-directory: sdk/ts
+
+      - name: Check generated SDK is current
+        run: make sdk-check
+
+      - name: Build and typecheck SDKs
+        run: make test-sdk

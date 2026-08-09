@@ -1,0 +1,21 @@
+{
+  "name": "@kyc/sdk",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Generated transport types for the KYC merchant Integration API.",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "generate": "openapi-typescript ../../web/public/openapi-integration.yaml -o src/generated/schema.d.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "openapi-fetch": "^0.15.1"
+  },
+  "devDependencies": {
+    "openapi-typescript": "^7.10.0",
+    "typescript": "^5.9.3"
+  }
+}

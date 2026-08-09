@@ -255,6 +255,7 @@ paths:
     parameters:
       - $ref: "#/components/parameters/orgId"
     get:
+      operationId: getOrganisation
       tags: [Organisations]
       summary: Get organisation
       responses:
@@ -888,6 +889,7 @@ paths:
     parameters:
       - $ref: "#/components/parameters/hookId"
     post:
+      operationId: receiveInboundWebhook
       tags: [Webhooks]
       summary: Receive inbound webhook (header or query auth)
       security: []
@@ -896,8 +898,7 @@ paths:
         content:
           application/json:
             schema:
-              type: object
-              additionalProperties: true
+              $ref: "#/components/schemas/InboundWebhookPayload"
       responses:
         "200":
           description: Accepted
@@ -920,6 +921,7 @@ paths:
         schema:
           type: string
     post:
+      operationId: receiveInboundWebhookWithToken
       tags: [Webhooks]
       summary: Receive inbound webhook (path-token auth)
       security: []
@@ -927,8 +929,7 @@ paths:
         content:
           application/json:
             schema:
-              type: object
-              additionalProperties: true
+              $ref: "#/components/schemas/InboundWebhookPayload"
       responses:
         "200":
           description: Accepted
@@ -1038,6 +1039,7 @@ paths:
     parameters:
       - $ref: "#/components/parameters/orgId"
     get:
+      operationId: getOrganisationLogo
       tags: [Organisations]
       summary: Public organisation logo image
       security: []
@@ -1507,6 +1509,7 @@ paths:
         default:
           $ref: "#/components/responses/Error"
     get:
+      operationId: listBillingPlans
       tags: [Billing]
       summary: List billing plans
       responses:
@@ -1528,6 +1531,7 @@ paths:
     parameters:
       - $ref: "#/components/parameters/id"
     get:
+      operationId: getBillingPlan
       tags: [Billing]
       summary: Get billing plan
       responses:
@@ -1608,6 +1612,7 @@ paths:
     parameters:
       - $ref: "#/components/parameters/id"
     get:
+      operationId: listBillingPlanPrices
       tags: [Billing]
       summary: List plan prices
       responses:
@@ -1655,6 +1660,7 @@ paths:
         default:
           $ref: "#/components/responses/Error"
     get:
+      operationId: listEntitlements
       tags: [Billing]
       summary: List global entitlement catalog
       responses:
@@ -1676,6 +1682,7 @@ paths:
     parameters:
       - $ref: "#/components/parameters/orgId"
     get:
+      operationId: getSubscription
       tags: [Billing]
       summary: Get organisation subscription
       description: Requires billing:read.
@@ -1720,6 +1727,7 @@ paths:
     parameters:
       - $ref: "#/components/parameters/orgId"
     get:
+      operationId: getOrganisationEntitlements
       tags: [Billing]
       summary: Get effective organisation entitlements
       responses:
@@ -1768,6 +1776,7 @@ paths:
 
   /v1/entitlements/check:
     post:
+      operationId: checkEntitlement
       tags: [Billing]
       summary: Check organisation entitlement
       requestBody:
@@ -1775,16 +1784,7 @@ paths:
         content:
           application/json:
             schema:
-              type: object
-              required: [organisation_id, entitlement]
-              properties:
-                organisation_id:
-                  type: string
-                entitlement:
-                  type: string
-                subject_id:
-                  type: string
-                  description: Required for product features with rollout between 1 and 99
+              $ref: "#/components/schemas/CheckEntitlementRequest"
       responses:
         "200":
           description: Entitlement check result
@@ -1981,6 +1981,7 @@ paths:
     parameters:
       - $ref: "#/components/parameters/orgId"
     post:
+      operationId: createAttributeDefinition
       tags: [Attributes]
       summary: Create attribute definition
       description: Requires attributes:manage.
@@ -1989,31 +1990,7 @@ paths:
         content:
           application/json:
             schema:
-              type: object
-              required: [key, label, value_type]
-              properties:
-                key:
-                  type: string
-                label:
-                  type: string
-                value_type:
-                  type: string
-                  enum: [string, number, boolean, date, dropdown]
-                section:
-                  type: string
-                  default: general
-                sort_order:
-                  type: integer
-                required:
-                  type: boolean
-                enum_values:
-                  type: array
-                  items:
-                    type: string
-                description:
-                  type: string
-                is_pii:
-                  type: boolean
+              $ref: "#/components/schemas/CreateAttributeDefinitionRequest"
       responses:
         "201":
           description: Created definition
@@ -2024,6 +2001,7 @@ paths:
         default:
           $ref: "#/components/responses/Error"
     get:
+      operationId: listAttributeDefinitions
       tags: [Attributes]
       summary: List attribute definitions
       description: Seeds system defaults if missing. Requires attributes:read.
@@ -2048,6 +2026,7 @@ paths:
     parameters:
       - $ref: "#/components/parameters/id"
     get:
+      operationId: getAttributeDefinition
       tags: [Attributes]
       summary: Get attribute definition
       responses:
@@ -2060,36 +2039,14 @@ paths:
         default:
           $ref: "#/components/responses/Error"
     patch:
+      operationId: updateAttributeDefinition
       tags: [Attributes]
       summary: Update attribute definition
       requestBody:
         content:
           application/json:
             schema:
-              type: object
-              properties:
-                label:
-                  type: string
-                description:
-                  type: string
-                value_type:
-                  type: string
-                  enum: [string, number, boolean, date, dropdown]
-                section:
-                  type: string
-                sort_order:
-                  type: integer
-                required:
-                  type: boolean
-                enum_values:
-                  type: array
-                  items:
-                    type: string
-                is_pii:
-                  type: boolean
-                status:
-                  type: string
-                  enum: [active, archived]
+              $ref: "#/components/schemas/UpdateAttributeDefinitionRequest"
       responses:
         "200":
           description: Updated definition
@@ -2100,6 +2057,7 @@ paths:
         default:
           $ref: "#/components/responses/Error"
     delete:
+      operationId: deleteAttributeDefinition
       tags: [Attributes]
       summary: Archive attribute definition
       responses:
@@ -2116,6 +2074,7 @@ paths:
     parameters:
       - $ref: "#/components/parameters/orgId"
     post:
+      operationId: createAppUser
       tags: [App users]
       summary: Create app user
       description: Requires app_users:write. attributes keys must match active definitions.
@@ -2123,21 +2082,7 @@ paths:
         content:
           application/json:
             schema:
-              type: object
-              properties:
-                email:
-                  type: string
-                  format: email
-                external_id:
-                  type: string
-                display_name:
-                  type: string
-                status:
-                  type: string
-                  enum: [active, disabled, archived]
-                attributes:
-                  type: object
-                  additionalProperties: true
+              $ref: "#/components/schemas/CreateAppUserRequest"
       responses:
         "201":
           description: Created app user
@@ -2148,6 +2093,7 @@ paths:
         default:
           $ref: "#/components/responses/Error"
     get:
+      operationId: listAppUsers
       tags: [App users]
       summary: List app users
       parameters:
@@ -2171,6 +2117,7 @@ paths:
     parameters:
       - $ref: "#/components/parameters/orgId"
     put:
+      operationId: ingestAppUser
       tags: [App users]
       summary: Upsert app user from external system
       description: |
@@ -2180,19 +2127,7 @@ paths:
         content:
           application/json:
             schema:
-              type: object
-              properties:
-                external_id:
-                  type: string
-                email:
-                  type: string
-                display_name:
-                  type: string
-                status:
-                  type: string
-                attributes:
-                  type: object
-                  additionalProperties: true
+              $ref: "#/components/schemas/IngestAppUserRequest"
       responses:
         "200":
           description: Updated app user
@@ -2225,6 +2160,7 @@ paths:
     parameters:
       - $ref: "#/components/parameters/id"
     get:
+      operationId: getAppUser
       tags: [App users]
       summary: Get app user
       responses:
@@ -2237,6 +2173,7 @@ paths:
         default:
           $ref: "#/components/responses/Error"
     patch:
+      operationId: updateAppUser
       tags: [App users]
       summary: Update app user
       description: When attributes is sent, replaces the entire attributes map.
@@ -2244,19 +2181,7 @@ paths:
         content:
           application/json:
             schema:
-              type: object
-              properties:
-                email:
-                  type: string
-                external_id:
-                  type: string
-                display_name:
-                  type: string
-                status:
-                  type: string
-                attributes:
-                  type: object
-                  additionalProperties: true
+              $ref: "#/components/schemas/UpdateAppUserRequest"
       responses:
         "200":
           description: Updated app user
@@ -2267,6 +2192,7 @@ paths:
         default:
           $ref: "#/components/responses/Error"
     delete:
+      operationId: deleteAppUser
       tags: [App users]
       summary: Delete app user
       responses:
@@ -2585,6 +2511,7 @@ paths:
     parameters:
       - $ref: "#/components/parameters/orgId"
     post:
+      operationId: createProductFeature
       tags: [Product]
       summary: Create product feature
       requestBody:
@@ -2592,19 +2519,7 @@ paths:
         content:
           application/json:
             schema:
-              type: object
-              required: [key]
-              properties:
-                key:
-                  type: string
-                description:
-                  type: string
-                enabled:
-                  type: boolean
-                rollout_percentage:
-                  type: integer
-                  minimum: 0
-                  maximum: 100
+              $ref: "#/components/schemas/CreateProductFeatureRequest"
       responses:
         "201":
           description: Created feature
@@ -2615,6 +2530,7 @@ paths:
         default:
           $ref: "#/components/responses/Error"
     get:
+      operationId: listProductFeatures
       tags: [Product]
       summary: List product features
       responses:
@@ -2636,6 +2552,7 @@ paths:
     parameters:
       - $ref: "#/components/parameters/id"
     get:
+      operationId: getProductFeature
       tags: [Product]
       summary: Get product feature
       responses:
@@ -2648,22 +2565,14 @@ paths:
         default:
           $ref: "#/components/responses/Error"
     patch:
+      operationId: updateProductFeature
       tags: [Product]
       summary: Update product feature
       requestBody:
         content:
           application/json:
             schema:
-              type: object
-              properties:
-                description:
-                  type: string
-                enabled:
-                  type: boolean
-                rollout_percentage:
-                  type: integer
-                  minimum: 0
-                  maximum: 100
+              $ref: "#/components/schemas/UpdateProductFeatureRequest"
       responses:
         "200":
           description: Updated feature
@@ -2674,6 +2583,7 @@ paths:
         default:
           $ref: "#/components/responses/Error"
     delete:
+      operationId: deleteProductFeature
       tags: [Product]
       summary: Delete product feature
       responses:
@@ -2693,6 +2603,7 @@ paths:
     parameters:
       - $ref: "#/components/parameters/id"
     put:
+      operationId: setProductFeatureOverrides
       tags: [Product]
       summary: Replace product feature subject overrides
       requestBody:
@@ -2700,20 +2611,7 @@ paths:
         content:
           application/json:
             schema:
-              type: object
-              required: [overrides]
-              properties:
-                overrides:
-                  type: array
-                  items:
-                    type: object
-                    required: [subject_id, effect]
-                    properties:
-                      subject_id:
-                        type: string
-                      effect:
-                        type: string
-                        enum: [include, exclude]
+              $ref: "#/components/schemas/SetProductFeatureOverridesRequest"
       responses:
         "200":
           description: Updated feature with overrides
@@ -2728,6 +2626,7 @@ paths:
     parameters:
       - $ref: "#/components/parameters/orgId"
     post:
+      operationId: createProductPlan
       tags: [Product]
       summary: Create product plan
       requestBody:
@@ -2735,26 +2634,7 @@ paths:
         content:
           application/json:
             schema:
-              type: object
-              required: [key, name]
-              properties:
-                key:
-                  type: string
-                name:
-                  type: string
-                price:
-                  type: object
-                  properties:
-                    interval:
-                      type: string
-                      enum: [month, year]
-                    currency:
-                      type: string
-                    unit_amount:
-                      type: integer
-                      format: int64
-                    status:
-                      type: string
+              $ref: "#/components/schemas/CreateProductPlanRequest"
       responses:
         "201":
           description: Created product plan
@@ -2765,6 +2645,7 @@ paths:
         default:
           $ref: "#/components/responses/Error"
     get:
+      operationId: listProductPlans
       tags: [Product]
       summary: List product plans
       responses:
@@ -2786,6 +2667,7 @@ paths:
     parameters:
       - $ref: "#/components/parameters/id"
     get:
+      operationId: getProductPlan
       tags: [Product]
       summary: Get product plan
       responses:
@@ -2798,19 +2680,14 @@ paths:
         default:
           $ref: "#/components/responses/Error"
     patch:
+      operationId: updateProductPlan
       tags: [Product]
       summary: Update product plan
       requestBody:
         content:
           application/json:
             schema:
-              type: object
-              properties:
-                name:
-                  type: string
-                status:
-                  type: string
-                  enum: [active, archived]
+              $ref: "#/components/schemas/UpdateProductPlanRequest"
       responses:
         "200":
           description: Updated product plan
@@ -2821,6 +2698,7 @@ paths:
         default:
           $ref: "#/components/responses/Error"
     delete:
+      operationId: deleteProductPlan
       tags: [Product]
       summary: Delete product plan
       responses:
@@ -2840,6 +2718,7 @@ paths:
     parameters:
       - $ref: "#/components/parameters/id"
     put:
+      operationId: setProductPlanFeatures
       tags: [Product]
       summary: Set product plan features
       requestBody:
@@ -2847,13 +2726,7 @@ paths:
         content:
           application/json:
             schema:
-              type: object
-              required: [feature_keys]
-              properties:
-                feature_keys:
-                  type: array
-                  items:
-                    type: string
+              $ref: "#/components/schemas/SetProductPlanFeaturesRequest"
       responses:
         "200":
           description: Updated product plan
@@ -2868,6 +2741,7 @@ paths:
     parameters:
       - $ref: "#/components/parameters/id"
     put:
+      operationId: upsertProductPlanPrice
       tags: [Product]
       summary: Create or update product plan price
       requestBody:
@@ -2875,19 +2749,7 @@ paths:
         content:
           application/json:
             schema:
-              type: object
-              required: [interval, unit_amount]
-              properties:
-                interval:
-                  type: string
-                  enum: [month, year]
-                currency:
-                  type: string
-                unit_amount:
-                  type: integer
-                  format: int64
-                status:
-                  type: string
+              $ref: "#/components/schemas/UpsertProductPlanPriceRequest"
       responses:
         "200":
           description: Product plan price
@@ -2902,6 +2764,7 @@ paths:
     parameters:
       - $ref: "#/components/parameters/id"
     get:
+      operationId: listProductPlanPrices
       tags: [Product]
       summary: List product plan prices
       responses:
@@ -2923,6 +2786,7 @@ paths:
     parameters:
       - $ref: "#/components/parameters/orgId"
     get:
+      operationId: getActiveProductPlan
       tags: [Product]
       summary: Get active product plan
       responses:
@@ -2935,6 +2799,7 @@ paths:
         default:
           $ref: "#/components/responses/Error"
     put:
+      operationId: setActiveProductPlan
       tags: [Product]
       summary: Set active product plan
       requestBody:
@@ -2942,11 +2807,7 @@ paths:
         content:
           application/json:
             schema:
-              type: object
-              properties:
-                product_plan_id:
-                  type: string
-                  description: Empty string clears active plan
+              $ref: "#/components/schemas/SetActiveProductPlanRequest"
       responses:
         "200":
           description: Active plan updated
@@ -3047,6 +2908,10 @@ components:
 
   schemas:
     Error:
+      # components/responses/Error and components/schemas/Error both map to a Go
+      # type named Error. x-go-name disambiguates them for oapi-codegen; other
+      # generators and Swagger UI ignore it.
+      x-go-name: APIError
       type: object
       required: [code, message]
       properties:
@@ -3833,3 +3698,241 @@ components:
         created_at:
           type: string
           format: date-time
+
+    # --- Request bodies (merchant Integration API) ---
+
+    CheckEntitlementRequest:
+      description: Check whether an organisation may use an entitlement.
+      type: object
+      required: [organisation_id, entitlement]
+      properties:
+        organisation_id:
+          type: string
+        entitlement:
+          type: string
+        subject_id:
+          type: string
+          description: Required for product features with rollout between 1 and 99
+
+    CreateAppUserRequest:
+      description: Create an app user under an organisation.
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+        external_id:
+          type: string
+        display_name:
+          type: string
+        status:
+          type: string
+          enum: [active, disabled, archived]
+        attributes:
+          type: object
+          additionalProperties: true
+
+    CreateAttributeDefinitionRequest:
+      description: Define a new app user profile field.
+      type: object
+      required: [key, label, value_type]
+      properties:
+        key:
+          type: string
+        label:
+          type: string
+        value_type:
+          type: string
+          enum: [string, number, boolean, date, dropdown]
+        section:
+          type: string
+          default: general
+        sort_order:
+          type: integer
+        required:
+          type: boolean
+        enum_values:
+          type: array
+          items:
+            type: string
+        description:
+          type: string
+        is_pii:
+          type: boolean
+
+    CreateProductFeatureRequest:
+      description: Create a product feature the organisation can sell.
+      type: object
+      required: [key]
+      properties:
+        key:
+          type: string
+        description:
+          type: string
+        enabled:
+          type: boolean
+        rollout_percentage:
+          type: integer
+          minimum: 0
+          maximum: 100
+
+    CreateProductPlanRequest:
+      description: Create a product plan.
+      type: object
+      required: [key, name]
+      properties:
+        key:
+          type: string
+        name:
+          type: string
+        price:
+          type: object
+          properties:
+            interval:
+              type: string
+              enum: [month, year]
+            currency:
+              type: string
+            unit_amount:
+              type: integer
+              format: int64
+            status:
+              type: string
+
+    InboundWebhookPayload:
+      description: Free-form JSON body delivered to an inbound webhook.
+      type: object
+      additionalProperties: true
+
+    IngestAppUserRequest:
+      description: Upsert an app user from an external system.
+      type: object
+      properties:
+        external_id:
+          type: string
+        email:
+          type: string
+        display_name:
+          type: string
+        status:
+          type: string
+        attributes:
+          type: object
+          additionalProperties: true
+
+    SetActiveProductPlanRequest:
+      description: Set the organisation's active product plan.
+      type: object
+      properties:
+        product_plan_id:
+          type: string
+          description: Empty string clears active plan
+
+    SetProductFeatureOverridesRequest:
+      description: Replace the subject override list for a product feature.
+      type: object
+      required: [overrides]
+      properties:
+        overrides:
+          type: array
+          items:
+            type: object
+            required: [subject_id, effect]
+            properties:
+              subject_id:
+                type: string
+              effect:
+                type: string
+                enum: [include, exclude]
+
+    SetProductPlanFeaturesRequest:
+      description: Replace the feature list on a product plan.
+      type: object
+      required: [feature_keys]
+      properties:
+        feature_keys:
+          type: array
+          items:
+            type: string
+
+    UpdateAppUserRequest:
+      description: Partial update of an app user.
+      type: object
+      properties:
+        email:
+          type: string
+        external_id:
+          type: string
+        display_name:
+          type: string
+        status:
+          type: string
+        attributes:
+          type: object
+          additionalProperties: true
+
+    UpdateAttributeDefinitionRequest:
+      description: Partial update of an attribute definition.
+      type: object
+      properties:
+        label:
+          type: string
+        description:
+          type: string
+        value_type:
+          type: string
+          enum: [string, number, boolean, date, dropdown]
+        section:
+          type: string
+        sort_order:
+          type: integer
+        required:
+          type: boolean
+        enum_values:
+          type: array
+          items:
+            type: string
+        is_pii:
+          type: boolean
+        status:
+          type: string
+          enum: [active, archived]
+
+    UpdateProductFeatureRequest:
+      description: Partial update of a product feature.
+      type: object
+      properties:
+        description:
+          type: string
+        enabled:
+          type: boolean
+        rollout_percentage:
+          type: integer
+          minimum: 0
+          maximum: 100
+
+    UpdateProductPlanRequest:
+      description: Partial update of a product plan.
+      type: object
+      properties:
+        name:
+          type: string
+        status:
+          type: string
+          enum: [active, archived]
+
+    UpsertProductPlanPriceRequest:
+      description: Create or update a product plan price.
+      type: object
+      required: [interval, unit_amount]
+      properties:
+        interval:
+          type: string
+          enum: [month, year]
+        currency:
+          type: string
+        unit_amount:
+          type: integer
+          format: int64
+        status:
+          type: string

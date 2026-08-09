@@ -1,7 +1,8 @@
-.PHONY: test test-unit test-store test-web test-e2e build run sqlc openapi compose-up compose-down compose-logs web worker
+.PHONY: test test-unit test-store test-web test-e2e test-sdk build run sqlc openapi sdk sdk-go sdk-ts sdk-check compose-up compose-down compose-logs web worker
 
 test:
 	go test ./... -count=1 -timeout 5m
+	$(MAKE) test-sdk
 	$(MAKE) test-web
 
 test-go:
@@ -20,6 +21,11 @@ test-e2e:
 test-web:
 	cd web && npm test
 
+# sdk/go is a separate module, so the root `go test ./...` does not reach it.
+test-sdk:
+	cd sdk/go && go build ./... && go vet ./...
+	cd sdk/ts && npm run typecheck
+
 sqlc:
 	$$(go env GOPATH)/bin/sqlc generate
 
@@ -27,6 +33,21 @@ sqlc:
 openapi:
 	cp docs/openapi.yaml web/public/openapi.yaml
 	go run ./cmd/openapi-filter -in docs/openapi.yaml -out web/public/openapi-integration.yaml
+
+# Regenerate the merchant SDK transport layers from the Integration spec.
+# Both outputs are committed, so CI can detect drift with sdk-check.
+sdk: openapi sdk-go sdk-ts
+
+sdk-go:
+	cd sdk/go && go tool oapi-codegen -config oapi-codegen.yaml ../../web/public/openapi-integration.yaml
+
+sdk-ts:
+	cd sdk/ts && npm run generate
+
+# Fail when the committed spec or generated SDK code is stale. Used by CI.
+sdk-check: sdk
+	@git diff --exit-code -- web/public sdk/go/kyc/generated.go sdk/ts/src/generated \
+		|| { echo; echo "Generated output is stale. Run 'make sdk' and commit the result."; exit 1; }
 
 build:
 	go build -o bin/api ./cmd/api
