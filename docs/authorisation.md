@@ -65,6 +65,7 @@ There is no grants table. Every grant comes from a relationship that already exi
 | Source | Produces |
 | --- | --- |
 | Break-glass (environment) | Global scope, every capability |
+| Recovery credential row | Global scope, every capability, expiring with the credential |
 | Org API key row | Its **owner's** grants, narrowed by the key's `Scopes` and to the key's organisation |
 | Active membership | That organisation, with the role's capabilities |
 | Active membership **of the platform organisation** | **Global** scope, with the role's capabilities |
@@ -165,7 +166,7 @@ Out of scope is a 404, byte-identical to a resource that does not exist. Otherwi
 
 Invariant 6 is what makes the rest tractable. A single deny rule reintroduces ordering, priority and conflict resolution.
 
-Invariant 2 has one structural carve-out: **break-glass**, which holds everything by definition, so the subset rule is satisfied rather than bypassed. Organisation creation was a second carve-out and is now ordinary delegation when a staff member creates the tenant; self-serve signup still mints a founding owner grant from the system.
+Invariant 2 has one structural carve-out: **break-glass**, which holds everything by definition, so the subset rule is satisfied rather than bypassed. A recovery credential is not a carve-out: minting one requires already holding global reach, so it is ordinary delegation. Organisation creation was a second carve-out and is now ordinary delegation when a staff member creates the tenant; self-serve signup still mints a founding owner grant from the system.
 
 `TestCapabilityRegistryMatchesSeededPermissions` enforces invariant 3 against the migrations. It has already caught real drift.
 

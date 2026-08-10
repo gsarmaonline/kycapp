@@ -66,6 +66,17 @@ func (s *Service) AuthenticateBearer(ctx context.Context, raw string, envTokens 
 		}
 	}
 
+	if rec, err := s.db.Q().GetLiveRecoveryCredentialByHash(ctx, HashAPIToken(raw)); err == nil {
+		// Expiry and revocation are enforced by the query, so a stale
+		// credential never reaches this point.
+		_ = s.db.Q().TouchRecoveryCredentialLastUsed(ctx, rec.ID)
+		return authn.Principal{
+			Kind:       authn.KindService,
+			RecoveryID: rec.ID,
+			Actor:      "recovery:" + rec.Name,
+		}, true
+	}
+
 	key, err := s.db.Q().GetAPIKeyByHash(ctx, HashAPIToken(raw))
 	if err != nil {
 		return authn.Principal{}, false

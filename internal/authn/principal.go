@@ -16,6 +16,9 @@ type Principal struct {
 	UserID         string
 	OrganisationID string // set for org-scoped service API keys
 	APIKeyID       string
+	// RecoveryID is set for a recovery credential. It reaches every
+	// organisation, but as a grant the evaluator weighs, not as a bypass.
+	RecoveryID string
 	// OwnerUserID is the user an API key belongs to. A key's capabilities are
 	// the intersection of this user's grants and the key's scopes, so a key can
 	// never exceed its owner.

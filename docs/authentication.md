@@ -30,6 +30,8 @@ type Principal struct {
     Kind           Kind     // user | service
     UserID         string
     OrganisationID string   // set for org-scoped API keys
+    OwnerUserID    string   // the user an API key belongs to
+    RecoveryID     string   // set for a recovery credential
     Scopes         []string // API key permission scopes
     PlatformAdmin  bool     // reaches every organisation
     SessionID      string
@@ -48,7 +50,7 @@ Authentication's entire job is to build this. It never decides whether the reque
 |  | Reaches **one** organisation | Reaches **every** organisation |
 | --- | --- | --- |
 | **Human**, Google session | **Operator** | **Staff** |
-| **Machine**, token | **Org API key** | **Break-glass** |
+| **Machine**, token | **Org API key** | **Recovery credential**, or the last-resort `API_TOKENS` |
 
 Concretely:
 
@@ -57,7 +59,8 @@ Concretely:
 | **Operator** | Priya at Acme. Signs in with Google, manages Acme. Sees only Acme. |
 | **Staff** | Dana at KYC. Signs in the same way. Because she is a member of the platform organisation, she reaches every merchant — limited to her role's capabilities. |
 | **Org API key** | Acme's backend calling `entitlements/check` at 3am. No human involved. |
-| **Break-glass** | An ops script, or you recovering a broken database. Resolves from the environment, not from data. |
+| **Recovery credential** | Minted by staff during an incident, with a reason and an expiry. Ordinary data, so it is attributable and revocable. |
+| **Last-resort token** | You, recovering a database that is itself broken. Resolves from the environment, not from data. Normally unset. |
 
 ### Operator and Staff are the same mechanism
 
@@ -83,28 +86,42 @@ Dana can open any merchant and change nothing. Priya, as an owner, has full powe
 | Credential | Format | Stored as | Lifetime |
 | --- | --- | --- | --- |
 | User session | `kyc_sess_…` | SHA-256 hash | 30 days, revocable |
-| Org API key | `kyc_` + 24 random bytes | SHA-256 hash | Until revoked |
-| Break-glass | Arbitrary, from `API_TOKENS` | Environment, constant-time compared | Until redeployed |
+| Org API key | `kyc_` + 24 random bytes | SHA-256 hash | Until revoked; bounded by its owner |
+| Recovery credential | `kyc_recovery_` + 32 random bytes | SHA-256 hash | Required expiry, max 7 days; revocable |
+| Last-resort token | Arbitrary, from `API_TOKENS` | Environment, constant-time compared | Until redeployed |
 
 No credential is stored in plaintext. Login starts are rate limited per IP (`AUTH_RATE_LIMIT_PER_MIN`, default 20), and every mutating request is written to the audit log with its actor label.
 
 Human login is **Google-only**. `POST /v1/auth/dev-login` exists for local work and tests, and is gated on `AUTH_DEV_LOGIN`.
 
-### Why break-glass is not just an API key with no organisation
+### Three tiers of elevated access
 
-An API key is a database row. When the database is empty, mis-seeded, or freshly restored there is no row to read, and no way to create one, because creating it would need permission you cannot yet hold.
+Recovery used to mean one shared environment token. It is now split by how broken things are:
 
-Break-glass resolves from an environment variable **before any query runs**. That is the whole point: it is the one credential that is not data. It must never become removable.
+| Tier | What | When |
+| --- | --- | --- |
+| **Staff membership** | A person in the platform organisation | Normal operation |
+| **Recovery credential** | Data: minted by a named person, with a reason and a required expiry | Access is wrong but the database works |
+| **`API_TOKENS`** | Environment, resolved before any query | The database itself is the problem |
+
+**Recovery credentials are ordinary grants.** Resolving one produces a global-scope grant that `Decide` weighs like a membership. There is no bypass in the access path for them.
+
+They must be minted by a principal that **already** reaches every organisation, so a recovery credential is delegation rather than a way around a boundary the caller is not already inside. A reason is required — one without a stated reason is indistinguishable from a back door — and so is an expiry, capped at seven days, because a permanent one is a bypass under another name.
+
+**`API_TOKENS` remains, and should normally be unset.** It is the only credential that is not data, which is exactly its value and its cost: it survives a mis-seeded or partly-migrated database, and it cannot be attributed, expired or revoked without a deploy. Reach for it when a recovery credential cannot be minted because the data is what broke.
+
+Since a recovery credential is a grant, none of the three needs a short-circuit in the gates. Break-glass produces a grant too; the escape latches that used to sit in `requireOrgAccess` and `RequirePlatformCapability` are gone.
 
 ---
 
 ## Resolution order
 
-**Shipped.** `AuthenticateBearer` (`service/auth.go:28`) tries three things; the first match wins.
+**Shipped.** `AuthenticateBearer` (`service/auth.go:28`) tries four things; the first match wins.
 
 1. **Session** — SHA-256 lookup in `sessions`. The SQL enforces liveness (`revoked_at IS NULL AND expires_at > now()`) and the joined user must be `active`. Staff status is then read from the data: a live membership of the platform organisation.
-2. **Break-glass** — constant-time compare against `API_TOKENS`. Reaches everything, belongs to no organisation.
-3. **API key** — SHA-256 lookup in `api_keys`. With an organisation it is org-scoped; without one it is platform. `last_used_at` is touched on every use.
+2. **Last-resort token** — constant-time compare against `API_TOKENS`.
+3. **Recovery credential** — SHA-256 lookup in `recovery_credentials`. Expiry and revocation are enforced **in the query**, so a stale credential never reaches application code.
+4. **API key** — SHA-256 lookup in `api_keys`. Its capabilities come from its owner, narrowed by its scopes.
 
 ---
 

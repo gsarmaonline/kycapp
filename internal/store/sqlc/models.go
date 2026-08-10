@@ -309,6 +309,19 @@ type ProductPlanPrice struct {
 	Status              string `json:"status"`
 }
 
+type RecoveryCredential struct {
+	ID          string             `json:"id"`
+	Name        string             `json:"name"`
+	TokenPrefix string             `json:"token_prefix"`
+	TokenHash   string             `json:"token_hash"`
+	GrantedBy   string             `json:"granted_by"`
+	Reason      string             `json:"reason"`
+	ExpiresAt   time.Time          `json:"expires_at"`
+	RevokedAt   pgtype.Timestamptz `json:"revoked_at"`
+	LastUsedAt  pgtype.Timestamptz `json:"last_used_at"`
+	CreatedAt   time.Time          `json:"created_at"`
+}
+
 type Role struct {
 	ID             string `json:"id"`
 	OrganisationID string `json:"organisation_id"`

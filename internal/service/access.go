@@ -60,9 +60,6 @@ func (s *Service) RequirePlatformCapability(ctx context.Context, permissionKey s
 	if err != nil {
 		return authn.Principal{}, err
 	}
-	if isBreakGlass(p) {
-		return p, nil
-	}
 	cap, ok := capabilityFor(permissionKey)
 	if !ok {
 		return authn.Principal{}, apperr.Forbidden("unknown permission " + permissionKey)
@@ -106,12 +103,6 @@ func (s *Service) requireOrgAccess(ctx context.Context, orgID string, cap access
 	if err != nil {
 		return authn.Principal{}, err
 	}
-	// Break-glass is the only short-circuit. It holds every capability by
-	// definition and has to work on a database that cannot answer questions.
-	if isBreakGlass(p) {
-		return p, nil
-	}
-
 	gs, err := s.grantsFor(ctx, p, orgID)
 	if err != nil {
 		return authn.Principal{}, err

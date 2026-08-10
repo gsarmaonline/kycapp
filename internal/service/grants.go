@@ -116,6 +116,18 @@ func (s *Service) grantsFor(ctx context.Context, p authn.Principal, orgID string
 		return gs, nil
 	}
 
+	// A recovery credential reaches everything, but as a grant rather than a
+	// short-circuit: it goes through Decide exactly like a membership does.
+	if p.RecoveryID != "" {
+		gs.Grants = append(gs.Grants, access.Grant{
+			ID:           "recovery:" + p.RecoveryID,
+			Scope:        access.GlobalScope(),
+			Capabilities: allKYCCapabilities,
+			Source:       "recovery",
+		})
+		return gs, nil
+	}
+
 	if p.APIKeyID != "" {
 		return s.keyGrants(ctx, p, orgID)
 	}
