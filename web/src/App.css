@@ -1778,6 +1778,54 @@ button.link-btn.danger:hover {
   color: var(--app-fg) !important;
 }
 
+.concept-docs-link {
+  white-space: nowrap;
+}
+
+/*
+ * Laid out with margins rather than flex and gap: a flex container turns its
+ * children into flex items, which drops their ::marker, and the numbers are
+ * the point of an ordered list.
+ */
+.docs-concept-steps {
+  margin: 0;
+  padding-left: 1.35rem;
+}
+
+.docs-concept-steps li + li {
+  margin-top: 0.6rem;
+}
+
+.docs-concept-steps strong {
+  display: block;
+  color: var(--app-fg);
+}
+
+.docs-concept-steps span {
+  display: block;
+  color: var(--app-fg-muted);
+  font-size: 0.92rem;
+  line-height: 1.45;
+}
+
+.docs-concept-sample code,
+.prose-docs .docs-concept-sample code {
+  background: none;
+  padding: 0;
+  border-radius: 0;
+  font-size: inherit;
+}
+
+.docs-concept-sample {
+  overflow-x: auto;
+  padding: 0.85rem 1rem;
+  border: 1px solid var(--app-border);
+  border-radius: 6px;
+  background: var(--app-panel);
+  font-size: 0.85rem;
+  line-height: 1.5;
+}
+
 .docs-tab {
   padding: 0.4rem 0.75rem;
   border-radius: 6px;

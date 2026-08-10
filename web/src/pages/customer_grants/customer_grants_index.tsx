@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { deleteAppGrant, listAppGrants, type AppGrant } from '../../api'
+import { ConceptDocsLink } from '../../components/ConceptDocsLink'
 import { PageHeader, ResourceTable } from '../../crud/ui'
 import { resourcePath } from '../../org_nav'
 
@@ -46,7 +47,8 @@ export function CustomerGrantsIndex() {
       />
       <p className="muted">
         Each row gives one subject one role over one scope. Grants are never edited in place: revoke
-        and issue a new one, so the history stays readable.
+        and issue a new one, so the history stays readable.{' '}
+        <ConceptDocsLink slug="customer-grants" label="How grants are evaluated" />
       </p>
       {error && <p className="error">{error}</p>}
       {loading ? (

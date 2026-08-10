@@ -14,7 +14,7 @@ Related: [authentication](authentication.md) · [data model](data-model.md) · [
 2. [The model](#the-model)
 3. [The gates](#the-gates)
 4. [Invariants](#invariants)
-5. [Merchant-hosted access control](#merchant-hosted-access-control)
+5. [Merchant-hosted access control](#merchant-hosted-access-control) — guide in [customer-access.md](customer-access.md)
 6. [Status and remaining work](#status-and-remaining-work)
 7. [Known defects](#known-defects)
 
@@ -173,6 +173,8 @@ Invariant 2 has one structural carve-out: **break-glass**, which holds everythin
 ---
 
 ## Merchant-hosted access control
+
+> The operator-facing guide — the five objects, the flow, and the read endpoint — is [customer-access.md](customer-access.md). This section is the rationale.
 
 **Shipped.** Merchants declare their own scope kinds, capabilities and roles, and grant those roles to their **app users**. KYC stores the model and returns an assembled grant set; the merchant's backend evaluates it locally.
 

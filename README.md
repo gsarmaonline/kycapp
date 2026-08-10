@@ -106,6 +106,7 @@ sequenceDiagram
 | [docs/saas-rethink.md](docs/saas-rethink.md) | SaaS gap analysis and revised roadmap |
 | [docs/authentication.md](docs/authentication.md) | Principals, credentials, resolution, bootstrap |
 | [docs/authorisation.md](docs/authorisation.md) | Capabilities, roles, grants, gates, invariants |
+| [docs/customer-access.md](docs/customer-access.md) | Authorisation merchants run for their own customers |
 | [docs/data-model.md](docs/data-model.md) | Objects, relationships, permission catalog |
 | [docs/api.md](docs/api.md) | REST `/v1` surface |
 | [docs/flows.md](docs/flows.md) | Signup, invite, ops-provision, runtime checks |
@@ -124,7 +125,7 @@ sequenceDiagram
 
 **Merchant product surface:** app users, attributes, product features/plans, branding, email templates, automations (River + Resend), KYC billing via Stripe executor. In-app **Documentation** (OpenAPI + [variable referencing](docs/variables.md)) is under each organisation sidebar.
 
-**Merchant access control:** merchants declare their own scope kinds, capabilities and roles for their **app users**, with role inheritance, grant them to a customer or to a **group** of customers, and read back a cached grant set to evaluate in their own backend. Configured under each organisation's **Customer access** section in the sidebar, one page per object: scope kinds, capabilities, roles, groups and grants. See [authorisation](docs/authorisation.md#merchant-hosted-access-control).
+**Merchant access control:** merchants declare their own scope kinds, capabilities and roles for their **app users**, with role inheritance, grant them to a customer or to a **group** of customers, and read back a cached grant set to evaluate in their own backend. Configured under each organisation's **Customer access** section in the sidebar, one page per object: scope kinds, capabilities, roles, groups and grants. See [customer access](docs/customer-access.md) for the guide, and [authorisation](docs/authorisation.md#merchant-hosted-access-control) for the rationale.
 
 **Merchant SDK:** the generated **transport layer** ships for Go and TypeScript ([sdk/](sdk/README.md)) — types plus a typed client for the 25 Integration API paths, regenerated from the spec by `make sdk` and drift-checked in CI.
 

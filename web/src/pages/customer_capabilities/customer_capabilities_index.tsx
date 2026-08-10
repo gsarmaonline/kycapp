@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { deleteAppCapability, listAppCapabilities, type AppCapability } from '../../api'
+import { ConceptDocsLink } from '../../components/ConceptDocsLink'
 import { PageHeader, ResourceTable, RowActions } from '../../crud/ui'
 import { resourcePath } from '../../org_nav'
 
@@ -45,7 +46,8 @@ export function CustomerCapabilitiesIndex() {
       />
       <p className="muted">
         The verbs your product checks, as <code>resource:action</code>. A role can only use
-        capabilities declared here, so a typo is caught rather than silently granting nothing.
+        capabilities declared here, so a typo is caught rather than silently granting nothing.{' '}
+        <ConceptDocsLink slug="customer-capabilities" label="How capabilities are used" />
       </p>
       {error && <p className="error">{error}</p>}
       {loading ? (

@@ -7,6 +7,7 @@ import {
   type AppAccessSet,
   type AppUser,
 } from '../../api'
+import { ConceptDocsLink } from '../../components/ConceptDocsLink'
 import { DetailList, PageHeader, ResourceTable } from '../../crud/ui'
 import { resourcePath } from '../../org_nav'
 
@@ -87,7 +88,8 @@ export function UsersShow() {
 
       <h3 className="section-title">Effective access</h3>
       <p className="muted">
-        What this customer can do in your app, and where each capability comes from.
+        What this customer can do in your app, and where each capability comes from.{' '}
+        <ConceptDocsLink slug="customer-access" label="How customer access works" />
       </p>
       <ResourceTable
         actions={false}
