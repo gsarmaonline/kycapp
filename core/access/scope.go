@@ -62,23 +62,30 @@ func (s Scope) Validate() error {
 }
 
 // ScopeRef is the set of scope coordinates a resource carries, e.g.
-// {"organisation": "acme", "project": "p1"}.
+// {"organisation": ["acme"], "project": ["p1", "p4"]}.
 //
 // Resources declare every coordinate they belong to, which is why containment
 // needs no hierarchy logic: an organisation-scoped grant reaches a resource in
 // one of its projects because the resource carries the organisation coordinate
 // too. The nesting lives in the data, not in a traversal.
-type ScopeRef map[string]string
+//
+// A kind holds many ids because a resource can belong to several containers at
+// once: a shared library in two projects, a document in two folders. Matching
+// any one of them is enough, which keeps containment additive like everything
+// else here.
+type ScopeRef map[string][]string
 
-// Ref builds a ScopeRef from alternating kind/id pairs. It panics on an odd
-// number of arguments, which can only be a programming error at a call site.
+// Ref builds a ScopeRef from alternating kind/id pairs. Repeating a kind adds
+// another id to it, so Ref("project", "p1", "project", "p4") describes a
+// resource in both projects. It panics on an odd number of arguments, which can
+// only be a programming error at a call site.
 func Ref(kv ...string) ScopeRef {
 	if len(kv)%2 != 0 {
 		panic("access: Ref requires alternating kind and id")
 	}
 	out := make(ScopeRef, len(kv)/2)
 	for i := 0; i < len(kv); i += 2 {
-		out[kv[i]] = kv[i+1]
+		out[kv[i]] = append(out[kv[i]], kv[i+1])
 	}
 	return out
 }
@@ -95,8 +102,12 @@ func (s Scope) Contains(r ScopeRef) bool {
 	if s.ID == "" {
 		return false // malformed; never match rather than match everything
 	}
-	got, ok := r[s.Kind]
-	return ok && got == s.ID
+	for _, id := range r[s.Kind] {
+		if id == s.ID {
+			return true
+		}
+	}
+	return false
 }
 
 // SelfRef returns the coordinates of the scope itself, so a scope can be tested
@@ -107,5 +118,5 @@ func (s Scope) SelfRef() ScopeRef {
 	if s.Kind == ScopeGlobal {
 		return ScopeRef{}
 	}
-	return ScopeRef{s.Kind: s.ID}
+	return ScopeRef{s.Kind: {s.ID}}
 }

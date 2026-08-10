@@ -94,7 +94,7 @@ sequenceDiagram
 ## Design principles
 
 - **Organisation is the hub.** Users, authz, billing, and product packaging hang off the organisation record.
-- **Login required (to KYC).** Session tokens authenticate operators; **org API keys** authenticate the merchant backend; platform tokens are for ops.
+- **Login required (to KYC).** Session tokens authenticate operators; **org API keys** authenticate the merchant backend; a break-glass env token exists only for recovery.
 - **Tenancy by membership.** Normal users can only access organisations they belong to.
 - **Permissions ≠ entitlements.** Permissions gate what an *operator* may do in KYC; entitlements gate what the *organisation* may use — **platform capabilities** (KYC itself) vs **product features** (their customers).
 - **Configure in KYC, enforce in their API.** Never trust the browser alone for feature gates.
@@ -209,9 +209,12 @@ cd web && npm install && npm run dev
 
 | Principal | Can do |
 | --- | --- |
-| User session (Google or dev-login) | Own profile, orgs they belong to, RBAC-gated mutations |
+| Operator — user session (Google or dev-login) | Own profile, plus the organisations they belong to, gated by their role |
+| Staff — user session, member of the platform organisation | Every organisation, but only what their role's permissions allow |
 | Org API key (Platform → API keys) | That organisation only — scoped by permissions; requires `api_access` |
-| Platform admin / unscoped service token | All orgs, plan catalog, platform API keys, audit, entitlement overrides |
+| Break-glass — unscoped `API_TOKENS` service token | Everything. Recovery only; resolves before any database read |
+
+Staff are ordinary members of a seeded platform organisation, so reach is derived from membership rather than from a flag. See [access control](docs/authentication.md#four-callers).
 
 Public (no Bearer): `GET /v1/auth/providers`, `GET /v1/auth/google`, `GET /v1/auth/google/callback`, `POST /v1/auth/dev-login` (if enabled), `GET /v1/public/organisations/{id}/branding/logo`, health endpoints.
 

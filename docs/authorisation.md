@@ -81,6 +81,17 @@ Time-boxing is a column, `memberships.expires_at`, honoured by assembly. Expired
 
 `global` contains every organisation; `org:<id>` contains one. Containment is a key comparison, never a traversal, because every resource carries its scope coordinates directly.
 
+A resource may carry **several ids for one kind**, so an object shared into two projects is reached by a grant on either:
+
+```
+object in acme, projects p1 and p4
+  -> { organisation: [acme], project: [p1, p4] }
+```
+
+**Union semantics, decided deliberately.** A principal holding different roles in different containers gets the union. Someone who maintains p1 and only reads p2 can write an object shared into both, because the p1 grant allows it. Adding a resource to another container therefore only ever widens access, never narrows it.
+
+The alternative, most-restrictive-wins, requires deny rules — and with them, ordering, precedence and conflict resolution. Invariant 6 exists to avoid exactly that. If a merchant expects "put it in the locked project to lock it down", the model will fight them; that is worth saying out loud in their UI rather than solving in the evaluator.
+
 The rule to hold: **add scope kinds, never add depth.** A level that nests inside itself turns containment into a graph walk on every request and makes "who can reach this?" unanswerable.
 
 ### The evaluator is portable

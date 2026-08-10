@@ -238,3 +238,50 @@ func TestGrantValidateRejectsMalformed(t *testing.T) {
 		})
 	}
 }
+
+// A resource can belong to several containers at once, and a principal can hold
+// a different role in each. Matching any one coordinate is enough.
+func TestMultiProjectMembershipAndResources(t *testing.T) {
+	deployRead := kycCaps.MustParse("app_users:read")   // stand-ins for a merchant's
+	deployWrite := kycCaps.MustParse("app_users:write") // own capabilities
+
+	// Alice maintains p1 and p3, and only reads in p2.
+	alice := GrantSet{Grants: []Grant{
+		{ID: "g-p1", Scope: Scope{Kind: "project", ID: "p1"}, Capabilities: []Capability{deployRead, deployWrite}},
+		{ID: "g-p2", Scope: Scope{Kind: "project", ID: "p2"}, Capabilities: []Capability{deployRead}},
+		{ID: "g-p3", Scope: Scope{Kind: "project", ID: "p3"}, Capabilities: []Capability{deployRead, deployWrite}},
+	}}
+
+	// A shared object living in p1 and p4.
+	shared := Resource{Scope: Ref("organisation", "acme", "project", "p1", "project", "p4")}
+
+	d := Decide(alice, deployWrite, shared, now)
+	if !d.Allowed {
+		t.Fatalf("p1 membership must reach an object shared into p1: %s", d.Reason)
+	}
+	if d.GrantID != "g-p1" {
+		t.Errorf("the deciding grant must be recorded: got %q, want g-p1", d.GrantID)
+	}
+
+	// An object in a project she is not in stays out of reach entirely, so the
+	// denial is out-of-scope rather than a missing capability.
+	elsewhere := Resource{Scope: Ref("project", "p9")}
+	if d := Decide(alice, deployRead, elsewhere, now); d.Reason != ReasonOutOfScope {
+		t.Errorf("unrelated project: want out_of_scope, got %s", d.Reason)
+	}
+
+	// Union semantics, stated deliberately: an object in both p1 and p2 is
+	// writable because p1 allows it, even though p2 alone would not. Adding a
+	// resource to another container can only widen access, never narrow it.
+	both := Resource{Scope: Ref("project", "p1", "project", "p2")}
+	if d := Decide(alice, deployWrite, both, now); !d.Allowed {
+		t.Errorf("union semantics: the more permissive grant must win, got %s", d.Reason)
+	}
+
+	// And a capability she holds nowhere is still denied, with the reason
+	// distinguishing "reached but lacked the verb" from "did not reach".
+	invite := kycCaps.MustParse("members:invite")
+	if d := Decide(alice, invite, shared, now); d.Reason != ReasonMissingCapability {
+		t.Errorf("held nowhere: want missing_capability, got %s", d.Reason)
+	}
+}
