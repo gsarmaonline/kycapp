@@ -3,8 +3,8 @@ package service
 import (
 	"context"
 	"errors"
-	"slices"
 
+	"github.com/gsarmaonline/kyc/core/access"
 	"github.com/gsarmaonline/kyc/internal/apperr"
 	"github.com/gsarmaonline/kyc/internal/authn"
 	"github.com/gsarmaonline/kyc/internal/store/sqlc"
@@ -56,40 +56,82 @@ func (s *Service) RequireOrgMemberAnyStatus(ctx context.Context, orgID string) (
 }
 
 func (s *Service) requireOrgMember(ctx context.Context, orgID string, requireActiveOrg bool) (authn.Principal, error) {
+	return s.requireOrgAccess(ctx, orgID, capMember, requireActiveOrg)
+}
+
+// requireOrgAccess is the single org-scoped gate. It assembles the principal's
+// grants once and asks the evaluator, so membership, API key scopes and platform
+// reach all take the same path instead of four hand-written branches.
+func (s *Service) requireOrgAccess(ctx context.Context, orgID string, cap access.Capability, requireActiveOrg bool) (authn.Principal, error) {
 	p, err := RequirePrincipal(ctx)
 	if err != nil {
 		return authn.Principal{}, err
 	}
+	// Platform short-circuits before the organisation is loaded, so platform
+	// tooling can still act on an archived or partly-created tenant.
 	if p.IsPlatform() {
 		return p, nil
 	}
-	org, err := s.db.Q().GetOrganisation(ctx, orgID)
-	if errors.Is(err, pgx.ErrNoRows) {
-		return authn.Principal{}, apperr.NotFound("organisation not found")
+	// Organisation lifecycle is a property of the resource, not of any grant:
+	// a suspended organisation is invisible even to its own members.
+	if err := s.assertOrgVisible(ctx, orgID, requireActiveOrg); err != nil {
+		return authn.Principal{}, err
 	}
+
+	gs, err := s.grantsFor(ctx, p, orgID)
 	if err != nil {
 		return authn.Principal{}, err
 	}
-	if requireActiveOrg && org.Status != "active" {
-		return authn.Principal{}, apperr.NotFound("organisation not found")
-	}
-	if p.Kind == authn.KindService && p.OrganisationID == orgID {
+	d := access.Decide(gs, cap, access.Resource{Scope: orgRef(orgID)}, decideNow())
+	if d.Allowed {
 		return p, nil
 	}
-	if p.Kind != authn.KindUser || p.UserID == "" {
-		return authn.Principal{}, apperr.Forbidden("not a member of this organisation")
+	return authn.Principal{}, orgDenial(d, cap)
+}
+
+// orgDenial maps a decision to an error. Out-of-scope is a 404 on purpose: a
+// caller with no reach into an organisation must not be able to tell it apart
+// from one that does not exist, or organisations become enumerable.
+func orgDenial(d access.Decision, cap access.Capability) error {
+	switch d.Reason {
+	case access.ReasonOutOfScope:
+		return apperr.NotFound("organisation not found")
+	case access.ReasonMissingCapability:
+		if cap == capMember {
+			return apperr.Forbidden("not a member of this organisation")
+		}
+		return apperr.Forbidden("missing permission " + cap.Key)
+	default:
+		return apperr.Forbidden("access denied")
 	}
-	_, err = s.db.Q().GetActiveMembershipByOrgAndUser(ctx, sqlc.GetActiveMembershipByOrgAndUserParams{
-		OrganisationID: orgID,
-		UserID:         p.UserID,
-	})
+}
+
+func (s *Service) assertOrgVisible(ctx context.Context, orgID string, requireActive bool) error {
+	org, err := s.db.Q().GetOrganisation(ctx, orgID)
 	if errors.Is(err, pgx.ErrNoRows) {
-		return authn.Principal{}, apperr.Forbidden("not a member of this organisation")
+		return apperr.NotFound("organisation not found")
 	}
 	if err != nil {
-		return authn.Principal{}, err
+		return err
 	}
-	return p, nil
+	if requireActive && org.Status != "active" {
+		return apperr.NotFound("organisation not found")
+	}
+	return nil
+}
+
+func (s *Service) hasActiveMembership(ctx context.Context, orgID, userID string) (bool, error) {
+	_, err := s.db.Q().GetActiveMembershipByOrgAndUser(ctx, sqlc.GetActiveMembershipByOrgAndUserParams{
+		OrganisationID: orgID,
+		UserID:         userID,
+	})
+	if errors.Is(err, pgx.ErrNoRows) {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	return true, nil
 }
 
 // RequireOrgPermission requires org membership plus an RBAC permission.
@@ -105,29 +147,11 @@ func (s *Service) RequireOrgPermissionAnyStatus(ctx context.Context, orgID, perm
 }
 
 func (s *Service) requireOrgPermission(ctx context.Context, orgID, permissionKey string, requireActiveOrg bool) (authn.Principal, error) {
-	p, err := s.requireOrgMember(ctx, orgID, requireActiveOrg)
-	if err != nil {
-		return authn.Principal{}, err
+	cap, ok := capabilityFor(permissionKey)
+	if !ok {
+		// Invariant 3: an unregistered key must deny. Treating it as absent
+		// would turn a typo in a gate into an open door.
+		return authn.Principal{}, apperr.Forbidden("unknown permission " + permissionKey)
 	}
-	if p.IsPlatform() {
-		return p, nil
-	}
-	if p.Kind == authn.KindService && p.OrganisationID == orgID {
-		if len(p.Scopes) == 0 || slices.Contains(p.Scopes, permissionKey) {
-			return p, nil
-		}
-		return authn.Principal{}, apperr.Forbidden("missing permission " + permissionKey)
-	}
-	allowed, err := s.CheckAuthz(ctx, AuthzCheckInput{
-		OrganisationID: orgID,
-		UserID:         p.UserID,
-		Permission:     permissionKey,
-	})
-	if err != nil {
-		return authn.Principal{}, err
-	}
-	if !allowed {
-		return authn.Principal{}, apperr.Forbidden("missing permission " + permissionKey)
-	}
-	return p, nil
+	return s.requireOrgAccess(ctx, orgID, cap, requireActiveOrg)
 }

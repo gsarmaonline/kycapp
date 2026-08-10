@@ -38,6 +38,7 @@ require (
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/go-ole/go-ole v1.2.6 // indirect
 	github.com/google/uuid v1.6.0 // indirect
+	github.com/gsarmaonline/kyc/core/access v0.0.0-00010101000000-000000000000 // indirect
 	github.com/jackc/pgerrcode v0.0.0-20240316143900-6e2875d9b438 // indirect
 	github.com/jackc/pgpassfile v1.0.0 // indirect
 	github.com/jackc/pgservicefile v0.0.0-20240606120523-5a60cdf6a761 // indirect
@@ -84,3 +85,5 @@ require (
 	golang.org/x/sys v0.45.0 // indirect
 	golang.org/x/text v0.38.0 // indirect
 )
+
+replace github.com/gsarmaonline/kyc/core/access => ./core/access

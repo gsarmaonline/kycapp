@@ -44,9 +44,20 @@ func TestTenancyBlocksCrossOrgAccess(t *testing.T) {
 	_, tokenB, _ := doBootstrapOrg(t, h, "b@acme.com", "B", "OrgB", "org-b")
 	orgA := a["organisation"].(map[string]any)["id"].(string)
 
+	// 404, not 403. A caller with no reach into an organisation must not be
+	// able to tell it apart from one that does not exist, or organisation ids
+	// become enumerable by reading status codes.
 	denied := doJSON(t, h, http.MethodGet, "/v1/organisations/"+orgA, nil, userAuth(tokenB))
-	if denied.Code != http.StatusForbidden {
-		t.Fatalf("want 403, got %d %s", denied.Code, denied.Body.String())
+	if denied.Code != http.StatusNotFound {
+		t.Fatalf("cross-org read want 404, got %d %s", denied.Code, denied.Body.String())
+	}
+
+	// A missing organisation must be indistinguishable from one that exists but
+	// is out of reach.
+	absent := doJSON(t, h, http.MethodGet, "/v1/organisations/org_does_not_exist", nil, userAuth(tokenB))
+	if absent.Code != denied.Code || absent.Body.String() != denied.Body.String() {
+		t.Fatalf("out-of-reach and absent must be identical: %d %s vs %d %s",
+			denied.Code, denied.Body.String(), absent.Code, absent.Body.String())
 	}
 
 	list := doJSON(t, h, http.MethodGet, "/v1/organisations", nil, userAuth(tokenA))

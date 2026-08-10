@@ -387,6 +387,45 @@ func (q *Queries) ListRolesByOrganisation(ctx context.Context, organisationID st
 	return items, nil
 }
 
+const listUserPermissionKeysInOrg = `-- name: ListUserPermissionKeysInOrg :many
+SELECT DISTINCT p.key
+FROM memberships m
+JOIN role_permissions rp ON rp.role_id = m.role_id
+JOIN permissions p ON p.id = rp.permission_id
+WHERE m.organisation_id = $1
+  AND m.user_id = $2
+  AND m.status = 'active'
+ORDER BY p.key
+`
+
+type ListUserPermissionKeysInOrgParams struct {
+	OrganisationID string `json:"organisation_id"`
+	UserID         string `json:"user_id"`
+}
+
+// ListUserPermissionKeysInOrg returns every permission an active member holds in
+// one organisation. Grant assembly loads the whole set once per request instead
+// of asking CheckUserPermission per gate.
+func (q *Queries) ListUserPermissionKeysInOrg(ctx context.Context, arg ListUserPermissionKeysInOrgParams) ([]string, error) {
+	rows, err := q.db.Query(ctx, listUserPermissionKeysInOrg, arg.OrganisationID, arg.UserID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []string{}
+	for rows.Next() {
+		var key string
+		if err := rows.Scan(&key); err != nil {
+			return nil, err
+		}
+		items = append(items, key)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const updateRole = `-- name: UpdateRole :one
 UPDATE roles
 SET

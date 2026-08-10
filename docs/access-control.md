@@ -85,22 +85,27 @@ These bypass authentication entirely (`internal/http/middleware.go:33`). Two of 
 
 ### Authorisation gates
 
-Handlers never inspect the principal directly. They call one of five gates in `service/access.go`, each stricter than the last.
+Handlers never inspect the principal directly. They call one of these gates in `service/access.go`.
 
 | Gate | Requires |
 | --- | --- |
 | `RequirePrincipal` | Anyone authenticated |
 | `RequireUser` | A human session; refuses every API key |
 | `RequirePlatform` | `IsPlatform()` |
-| `RequireOrgMember(org)` | Platform, a matching org key, or an active membership |
-| `RequireOrgPermission(org, key)` | The above, then scopes (keys) or RBAC (users) |
+| `RequireOrgMember(org)` | The organisation is in reach |
+| `RequireOrgPermission(org, key)` | The above, plus the capability |
 
-Two behaviours worth knowing:
+The last two now share one implementation, `requireOrgAccess`, which assembles the caller's grants and asks the evaluator. Membership, API key scopes and platform reach all take the same path instead of four hand-written branches.
+
+Three behaviours worth knowing:
 
 - A suspended or archived organisation returns **404, not 403**. Existence is not leaked.
-- An org API key with an **empty** `Scopes` list has **full organisation access**. Scoping is opt-in.
+- An organisation the caller cannot reach also returns **404**, and byte-identically to one that does not exist. Organisation ids are not enumerable by reading status codes.
+- An org API key with an **empty** `Scopes` list has **full organisation access**. Scoping is opt-in. This is a defect, kept for now so the gate swap stayed behaviour-preserving.
 
-RBAC for users is one join — `user → membership → role → permission`, scoped to the organisation, requiring `membership.status = 'active'`.
+Reaching an organisation is modelled as an inherent capability, `organisation:member`. It is not a row in the permissions catalog, because it is not something a role hands out — it is what holding any grant in an organisation means. That is how a member whose role carries no permissions can still be a member.
+
+RBAC for users is one join — `user → membership → role → permission`, scoped to the organisation, requiring `membership.status = 'active'`. Assembly loads the whole set once per request; the decision is then a set lookup.
 
 ---
 
@@ -264,9 +269,13 @@ Both write sites are guarded by `if admin && !user.PlatformAdmin` and only ever 
 
 ### Platform privilege is ambient and unconditional
 
-`IsPlatform()` returns early past membership (`access.go:63`) and past permission checks (`access.go:112`), at twelve call sites. It rides on an ordinary session, so a staff member browsing a normal screen carries a full tenancy bypass in every request.
+Partly addressed. Platform capabilities now flow through an ordinary grant at `global` scope rather than a branch inside the permission check, so platform takes the same evaluation path as everyone else.
 
-It is also all-or-nothing: **least privilege for KYC's own staff is currently impossible.** A support engineer who needs to read one merchant's activity must be given write access to every organisation.
+What remains: the gate still short-circuits before the organisation is loaded, so platform tooling can act on an archived or partly-created tenant. That short-circuit is deliberate and was preserved.
+
+The larger problem is untouched. Platform is still **all-or-nothing** — the global grant carries every capability — so **least privilege for KYC's own staff remains impossible**. A support engineer who needs to read one merchant's activity must still be given everything, everywhere. Phase 5 splits this into scoped roles.
+
+It also still rides on an ordinary session, so a staff member browsing a normal screen carries full reach in every request.
 
 ### Unscoped API keys are unrestricted
 
@@ -282,15 +291,25 @@ An empty `Scopes` array grants the whole organisation (`access.go:116`). A key c
 
 The phase that makes the rest safe is **phase 3**.
 
-| Phase | Work | Risk |
+| Phase | Work | Status |
 | --- | --- | --- |
-| 1 | **Built** — [`core/access`](../core/access): capability, scope, grant set, role expansion, `Decide`, delegation. A separate zero-dependency module, because the same logic must run in the API and inside both SDKs. Nothing imports it yet. | None; pure code |
-| 2 | `grants` table, queries, grant assembly at authentication. Nothing reads the result. | Low |
-| 3 | **Shadow mode.** Handlers keep today's gates and *also* call `Decide`, logging disagreements without changing behaviour. | None; observation only |
-| 4 | Flip per domain. `Decide` becomes authoritative; the old gate becomes the shadow. | Reversible by flag |
-| 5 | Delete `Require*`, `IsPlatform`, and `platform_admin`. The latch defect dies here. | Low once 4 is quiet |
+| 1 | [`core/access`](../core/access): capability, scope, grant set, role expansion, `Decide`, delegation. A separate zero-dependency module, because the same logic must run in the API and inside both SDKs. | **Built** |
+| 2 | Grant assembly from existing relationships (`service/grants.go`), plus KYC's code-defined capability registry. | **Built** |
+| 3 | Org-scoped gates evaluate through `Decide`. | **Built** |
+| 4 | `grants` table for what no relationship expresses: time-boxed staff access, app-user tokens. | Not started |
+| 5 | Split platform into scoped roles; delete `platform_admin`. The latch defect dies here. | Not started |
 
-Backfill is mechanical: memberships derive, API keys become capability grants, and each `platform_admin = true` becomes a global grant flagged for review — most should not be standing global.
+### No grants table yet, on purpose
+
+Every grant today is **derived**: platform from the principal flag, API keys from their row and scopes, users from an active membership and its role. Nothing needs storing, so nothing is stored. Membership stays the single source of truth for organisation access, which means no backfill and no dual-write.
+
+The table arrives in phase 4, when there is finally something with no relationship to derive from.
+
+### Shadow mode was skipped
+
+The original plan ran both gates in parallel and logged disagreements. That exists to de-risk a **live** system. KYC is not deployed, so the existing API suite serves the same purpose more cheaply: the gates were swapped outright, and every authorisation test — API keys, hardening, onboarding, settings, memberships, authz, app users, and the local e2e — passed unchanged.
+
+Exactly one behaviour changed deliberately: an organisation the caller cannot reach now returns **404 instead of 403**, matching invariant 5.
 
 ### Test as properties, not examples
 

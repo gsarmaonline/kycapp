@@ -82,3 +82,16 @@ SELECT EXISTS (
       AND m.status = 'active'
       AND p.key = sqlc.arg('permission_key')
 ) AS allowed;
+
+-- ListUserPermissionKeysInOrg returns every permission an active member holds in
+-- one organisation. Grant assembly loads the whole set once per request instead
+-- of asking CheckUserPermission per gate.
+-- name: ListUserPermissionKeysInOrg :many
+SELECT DISTINCT p.key
+FROM memberships m
+JOIN role_permissions rp ON rp.role_id = m.role_id
+JOIN permissions p ON p.id = rp.permission_id
+WHERE m.organisation_id = sqlc.arg('organisation_id')
+  AND m.user_id = sqlc.arg('user_id')
+  AND m.status = 'active'
+ORDER BY p.key;
