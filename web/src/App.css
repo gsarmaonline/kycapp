@@ -1929,3 +1929,24 @@ html.dark-mode .docs-swagger {
 [data-theme="dark"] .error {
   color: var(--app-danger);
 }
+
+/* Collapsible sidebar sections.
+   The section label is the fold, so there is one nesting mechanism and one
+   depth rather than dropdowns nested inside static headers. */
+.nav-parent {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  background: none;
+  border: none;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.nav-caret {
+  font-size: 0.75em;
+  opacity: 0.6;
+}
+

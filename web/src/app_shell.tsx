@@ -16,7 +16,7 @@ import {
   type User,
 } from './api'
 import { GIT_SHA, GIT_SHA_SHORT } from './build_info'
-import { ORG_NAV_GROUPS, orgPath, sectionFromPathname } from './org_nav'
+import { ORG_NAV_GROUPS, orgPath, sectionFromPathname, type OrgNavGroup } from './org_nav'
 import { getStoredTheme, toggleTheme, type ThemeMode } from './theme'
 
 function userInitials(label: string): string {
@@ -122,20 +122,7 @@ export function AppShell({ user, onLogout }: { user: User | null; onLogout: () =
               Overview
             </NavLink>
             {ORG_NAV_GROUPS.map((group) => (
-              <div key={group.id} className="sidebar-nav-group">
-                <p className="sidebar-nav-group-label" title={group.hint}>
-                  {group.label}
-                </p>
-                {group.items.map((item) => (
-                  <NavLink
-                    key={item.id}
-                    to={orgPath(routeOrgId, item.id)}
-                    className={({ isActive }) => (isActive ? 'nav-item active' : 'nav-item')}
-                  >
-                    {item.label}
-                  </NavLink>
-                ))}
-              </div>
+              <NavSection key={group.id} group={group} orgId={routeOrgId ?? ''} section={section} />
             ))}
           </nav>
         )}
@@ -264,6 +251,62 @@ export function AppShell({ user, onLogout }: { user: User | null; onLogout: () =
           </div>
         )}
       </main>
+    </div>
+  )
+}
+
+/**
+ * A collapsible sidebar section.
+ *
+ * Sections used to be static headers, which meant a cluster large enough to
+ * need folding had to nest inside one, putting its pages three levels deep
+ * while everything else sat at two. Making the section itself the fold keeps
+ * one mechanism and one depth.
+ *
+ * A section opens itself whenever one of its pages is current, so navigating
+ * can never leave you on a page hidden in the nav. Once open it stays open:
+ * collapsing out from under someone moving between siblings would be worse.
+ */
+function NavSection({
+  group,
+  orgId,
+  section,
+}: {
+  group: OrgNavGroup
+  orgId: string
+  section: string
+}) {
+  const hasActiveChild = group.items.some((i) => i.id === section)
+  const [open, setOpen] = useState(hasActiveChild || Boolean(group.defaultOpen))
+
+  useEffect(() => {
+    if (hasActiveChild) setOpen(true)
+  }, [hasActiveChild])
+
+  return (
+    <div className="sidebar-nav-group">
+      <button
+        type="button"
+        className="sidebar-nav-group-label nav-parent"
+        title={group.hint}
+        aria-expanded={open}
+        onClick={() => setOpen((v) => !v)}
+      >
+        <span>{group.label}</span>
+        <span aria-hidden="true" className="nav-caret">
+          {open ? '\u25be' : '\u25b8'}
+        </span>
+      </button>
+      {open &&
+        group.items.map((item) => (
+          <NavLink
+            key={item.id}
+            to={orgPath(orgId, item.id)}
+            className={({ isActive }) => (isActive ? 'nav-item active' : 'nav-item')}
+          >
+            {item.label}
+          </NavLink>
+        ))}
     </div>
   )
 }
