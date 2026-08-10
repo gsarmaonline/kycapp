@@ -161,7 +161,8 @@ Machine credentials for calling KYC. Platform keys have null `organisation_id`; 
 | `key_prefix` | string | First characters for UI identification |
 | `key_hash` | string | Unique SHA-256 hex of raw token |
 | `organisation_id` | string? | Null = platform key; set = org-scoped service principal |
-| `scopes` | text[] | RBAC permission keys; empty = full org access |
+| `user_id` | string? | Owner. A key carries the intersection of this user's grants and its scopes, so it can never exceed them. Transferable. |
+| `scopes` | text[] | RBAC permission keys; empty = everything the owner can do |
 | `last_used_at` | timestamptz? | Updated on successful Bearer auth |
 | `created_at` | timestamptz | |
 | `revoked_at` | timestamptz? | Soft revoke; excluded from auth lookup |

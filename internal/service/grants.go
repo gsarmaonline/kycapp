@@ -116,25 +116,8 @@ func (s *Service) grantsFor(ctx context.Context, p authn.Principal, orgID string
 		return gs, nil
 	}
 
-	if p.Kind == authn.KindService && p.OrganisationID != "" {
-		if p.OrganisationID != orgID {
-			return gs, nil // reaches nothing here
-		}
-		caps := allKYCCapabilities
-		if len(p.Scopes) > 0 {
-			caps = capsFromKeys(p.Scopes)
-			// A key scoped only to keys we no longer recognise would produce an
-			// empty, invalid grant. Membership still holds, so it can reach the
-			// organisation but do nothing in it.
-			caps = append(caps, capMember)
-		}
-		gs.Grants = append(gs.Grants, access.Grant{
-			ID:           "api-key:" + p.APIKeyID,
-			Scope:        access.OrgScope(orgID),
-			Capabilities: caps,
-			Source:       "api-key",
-		})
-		return gs, nil
+	if p.APIKeyID != "" {
+		return s.keyGrants(ctx, p, orgID)
 	}
 
 	if p.Kind != authn.KindUser || p.UserID == "" {
@@ -150,6 +133,77 @@ func (s *Service) grantsFor(ctx context.Context, p authn.Principal, orgID string
 	}
 	gs.Grants = append(gs.Grants, grantsFromMemberships(rows, orgID)...)
 	return gs, nil
+}
+
+// keyGrants derives what an API key holds from the user who owns it.
+//
+// A key never has power of its own. It carries the intersection of its owner's
+// grants and its own scopes, which means three things follow without any extra
+// rule: a key can never exceed the person who holds it, demoting them demotes
+// it on the next request, and revoking their membership stops it.
+//
+// That last one is the cost of this model, and it is why ownership is
+// transferable: a key that has to outlive its owner's involvement must be moved
+// to someone else before they are offboarded.
+func (s *Service) keyGrants(ctx context.Context, p authn.Principal, orgID string) (access.GrantSet, error) {
+	gs := access.GrantSet{PrincipalID: p.ActorLabel()}
+
+	// An ownerless key confers nothing. Keys predating ownership fail closed
+	// rather than keeping the unrestricted access they used to have.
+	if p.OwnerUserID == "" {
+		return gs, nil
+	}
+	// An organisation-scoped key acts only in its own organisation, whatever
+	// else its owner can reach.
+	if p.OrganisationID != "" && p.OrganisationID != orgID {
+		return gs, nil
+	}
+
+	owner, err := s.grantsFor(ctx, authn.Principal{
+		Kind:   authn.KindUser,
+		UserID: p.OwnerUserID,
+		Actor:  p.Actor,
+	}, orgID)
+	if err != nil {
+		return access.GrantSet{}, err
+	}
+
+	var narrowed []access.Capability
+	if len(p.Scopes) > 0 {
+		narrowed = capsFromKeys(p.Scopes)
+	}
+
+	for _, g := range owner.Grants {
+		// An org-scoped key must not inherit its owner's global reach: a staff
+		// member's key bound to one merchant stays bound to it.
+		if p.OrganisationID != "" && g.Scope.IsGlobal() {
+			g.Scope = access.OrgScope(p.OrganisationID)
+		}
+		if narrowed != nil {
+			// Empty scopes deliberately mean "everything my owner can do",
+			// which is bounded, rather than the unrestricted access an unscoped
+			// key used to grant.
+			g.Capabilities = append(intersectCapabilities(g.Capabilities, narrowed), capMember)
+		}
+		g.ID = "api-key:" + p.APIKeyID
+		g.Source = "api-key"
+		gs.Grants = append(gs.Grants, g)
+	}
+	return gs, nil
+}
+
+func intersectCapabilities(have, want []access.Capability) []access.Capability {
+	index := make(map[access.Capability]struct{}, len(have))
+	for _, c := range have {
+		index[c] = struct{}{}
+	}
+	out := make([]access.Capability, 0, len(want))
+	for _, c := range want {
+		if _, ok := index[c]; ok {
+			out = append(out, c)
+		}
+	}
+	return out
 }
 
 // grantsFromMemberships folds membership rows into grants.

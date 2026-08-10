@@ -31,11 +31,16 @@ func RequireUser(ctx context.Context) (authn.Principal, error) {
 	return p, nil
 }
 
-// isBreakGlass reports whether the principal is an unscoped environment service
-// token. It is resolved before any query, which is what makes it the root of
-// trust on an empty or mis-seeded database.
+// isBreakGlass reports whether the principal is an environment service token
+// from API_TOKENS. It is resolved before any query, which is what makes it the
+// root of trust on an empty or mis-seeded database.
+//
+// APIKeyID must be empty. A platform key stored in the database also has no
+// organisation, so without that check it would be mistaken for break-glass and
+// short-circuit past its owner — exactly the unbounded access that owning keys
+// was meant to remove.
 func isBreakGlass(p authn.Principal) bool {
-	return p.Kind == authn.KindService && p.OrganisationID == ""
+	return p.Kind == authn.KindService && p.OrganisationID == "" && p.APIKeyID == ""
 }
 
 func hasGlobalReach(gs access.GrantSet) bool {

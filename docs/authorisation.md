@@ -65,7 +65,7 @@ There is no grants table. Every grant comes from a relationship that already exi
 | Source | Produces |
 | --- | --- |
 | Break-glass (environment) | Global scope, every capability |
-| Org API key row | That organisation, narrowed by `Scopes` |
+| Org API key row | Its **owner's** grants, narrowed by the key's `Scopes` and to the key's organisation |
 | Active membership | That organisation, with the role's capabilities |
 | Active membership **of the platform organisation** | **Global** scope, with the role's capabilities |
 
@@ -220,15 +220,13 @@ Shadow mode was skipped deliberately: it de-risks a live system, and this one is
 
 ## Known defects
 
-### Unscoped API keys are unrestricted
+### API key escalation — fixed
 
-An empty `Scopes` array grants the whole organisation. A key created without thinking about scopes is the most permissive one available, not the least. This violates invariant 1 and is kept only because changing it was out of scope for a behaviour-preserving swap.
+Both defects here had the same root: a key's power was independent of any person. An empty `Scopes` array granted the whole organisation, and `createAPIKey` never compared the requested scopes against what the creator held, so a member whose role carried only `api_keys:manage` could mint an unscoped key and act well beyond their own role.
 
-### Key creation does not apply the subset rule
+Keys now belong to a user and carry the intersection of that owner's grants and their scopes. The subset rule is not checked at creation, it is **structural**: a key derives from its owner on every request, so it can never exceed them, and demoting them demotes it. Empty scopes mean "everything my owner can do".
 
-`createAPIKey` never compares the requested scopes against what the **creator** holds. Combined with the defect above, a member whose role carries only `api_keys:manage` can mint a key with no scopes, which reaches the whole organisation, and then act through it well beyond their own permissions.
-
-This is a live privilege escalation and a direct violation of invariant 2. The fix is to run `CanGrant` at key creation: a key may never carry a capability its creator lacks. `core/access` already implements the rule; it is not yet wired into this path.
+See [authentication](authentication.md#api-keys-belong-to-a-user--settled) for the offboarding consequence.
 
 ### Staff reach is ambient
 

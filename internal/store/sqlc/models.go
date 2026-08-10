@@ -21,6 +21,7 @@ type ApiKey struct {
 	OrganisationID pgtype.Text        `json:"organisation_id"`
 	Scopes         []string           `json:"scopes"`
 	LastUsedAt     pgtype.Timestamptz `json:"last_used_at"`
+	UserID         pgtype.Text        `json:"user_id"`
 }
 
 type AppUser struct {

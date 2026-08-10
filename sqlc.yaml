@@ -47,6 +47,7 @@ sql:
       - "internal/store/migrations/000042_drop_platform_admin.up.sql"
       - "internal/store/migrations/000043_platform_org.up.sql"
       - "internal/store/migrations/000044_derive_global_reach.up.sql"
+      - "internal/store/migrations/000045_api_key_owner.up.sql"
     gen:
       go:
         package: "sqlc"

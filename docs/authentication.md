@@ -152,30 +152,23 @@ API access is something KYC sells, so the check sits here rather than in every h
 
 ## Open questions
 
-### API keys have no owner
+### API keys belong to a user — settled
 
-`api_keys` has no user column, not even `created_by`. A key belongs to an organisation and to nobody in particular.
+`api_keys.user_id` is the owner, and a key's capabilities are the **intersection of that owner's grants and the key's scopes**. The key holds nothing of its own, which gives three properties with no extra rule to enforce:
 
-That means:
+- A key can never exceed the person who holds it.
+- Demoting them demotes it on the next request.
+- Revoking their membership stops it.
 
-- A person leaves, their membership is revoked and sessions die, but **keys they created keep working**.
-- Audit shows `api-key:nightly-sync` and cannot answer "whose is this?"
-- A key may hold permissions **no current member has**.
+It also settles the operator/key question: the difference really is *manual versus programmatic*, because the same person is behind both. A key is Priya acting through a program.
 
-This blocks framing the operator/key difference as *manual versus programmatic*, because the programmatic path has no person behind it.
+Empty scopes now mean **"everything my owner can do"** — bounded — rather than the unrestricted organisation access an unscoped key used to grant.
 
-Two distinct things are wanted, and most mature systems ship both:
+Break-glass cannot own a key: it is an environment credential with no person behind it, and a key it created would derive nothing. A key creating another key passes its own owner along, so a chain still terminates at a person. Keys predating ownership confer nothing rather than keeping their old access.
 
-| | Personal token | Service identity |
-| --- | --- | --- |
-| Acts as | The user | The organisation |
-| Permissions | A subset of theirs | Its own |
-| Dies when | They leave | Someone revokes it |
-| Right for | Scripts, one-off automation | Production integrations |
+**The cost, accepted deliberately:** offboarding stops that person's keys. Ownership is therefore transferable, and a key that must outlive its owner's involvement has to be moved before they go. `TestRevokingTheOwnerStopsTheirKey` pins the behaviour so it cannot regress quietly.
 
-KYC has only the second. Adding the first would make "manual versus programmatic" literally true, but it must not replace org keys: a production integration that dies because an engineer left is a worse failure than the one it fixes.
-
-**Cheapest useful step:** add `created_by` to `api_keys`. One column, and it answers the question that actually comes up.
+**Not yet built:** the transfer flow, and a view of keys whose owner has lost their membership.
 
 ### No principal for a merchant's customer
 

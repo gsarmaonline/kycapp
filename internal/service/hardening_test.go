@@ -45,11 +45,15 @@ func TestAPIKeyLifecycleAndAudit(t *testing.T) {
 	h := httpserver.New(db, httpserver.Options{
 		Service:             svc,
 		APITokens:           []string{"bootstrap"},
+		PlatformAdminEmails: []string{"ops@kyc.com"},
 		AuthRateLimitPerMin: 0,
 		AuthDevLogin:        true,
 	}).Handler()
 
-	auth := map[string]string{"Authorization": "Bearer bootstrap"}
+	// A key belongs to a user, so it is created by one. Break-glass cannot own
+	// anything: it is an environment credential with no person behind it.
+	_, opsToken := doDevLogin(t, h, "ops@kyc.com", "Ops")
+	auth := userAuth(opsToken)
 	created := doJSON(t, h, http.MethodPost, "/v1/api-keys", map[string]any{
 		"name": "product-a",
 	}, auth)

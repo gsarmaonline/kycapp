@@ -12,9 +12,9 @@ import (
 )
 
 const createAPIKey = `-- name: CreateAPIKey :one
-INSERT INTO api_keys (id, name, key_prefix, key_hash, organisation_id, scopes)
-VALUES ($1, $2, $3, $4, $5, $6)
-RETURNING id, name, key_prefix, key_hash, created_at, revoked_at, organisation_id, scopes, last_used_at
+INSERT INTO api_keys (id, name, key_prefix, key_hash, organisation_id, scopes, user_id)
+VALUES ($1, $2, $3, $4, $5, $6, $7)
+RETURNING id, name, key_prefix, key_hash, created_at, revoked_at, organisation_id, scopes, last_used_at, user_id
 `
 
 type CreateAPIKeyParams struct {
@@ -24,6 +24,7 @@ type CreateAPIKeyParams struct {
 	KeyHash        string      `json:"key_hash"`
 	OrganisationID pgtype.Text `json:"organisation_id"`
 	Scopes         []string    `json:"scopes"`
+	UserID         pgtype.Text `json:"user_id"`
 }
 
 func (q *Queries) CreateAPIKey(ctx context.Context, arg CreateAPIKeyParams) (ApiKey, error) {
@@ -34,6 +35,7 @@ func (q *Queries) CreateAPIKey(ctx context.Context, arg CreateAPIKeyParams) (Api
 		arg.KeyHash,
 		arg.OrganisationID,
 		arg.Scopes,
+		arg.UserID,
 	)
 	var i ApiKey
 	err := row.Scan(
@@ -46,12 +48,13 @@ func (q *Queries) CreateAPIKey(ctx context.Context, arg CreateAPIKeyParams) (Api
 		&i.OrganisationID,
 		&i.Scopes,
 		&i.LastUsedAt,
+		&i.UserID,
 	)
 	return i, err
 }
 
 const getAPIKey = `-- name: GetAPIKey :one
-SELECT id, name, key_prefix, key_hash, created_at, revoked_at, organisation_id, scopes, last_used_at FROM api_keys
+SELECT id, name, key_prefix, key_hash, created_at, revoked_at, organisation_id, scopes, last_used_at, user_id FROM api_keys
 WHERE id = $1
 `
 
@@ -68,12 +71,13 @@ func (q *Queries) GetAPIKey(ctx context.Context, id string) (ApiKey, error) {
 		&i.OrganisationID,
 		&i.Scopes,
 		&i.LastUsedAt,
+		&i.UserID,
 	)
 	return i, err
 }
 
 const getAPIKeyByHash = `-- name: GetAPIKeyByHash :one
-SELECT id, name, key_prefix, key_hash, created_at, revoked_at, organisation_id, scopes, last_used_at FROM api_keys
+SELECT id, name, key_prefix, key_hash, created_at, revoked_at, organisation_id, scopes, last_used_at, user_id FROM api_keys
 WHERE key_hash = $1 AND revoked_at IS NULL
 `
 
@@ -90,6 +94,7 @@ func (q *Queries) GetAPIKeyByHash(ctx context.Context, keyHash string) (ApiKey, 
 		&i.OrganisationID,
 		&i.Scopes,
 		&i.LastUsedAt,
+		&i.UserID,
 	)
 	return i, err
 }
@@ -132,7 +137,7 @@ func (q *Queries) InsertAuditEvent(ctx context.Context, arg InsertAuditEventPara
 }
 
 const listAPIKeys = `-- name: ListAPIKeys :many
-SELECT id, name, key_prefix, key_hash, created_at, revoked_at, organisation_id, scopes, last_used_at FROM api_keys
+SELECT id, name, key_prefix, key_hash, created_at, revoked_at, organisation_id, scopes, last_used_at, user_id FROM api_keys
 WHERE organisation_id IS NULL
 ORDER BY created_at DESC
 `
@@ -156,6 +161,7 @@ func (q *Queries) ListAPIKeys(ctx context.Context) ([]ApiKey, error) {
 			&i.OrganisationID,
 			&i.Scopes,
 			&i.LastUsedAt,
+			&i.UserID,
 		); err != nil {
 			return nil, err
 		}
@@ -168,7 +174,7 @@ func (q *Queries) ListAPIKeys(ctx context.Context) ([]ApiKey, error) {
 }
 
 const listAPIKeysByOrg = `-- name: ListAPIKeysByOrg :many
-SELECT id, name, key_prefix, key_hash, created_at, revoked_at, organisation_id, scopes, last_used_at FROM api_keys
+SELECT id, name, key_prefix, key_hash, created_at, revoked_at, organisation_id, scopes, last_used_at, user_id FROM api_keys
 WHERE organisation_id = $1
 ORDER BY created_at DESC
 `
@@ -192,6 +198,7 @@ func (q *Queries) ListAPIKeysByOrg(ctx context.Context, organisationID pgtype.Te
 			&i.OrganisationID,
 			&i.Scopes,
 			&i.LastUsedAt,
+			&i.UserID,
 		); err != nil {
 			return nil, err
 		}
@@ -241,7 +248,7 @@ const revokeAPIKey = `-- name: RevokeAPIKey :one
 UPDATE api_keys
 SET revoked_at = now()
 WHERE id = $1 AND revoked_at IS NULL
-RETURNING id, name, key_prefix, key_hash, created_at, revoked_at, organisation_id, scopes, last_used_at
+RETURNING id, name, key_prefix, key_hash, created_at, revoked_at, organisation_id, scopes, last_used_at, user_id
 `
 
 func (q *Queries) RevokeAPIKey(ctx context.Context, id string) (ApiKey, error) {
@@ -257,6 +264,7 @@ func (q *Queries) RevokeAPIKey(ctx context.Context, id string) (ApiKey, error) {
 		&i.OrganisationID,
 		&i.Scopes,
 		&i.LastUsedAt,
+		&i.UserID,
 	)
 	return i, err
 }

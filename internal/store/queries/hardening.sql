@@ -1,6 +1,6 @@
 -- name: CreateAPIKey :one
-INSERT INTO api_keys (id, name, key_prefix, key_hash, organisation_id, scopes)
-VALUES ($1, $2, $3, $4, $5, $6)
+INSERT INTO api_keys (id, name, key_prefix, key_hash, organisation_id, scopes, user_id)
+VALUES ($1, $2, $3, $4, $5, $6, $7)
 RETURNING *;
 
 -- name: GetAPIKey :one

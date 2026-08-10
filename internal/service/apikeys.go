@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/gsarmaonline/kyc/internal/apperr"
+	"github.com/gsarmaonline/kyc/internal/authn"
 	"github.com/gsarmaonline/kyc/internal/ids"
 	"github.com/gsarmaonline/kyc/internal/observability"
 	"github.com/gsarmaonline/kyc/internal/store/sqlc"
@@ -79,6 +80,10 @@ func (s *Service) createAPIKey(ctx context.Context, orgID string, in CreateAPIKe
 	if len(prefix) > 12 {
 		prefix = prefix[:12]
 	}
+	ownerID, err := keyOwnerFor(ctx)
+	if err != nil {
+		return CreatedAPIKey{}, err
+	}
 	row, err := s.db.Q().CreateAPIKey(ctx, sqlc.CreateAPIKeyParams{
 		ID:             ids.New(),
 		Name:           name,
@@ -86,6 +91,7 @@ func (s *Service) createAPIKey(ctx context.Context, orgID string, in CreateAPIKe
 		KeyHash:        HashAPIToken(raw),
 		OrganisationID: textArg(orgID),
 		Scopes:         scopes,
+		UserID:         textArg(ownerID),
 	})
 	if err != nil {
 		return CreatedAPIKey{}, err
@@ -211,4 +217,25 @@ func newAPIToken() (string, error) {
 		return "", err
 	}
 	return "kyc_" + hex.EncodeToString(b[:]), nil
+}
+
+// keyOwnerFor resolves who a newly created key belongs to.
+//
+// A user owns the keys they create. A key creating another key passes its own
+// owner along, so a chain of keys still terminates at a person. Break-glass
+// cannot own anything: it is an environment credential with no user behind it,
+// and a key it created would derive no capabilities and silently do nothing.
+func keyOwnerFor(ctx context.Context) (string, error) {
+	p, err := RequirePrincipal(ctx)
+	if err != nil {
+		return "", err
+	}
+	switch {
+	case p.Kind == authn.KindUser && p.UserID != "":
+		return p.UserID, nil
+	case p.OwnerUserID != "":
+		return p.OwnerUserID, nil
+	default:
+		return "", apperr.Forbidden("an API key must belong to a user; sign in to create one")
+	}
 }

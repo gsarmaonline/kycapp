@@ -76,6 +76,9 @@ func (s *Service) AuthenticateBearer(ctx context.Context, raw string, envTokens 
 		Scopes:   append([]string(nil), key.Scopes...),
 		Actor:    "api-key:" + key.Name,
 	}
+	if key.UserID.Valid {
+		p.OwnerUserID = key.UserID.String
+	}
 	if key.OrganisationID.Valid {
 		p.OrganisationID = key.OrganisationID.String
 		allowed, entErr := s.CheckEntitlement(ctx, p.OrganisationID, "api_access")

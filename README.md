@@ -211,7 +211,7 @@ cd web && npm install && npm run dev
 | --- | --- |
 | Operator — user session (Google or dev-login) | Own profile, plus the organisations they belong to, gated by their role |
 | Staff — user session, member of the platform organisation | Every organisation, but only what their role's permissions allow |
-| Org API key (Platform → API keys) | That organisation only — scoped by permissions; requires `api_access` |
+| Org API key (Platform → API keys) | That organisation only, and never more than its **owner** can do; requires `api_access` |
 | Break-glass — unscoped `API_TOKENS` service token | Everything. Recovery only; resolves before any database read |
 
 Staff are ordinary members of a seeded platform organisation, so reach is derived from membership rather than from a flag. See [access control](docs/authentication.md#four-callers).

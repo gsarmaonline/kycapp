@@ -47,63 +47,22 @@ func TestPlatformGrantIsGlobalAndComplete(t *testing.T) {
 	}
 }
 
-// An org API key reaches only its own organisation, and an explicit scope list
-// narrows what it may do there.
-func TestOrgKeyGrantIsScopedToItsOrganisation(t *testing.T) {
-	svc := nilStoreService()
-	ctx := context.Background()
-	scoped := authn.Principal{
-		Kind: authn.KindService, OrganisationID: "org_a", APIKeyID: "k1",
-		Scopes: []string{"app_users:read"}, Actor: "api-key:test",
-	}
-
-	gs, err := svc.grantsFor(ctx, scoped, "org_a")
-	if err != nil {
-		t.Fatalf("grantsFor: %v", err)
-	}
-	ref := access.Resource{Scope: orgRef("org_a")}
-	read := KYCCapabilities.MustParse("app_users:read")
-	write := KYCCapabilities.MustParse("app_users:write")
-
-	if d := access.Decide(gs, read, ref, decideNow()); !d.Allowed {
-		t.Errorf("scoped key must hold app_users:read, got %s", d.Reason)
-	}
-	if d := access.Decide(gs, write, ref, decideNow()); d.Allowed {
-		t.Error("scoped key must not hold app_users:write")
-	}
-	// Reaching the organisation is inherent, so a narrowly-scoped key is still
-	// a member rather than invisible.
-	if d := access.Decide(gs, capMember, ref, decideNow()); !d.Allowed {
-		t.Errorf("scoped key must still reach its organisation, got %s", d.Reason)
-	}
-
-	other, err := svc.grantsFor(ctx, scoped, "org_b")
-	if err != nil {
-		t.Fatalf("grantsFor(other org): %v", err)
-	}
-	if d := access.Decide(other, read, access.Resource{Scope: orgRef("org_b")}, decideNow()); d.Allowed {
-		t.Error("an org key must not reach another organisation")
-	}
-	if d := access.Decide(other, capMember, access.Resource{Scope: orgRef("org_b")}, decideNow()); d.Reason != access.ReasonOutOfScope {
-		t.Errorf("reaching nothing must read as out-of-scope, got %s", d.Reason)
-	}
-}
-
-// An unscoped key keeps full organisation access. This is today's behaviour,
-// recorded as a defect in docs/access-control.md rather than changed here, so
-// the gate swap stays behaviour-preserving.
-func TestUnscopedOrgKeyStillHasFullAccess(t *testing.T) {
+// An ownerless key confers nothing. Keys predating ownership fail closed rather
+// than keeping the unrestricted access they used to have. This path returns
+// before touching the database, which the nil store proves.
+func TestOwnerlessKeyConfersNothing(t *testing.T) {
 	svc := nilStoreService()
 	gs, err := svc.grantsFor(context.Background(), authn.Principal{
-		Kind: authn.KindService, OrganisationID: "org_a", APIKeyID: "k1", Actor: "api-key:test",
+		Kind: authn.KindService, OrganisationID: "org_a", APIKeyID: "k1", Actor: "api-key:legacy",
 	}, "org_a")
 	if err != nil {
 		t.Fatalf("grantsFor: %v", err)
 	}
-	ref := access.Resource{Scope: orgRef("org_a")}
-	for _, key := range kycPermissionKeys {
-		if d := access.Decide(gs, KYCCapabilities.MustParse(key), ref, decideNow()); !d.Allowed {
-			t.Errorf("unscoped key must hold %s, got %s", key, d.Reason)
-		}
+	if len(gs.Grants) != 0 {
+		t.Fatalf("want no grants, got %+v", gs.Grants)
+	}
+	d := access.Decide(gs, capMember, access.Resource{Scope: orgRef("org_a")}, decideNow())
+	if d.Reason != access.ReasonOutOfScope {
+		t.Errorf("want out_of_scope, got %s", d.Reason)
 	}
 }
