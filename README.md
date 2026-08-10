@@ -193,7 +193,7 @@ cd web && npm install && npm run dev
 | `OAUTH_STATE_SECRET` | HMAC secret for OAuth CSRF state |
 | `AUTH_DEV_LOGIN` | If `true`, enables `POST /v1/auth/dev-login` for local/tests (**never in prod**) |
 | `API_TOKENS` | Comma-separated **platform** service tokens |
-| `PLATFORM_ADMIN_EMAILS` | Emails granted `platform_admin` on Google/dev login |
+| `PLATFORM_ADMIN_EMAILS` | Emails treated as KYC staff. Evaluated per request, so removing an address demotes immediately |
 | `CHECK_RATE_LIMIT_PER_MIN` | Max check-endpoint calls per actor/minute (default 120; `0` disables) |
 | `AUTH_RATE_LIMIT_PER_MIN` | Max OAuth/dev-login starts per IP/minute (default 20; `0` disables) |
 | `UPLOAD_DIR` | Local directory for org logo files (default `data/uploads`) |

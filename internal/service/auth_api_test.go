@@ -49,7 +49,7 @@ func TestGoogleLoginLinksInviteUser(t *testing.T) {
 
 	auth, err := svc.LoginWithGoogle(ctx, service.GoogleIdentity{
 		Sub: "google-sub-1", Email: "invited@acme.com", EmailVerified: true, Name: "Invited Person",
-	}, nil)
+	})
 	if err != nil {
 		t.Fatal(err)
 	}

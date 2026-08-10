@@ -68,36 +68,35 @@ func queryLimit(r *http.Request) int32 {
 func orgJSON(o sqlc.Organisation) map[string]any {
 	ty := emailtemplates.ResolveTypography(o.EmailTypography, o.EmailFont)
 	return map[string]any{
-		"id":                          o.ID,
-		"name":                        o.Name,
-		"slug":                        o.Slug,
-		"status":                      o.Status,
-		"logo_url":                    o.LogoUrl,
-		"primary_color":               o.PrimaryColor,
-		"accent_color":                o.AccentColor,
-		"email_footer":                o.EmailFooter,
-		"email_font":                  o.EmailFont,
-		"email_typography":            ty,
-		"email_from_name":             o.EmailFromName,
-		"email_from_address":          o.EmailFromAddress,
-		"app_user_authority":          o.AppUserAuthority,
-		"app_user_ingest_upsert_key":  o.AppUserIngestUpsertKey,
-		"app_user_attributes_mode":    o.AppUserAttributesMode,
-		"created_at":                  o.CreatedAt.UTC().Format(time.RFC3339Nano),
-		"updated_at":                  o.UpdatedAt.UTC().Format(time.RFC3339Nano),
+		"id":                         o.ID,
+		"name":                       o.Name,
+		"slug":                       o.Slug,
+		"status":                     o.Status,
+		"logo_url":                   o.LogoUrl,
+		"primary_color":              o.PrimaryColor,
+		"accent_color":               o.AccentColor,
+		"email_footer":               o.EmailFooter,
+		"email_font":                 o.EmailFont,
+		"email_typography":           ty,
+		"email_from_name":            o.EmailFromName,
+		"email_from_address":         o.EmailFromAddress,
+		"app_user_authority":         o.AppUserAuthority,
+		"app_user_ingest_upsert_key": o.AppUserIngestUpsertKey,
+		"app_user_attributes_mode":   o.AppUserAttributesMode,
+		"created_at":                 o.CreatedAt.UTC().Format(time.RFC3339Nano),
+		"updated_at":                 o.UpdatedAt.UTC().Format(time.RFC3339Nano),
 	}
 }
 
 func userJSON(u sqlc.User) map[string]any {
 	out := map[string]any{
-		"id":             u.ID,
-		"email":          u.Email,
-		"name":           u.Name,
-		"status":         u.Status,
-		"platform_admin": u.PlatformAdmin,
-		"avatar_url":     u.AvatarUrl,
-		"created_at":     u.CreatedAt.UTC().Format(time.RFC3339Nano),
-		"updated_at":     u.UpdatedAt.UTC().Format(time.RFC3339Nano),
+		"id":         u.ID,
+		"email":      u.Email,
+		"name":       u.Name,
+		"status":     u.Status,
+		"avatar_url": u.AvatarUrl,
+		"created_at": u.CreatedAt.UTC().Format(time.RFC3339Nano),
+		"updated_at": u.UpdatedAt.UTC().Format(time.RFC3339Nano),
 	}
 	if u.AvatarUrl == "" {
 		out["avatar_url"] = nil

@@ -3013,8 +3013,6 @@ components:
         status:
           type: string
           enum: [active, disabled]
-        platform_admin:
-          type: boolean
         avatar_url:
           type: string
           nullable: true

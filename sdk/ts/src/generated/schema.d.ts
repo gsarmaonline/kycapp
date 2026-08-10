@@ -1037,7 +1037,6 @@ export interface components {
             email?: string;
             id?: string;
             name?: string;
-            platform_admin?: boolean;
             /** @enum {string} */
             status?: "active" | "disabled";
             /** Format: date-time */

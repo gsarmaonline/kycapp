@@ -261,11 +261,13 @@ The README lists *"not Auth0/Clerk-for-your-customers"* as a non-goal. That non-
 
 **Present in the shipped system.** Each is independent of whether the target model is adopted.
 
-### Platform admin is a one-way latch
+### Platform admin was a one-way latch — fixed
 
-Both write sites are guarded by `if admin && !user.PlatformAdmin` and only ever set the flag true (`service/auth.go:199`, `:226`). The session reads it back as `sess.PlatformAdmin || emailInList(...)` (`:38`).
+The flag was only ever written true, and the session read it back as
+`sess.PlatformAdmin || emailInList(...)`, so **removing an address from
+`PLATFORM_ADMIN_EMAILS` did not demote anyone** and offboarding silently did nothing.
 
-**Removing an address from `PLATFORM_ADMIN_EMAILS` does not demote anyone.** Offboarding through that variable silently does nothing. Fix by making the env list authoritative in both directions, or by deriving the flag per login instead of persisting it.
+Platform privilege is now derived per request from the env list and never persisted. The `users.platform_admin` column is dropped (migration `000042`), and the login paths no longer take the list at all: it is a property of the request, not of the login. `TestPlatformAdminIsDerivedNotLatched` pins this by moving the same session between servers configured with and without the address, and asserting a platform route refuses after demotion.
 
 ### Platform privilege is ambient and unconditional
 

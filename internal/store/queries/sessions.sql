@@ -4,7 +4,7 @@ VALUES ($1, $2, $3, $4)
 RETURNING *;
 
 -- name: GetSessionByTokenHash :one
-SELECT s.*, u.email AS user_email, u.name AS user_name, u.status AS user_status, u.platform_admin
+SELECT s.*, u.email AS user_email, u.name AS user_name, u.status AS user_status
 FROM sessions s
 JOIN users u ON u.id = s.user_id
 WHERE s.token_hash = $1

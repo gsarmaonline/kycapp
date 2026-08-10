@@ -59,7 +59,7 @@ func (s *Server) handleGoogleCallback(w http.ResponseWriter, r *http.Request) {
 		writeError(w, err)
 		return
 	}
-	result, err := s.svc.LoginWithGoogle(r.Context(), identity, s.platformAdminEmails)
+	result, err := s.svc.LoginWithGoogle(r.Context(), identity)
 	if err != nil {
 		writeError(w, err)
 		return
@@ -82,7 +82,7 @@ func (s *Server) handleDevLogin(w http.ResponseWriter, r *http.Request) {
 		writeError(w, apperr.Validation("invalid JSON body"))
 		return
 	}
-	result, err := s.svc.DevLogin(r.Context(), body.Email, body.Name, s.platformAdminEmails)
+	result, err := s.svc.DevLogin(r.Context(), body.Email, body.Name)
 	if err != nil {
 		writeError(w, err)
 		return
@@ -130,8 +130,9 @@ func (s *Server) handleMe(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 	writeJSON(w, http.StatusOK, map[string]any{
-		"user":           userJSON(me.User),
-		"memberships":    items,
-		"platform_admin": p.PlatformAdmin || me.User.PlatformAdmin,
+		"user":        userJSON(me.User),
+		"memberships": items,
+		// Derived from the request principal, not from a stored flag.
+		"platform_admin": p.PlatformAdmin,
 	})
 }

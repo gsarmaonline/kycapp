@@ -69,11 +69,10 @@ func (s *Service) CreateMembership(ctx context.Context, orgID string, in CreateM
 		user, err := s.db.Q().GetUserByEmail(ctx, email)
 		if errors.Is(err, pgx.ErrNoRows) {
 			user, err = s.db.Q().CreateUser(ctx, sqlc.CreateUserParams{
-				ID:            ids.New(),
-				Email:         email,
-				Name:          email,
-				Status:        "active",
-				PlatformAdmin: false,
+				ID:     ids.New(),
+				Email:  email,
+				Name:   email,
+				Status: "active",
 			})
 			if err != nil {
 				if store.IsUniqueViolation(err) {

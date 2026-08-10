@@ -26,7 +26,6 @@ export type User = {
   email: string
   name: string
   status: string
-  platform_admin?: boolean
   avatar_url?: string | null
 }
 

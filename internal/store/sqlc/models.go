@@ -341,13 +341,12 @@ type Subscription struct {
 }
 
 type User struct {
-	ID            string      `json:"id"`
-	Email         string      `json:"email"`
-	Name          string      `json:"name"`
-	Status        string      `json:"status"`
-	CreatedAt     time.Time   `json:"created_at"`
-	UpdatedAt     time.Time   `json:"updated_at"`
-	PlatformAdmin bool        `json:"platform_admin"`
-	GoogleSub     pgtype.Text `json:"google_sub"`
-	AvatarUrl     string      `json:"avatar_url"`
+	ID        string      `json:"id"`
+	Email     string      `json:"email"`
+	Name      string      `json:"name"`
+	Status    string      `json:"status"`
+	CreatedAt time.Time   `json:"created_at"`
+	UpdatedAt time.Time   `json:"updated_at"`
+	GoogleSub pgtype.Text `json:"google_sub"`
+	AvatarUrl string      `json:"avatar_url"`
 }

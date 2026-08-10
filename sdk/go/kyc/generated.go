@@ -1425,14 +1425,13 @@ type UpsertProductPlanPriceRequestInterval string
 
 // User defines model for User.
 type User struct {
-	AvatarUrl     *string              `json:"avatar_url,omitempty"`
-	CreatedAt     *time.Time           `json:"created_at,omitempty"`
-	Email         *openapi_types.Email `json:"email,omitempty"`
-	Id            *string              `json:"id,omitempty"`
-	Name          *string              `json:"name,omitempty"`
-	PlatformAdmin *bool                `json:"platform_admin,omitempty"`
-	Status        *UserStatus          `json:"status,omitempty"`
-	UpdatedAt     *time.Time           `json:"updated_at,omitempty"`
+	AvatarUrl *string              `json:"avatar_url,omitempty"`
+	CreatedAt *time.Time           `json:"created_at,omitempty"`
+	Email     *openapi_types.Email `json:"email,omitempty"`
+	Id        *string              `json:"id,omitempty"`
+	Name      *string              `json:"name,omitempty"`
+	Status    *UserStatus          `json:"status,omitempty"`
+	UpdatedAt *time.Time           `json:"updated_at,omitempty"`
 }
 
 // UserStatus defines model for User.Status.
