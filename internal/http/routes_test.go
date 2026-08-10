@@ -137,7 +137,7 @@ func TestOrgRoutesAreEnforcedOrExplainWhyNot(t *testing.T) {
 			continue
 		}
 		switch rt.Auth.Kind {
-		case authOrgPermission, authOrgPermissionAnyStatus, authOrgMember:
+		case authOrgPermission, authOrgPermissionAnyStatus, authOrgMember, authOrgMemberAnyStatus:
 			// Enforced by the gate.
 		case authOrgFromResource, authOrgFromBody, authInService, authPlatform, authPublic:
 			// Cannot be enforced from the path, and says so.

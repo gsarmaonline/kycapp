@@ -40,13 +40,23 @@ const (
 	authPlatform authKind = "platform"
 	// authOrgMember requires reach into the organisation named in the path.
 	authOrgMember authKind = "org_member"
+	// authOrgMemberAnyStatus is authOrgMember for a lifecycle route: a
+	// suspended organisation stays visible to its own members, so the state can
+	// be seen and acted on rather than the tenant simply vanishing.
+	authOrgMemberAnyStatus authKind = "org_member_any_status"
 	// authOrgPermission requires a named permission in the organisation named
 	// in the path. These are the routes a middleware could gate from this
 	// table, because the organisation is known before the handler runs.
 	authOrgPermission authKind = "org_permission"
-	// authOrgPermissionAnyStatus is authOrgPermission that also accepts an
-	// archived or suspended organisation, which hard delete needs: you must be
-	// able to finish removing a tenant you already archived.
+	// authOrgPermissionAnyStatus is authOrgPermission that also accepts a
+	// suspended or archived organisation.
+	//
+	// Lifecycle routes need it. Status is settable through PATCH, so without it
+	// suspending a tenant made every route on that tenant return 404, including
+	// the route that would restore it: a one-way door out of "suspend for
+	// non-payment" into deletion. Read, update and delete therefore work on any
+	// status, and everything else stays active-only, which is what suspension
+	// is for.
 	authOrgPermissionAnyStatus authKind = "org_permission_any_status"
 	// authOrgFromResource requires a permission in an organisation that is only
 	// known after loading the resource, so the handler must gate itself. The
@@ -79,7 +89,8 @@ func platform(perm string) authRule {
 	return authRule{Kind: authPlatform, Permission: perm}
 }
 
-func orgMember() authRule { return authRule{Kind: authOrgMember} }
+func orgMember() authRule          { return authRule{Kind: authOrgMember} }
+func orgMemberAnyStatus() authRule { return authRule{Kind: authOrgMemberAnyStatus} }
 
 func orgPermission(perm string) authRule {
 	return authRule{Kind: authOrgPermission, Permission: perm}
@@ -98,7 +109,7 @@ func orgFromResource(perm string) authRule {
 // every such route declares how it is guarded.
 func (r route) IsOrgScoped() bool {
 	switch r.Auth.Kind {
-	case authOrgMember, authOrgPermission, authOrgPermissionAnyStatus,
+	case authOrgMember, authOrgMemberAnyStatus, authOrgPermission, authOrgPermissionAnyStatus,
 		authOrgFromResource, authOrgFromBody, authInService:
 		return true
 	default:
@@ -134,6 +145,14 @@ func (s *Server) gate(rule authRule, next http.HandlerFunc) http.HandlerFunc {
 			}
 			next(w, r)
 		}
+	case authOrgMemberAnyStatus:
+		return func(w http.ResponseWriter, r *http.Request) {
+			if _, err := s.svc.RequireOrgMemberAnyStatus(r.Context(), r.PathValue("id")); err != nil {
+				writeError(w, err)
+				return
+			}
+			next(w, r)
+		}
 	case authOrgMember:
 		return func(w http.ResponseWriter, r *http.Request) {
 			if _, err := s.svc.RequireOrgMember(r.Context(), r.PathValue("id")); err != nil {
@@ -151,7 +170,7 @@ func (s *Server) gate(rule authRule, next http.HandlerFunc) http.HandlerFunc {
 // the handler applying it. Used by the test that checks the two never disagree.
 func (r authRule) EnforcedFromTable() bool {
 	switch r.Kind {
-	case authOrgPermission, authOrgPermissionAnyStatus, authOrgMember:
+	case authOrgPermission, authOrgPermissionAnyStatus, authOrgMember, authOrgMemberAnyStatus:
 		return true
 	default:
 		return false
