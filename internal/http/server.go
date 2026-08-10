@@ -190,11 +190,13 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /v1/organisations/{id}/app-grants", s.handleListAppGrants)
 	s.mux.HandleFunc("GET /v1/organisations/{id}/app-user-groups", s.handleListAppUserGroups)
 	s.mux.HandleFunc("POST /v1/organisations/{id}/app-user-groups", s.handleCreateAppUserGroup)
+	s.mux.HandleFunc("PATCH /v1/organisations/{id}/app-user-groups/{groupId}", s.handlePatchAppUserGroup)
 	s.mux.HandleFunc("DELETE /v1/organisations/{id}/app-user-groups/{groupId}", s.handleDeleteAppUserGroup)
 	s.mux.HandleFunc("GET /v1/organisations/{id}/app-user-groups/{groupId}/members", s.handleListAppUserGroupMembers)
 	s.mux.HandleFunc("POST /v1/organisations/{id}/app-user-groups/{groupId}/members", s.handleAddAppUserGroupMember)
 	s.mux.HandleFunc("DELETE /v1/organisations/{id}/app-user-groups/{groupId}/members/{appUserId}", s.handleRemoveAppUserGroupMember)
 	s.mux.HandleFunc("GET /v1/app-users/{id}/access", s.handleAppUserAccess)
+	s.mux.HandleFunc("GET /v1/app-users/{id}/groups", s.handleAppUserGroups)
 
 	s.mux.HandleFunc("POST /v1/recovery-credentials", s.handleCreateRecoveryCredential)
 	s.mux.HandleFunc("GET /v1/recovery-credentials", s.handleListRecoveryCredentials)

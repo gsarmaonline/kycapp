@@ -19,7 +19,10 @@ import {
   listAppScopeTypes,
   listAppUserGroups,
   listAppUsers,
+  listGroupsForAppUser,
+  getAppUserAccess,
   removeAppGroupMember,
+  updateAppUserGroup,
   type AppCapability,
   type AppGrant,
   type AppGroupMember,
@@ -27,16 +30,22 @@ import {
   type AppScopeType,
   type AppUser,
   type AppUserGroup,
+  type AppAccessSet,
 } from '../../api'
 import { ResourceTable } from '../../crud/ui'
 
-type Tab = 'roles' | 'groups' | 'grants' | 'vocabulary'
+type Tab = 'roles' | 'groups' | 'grants' | 'vocabulary' | 'customer'
 
 const TABS: { id: Tab; label: string; hint: string }[] = [
   { id: 'vocabulary', label: 'Vocabulary', hint: 'The scope kinds and capabilities your product uses' },
   { id: 'roles', label: 'Roles', hint: 'Named sets of capabilities, which may build on each other' },
   { id: 'groups', label: 'Groups', hint: 'Sets of customers a role can be granted to at once' },
   { id: 'grants', label: 'Grants', hint: 'Who holds which role, and where' },
+  {
+    id: 'customer',
+    label: 'Customer',
+    hint: 'Why one customer has the access they have',
+  },
 ]
 
 export function AppAccessPage() {
@@ -137,6 +146,7 @@ export function AppAccessPage() {
           {tab === 'groups' && (
             <GroupsTab orgId={orgId} groups={groups} appUsers={appUsers} run={run} />
           )}
+          {tab === 'customer' && <CustomerTab appUsers={appUsers} />}
           {tab === 'grants' && (
             <GrantsTab
               orgId={orgId}
@@ -198,17 +208,16 @@ function VocabularyTab({
           <button type="submit">Add scope kind</button>
         </form>
         <ResourceTable
-          columns={['Kind', 'Label', '']}
+          columns={['Kind', 'Label']}
           empty="No scope kinds yet. Add one before granting."
           rows={scopeTypes.map((s) => ({
             key: s.id,
-            cells: [
-              <code key="k">{s.kind}</code>,
-              s.label || '—',
-              <button key="d" type="button" onClick={() => void run(() => deleteAppScopeType(orgId, s.id))}>
+            cells: [<code key="k">{s.kind}</code>, s.label || '—'],
+            actions: (
+              <button type="button" onClick={() => void run(() => deleteAppScopeType(orgId, s.id))}>
                 Delete
-              </button>,
-            ],
+              </button>
+            ),
           }))}
         />
       </div>
@@ -239,17 +248,16 @@ function VocabularyTab({
           <button type="submit">Add capability</button>
         </form>
         <ResourceTable
-          columns={['Key', 'Description', '']}
+          columns={['Key', 'Description']}
           empty="No capabilities yet."
           rows={capabilities.map((c) => ({
             key: c.id,
-            cells: [
-              <code key="k">{c.key}</code>,
-              c.description || '—',
-              <button key="d" type="button" onClick={() => void run(() => deleteAppCapability(orgId, c.id))}>
+            cells: [<code key="k">{c.key}</code>, c.description || '—'],
+            actions: (
+              <button type="button" onClick={() => void run(() => deleteAppCapability(orgId, c.id))}>
                 Delete
-              </button>,
-            ],
+              </button>
+            ),
           }))}
         />
       </div>
@@ -351,7 +359,7 @@ function RolesTab({
       </form>
 
       <ResourceTable
-        columns={['Role', 'Own', 'Effective', '']}
+        columns={['Role', 'Own', 'Effective']}
         empty="No roles yet."
         rows={roles.map((r) => ({
           key: r.id,
@@ -365,10 +373,12 @@ function RolesTab({
             // Showing only the chain is how inheritance surprises people, so the
             // resolved set is always displayed next to it.
             <CapList key="e" items={r.effective_capabilities} inheritedFrom={r} lookup={roleById} />,
-            <button key="d" type="button" onClick={() => void run(() => deleteAppRole(orgId, r.id))}>
-              Delete
-            </button>,
           ],
+          actions: (
+            <button type="button" onClick={() => void run(() => deleteAppRole(orgId, r.id))}>
+              Delete
+            </button>
+          ),
         }))}
       />
     </div>
@@ -449,26 +459,21 @@ function GroupsTab({
       </form>
 
       <ResourceTable
-        columns={['Group', 'Members', '']}
+        columns={['Group', 'Members']}
         empty="No groups yet."
         rows={groups.map((g) => ({
           key: g.id,
-          cells: [
-            <div key="n">
-              <strong>{g.name}</strong>
-              <br />
-              <code className="muted">{g.key}</code>
-            </div>,
-            String(g.member_count),
-            <div className="row" key="a">
+          cells: [<GroupName key="n" orgId={orgId} group={g} run={run} />, String(g.member_count)],
+          actions: (
+            <>
               <button type="button" onClick={() => void openMembers(g.id)}>
                 Members
               </button>
               <button type="button" onClick={() => void run(() => deleteAppUserGroup(orgId, g.id))}>
                 Delete
               </button>
-            </div>,
-          ],
+            </>
+          ),
         }))}
       />
 
@@ -497,15 +502,13 @@ function GroupsTab({
             <button type="submit">Add to group</button>
           </form>
           <ResourceTable
-            columns={['Customer', 'Status', '']}
+            columns={['Customer', 'Status']}
             empty="No members yet."
             rows={members.map((m) => ({
               key: m.id,
-              cells: [
-                m.email ?? m.display_name ?? m.id,
-                m.status,
+              cells: [m.email ?? m.display_name ?? m.id, m.status],
+              actions: (
                 <button
-                  key="r"
                   type="button"
                   onClick={() =>
                     void run(async () => {
@@ -515,8 +518,8 @@ function GroupsTab({
                   }
                 >
                   Remove
-                </button>,
-              ],
+                </button>
+              ),
             }))}
           />
         </div>
@@ -625,7 +628,7 @@ function GrantsTab({
       </form>
 
       <ResourceTable
-        columns={['Subject', 'Role', 'Scope', '']}
+        columns={['Subject', 'Role', 'Scope']}
         empty="No grants yet."
         rows={grants.map((g) => ({
           key: g.id,
@@ -638,12 +641,182 @@ function GrantsTab({
             <code key="sc">
               {g.scope_kind}:{g.scope_id}
             </code>,
-            <button key="d" type="button" onClick={() => void run(() => deleteAppGrant(orgId, g.id))}>
-              Revoke
-            </button>,
           ],
+          actions: (
+            <button type="button" onClick={() => void run(() => deleteAppGrant(orgId, g.id))}>
+              Revoke
+            </button>
+          ),
         }))}
       />
+    </div>
+  )
+}
+
+/**
+ * An editable group name. Renaming is separate from the key, which stays fixed
+ * because grants and any of the merchant's own tooling refer to it.
+ */
+function GroupName({
+  orgId,
+  group,
+  run,
+}: {
+  orgId: string
+  group: AppUserGroup
+  run: Runner
+}) {
+  const [editing, setEditing] = useState(false)
+  const [name, setName] = useState(group.name)
+
+  if (!editing) {
+    return (
+      <div>
+        <strong>{group.name}</strong>{' '}
+        <button type="button" className="link" onClick={() => setEditing(true)}>
+          Rename
+        </button>
+        {/* The key repeats the name until one is set, so only show it when it differs. */}
+        {group.key !== group.name && (
+          <>
+            <br />
+            <code className="muted">{group.key}</code>
+          </>
+        )}
+      </div>
+    )
+  }
+  return (
+    <form
+      className="row"
+      onSubmit={(e) => {
+        e.preventDefault()
+        void run(async () => {
+          await updateAppUserGroup(orgId, group.id, { name })
+          setEditing(false)
+        })
+      }}
+    >
+      <input value={name} onChange={(e) => setName(e.target.value)} aria-label="Group name" required />
+      <button type="submit">Save</button>
+      <button
+        type="button"
+        onClick={() => {
+          setName(group.name)
+          setEditing(false)
+        }}
+      >
+        Cancel
+      </button>
+    </form>
+  )
+}
+
+/**
+ * Answers "why does this customer have this access?".
+ *
+ * The group list and the resolved grant set together are the answer: the groups
+ * they belong to, and every capability they end up with, each labelled with
+ * where it came from.
+ */
+function CustomerTab({ appUsers }: { appUsers: AppUser[] }) {
+  const [selected, setSelected] = useState('')
+  const [groups, setGroups] = useState<{ id: string; key: string; name: string }[]>([])
+  const [access, setAccess] = useState<AppAccessSet | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const [loading, setLoading] = useState(false)
+
+  useEffect(() => {
+    if (!selected) {
+      setGroups([])
+      setAccess(null)
+      return
+    }
+    let cancelled = false
+    setLoading(true)
+    setError(null)
+    Promise.all([listGroupsForAppUser(selected), getAppUserAccess(selected)])
+      .then(([g, a]) => {
+        if (cancelled) return
+        setGroups(g.items)
+        setAccess(a)
+      })
+      .catch((e: unknown) => {
+        if (!cancelled) setError(e instanceof Error ? e.message : 'Failed to load')
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [selected])
+
+  return (
+    <div className="stack">
+      <select
+        value={selected}
+        onChange={(e) => setSelected(e.target.value)}
+        aria-label="Customer"
+      >
+        <option value="">Choose a customer…</option>
+        {appUsers.map((u) => (
+          <option key={u.id} value={u.id}>
+            {u.email ?? u.display_name ?? u.id}
+          </option>
+        ))}
+      </select>
+
+      {error && <p className="error">{error}</p>}
+      {loading && <p>Loading…</p>}
+
+      {selected && !loading && (
+        <>
+          <div>
+            <h2>Groups</h2>
+            <ResourceTable
+              columns={['Group', 'Key']}
+              empty="Not in any group."
+              rows={groups.map((g) => ({
+                key: g.id,
+                cells: [g.name, <code key="k">{g.key}</code>],
+              }))}
+            />
+          </div>
+
+          <div>
+            <h2>Effective access</h2>
+            <p className="muted">
+              Exactly what your backend receives from{' '}
+              <code>GET /v1/app-users/&#123;id&#125;/access</code>
+              {access ? ` — version ${access.version}` : ''}.
+            </p>
+            <ResourceTable
+              columns={['Scope', 'Capabilities', 'Via']}
+              empty="No access. Grant a role, directly or through a group."
+              rows={(access?.grants ?? []).map((g) => ({
+                key: g.id,
+                cells: [
+                  <code key="s">
+                    {g.scope_kind}:{g.scope_id}
+                  </code>,
+                  <div className="row wrap" key="c">
+                    {g.capabilities.map((c) => (
+                      <code key={c}>{c}</code>
+                    ))}
+                  </div>,
+                  // Provenance is the whole point of this view: a capability
+                  // held through a group says so, rather than appearing from
+                  // nowhere.
+                  <span key="v" className="muted">
+                    {g.source}
+                  </span>,
+                ],
+              }))}
+            />
+          </div>
+        </>
+      )}
     </div>
   )
 }

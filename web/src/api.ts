@@ -1395,3 +1395,40 @@ export function createAppGrant(
 export function deleteAppGrant(orgId: string, grantId: string) {
   return request<void>(`/v1/organisations/${orgId}/app-grants/${grantId}`, { method: 'DELETE' })
 }
+
+export function updateAppUserGroup(
+  orgId: string,
+  groupId: string,
+  body: { name?: string; description?: string },
+) {
+  return request<AppUserGroup>(`/v1/organisations/${orgId}/app-user-groups/${groupId}`, {
+    method: 'PATCH',
+    body: JSON.stringify(body),
+  })
+}
+
+/** Which groups a customer belongs to. Half of "why do they have this access?". */
+export function listGroupsForAppUser(appUserId: string) {
+  return request<{ items: { id: string; key: string; name: string }[] }>(
+    `/v1/app-users/${appUserId}/groups`,
+  )
+}
+
+export type AppAccessSet = {
+  app_user_id: string
+  namespace: string
+  version: number
+  grants: {
+    id: string
+    scope_kind: string
+    scope_id: string
+    capabilities: string[]
+    /** Names the group a capability came through, when it did. */
+    source: string
+    expires_at?: string
+  }[]
+}
+
+export function getAppUserAccess(appUserId: string) {
+  return request<AppAccessSet>(`/v1/app-users/${appUserId}/access`)
+}

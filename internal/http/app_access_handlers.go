@@ -475,3 +475,54 @@ func (s *Server) handleListAppGrants(w http.ResponseWriter, r *http.Request) {
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"items": items})
 }
+
+func (s *Server) handlePatchAppUserGroup(w http.ResponseWriter, r *http.Request) {
+	orgID := r.PathValue("id")
+	if _, err := s.svc.RequireOrgPermission(r.Context(), orgID, "app_access:manage"); err != nil {
+		writeError(w, err)
+		return
+	}
+	var body struct {
+		Name        string `json:"name"`
+		Description string `json:"description"`
+	}
+	if err := decodeJSON(r, &body); err != nil {
+		writeError(w, apperr.Validation("invalid JSON body"))
+		return
+	}
+	row, err := s.svc.UpdateAppUserGroup(r.Context(), orgID, r.PathValue("groupId"), service.AppUserGroupInput{
+		Name: body.Name, Description: body.Description,
+	})
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{
+		"id": row.ID, "key": row.Key, "name": row.Name, "description": row.Description,
+	})
+}
+
+// handleAppUserGroups answers "which groups is this customer in?", which is
+// half of "why does this customer have this access?". The other half is the
+// grant set, with its source naming the group a capability came through.
+func (s *Server) handleAppUserGroups(w http.ResponseWriter, r *http.Request) {
+	appUser, err := s.svc.GetAppUser(r.Context(), r.PathValue("id"))
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	if _, err := s.svc.RequireOrgPermission(r.Context(), appUser.OrganisationID, "app_access:read"); err != nil {
+		writeError(w, err)
+		return
+	}
+	rows, err := s.svc.ListGroupsForAppUser(r.Context(), appUser.ID)
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	items := make([]map[string]any, 0, len(rows))
+	for _, g := range rows {
+		items = append(items, map[string]any{"id": g.ID, "key": g.Key, "name": g.Name})
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"items": items})
+}
