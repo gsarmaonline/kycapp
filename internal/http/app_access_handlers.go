@@ -235,6 +235,7 @@ func (s *Server) handleCreateAppGrant(w http.ResponseWriter, r *http.Request) {
 	}
 	var body struct {
 		AppUserID string `json:"app_user_id"`
+		GroupID   string `json:"group_id"`
 		RoleID    string `json:"role_id"`
 		ScopeKind string `json:"scope_kind"`
 		ScopeID   string `json:"scope_id"`
@@ -245,7 +246,7 @@ func (s *Server) handleCreateAppGrant(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	in := service.AppGrantInput{
-		AppUserID: body.AppUserID, RoleID: body.RoleID,
+		AppUserID: body.AppUserID, GroupID: body.GroupID, RoleID: body.RoleID,
 		ScopeKind: body.ScopeKind, ScopeID: body.ScopeID,
 		GrantedBy: p.ActorLabel(),
 	}
@@ -263,8 +264,8 @@ func (s *Server) handleCreateAppGrant(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusCreated, map[string]any{
-		"id": grant.ID, "app_user_id": grant.AppUserID, "role_id": grant.RoleID,
-		"scope_kind": grant.ScopeKind, "scope_id": grant.ScopeID,
+		"id": grant.ID, "app_user_id": grant.AppUserID.String, "group_id": grant.GroupID.String,
+		"role_id": grant.RoleID, "scope_kind": grant.ScopeKind, "scope_id": grant.ScopeID,
 	})
 }
 
@@ -323,4 +324,154 @@ func (s *Server) handleAppUserAccess(w http.ResponseWriter, r *http.Request) {
 		"version":     set.Version,
 		"grants":      grants,
 	})
+}
+
+// --- Groups ---
+//
+// A group is a set of app users a grant can target. It answers "which
+// principals", where a scope answers "which resources", so a grant simply gains
+// a subject rather than changing shape.
+
+func (s *Server) handleListAppUserGroups(w http.ResponseWriter, r *http.Request) {
+	orgID := r.PathValue("id")
+	if _, err := s.svc.RequireOrgPermission(r.Context(), orgID, "app_access:read"); err != nil {
+		writeError(w, err)
+		return
+	}
+	rows, err := s.svc.ListAppUserGroups(r.Context(), orgID)
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	items := make([]map[string]any, 0, len(rows))
+	for _, g := range rows {
+		items = append(items, map[string]any{
+			"id": g.ID, "key": g.Key, "name": g.Name,
+			"description": g.Description, "member_count": g.MemberCount,
+		})
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"items": items})
+}
+
+func (s *Server) handleCreateAppUserGroup(w http.ResponseWriter, r *http.Request) {
+	orgID := r.PathValue("id")
+	if _, err := s.svc.RequireOrgPermission(r.Context(), orgID, "app_access:manage"); err != nil {
+		writeError(w, err)
+		return
+	}
+	var body struct {
+		Key         string `json:"key"`
+		Name        string `json:"name"`
+		Description string `json:"description"`
+	}
+	if err := decodeJSON(r, &body); err != nil {
+		writeError(w, apperr.Validation("invalid JSON body"))
+		return
+	}
+	row, err := s.svc.CreateAppUserGroup(r.Context(), orgID, service.AppUserGroupInput{
+		Key: body.Key, Name: body.Name, Description: body.Description,
+	})
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusCreated, map[string]any{
+		"id": row.ID, "key": row.Key, "name": row.Name, "description": row.Description, "member_count": 0,
+	})
+}
+
+func (s *Server) handleDeleteAppUserGroup(w http.ResponseWriter, r *http.Request) {
+	orgID := r.PathValue("id")
+	if _, err := s.svc.RequireOrgPermission(r.Context(), orgID, "app_access:manage"); err != nil {
+		writeError(w, err)
+		return
+	}
+	if err := s.svc.DeleteAppUserGroup(r.Context(), orgID, r.PathValue("groupId")); err != nil {
+		writeError(w, err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (s *Server) handleListAppUserGroupMembers(w http.ResponseWriter, r *http.Request) {
+	orgID := r.PathValue("id")
+	if _, err := s.svc.RequireOrgPermission(r.Context(), orgID, "app_access:read"); err != nil {
+		writeError(w, err)
+		return
+	}
+	rows, err := s.svc.ListAppUserGroupMembers(r.Context(), r.PathValue("groupId"))
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	items := make([]map[string]any, 0, len(rows))
+	for _, m := range rows {
+		items = append(items, map[string]any{
+			"id": m.ID, "email": m.Email, "display_name": m.DisplayName, "status": m.Status,
+		})
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"items": items})
+}
+
+func (s *Server) handleAddAppUserGroupMember(w http.ResponseWriter, r *http.Request) {
+	orgID := r.PathValue("id")
+	if _, err := s.svc.RequireOrgPermission(r.Context(), orgID, "app_access:manage"); err != nil {
+		writeError(w, err)
+		return
+	}
+	var body struct {
+		AppUserID string `json:"app_user_id"`
+	}
+	if err := decodeJSON(r, &body); err != nil {
+		writeError(w, apperr.Validation("invalid JSON body"))
+		return
+	}
+	if err := s.svc.SetAppUserGroupMember(r.Context(), orgID, r.PathValue("groupId"), body.AppUserID, true); err != nil {
+		writeError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusCreated, map[string]any{"ok": true})
+}
+
+func (s *Server) handleRemoveAppUserGroupMember(w http.ResponseWriter, r *http.Request) {
+	orgID := r.PathValue("id")
+	if _, err := s.svc.RequireOrgPermission(r.Context(), orgID, "app_access:manage"); err != nil {
+		writeError(w, err)
+		return
+	}
+	if err := s.svc.SetAppUserGroupMember(r.Context(), orgID, r.PathValue("groupId"), r.PathValue("appUserId"), false); err != nil {
+		writeError(w, err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (s *Server) handleListAppGrants(w http.ResponseWriter, r *http.Request) {
+	orgID := r.PathValue("id")
+	if _, err := s.svc.RequireOrgPermission(r.Context(), orgID, "app_access:read"); err != nil {
+		writeError(w, err)
+		return
+	}
+	rows, err := s.svc.ListAppGrantsForOrg(r.Context(), orgID, 0)
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	items := make([]map[string]any, 0, len(rows))
+	for _, g := range rows {
+		item := map[string]any{
+			"id": g.ID, "role_key": g.RoleKey,
+			"scope_kind": g.ScopeKind, "scope_id": g.ScopeID,
+			"subject_kind": "app_user", "subject_label": g.AppUserEmail,
+		}
+		if g.GroupID.Valid {
+			item["subject_kind"] = "group"
+			item["subject_label"] = g.GroupKey
+		}
+		if g.ExpiresAt.Valid {
+			item["expires_at"] = g.ExpiresAt.Time.UTC().Format(time.RFC3339Nano)
+		}
+		items = append(items, item)
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"items": items})
 }

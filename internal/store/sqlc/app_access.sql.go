@@ -7,6 +7,7 @@ package sqlc
 
 import (
 	"context"
+	"time"
 
 	"github.com/jackc/pgx/v5/pgtype"
 )
@@ -26,22 +27,44 @@ func (q *Queries) AddAppRoleExtends(ctx context.Context, arg AddAppRoleExtendsPa
 	return err
 }
 
+const addAppUserToGroup = `-- name: AddAppUserToGroup :exec
+INSERT INTO app_user_group_members (group_id, app_user_id) VALUES ($1, $2)
+ON CONFLICT DO NOTHING
+`
+
+type AddAppUserToGroupParams struct {
+	GroupID   string `json:"group_id"`
+	AppUserID string `json:"app_user_id"`
+}
+
+func (q *Queries) AddAppUserToGroup(ctx context.Context, arg AddAppUserToGroupParams) error {
+	_, err := q.db.Exec(ctx, addAppUserToGroup, arg.GroupID, arg.AppUserID)
+	return err
+}
+
 const appAccessVersion = `-- name: AppAccessVersion :one
 SELECT COALESCE(EXTRACT(EPOCH FROM GREATEST(
-    (SELECT MAX(g.created_at) FROM app_grants g WHERE g.app_user_id = $1),
-    (SELECT MAX(r.updated_at) FROM app_roles r WHERE r.organisation_id = $2)
+    (SELECT MAX(g.created_at) FROM app_grants g WHERE g.organisation_id = $1),
+    (SELECT MAX(r.updated_at) FROM app_roles r WHERE r.organisation_id = $1),
+    (SELECT MAX(m.created_at) FROM app_user_group_members m WHERE m.app_user_id = $2)
 ))::bigint, 0)::bigint AS version
 `
 
 type AppAccessVersionParams struct {
-	AppUserID      string `json:"app_user_id"`
 	OrganisationID string `json:"organisation_id"`
+	AppUserID      string `json:"app_user_id"`
 }
 
 // AppAccessVersion changes whenever anything a customer's grant set depends on
 // changes, so a merchant can cache by version instead of polling.
+// AppAccessVersion changes whenever anything a customer's grant set depends on
+// changes, so a merchant can cache by version instead of polling.
+//
+// Grants are taken organisation-wide rather than per user, because a grant made
+// to a group affects members without touching their rows. Over-invalidating is
+// the safe direction: a stale cache silently serves the wrong permissions.
 func (q *Queries) AppAccessVersion(ctx context.Context, arg AppAccessVersionParams) (int64, error) {
-	row := q.db.QueryRow(ctx, appAccessVersion, arg.AppUserID, arg.OrganisationID)
+	row := q.db.QueryRow(ctx, appAccessVersion, arg.OrganisationID, arg.AppUserID)
 	var version int64
 	err := row.Scan(&version)
 	return version, err
@@ -78,18 +101,18 @@ func (q *Queries) CreateAppCapability(ctx context.Context, arg CreateAppCapabili
 	return i, err
 }
 
-const createAppGrant = `-- name: CreateAppGrant :one
-INSERT INTO app_grants (id, organisation_id, app_user_id, role_id, scope_kind, scope_id, expires_at, granted_by)
+const createAppGroupGrant = `-- name: CreateAppGroupGrant :one
+INSERT INTO app_grants (id, organisation_id, group_id, role_id, scope_kind, scope_id, expires_at, granted_by)
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-ON CONFLICT (app_user_id, role_id, scope_kind, scope_id)
+ON CONFLICT (group_id, role_id, scope_kind, scope_id) WHERE group_id IS NOT NULL
 DO UPDATE SET expires_at = EXCLUDED.expires_at, granted_by = EXCLUDED.granted_by
-RETURNING id, organisation_id, app_user_id, role_id, scope_kind, scope_id, expires_at, granted_by, created_at
+RETURNING id, organisation_id, app_user_id, role_id, scope_kind, scope_id, expires_at, granted_by, created_at, group_id
 `
 
-type CreateAppGrantParams struct {
+type CreateAppGroupGrantParams struct {
 	ID             string             `json:"id"`
 	OrganisationID string             `json:"organisation_id"`
-	AppUserID      string             `json:"app_user_id"`
+	GroupID        pgtype.Text        `json:"group_id"`
 	RoleID         string             `json:"role_id"`
 	ScopeKind      string             `json:"scope_kind"`
 	ScopeID        string             `json:"scope_id"`
@@ -97,11 +120,11 @@ type CreateAppGrantParams struct {
 	GrantedBy      string             `json:"granted_by"`
 }
 
-func (q *Queries) CreateAppGrant(ctx context.Context, arg CreateAppGrantParams) (AppGrant, error) {
-	row := q.db.QueryRow(ctx, createAppGrant,
+func (q *Queries) CreateAppGroupGrant(ctx context.Context, arg CreateAppGroupGrantParams) (AppGrant, error) {
+	row := q.db.QueryRow(ctx, createAppGroupGrant,
 		arg.ID,
 		arg.OrganisationID,
-		arg.AppUserID,
+		arg.GroupID,
 		arg.RoleID,
 		arg.ScopeKind,
 		arg.ScopeID,
@@ -119,6 +142,7 @@ func (q *Queries) CreateAppGrant(ctx context.Context, arg CreateAppGrantParams) 
 		&i.ExpiresAt,
 		&i.GrantedBy,
 		&i.CreatedAt,
+		&i.GroupID,
 	)
 	return i, err
 }
@@ -193,6 +217,87 @@ func (q *Queries) CreateAppScopeType(ctx context.Context, arg CreateAppScopeType
 	return i, err
 }
 
+const createAppUserGrant = `-- name: CreateAppUserGrant :one
+INSERT INTO app_grants (id, organisation_id, app_user_id, role_id, scope_kind, scope_id, expires_at, granted_by)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+ON CONFLICT (app_user_id, role_id, scope_kind, scope_id) WHERE app_user_id IS NOT NULL
+DO UPDATE SET expires_at = EXCLUDED.expires_at, granted_by = EXCLUDED.granted_by
+RETURNING id, organisation_id, app_user_id, role_id, scope_kind, scope_id, expires_at, granted_by, created_at, group_id
+`
+
+type CreateAppUserGrantParams struct {
+	ID             string             `json:"id"`
+	OrganisationID string             `json:"organisation_id"`
+	AppUserID      pgtype.Text        `json:"app_user_id"`
+	RoleID         string             `json:"role_id"`
+	ScopeKind      string             `json:"scope_kind"`
+	ScopeID        string             `json:"scope_id"`
+	ExpiresAt      pgtype.Timestamptz `json:"expires_at"`
+	GrantedBy      string             `json:"granted_by"`
+}
+
+func (q *Queries) CreateAppUserGrant(ctx context.Context, arg CreateAppUserGrantParams) (AppGrant, error) {
+	row := q.db.QueryRow(ctx, createAppUserGrant,
+		arg.ID,
+		arg.OrganisationID,
+		arg.AppUserID,
+		arg.RoleID,
+		arg.ScopeKind,
+		arg.ScopeID,
+		arg.ExpiresAt,
+		arg.GrantedBy,
+	)
+	var i AppGrant
+	err := row.Scan(
+		&i.ID,
+		&i.OrganisationID,
+		&i.AppUserID,
+		&i.RoleID,
+		&i.ScopeKind,
+		&i.ScopeID,
+		&i.ExpiresAt,
+		&i.GrantedBy,
+		&i.CreatedAt,
+		&i.GroupID,
+	)
+	return i, err
+}
+
+const createAppUserGroup = `-- name: CreateAppUserGroup :one
+INSERT INTO app_user_groups (id, organisation_id, key, name, description)
+VALUES ($1, $2, $3, $4, $5)
+RETURNING id, organisation_id, key, name, description, created_at, updated_at
+`
+
+type CreateAppUserGroupParams struct {
+	ID             string `json:"id"`
+	OrganisationID string `json:"organisation_id"`
+	Key            string `json:"key"`
+	Name           string `json:"name"`
+	Description    string `json:"description"`
+}
+
+func (q *Queries) CreateAppUserGroup(ctx context.Context, arg CreateAppUserGroupParams) (AppUserGroup, error) {
+	row := q.db.QueryRow(ctx, createAppUserGroup,
+		arg.ID,
+		arg.OrganisationID,
+		arg.Key,
+		arg.Name,
+		arg.Description,
+	)
+	var i AppUserGroup
+	err := row.Scan(
+		&i.ID,
+		&i.OrganisationID,
+		&i.Key,
+		&i.Name,
+		&i.Description,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
 const deleteAppCapability = `-- name: DeleteAppCapability :exec
 DELETE FROM app_capabilities WHERE id = $1 AND organisation_id = $2
 `
@@ -249,6 +354,20 @@ func (q *Queries) DeleteAppScopeType(ctx context.Context, arg DeleteAppScopeType
 	return err
 }
 
+const deleteAppUserGroup = `-- name: DeleteAppUserGroup :exec
+DELETE FROM app_user_groups WHERE id = $1 AND organisation_id = $2
+`
+
+type DeleteAppUserGroupParams struct {
+	ID             string `json:"id"`
+	OrganisationID string `json:"organisation_id"`
+}
+
+func (q *Queries) DeleteAppUserGroup(ctx context.Context, arg DeleteAppUserGroupParams) error {
+	_, err := q.db.Exec(ctx, deleteAppUserGroup, arg.ID, arg.OrganisationID)
+	return err
+}
+
 const getAppRole = `-- name: GetAppRole :one
 SELECT id, organisation_id, key, name, description, own_capabilities, effective_capabilities, created_at, updated_at FROM app_roles WHERE id = $1
 `
@@ -264,6 +383,25 @@ func (q *Queries) GetAppRole(ctx context.Context, id string) (AppRole, error) {
 		&i.Description,
 		&i.OwnCapabilities,
 		&i.EffectiveCapabilities,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const getAppUserGroup = `-- name: GetAppUserGroup :one
+SELECT id, organisation_id, key, name, description, created_at, updated_at FROM app_user_groups WHERE id = $1
+`
+
+func (q *Queries) GetAppUserGroup(ctx context.Context, id string) (AppUserGroup, error) {
+	row := q.db.QueryRow(ctx, getAppUserGroup, id)
+	var i AppUserGroup
+	err := row.Scan(
+		&i.ID,
+		&i.OrganisationID,
+		&i.Key,
+		&i.Name,
+		&i.Description,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -302,13 +440,77 @@ func (q *Queries) ListAppCapabilities(ctx context.Context, organisationID string
 	return items, nil
 }
 
-const listAppGrantsForUser = `-- name: ListAppGrantsForUser :many
-SELECT g.id, g.scope_kind, g.scope_id, g.expires_at, g.role_id,
-       r.key AS role_key, r.effective_capabilities
+const listAppGrantsForOrg = `-- name: ListAppGrantsForOrg :many
+SELECT g.id, g.scope_kind, g.scope_id, g.expires_at, g.app_user_id, g.group_id,
+       r.key AS role_key, COALESCE(grp.key, '')::text AS group_key,
+       COALESCE(u.email, '')::text AS app_user_email
 FROM app_grants g
 JOIN app_roles r ON r.id = g.role_id
-WHERE g.app_user_id = $1
-  AND (g.expires_at IS NULL OR g.expires_at > now())
+LEFT JOIN app_user_groups grp ON grp.id = g.group_id
+LEFT JOIN app_users u ON u.id = g.app_user_id
+WHERE g.organisation_id = $1
+ORDER BY g.created_at DESC
+LIMIT $2
+`
+
+type ListAppGrantsForOrgParams struct {
+	OrganisationID string `json:"organisation_id"`
+	Limit          int32  `json:"limit"`
+}
+
+type ListAppGrantsForOrgRow struct {
+	ID           string             `json:"id"`
+	ScopeKind    string             `json:"scope_kind"`
+	ScopeID      string             `json:"scope_id"`
+	ExpiresAt    pgtype.Timestamptz `json:"expires_at"`
+	AppUserID    pgtype.Text        `json:"app_user_id"`
+	GroupID      pgtype.Text        `json:"group_id"`
+	RoleKey      string             `json:"role_key"`
+	GroupKey     string             `json:"group_key"`
+	AppUserEmail string             `json:"app_user_email"`
+}
+
+func (q *Queries) ListAppGrantsForOrg(ctx context.Context, arg ListAppGrantsForOrgParams) ([]ListAppGrantsForOrgRow, error) {
+	rows, err := q.db.Query(ctx, listAppGrantsForOrg, arg.OrganisationID, arg.Limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListAppGrantsForOrgRow{}
+	for rows.Next() {
+		var i ListAppGrantsForOrgRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.ScopeKind,
+			&i.ScopeID,
+			&i.ExpiresAt,
+			&i.AppUserID,
+			&i.GroupID,
+			&i.RoleKey,
+			&i.GroupKey,
+			&i.AppUserEmail,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listAppGrantsForUser = `-- name: ListAppGrantsForUser :many
+SELECT g.id, g.scope_kind, g.scope_id, g.expires_at, g.role_id,
+       r.key AS role_key, r.effective_capabilities,
+       g.group_id, COALESCE(grp.key, '')::text AS group_key
+FROM app_grants g
+JOIN app_roles r ON r.id = g.role_id
+LEFT JOIN app_user_groups grp ON grp.id = g.group_id
+LEFT JOIN app_user_group_members m
+       ON m.group_id = g.group_id AND m.app_user_id = $1
+WHERE (g.expires_at IS NULL OR g.expires_at > now())
+  AND (g.app_user_id = $1 OR m.app_user_id IS NOT NULL)
 ORDER BY g.scope_kind, g.scope_id, r.key
 `
 
@@ -320,10 +522,16 @@ type ListAppGrantsForUserRow struct {
 	RoleID                string             `json:"role_id"`
 	RoleKey               string             `json:"role_key"`
 	EffectiveCapabilities []string           `json:"effective_capabilities"`
+	GroupID               pgtype.Text        `json:"group_id"`
+	GroupKey              string             `json:"group_key"`
 }
 
 // ListAppGrantsForUser returns a customer's live grants with the role's
 // materialised capabilities, so the caller never walks the inheritance graph.
+//
+// Both subjects in one query: grants made directly to the user, and grants made
+// to any group they belong to. The result is a union, which is why a group can
+// only ever add access.
 func (q *Queries) ListAppGrantsForUser(ctx context.Context, appUserID string) ([]ListAppGrantsForUserRow, error) {
 	rows, err := q.db.Query(ctx, listAppGrantsForUser, appUserID)
 	if err != nil {
@@ -341,6 +549,8 @@ func (q *Queries) ListAppGrantsForUser(ctx context.Context, appUserID string) ([
 			&i.RoleID,
 			&i.RoleKey,
 			&i.EffectiveCapabilities,
+			&i.GroupID,
+			&i.GroupKey,
 		); err != nil {
 			return nil, err
 		}
@@ -445,6 +655,141 @@ func (q *Queries) ListAppScopeTypes(ctx context.Context, organisationID string) 
 	return items, nil
 }
 
+const listAppUserGroupMembers = `-- name: ListAppUserGroupMembers :many
+SELECT u.id, u.email, u.display_name, u.status
+FROM app_user_group_members m
+JOIN app_users u ON u.id = m.app_user_id
+WHERE m.group_id = $1
+ORDER BY u.email
+`
+
+type ListAppUserGroupMembersRow struct {
+	ID          string      `json:"id"`
+	Email       pgtype.Text `json:"email"`
+	DisplayName string      `json:"display_name"`
+	Status      string      `json:"status"`
+}
+
+func (q *Queries) ListAppUserGroupMembers(ctx context.Context, groupID string) ([]ListAppUserGroupMembersRow, error) {
+	rows, err := q.db.Query(ctx, listAppUserGroupMembers, groupID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListAppUserGroupMembersRow{}
+	for rows.Next() {
+		var i ListAppUserGroupMembersRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Email,
+			&i.DisplayName,
+			&i.Status,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listAppUserGroups = `-- name: ListAppUserGroups :many
+SELECT g.id, g.organisation_id, g.key, g.name, g.description, g.created_at, g.updated_at, (SELECT COUNT(*) FROM app_user_group_members m WHERE m.group_id = g.id)::bigint AS member_count
+FROM app_user_groups g
+WHERE g.organisation_id = $1
+ORDER BY g.key
+`
+
+type ListAppUserGroupsRow struct {
+	ID             string    `json:"id"`
+	OrganisationID string    `json:"organisation_id"`
+	Key            string    `json:"key"`
+	Name           string    `json:"name"`
+	Description    string    `json:"description"`
+	CreatedAt      time.Time `json:"created_at"`
+	UpdatedAt      time.Time `json:"updated_at"`
+	MemberCount    int64     `json:"member_count"`
+}
+
+func (q *Queries) ListAppUserGroups(ctx context.Context, organisationID string) ([]ListAppUserGroupsRow, error) {
+	rows, err := q.db.Query(ctx, listAppUserGroups, organisationID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListAppUserGroupsRow{}
+	for rows.Next() {
+		var i ListAppUserGroupsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.OrganisationID,
+			&i.Key,
+			&i.Name,
+			&i.Description,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.MemberCount,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listGroupsForAppUser = `-- name: ListGroupsForAppUser :many
+SELECT g.id, g.key, g.name
+FROM app_user_group_members m
+JOIN app_user_groups g ON g.id = m.group_id
+WHERE m.app_user_id = $1
+ORDER BY g.key
+`
+
+type ListGroupsForAppUserRow struct {
+	ID   string `json:"id"`
+	Key  string `json:"key"`
+	Name string `json:"name"`
+}
+
+func (q *Queries) ListGroupsForAppUser(ctx context.Context, appUserID string) ([]ListGroupsForAppUserRow, error) {
+	rows, err := q.db.Query(ctx, listGroupsForAppUser, appUserID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListGroupsForAppUserRow{}
+	for rows.Next() {
+		var i ListGroupsForAppUserRow
+		if err := rows.Scan(&i.ID, &i.Key, &i.Name); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const removeAppUserFromGroup = `-- name: RemoveAppUserFromGroup :exec
+DELETE FROM app_user_group_members WHERE group_id = $1 AND app_user_id = $2
+`
+
+type RemoveAppUserFromGroupParams struct {
+	GroupID   string `json:"group_id"`
+	AppUserID string `json:"app_user_id"`
+}
+
+func (q *Queries) RemoveAppUserFromGroup(ctx context.Context, arg RemoveAppUserFromGroupParams) error {
+	_, err := q.db.Exec(ctx, removeAppUserFromGroup, arg.GroupID, arg.AppUserID)
+	return err
+}
+
 const replaceAppRoleExtends = `-- name: ReplaceAppRoleExtends :exec
 DELETE FROM app_role_extends WHERE role_id = $1
 `
@@ -503,6 +848,42 @@ func (q *Queries) UpdateAppRole(ctx context.Context, arg UpdateAppRoleParams) (A
 		&i.Description,
 		&i.OwnCapabilities,
 		&i.EffectiveCapabilities,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const updateAppUserGroup = `-- name: UpdateAppUserGroup :one
+UPDATE app_user_groups
+SET name = COALESCE($1, name),
+    description = COALESCE($2, description),
+    updated_at = now()
+WHERE id = $3 AND organisation_id = $4
+RETURNING id, organisation_id, key, name, description, created_at, updated_at
+`
+
+type UpdateAppUserGroupParams struct {
+	Name           pgtype.Text `json:"name"`
+	Description    pgtype.Text `json:"description"`
+	ID             string      `json:"id"`
+	OrganisationID string      `json:"organisation_id"`
+}
+
+func (q *Queries) UpdateAppUserGroup(ctx context.Context, arg UpdateAppUserGroupParams) (AppUserGroup, error) {
+	row := q.db.QueryRow(ctx, updateAppUserGroup,
+		arg.Name,
+		arg.Description,
+		arg.ID,
+		arg.OrganisationID,
+	)
+	var i AppUserGroup
+	err := row.Scan(
+		&i.ID,
+		&i.OrganisationID,
+		&i.Key,
+		&i.Name,
+		&i.Description,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
