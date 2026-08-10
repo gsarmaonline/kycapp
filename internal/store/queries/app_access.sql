@@ -80,21 +80,34 @@ RETURNING *;
 -- ListAppGrantsForUser returns a customer's live grants with the role's
 -- materialised capabilities, so the caller never walks the inheritance graph.
 --
--- Both subjects in one query: grants made directly to the user, and grants made
--- to any group they belong to. The result is a union, which is why a group can
--- only ever add access.
+-- Two branches unioned rather than one query with an OR. An OR spanning two
+-- different access paths — a direct grant and a grant reached through group
+-- membership — cannot use either index, so Postgres falls back to scanning
+-- every grant in the table and discarding almost all of them. That cost grows
+-- with the total across all merchants, on a path a merchant's backend calls
+-- constantly. Measured at 41k grants: 16.5ms scanning, 0.125ms as a union.
+--
+-- UNION ALL, not UNION: a customer holding the same role at the same scope both
+-- directly and through a group legitimately has two grants, and the evaluator
+-- unions capabilities anyway.
 -- name: ListAppGrantsForUser :many
 SELECT g.id, g.scope_kind, g.scope_id, g.expires_at, g.role_id,
        r.key AS role_key, r.effective_capabilities,
-       g.group_id, COALESCE(grp.key, '')::text AS group_key
+       g.group_id, ''::text AS group_key
 FROM app_grants g
 JOIN app_roles r ON r.id = g.role_id
-LEFT JOIN app_user_groups grp ON grp.id = g.group_id
-LEFT JOIN app_user_group_members m
-       ON m.group_id = g.group_id AND m.app_user_id = sqlc.arg('app_user_id')
-WHERE (g.expires_at IS NULL OR g.expires_at > now())
-  AND (g.app_user_id = sqlc.arg('app_user_id') OR m.app_user_id IS NOT NULL)
-ORDER BY g.scope_kind, g.scope_id, r.key;
+WHERE g.app_user_id = sqlc.arg('app_user_id')
+  AND (g.expires_at IS NULL OR g.expires_at > now())
+UNION ALL
+SELECT g.id, g.scope_kind, g.scope_id, g.expires_at, g.role_id,
+       r.key AS role_key, r.effective_capabilities,
+       g.group_id, grp.key AS group_key
+FROM app_user_group_members m
+JOIN app_grants g ON g.group_id = m.group_id
+JOIN app_roles r ON r.id = g.role_id
+JOIN app_user_groups grp ON grp.id = g.group_id
+WHERE m.app_user_id = sqlc.arg('app_user_id')
+  AND (g.expires_at IS NULL OR g.expires_at > now());
 
 -- name: DeleteAppGrant :exec
 DELETE FROM app_grants WHERE id = $1 AND organisation_id = $2;

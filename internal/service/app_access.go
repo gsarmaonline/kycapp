@@ -477,7 +477,7 @@ type AppAccessSet struct {
 // core/access grants because the merchant's SDK evaluates it with the same
 // Decide the API uses.
 func (s *Service) AppAccessFor(ctx context.Context, orgID, appUserID string) (AppAccessSet, error) {
-	rows, err := s.db.Q().ListAppGrantsForUser(ctx, appUserID)
+	rows, err := s.db.Q().ListAppGrantsForUser(ctx, textArg(appUserID))
 	if err != nil {
 		return AppAccessSet{}, err
 	}
