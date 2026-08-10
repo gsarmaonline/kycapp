@@ -9,10 +9,6 @@ import (
 
 func (s *Server) handleCreateAttributeDefinition(w http.ResponseWriter, r *http.Request) {
 	orgID := r.PathValue("id")
-	if _, err := s.svc.RequireOrgPermission(r.Context(), orgID, "attributes:manage"); err != nil {
-		writeError(w, err)
-		return
-	}
 	var body struct {
 		Key         string   `json:"key"`
 		Label       string   `json:"label"`
@@ -42,10 +38,6 @@ func (s *Server) handleCreateAttributeDefinition(w http.ResponseWriter, r *http.
 
 func (s *Server) handleListAttributeDefinitions(w http.ResponseWriter, r *http.Request) {
 	orgID := r.PathValue("id")
-	if _, err := s.svc.RequireOrgPermission(r.Context(), orgID, "attributes:read"); err != nil {
-		writeError(w, err)
-		return
-	}
 	rows, err := s.svc.ListAttributeDefinitions(r.Context(), orgID, r.URL.Query().Get("status"))
 	if err != nil {
 		writeError(w, err)
@@ -128,10 +120,6 @@ func (s *Server) handleDeleteAttributeDefinition(w http.ResponseWriter, r *http.
 
 func (s *Server) handleCreateAppUser(w http.ResponseWriter, r *http.Request) {
 	orgID := r.PathValue("id")
-	if _, err := s.svc.RequireOrgPermission(r.Context(), orgID, "app_users:write"); err != nil {
-		writeError(w, err)
-		return
-	}
 	var body struct {
 		ExternalID  string         `json:"external_id"`
 		Email       string         `json:"email"`
@@ -156,10 +144,6 @@ func (s *Server) handleCreateAppUser(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleIngestAppUser(w http.ResponseWriter, r *http.Request) {
 	orgID := r.PathValue("id")
-	if _, err := s.svc.RequireOrgPermission(r.Context(), orgID, "app_users:write"); err != nil {
-		writeError(w, err)
-		return
-	}
 	var body struct {
 		ExternalID  string         `json:"external_id"`
 		Email       string         `json:"email"`
@@ -190,10 +174,6 @@ func (s *Server) handleIngestAppUser(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleListAppUsers(w http.ResponseWriter, r *http.Request) {
 	orgID := r.PathValue("id")
-	if _, err := s.svc.RequireOrgPermission(r.Context(), orgID, "app_users:read"); err != nil {
-		writeError(w, err)
-		return
-	}
 	rows, err := s.svc.ListAppUsers(r.Context(), orgID, r.URL.Query().Get("status"))
 	if err != nil {
 		writeError(w, err)

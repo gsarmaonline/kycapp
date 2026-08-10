@@ -77,10 +77,6 @@ func (s *Server) handleListOrganisations(w http.ResponseWriter, r *http.Request)
 
 func (s *Server) handleGetOrganisation(w http.ResponseWriter, r *http.Request) {
 	orgID := r.PathValue("id")
-	if _, err := s.svc.RequireOrgMember(r.Context(), orgID); err != nil {
-		writeError(w, err)
-		return
-	}
 	org, err := s.svc.GetOrganisation(r.Context(), orgID)
 	if err != nil {
 		writeError(w, err)
@@ -91,10 +87,6 @@ func (s *Server) handleGetOrganisation(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handlePatchOrganisation(w http.ResponseWriter, r *http.Request) {
 	orgID := r.PathValue("id")
-	if _, err := s.svc.RequireOrgPermission(r.Context(), orgID, "organisation:update"); err != nil {
-		writeError(w, err)
-		return
-	}
 	var body struct {
 		Name                   *string                    `json:"name"`
 		Status                 *string                    `json:"status"`
@@ -133,10 +125,6 @@ func (s *Server) handlePatchOrganisation(w http.ResponseWriter, r *http.Request)
 
 func (s *Server) handleUploadOrganisationLogo(w http.ResponseWriter, r *http.Request) {
 	orgID := r.PathValue("id")
-	if _, err := s.svc.RequireOrgPermission(r.Context(), orgID, "organisation:update"); err != nil {
-		writeError(w, err)
-		return
-	}
 	if err := r.ParseMultipartForm(service.MaxLogoBytes + 1<<20); err != nil {
 		writeError(w, apperr.Validation("invalid multipart form"))
 		return
@@ -161,10 +149,6 @@ func (s *Server) handleUploadOrganisationLogo(w http.ResponseWriter, r *http.Req
 
 func (s *Server) handleDeleteOrganisationLogo(w http.ResponseWriter, r *http.Request) {
 	orgID := r.PathValue("id")
-	if _, err := s.svc.RequireOrgPermission(r.Context(), orgID, "organisation:update"); err != nil {
-		writeError(w, err)
-		return
-	}
 	org, err := s.svc.ClearOrganisationLogo(r.Context(), orgID)
 	if err != nil {
 		writeError(w, err)
@@ -194,10 +178,6 @@ func (s *Server) handleArchiveOrganisation(w http.ResponseWriter, r *http.Reques
 
 func (s *Server) handleDeleteOrganisation(w http.ResponseWriter, r *http.Request) {
 	orgID := r.PathValue("id")
-	if _, err := s.svc.RequireOrgPermissionAnyStatus(r.Context(), orgID, "organisation:update"); err != nil {
-		writeError(w, err)
-		return
-	}
 	if err := s.svc.DeleteOrganisation(r.Context(), orgID); err != nil {
 		writeError(w, err)
 		return

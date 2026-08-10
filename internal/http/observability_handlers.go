@@ -48,10 +48,6 @@ func usageJSON(u observability.UsageRow) map[string]any {
 
 func (s *Server) handleListOrgActivity(w http.ResponseWriter, r *http.Request) {
 	orgID := r.PathValue("id")
-	if _, err := s.svc.RequireOrgPermission(r.Context(), orgID, "activity:read"); err != nil {
-		writeError(w, err)
-		return
-	}
 	limit := int32(50)
 	if raw := strings.TrimSpace(r.URL.Query().Get("limit")); raw != "" {
 		n, err := strconv.Atoi(raw)
@@ -78,10 +74,6 @@ func (s *Server) handleListOrgActivity(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleListOrgUsage(w http.ResponseWriter, r *http.Request) {
 	orgID := r.PathValue("id")
-	if _, err := s.svc.RequireOrgPermission(r.Context(), orgID, "usage:read"); err != nil {
-		writeError(w, err)
-		return
-	}
 	var from, to time.Time
 	if raw := strings.TrimSpace(r.URL.Query().Get("from")); raw != "" {
 		t, err := time.Parse(time.RFC3339, raw)

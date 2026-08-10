@@ -156,10 +156,6 @@ func (s *Server) handleUpsertSubscription(w http.ResponseWriter, r *http.Request
 
 func (s *Server) handleGetSubscription(w http.ResponseWriter, r *http.Request) {
 	orgID := r.PathValue("id")
-	if _, err := s.svc.RequireOrgPermission(r.Context(), orgID, "billing:read"); err != nil {
-		writeError(w, err)
-		return
-	}
 	sub, err := s.svc.GetSubscription(r.Context(), orgID)
 	if err != nil {
 		writeError(w, err)
@@ -203,10 +199,6 @@ func (s *Server) handleSetOrgEntitlements(w http.ResponseWriter, r *http.Request
 
 func (s *Server) handleGetOrgEntitlements(w http.ResponseWriter, r *http.Request) {
 	orgID := r.PathValue("id")
-	if _, err := s.svc.RequireOrgPermission(r.Context(), orgID, "billing:read"); err != nil {
-		writeError(w, err)
-		return
-	}
 	view, err := s.svc.EffectiveEntitlementsView(r.Context(), orgID)
 	if err != nil {
 		writeError(w, err)
@@ -297,10 +289,6 @@ func (s *Server) handleListPlanPrices(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleBillingCheckout(w http.ResponseWriter, r *http.Request) {
 	orgID := r.PathValue("id")
-	if _, err := s.svc.RequireOrgPermission(r.Context(), orgID, "billing:manage"); err != nil {
-		writeError(w, err)
-		return
-	}
 	var body struct {
 		PlanID     string `json:"plan_id"`
 		Interval   string `json:"interval"`
@@ -326,10 +314,6 @@ func (s *Server) handleBillingCheckout(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleBillingPortal(w http.ResponseWriter, r *http.Request) {
 	orgID := r.PathValue("id")
-	if _, err := s.svc.RequireOrgPermission(r.Context(), orgID, "billing:manage"); err != nil {
-		writeError(w, err)
-		return
-	}
 	var body struct {
 		ReturnURL string `json:"return_url"`
 	}

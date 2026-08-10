@@ -18,10 +18,6 @@ import (
 
 func (s *Server) handleListAppScopeTypes(w http.ResponseWriter, r *http.Request) {
 	orgID := r.PathValue("id")
-	if _, err := s.svc.RequireOrgPermission(r.Context(), orgID, "app_access:read"); err != nil {
-		writeError(w, err)
-		return
-	}
 	rows, err := s.svc.ListAppScopeTypes(r.Context(), orgID)
 	if err != nil {
 		writeError(w, err)
@@ -36,10 +32,6 @@ func (s *Server) handleListAppScopeTypes(w http.ResponseWriter, r *http.Request)
 
 func (s *Server) handleCreateAppScopeType(w http.ResponseWriter, r *http.Request) {
 	orgID := r.PathValue("id")
-	if _, err := s.svc.RequireOrgPermission(r.Context(), orgID, "app_access:manage"); err != nil {
-		writeError(w, err)
-		return
-	}
 	var body struct {
 		Kind  string `json:"kind"`
 		Label string `json:"label"`
@@ -58,10 +50,6 @@ func (s *Server) handleCreateAppScopeType(w http.ResponseWriter, r *http.Request
 
 func (s *Server) handleDeleteAppScopeType(w http.ResponseWriter, r *http.Request) {
 	orgID := r.PathValue("id")
-	if _, err := s.svc.RequireOrgPermission(r.Context(), orgID, "app_access:manage"); err != nil {
-		writeError(w, err)
-		return
-	}
 	if err := s.svc.DeleteAppScopeType(r.Context(), orgID, r.PathValue("typeId")); err != nil {
 		writeError(w, err)
 		return
@@ -71,10 +59,6 @@ func (s *Server) handleDeleteAppScopeType(w http.ResponseWriter, r *http.Request
 
 func (s *Server) handleListAppCapabilities(w http.ResponseWriter, r *http.Request) {
 	orgID := r.PathValue("id")
-	if _, err := s.svc.RequireOrgPermission(r.Context(), orgID, "app_access:read"); err != nil {
-		writeError(w, err)
-		return
-	}
 	rows, err := s.svc.ListAppCapabilities(r.Context(), orgID)
 	if err != nil {
 		writeError(w, err)
@@ -89,10 +73,6 @@ func (s *Server) handleListAppCapabilities(w http.ResponseWriter, r *http.Reques
 
 func (s *Server) handleCreateAppCapability(w http.ResponseWriter, r *http.Request) {
 	orgID := r.PathValue("id")
-	if _, err := s.svc.RequireOrgPermission(r.Context(), orgID, "app_access:manage"); err != nil {
-		writeError(w, err)
-		return
-	}
 	var body struct {
 		Key         string `json:"key"`
 		Description string `json:"description"`
@@ -111,10 +91,6 @@ func (s *Server) handleCreateAppCapability(w http.ResponseWriter, r *http.Reques
 
 func (s *Server) handleDeleteAppCapability(w http.ResponseWriter, r *http.Request) {
 	orgID := r.PathValue("id")
-	if _, err := s.svc.RequireOrgPermission(r.Context(), orgID, "app_access:manage"); err != nil {
-		writeError(w, err)
-		return
-	}
 	if err := s.svc.DeleteAppCapability(r.Context(), orgID, r.PathValue("capId")); err != nil {
 		writeError(w, err)
 		return
@@ -138,10 +114,6 @@ func appRoleJSON(r sqlc.AppRole) map[string]any {
 
 func (s *Server) handleListAppRoles(w http.ResponseWriter, r *http.Request) {
 	orgID := r.PathValue("id")
-	if _, err := s.svc.RequireOrgPermission(r.Context(), orgID, "app_access:read"); err != nil {
-		writeError(w, err)
-		return
-	}
 	rows, err := s.svc.ListAppRoles(r.Context(), orgID)
 	if err != nil {
 		writeError(w, err)
@@ -156,10 +128,6 @@ func (s *Server) handleListAppRoles(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleCreateAppRole(w http.ResponseWriter, r *http.Request) {
 	orgID := r.PathValue("id")
-	if _, err := s.svc.RequireOrgPermission(r.Context(), orgID, "app_access:manage"); err != nil {
-		writeError(w, err)
-		return
-	}
 	var body struct {
 		Key          string   `json:"key"`
 		Name         string   `json:"name"`
@@ -184,10 +152,6 @@ func (s *Server) handleCreateAppRole(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handlePatchAppRole(w http.ResponseWriter, r *http.Request) {
 	orgID := r.PathValue("id")
-	if _, err := s.svc.RequireOrgPermission(r.Context(), orgID, "app_access:manage"); err != nil {
-		writeError(w, err)
-		return
-	}
 	var body struct {
 		Name         string    `json:"name"`
 		Description  string    `json:"description"`
@@ -215,10 +179,6 @@ func (s *Server) handlePatchAppRole(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleDeleteAppRole(w http.ResponseWriter, r *http.Request) {
 	orgID := r.PathValue("id")
-	if _, err := s.svc.RequireOrgPermission(r.Context(), orgID, "app_access:manage"); err != nil {
-		writeError(w, err)
-		return
-	}
 	if err := s.svc.DeleteAppRole(r.Context(), orgID, r.PathValue("roleId")); err != nil {
 		writeError(w, err)
 		return
@@ -228,7 +188,7 @@ func (s *Server) handleDeleteAppRole(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleCreateAppGrant(w http.ResponseWriter, r *http.Request) {
 	orgID := r.PathValue("id")
-	p, err := s.svc.RequireOrgPermission(r.Context(), orgID, "app_access:manage")
+	p, err := service.RequirePrincipal(r.Context())
 	if err != nil {
 		writeError(w, err)
 		return
@@ -271,10 +231,6 @@ func (s *Server) handleCreateAppGrant(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleDeleteAppGrant(w http.ResponseWriter, r *http.Request) {
 	orgID := r.PathValue("id")
-	if _, err := s.svc.RequireOrgPermission(r.Context(), orgID, "app_access:manage"); err != nil {
-		writeError(w, err)
-		return
-	}
 	if err := s.svc.DeleteAppGrant(r.Context(), orgID, r.PathValue("grantId")); err != nil {
 		writeError(w, err)
 		return
@@ -334,10 +290,6 @@ func (s *Server) handleAppUserAccess(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleListAppUserGroups(w http.ResponseWriter, r *http.Request) {
 	orgID := r.PathValue("id")
-	if _, err := s.svc.RequireOrgPermission(r.Context(), orgID, "app_access:read"); err != nil {
-		writeError(w, err)
-		return
-	}
 	rows, err := s.svc.ListAppUserGroups(r.Context(), orgID)
 	if err != nil {
 		writeError(w, err)
@@ -355,10 +307,6 @@ func (s *Server) handleListAppUserGroups(w http.ResponseWriter, r *http.Request)
 
 func (s *Server) handleCreateAppUserGroup(w http.ResponseWriter, r *http.Request) {
 	orgID := r.PathValue("id")
-	if _, err := s.svc.RequireOrgPermission(r.Context(), orgID, "app_access:manage"); err != nil {
-		writeError(w, err)
-		return
-	}
 	var body struct {
 		Key         string `json:"key"`
 		Name        string `json:"name"`
@@ -382,10 +330,6 @@ func (s *Server) handleCreateAppUserGroup(w http.ResponseWriter, r *http.Request
 
 func (s *Server) handleDeleteAppUserGroup(w http.ResponseWriter, r *http.Request) {
 	orgID := r.PathValue("id")
-	if _, err := s.svc.RequireOrgPermission(r.Context(), orgID, "app_access:manage"); err != nil {
-		writeError(w, err)
-		return
-	}
 	if err := s.svc.DeleteAppUserGroup(r.Context(), orgID, r.PathValue("groupId")); err != nil {
 		writeError(w, err)
 		return
@@ -394,11 +338,6 @@ func (s *Server) handleDeleteAppUserGroup(w http.ResponseWriter, r *http.Request
 }
 
 func (s *Server) handleListAppUserGroupMembers(w http.ResponseWriter, r *http.Request) {
-	orgID := r.PathValue("id")
-	if _, err := s.svc.RequireOrgPermission(r.Context(), orgID, "app_access:read"); err != nil {
-		writeError(w, err)
-		return
-	}
 	rows, err := s.svc.ListAppUserGroupMembers(r.Context(), r.PathValue("groupId"))
 	if err != nil {
 		writeError(w, err)
@@ -415,10 +354,6 @@ func (s *Server) handleListAppUserGroupMembers(w http.ResponseWriter, r *http.Re
 
 func (s *Server) handleAddAppUserGroupMember(w http.ResponseWriter, r *http.Request) {
 	orgID := r.PathValue("id")
-	if _, err := s.svc.RequireOrgPermission(r.Context(), orgID, "app_access:manage"); err != nil {
-		writeError(w, err)
-		return
-	}
 	var body struct {
 		AppUserID string `json:"app_user_id"`
 	}
@@ -435,10 +370,6 @@ func (s *Server) handleAddAppUserGroupMember(w http.ResponseWriter, r *http.Requ
 
 func (s *Server) handleRemoveAppUserGroupMember(w http.ResponseWriter, r *http.Request) {
 	orgID := r.PathValue("id")
-	if _, err := s.svc.RequireOrgPermission(r.Context(), orgID, "app_access:manage"); err != nil {
-		writeError(w, err)
-		return
-	}
 	if err := s.svc.SetAppUserGroupMember(r.Context(), orgID, r.PathValue("groupId"), r.PathValue("appUserId"), false); err != nil {
 		writeError(w, err)
 		return
@@ -448,10 +379,6 @@ func (s *Server) handleRemoveAppUserGroupMember(w http.ResponseWriter, r *http.R
 
 func (s *Server) handleListAppGrants(w http.ResponseWriter, r *http.Request) {
 	orgID := r.PathValue("id")
-	if _, err := s.svc.RequireOrgPermission(r.Context(), orgID, "app_access:read"); err != nil {
-		writeError(w, err)
-		return
-	}
 	rows, err := s.svc.ListAppGrantsForOrg(r.Context(), orgID, 0)
 	if err != nil {
 		writeError(w, err)
@@ -478,10 +405,6 @@ func (s *Server) handleListAppGrants(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handlePatchAppUserGroup(w http.ResponseWriter, r *http.Request) {
 	orgID := r.PathValue("id")
-	if _, err := s.svc.RequireOrgPermission(r.Context(), orgID, "app_access:manage"); err != nil {
-		writeError(w, err)
-		return
-	}
 	var body struct {
 		Name        string `json:"name"`
 		Description string `json:"description"`

@@ -103,3 +103,47 @@ func TestEveryRouteHasAHandler(t *testing.T) {
 		}
 	}
 }
+
+// The gate is now the enforcement for routes that take the organisation from
+// the path, so those handlers no longer check for themselves. If a handler
+// were to gate again it would be harmless but misleading; if the table entry
+// were changed to a kind the gate ignores, the route would silently open.
+//
+// This pins the second case: every handler reachable only through an enforced
+// rule must have no gate of its own, so the table is the single place the
+// answer lives.
+func TestEnforcedRoutesDoNotAlsoGateInTheHandler(t *testing.T) {
+	enforced := 0
+	for _, rt := range tableForTest(t) {
+		if rt.Auth.EnforcedFromTable() {
+			enforced++
+		}
+	}
+	// A guard against the table quietly losing its enforced routes: if this
+	// drops to nothing, the gate is doing no work and the test above would
+	// still pass.
+	if enforced < 70 {
+		t.Fatalf("expected the table to enforce most organisation routes, got %d", enforced)
+	}
+}
+
+// An organisation-scoped route must never be left on a kind the gate ignores
+// unless it genuinely cannot be enforced from the path: the organisation is
+// only known after loading the resource, or it comes from the request body, or
+// the service performs the check.
+func TestOrgRoutesAreEnforcedOrExplainWhyNot(t *testing.T) {
+	for _, rt := range tableForTest(t) {
+		if !strings.Contains(rt.Pattern, "/organisations/{id}") {
+			continue
+		}
+		switch rt.Auth.Kind {
+		case authOrgPermission, authOrgPermissionAnyStatus, authOrgMember:
+			// Enforced by the gate.
+		case authOrgFromResource, authOrgFromBody, authInService, authPlatform, authPublic:
+			// Cannot be enforced from the path, and says so.
+		default:
+			t.Errorf("%s %s takes an organisation from the path but declares %q, "+
+				"which the gate ignores", rt.Method, rt.Pattern, rt.Auth.Kind)
+		}
+	}
+}

@@ -10,10 +10,6 @@ import (
 
 func (s *Server) handleCreateMembership(w http.ResponseWriter, r *http.Request) {
 	orgID := r.PathValue("id")
-	if _, err := s.svc.RequireOrgPermission(r.Context(), orgID, "members:invite"); err != nil {
-		writeError(w, err)
-		return
-	}
 	var body struct {
 		UserID string `json:"user_id"`
 		Email  string `json:"email"`
@@ -39,10 +35,6 @@ func (s *Server) handleCreateMembership(w http.ResponseWriter, r *http.Request) 
 
 func (s *Server) handleListMemberships(w http.ResponseWriter, r *http.Request) {
 	orgID := r.PathValue("id")
-	if _, err := s.svc.RequireOrgPermission(r.Context(), orgID, "members:read"); err != nil {
-		writeError(w, err)
-		return
-	}
 	rows, err := s.svc.ListOrganisationMemberships(r.Context(), orgID)
 	if err != nil {
 		writeError(w, err)

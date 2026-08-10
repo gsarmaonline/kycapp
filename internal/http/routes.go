@@ -44,6 +44,10 @@ const (
 	// in the path. These are the routes a middleware could gate from this
 	// table, because the organisation is known before the handler runs.
 	authOrgPermission authKind = "org_permission"
+	// authOrgPermissionAnyStatus is authOrgPermission that also accepts an
+	// archived or suspended organisation, which hard delete needs: you must be
+	// able to finish removing a tenant you already archived.
+	authOrgPermissionAnyStatus authKind = "org_permission_any_status"
 	// authOrgFromResource requires a permission in an organisation that is only
 	// known after loading the resource, so the handler must gate itself. The
 	// permission is recorded here for the reader, not enforced from here.
@@ -81,6 +85,10 @@ func orgPermission(perm string) authRule {
 	return authRule{Kind: authOrgPermission, Permission: perm}
 }
 
+func orgPermissionAnyStatus(perm string) authRule {
+	return authRule{Kind: authOrgPermissionAnyStatus, Permission: perm}
+}
+
 func orgFromResource(perm string) authRule {
 	return authRule{Kind: authOrgFromResource, Permission: perm}
 }
@@ -90,7 +98,60 @@ func orgFromResource(perm string) authRule {
 // every such route declares how it is guarded.
 func (r route) IsOrgScoped() bool {
 	switch r.Auth.Kind {
-	case authOrgMember, authOrgPermission, authOrgFromResource, authOrgFromBody, authInService:
+	case authOrgMember, authOrgPermission, authOrgPermissionAnyStatus,
+		authOrgFromResource, authOrgFromBody, authInService:
+		return true
+	default:
+		return false
+	}
+}
+
+// gate applies the rules the table can enforce.
+//
+// Only the kinds where the organisation is known before the handler runs, which
+// is every route taking it straight from the path. The rest still gate
+// themselves, because the organisation is not knowable until the resource is
+// loaded or the body is read.
+//
+// This is the reason the table declares rather than merely documents: for these
+// routes the declaration is now the enforcement, so a route cannot be gated
+// differently from what it claims.
+func (s *Server) gate(rule authRule, next http.HandlerFunc) http.HandlerFunc {
+	switch rule.Kind {
+	case authOrgPermission:
+		return func(w http.ResponseWriter, r *http.Request) {
+			if _, err := s.svc.RequireOrgPermission(r.Context(), r.PathValue("id"), rule.Permission); err != nil {
+				writeError(w, err)
+				return
+			}
+			next(w, r)
+		}
+	case authOrgPermissionAnyStatus:
+		return func(w http.ResponseWriter, r *http.Request) {
+			if _, err := s.svc.RequireOrgPermissionAnyStatus(r.Context(), r.PathValue("id"), rule.Permission); err != nil {
+				writeError(w, err)
+				return
+			}
+			next(w, r)
+		}
+	case authOrgMember:
+		return func(w http.ResponseWriter, r *http.Request) {
+			if _, err := s.svc.RequireOrgMember(r.Context(), r.PathValue("id")); err != nil {
+				writeError(w, err)
+				return
+			}
+			next(w, r)
+		}
+	default:
+		return next
+	}
+}
+
+// EnforcedFromTable reports whether the gate applies this rule, as opposed to
+// the handler applying it. Used by the test that checks the two never disagree.
+func (r authRule) EnforcedFromTable() bool {
+	switch r.Kind {
+	case authOrgPermission, authOrgPermissionAnyStatus, authOrgMember:
 		return true
 	default:
 		return false

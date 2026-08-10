@@ -10,10 +10,6 @@ import (
 
 func (s *Server) handleCreateEmailTemplate(w http.ResponseWriter, r *http.Request) {
 	orgID := r.PathValue("id")
-	if _, err := s.svc.RequireOrgPermission(r.Context(), orgID, "email_templates:manage"); err != nil {
-		writeError(w, err)
-		return
-	}
 	var body struct {
 		Key          string                       `json:"key"`
 		Name         string                       `json:"name"`
@@ -43,10 +39,6 @@ func (s *Server) handleCreateEmailTemplate(w http.ResponseWriter, r *http.Reques
 
 func (s *Server) handleListEmailTemplates(w http.ResponseWriter, r *http.Request) {
 	orgID := r.PathValue("id")
-	if _, err := s.svc.RequireOrgPermission(r.Context(), orgID, "email_templates:read"); err != nil {
-		writeError(w, err)
-		return
-	}
 	rows, err := s.svc.ListEmailTemplates(r.Context(), orgID, r.URL.Query().Get("status"))
 	if err != nil {
 		writeError(w, err)

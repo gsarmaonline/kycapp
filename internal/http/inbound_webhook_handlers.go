@@ -27,10 +27,6 @@ func inboundWebhookJSON(v service.InboundWebhookView) map[string]any {
 
 func (s *Server) handleListInboundWebhooks(w http.ResponseWriter, r *http.Request) {
 	orgID := r.PathValue("id")
-	if _, err := s.svc.RequireOrgPermission(r.Context(), orgID, "organisation:update"); err != nil {
-		writeError(w, err)
-		return
-	}
 	items, err := s.svc.ListInboundWebhooks(r.Context(), orgID)
 	if err != nil {
 		writeError(w, err)
@@ -45,10 +41,6 @@ func (s *Server) handleListInboundWebhooks(w http.ResponseWriter, r *http.Reques
 
 func (s *Server) handleCreateInboundWebhook(w http.ResponseWriter, r *http.Request) {
 	orgID := r.PathValue("id")
-	if _, err := s.svc.RequireOrgPermission(r.Context(), orgID, "organisation:update"); err != nil {
-		writeError(w, err)
-		return
-	}
 	var body struct {
 		Name     string `json:"name"`
 		Secret   string `json:"secret"`
@@ -72,10 +64,6 @@ func (s *Server) handleCreateInboundWebhook(w http.ResponseWriter, r *http.Reque
 func (s *Server) handleGetInboundWebhook(w http.ResponseWriter, r *http.Request) {
 	orgID := r.PathValue("id")
 	hookID := r.PathValue("hookId")
-	if _, err := s.svc.RequireOrgPermission(r.Context(), orgID, "organisation:update"); err != nil {
-		writeError(w, err)
-		return
-	}
 	view, err := s.svc.GetInboundWebhook(r.Context(), orgID, hookID)
 	if err != nil {
 		writeError(w, err)
@@ -87,10 +75,6 @@ func (s *Server) handleGetInboundWebhook(w http.ResponseWriter, r *http.Request)
 func (s *Server) handlePatchInboundWebhook(w http.ResponseWriter, r *http.Request) {
 	orgID := r.PathValue("id")
 	hookID := r.PathValue("hookId")
-	if _, err := s.svc.RequireOrgPermission(r.Context(), orgID, "organisation:update"); err != nil {
-		writeError(w, err)
-		return
-	}
 	var body struct {
 		Name     *string `json:"name"`
 		Secret   *string `json:"secret"`
@@ -115,10 +99,6 @@ func (s *Server) handlePatchInboundWebhook(w http.ResponseWriter, r *http.Reques
 func (s *Server) handleDeleteInboundWebhook(w http.ResponseWriter, r *http.Request) {
 	orgID := r.PathValue("id")
 	hookID := r.PathValue("hookId")
-	if _, err := s.svc.RequireOrgPermission(r.Context(), orgID, "organisation:update"); err != nil {
-		writeError(w, err)
-		return
-	}
 	if err := s.svc.DeleteInboundWebhook(r.Context(), orgID, hookID); err != nil {
 		writeError(w, err)
 		return

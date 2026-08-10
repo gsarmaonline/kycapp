@@ -9,10 +9,6 @@ import (
 
 func (s *Server) handleListRoles(w http.ResponseWriter, r *http.Request) {
 	orgID := r.PathValue("id")
-	if _, err := s.svc.RequireOrgPermission(r.Context(), orgID, "roles:read"); err != nil {
-		writeError(w, err)
-		return
-	}
 	roles, err := s.svc.ListRoles(r.Context(), orgID)
 	if err != nil {
 		writeError(w, err)
@@ -58,10 +54,6 @@ func (s *Server) handleGetPermission(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleCreateRole(w http.ResponseWriter, r *http.Request) {
 	orgID := r.PathValue("id")
-	if _, err := s.svc.RequireOrgPermission(r.Context(), orgID, "roles:manage"); err != nil {
-		writeError(w, err)
-		return
-	}
 	var body struct {
 		Key            string   `json:"key"`
 		Name           string   `json:"name"`

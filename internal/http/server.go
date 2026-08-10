@@ -79,7 +79,7 @@ func New(db DBPinger, opts Options) *Server {
 
 func (s *Server) routes() {
 	for _, rt := range s.routeTable() {
-		s.mux.HandleFunc(rt.Method+" "+rt.Pattern, rt.Handler)
+		s.mux.HandleFunc(rt.Method+" "+rt.Pattern, s.gate(rt.Auth, rt.Handler))
 	}
 }
 
@@ -111,8 +111,8 @@ func (s *Server) routeTable() []route {
 		{"PATCH", "/v1/organisations/{id}/onboarding", s.handlePatchOrgOnboarding, inService()},
 		{"GET", "/v1/organisations/{id}/activity", s.handleListOrgActivity, orgPermission("activity:read")},
 		{"GET", "/v1/organisations/{id}/usage", s.handleListOrgUsage, orgPermission("usage:read")},
-		{"POST", "/v1/organisations/{id}/archive", s.handleArchiveOrganisation, inService()},
-		{"DELETE", "/v1/organisations/{id}", s.handleDeleteOrganisation, orgPermission("organisation:update")},
+		{"POST", "/v1/organisations/{id}/archive", s.handleArchiveOrganisation, orgPermissionAnyStatus("organisation:update")},
+		{"DELETE", "/v1/organisations/{id}", s.handleDeleteOrganisation, orgPermissionAnyStatus("organisation:update")},
 		{"GET", "/v1/organisations/{id}/integrations", s.handleListOrgIntegrations, orgPermission("organisation:update")},
 		{"PUT", "/v1/organisations/{id}/integrations/stripe", s.handleUpsertStripeIntegration, orgPermission("organisation:update")},
 		{"GET", "/v1/organisations/{id}/integrations/stripe/catalog", s.handleListStripeCatalog, orgPermission("organisation:update")},
