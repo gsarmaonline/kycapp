@@ -368,6 +368,23 @@ func (q *Queries) DeleteAppUserGroup(ctx context.Context, arg DeleteAppUserGroup
 	return err
 }
 
+const getAppCapability = `-- name: GetAppCapability :one
+SELECT id, organisation_id, key, description, created_at FROM app_capabilities WHERE id = $1
+`
+
+func (q *Queries) GetAppCapability(ctx context.Context, id string) (AppCapability, error) {
+	row := q.db.QueryRow(ctx, getAppCapability, id)
+	var i AppCapability
+	err := row.Scan(
+		&i.ID,
+		&i.OrganisationID,
+		&i.Key,
+		&i.Description,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
 const getAppRole = `-- name: GetAppRole :one
 SELECT id, organisation_id, key, name, description, own_capabilities, effective_capabilities, created_at, updated_at FROM app_roles WHERE id = $1
 `
@@ -385,6 +402,23 @@ func (q *Queries) GetAppRole(ctx context.Context, id string) (AppRole, error) {
 		&i.EffectiveCapabilities,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const getAppScopeType = `-- name: GetAppScopeType :one
+SELECT id, organisation_id, kind, label, created_at FROM app_scope_types WHERE id = $1
+`
+
+func (q *Queries) GetAppScopeType(ctx context.Context, id string) (AppScopeType, error) {
+	row := q.db.QueryRow(ctx, getAppScopeType, id)
+	var i AppScopeType
+	err := row.Scan(
+		&i.ID,
+		&i.OrganisationID,
+		&i.Kind,
+		&i.Label,
+		&i.CreatedAt,
 	)
 	return i, err
 }
@@ -595,6 +629,32 @@ func (q *Queries) ListAppRoleExtends(ctx context.Context, organisationID string)
 			return nil, err
 		}
 		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listAppRoleParents = `-- name: ListAppRoleParents :many
+SELECT parent_id FROM app_role_extends WHERE role_id = $1
+`
+
+// ListAppRoleParents returns the roles one role builds on, so an edit form can
+// show what is already selected.
+func (q *Queries) ListAppRoleParents(ctx context.Context, roleID string) ([]string, error) {
+	rows, err := q.db.Query(ctx, listAppRoleParents, roleID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []string{}
+	for rows.Next() {
+		var parent_id string
+		if err := rows.Scan(&parent_id); err != nil {
+			return nil, err
+		}
+		items = append(items, parent_id)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
@@ -826,6 +886,32 @@ func (q *Queries) SetAppRoleEffectiveCapabilities(ctx context.Context, arg SetAp
 	return err
 }
 
+const updateAppCapability = `-- name: UpdateAppCapability :one
+UPDATE app_capabilities
+SET description = COALESCE($1, description)
+WHERE id = $2 AND organisation_id = $3
+RETURNING id, organisation_id, key, description, created_at
+`
+
+type UpdateAppCapabilityParams struct {
+	Description    pgtype.Text `json:"description"`
+	ID             string      `json:"id"`
+	OrganisationID string      `json:"organisation_id"`
+}
+
+func (q *Queries) UpdateAppCapability(ctx context.Context, arg UpdateAppCapabilityParams) (AppCapability, error) {
+	row := q.db.QueryRow(ctx, updateAppCapability, arg.Description, arg.ID, arg.OrganisationID)
+	var i AppCapability
+	err := row.Scan(
+		&i.ID,
+		&i.OrganisationID,
+		&i.Key,
+		&i.Description,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
 const updateAppRole = `-- name: UpdateAppRole :one
 UPDATE app_roles
 SET name = COALESCE($1, name),
@@ -863,6 +949,32 @@ func (q *Queries) UpdateAppRole(ctx context.Context, arg UpdateAppRoleParams) (A
 		&i.EffectiveCapabilities,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const updateAppScopeType = `-- name: UpdateAppScopeType :one
+UPDATE app_scope_types
+SET label = COALESCE($1, label)
+WHERE id = $2 AND organisation_id = $3
+RETURNING id, organisation_id, kind, label, created_at
+`
+
+type UpdateAppScopeTypeParams struct {
+	Label          pgtype.Text `json:"label"`
+	ID             string      `json:"id"`
+	OrganisationID string      `json:"organisation_id"`
+}
+
+func (q *Queries) UpdateAppScopeType(ctx context.Context, arg UpdateAppScopeTypeParams) (AppScopeType, error) {
+	row := q.db.QueryRow(ctx, updateAppScopeType, arg.Label, arg.ID, arg.OrganisationID)
+	var i AppScopeType
+	err := row.Scan(
+		&i.ID,
+		&i.OrganisationID,
+		&i.Kind,
+		&i.Label,
+		&i.CreatedAt,
 	)
 	return i, err
 }

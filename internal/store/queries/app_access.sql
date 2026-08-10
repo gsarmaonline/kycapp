@@ -184,3 +184,26 @@ LEFT JOIN app_users u ON u.id = g.app_user_id
 WHERE g.organisation_id = $1
 ORDER BY g.created_at DESC
 LIMIT sqlc.arg('limit');
+
+-- name: GetAppScopeType :one
+SELECT * FROM app_scope_types WHERE id = $1;
+
+-- name: UpdateAppScopeType :one
+UPDATE app_scope_types
+SET label = COALESCE(sqlc.narg('label'), label)
+WHERE id = sqlc.arg('id') AND organisation_id = sqlc.arg('organisation_id')
+RETURNING *;
+
+-- name: GetAppCapability :one
+SELECT * FROM app_capabilities WHERE id = $1;
+
+-- name: UpdateAppCapability :one
+UPDATE app_capabilities
+SET description = COALESCE(sqlc.narg('description'), description)
+WHERE id = sqlc.arg('id') AND organisation_id = sqlc.arg('organisation_id')
+RETURNING *;
+
+-- ListAppRoleParents returns the roles one role builds on, so an edit form can
+-- show what is already selected.
+-- name: ListAppRoleParents :many
+SELECT parent_id FROM app_role_extends WHERE role_id = $1;

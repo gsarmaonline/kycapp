@@ -1432,3 +1432,38 @@ export type AppAccessSet = {
 export function getAppUserAccess(appUserId: string) {
   return request<AppAccessSet>(`/v1/app-users/${appUserId}/access`)
 }
+
+export function getAppScopeType(orgId: string, id: string) {
+  return request<AppScopeType>(`/v1/organisations/${orgId}/app-scope-types/${id}`)
+}
+
+export function updateAppScopeType(orgId: string, id: string, body: { label: string }) {
+  return request<AppScopeType>(`/v1/organisations/${orgId}/app-scope-types/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(body),
+  })
+}
+
+export function getAppCapability(orgId: string, id: string) {
+  return request<AppCapability>(`/v1/organisations/${orgId}/app-capabilities/${id}`)
+}
+
+export function updateAppCapability(orgId: string, id: string, body: { description: string }) {
+  return request<AppCapability>(`/v1/organisations/${orgId}/app-capabilities/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(body),
+  })
+}
+
+/** A role with the ids of the roles it builds on, which the edit form needs. */
+export function getAppRole(orgId: string, roleId: string) {
+  return request<AppRole & { extends: string[] }>(
+    `/v1/organisations/${orgId}/app-roles/${roleId}`,
+  )
+}
+
+export function getAppUserGroup(orgId: string, groupId: string) {
+  return request<Omit<AppUserGroup, 'member_count'>>(
+    `/v1/organisations/${orgId}/app-user-groups/${groupId}`,
+  )
+}
