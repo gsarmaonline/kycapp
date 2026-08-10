@@ -44,6 +44,11 @@ sql:
       - "internal/store/migrations/000039_activity_usage_permissions.up.sql"
       - "internal/store/migrations/000040_email_from.up.sql"
       - "internal/store/migrations/000041_email_template_sections.up.sql"
+      - "internal/store/migrations/000042_drop_platform_admin.up.sql"
+      - "internal/store/migrations/000043_platform_org.up.sql"
+      - "internal/store/migrations/000044_derive_global_reach.up.sql"
+      - "internal/store/migrations/000045_api_key_owner.up.sql"
+      - "internal/store/migrations/000046_recovery_credentials.up.sql"
     gen:
       go:
         package: "sqlc"

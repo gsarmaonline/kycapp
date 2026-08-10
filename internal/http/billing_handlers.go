@@ -10,7 +10,7 @@ import (
 )
 
 func (s *Server) handleCreatePlan(w http.ResponseWriter, r *http.Request) {
-	if _, err := service.RequirePlatform(r.Context()); err != nil {
+	if _, err := s.svc.RequirePlatformCapability(r.Context(), "billing:manage"); err != nil {
 		writeError(w, err)
 		return
 	}
@@ -66,7 +66,7 @@ func (s *Server) handleGetPlan(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleSetPlanEntitlements(w http.ResponseWriter, r *http.Request) {
-	if _, err := service.RequirePlatform(r.Context()); err != nil {
+	if _, err := s.svc.RequirePlatformCapability(r.Context(), "billing:manage"); err != nil {
 		writeError(w, err)
 		return
 	}
@@ -88,7 +88,7 @@ func (s *Server) handleSetPlanEntitlements(w http.ResponseWriter, r *http.Reques
 }
 
 func (s *Server) handleCreateEntitlement(w http.ResponseWriter, r *http.Request) {
-	if _, err := service.RequirePlatform(r.Context()); err != nil {
+	if _, err := s.svc.RequirePlatformCapability(r.Context(), "billing:manage"); err != nil {
 		writeError(w, err)
 		return
 	}
@@ -131,7 +131,7 @@ func (s *Server) handleListEntitlementsCatalog(w http.ResponseWriter, r *http.Re
 func (s *Server) handleUpsertSubscription(w http.ResponseWriter, r *http.Request) {
 	orgID := r.PathValue("id")
 	// Assigning plans is platform-only until Stripe self-serve exists.
-	if _, err := service.RequirePlatform(r.Context()); err != nil {
+	if _, err := s.svc.RequirePlatformCapability(r.Context(), "billing:manage"); err != nil {
 		writeError(w, err)
 		return
 	}
@@ -169,7 +169,7 @@ func (s *Server) handleGetSubscription(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleSetOrgEntitlements(w http.ResponseWriter, r *http.Request) {
-	if _, err := service.RequirePlatform(r.Context()); err != nil {
+	if _, err := s.svc.RequirePlatformCapability(r.Context(), "billing:manage"); err != nil {
 		writeError(w, err)
 		return
 	}
@@ -249,7 +249,7 @@ func (s *Server) handleEntitlementsCheck(w http.ResponseWriter, r *http.Request)
 }
 
 func (s *Server) handleUpsertPlanPrice(w http.ResponseWriter, r *http.Request) {
-	if _, err := service.RequirePlatform(r.Context()); err != nil {
+	if _, err := s.svc.RequirePlatformCapability(r.Context(), "billing:manage"); err != nil {
 		writeError(w, err)
 		return
 	}

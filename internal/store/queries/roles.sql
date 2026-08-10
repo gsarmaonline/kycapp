@@ -82,3 +82,44 @@ SELECT EXISTS (
       AND m.status = 'active'
       AND p.key = sqlc.arg('permission_key')
 ) AS allowed;
+
+
+-- ListUserGrantSources returns everything a user's memberships confer that is
+-- relevant to one organisation: that organisation's own membership, plus any
+-- membership of the platform organisation, which is what makes someone staff.
+--
+-- Global reach is derived here, never stored. A role in a merchant organisation
+-- can therefore never produce one, whatever anybody sets on it.
+--
+-- COALESCE keeps this failing closed: with no system_state row the comparison
+-- is NULL, and nobody gets reach.
+--
+-- LEFT JOIN on purpose: a membership with a permissionless role still confers
+-- reach, and dropping it would make such a member invisible rather than
+-- powerless.
+-- name: ListUserGrantSources :many
+SELECT
+    m.organisation_id,
+    COALESCE(m.organisation_id = (SELECT platform_organisation_id FROM system_state WHERE id = 1), false)::boolean AS global_reach,
+    p.key AS permission_key
+FROM memberships m
+LEFT JOIN role_permissions rp ON rp.role_id = m.role_id
+LEFT JOIN permissions p ON p.id = rp.permission_id
+WHERE m.user_id = sqlc.arg('user_id')
+  AND m.status = 'active'
+  AND (m.expires_at IS NULL OR m.expires_at > now())
+  AND (
+        m.organisation_id = sqlc.arg('organisation_id')
+     OR m.organisation_id = (SELECT platform_organisation_id FROM system_state WHERE id = 1)
+  )
+ORDER BY m.organisation_id;
+
+-- ListUserGlobalReach returns the user's live memberships of the platform
+-- organisation. Used to report staff status without naming any role.
+-- name: ListUserGlobalReach :many
+SELECT m.id
+FROM memberships m
+WHERE m.user_id = sqlc.arg('user_id')
+  AND m.status = 'active'
+  AND (m.expires_at IS NULL OR m.expires_at > now())
+  AND m.organisation_id = (SELECT platform_organisation_id FROM system_state WHERE id = 1);

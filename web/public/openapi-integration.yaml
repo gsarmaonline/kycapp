@@ -1126,8 +1126,6 @@ components:
                     type: string
                 name:
                     type: string
-                platform_admin:
-                    type: boolean
                 status:
                     enum:
                         - active

@@ -21,6 +21,7 @@ type ApiKey struct {
 	OrganisationID pgtype.Text        `json:"organisation_id"`
 	Scopes         []string           `json:"scopes"`
 	LastUsedAt     pgtype.Timestamptz `json:"last_used_at"`
+	UserID         pgtype.Text        `json:"user_id"`
 }
 
 type AppUser struct {
@@ -134,12 +135,13 @@ type IdempotencyKey struct {
 }
 
 type Membership struct {
-	ID             string    `json:"id"`
-	OrganisationID string    `json:"organisation_id"`
-	UserID         string    `json:"user_id"`
-	RoleID         string    `json:"role_id"`
-	Status         string    `json:"status"`
-	CreatedAt      time.Time `json:"created_at"`
+	ID             string             `json:"id"`
+	OrganisationID string             `json:"organisation_id"`
+	UserID         string             `json:"user_id"`
+	RoleID         string             `json:"role_id"`
+	Status         string             `json:"status"`
+	CreatedAt      time.Time          `json:"created_at"`
+	ExpiresAt      pgtype.Timestamptz `json:"expires_at"`
 }
 
 type Organisation struct {
@@ -307,6 +309,19 @@ type ProductPlanPrice struct {
 	Status              string `json:"status"`
 }
 
+type RecoveryCredential struct {
+	ID          string             `json:"id"`
+	Name        string             `json:"name"`
+	TokenPrefix string             `json:"token_prefix"`
+	TokenHash   string             `json:"token_hash"`
+	GrantedBy   string             `json:"granted_by"`
+	Reason      string             `json:"reason"`
+	ExpiresAt   time.Time          `json:"expires_at"`
+	RevokedAt   pgtype.Timestamptz `json:"revoked_at"`
+	LastUsedAt  pgtype.Timestamptz `json:"last_used_at"`
+	CreatedAt   time.Time          `json:"created_at"`
+}
+
 type Role struct {
 	ID             string `json:"id"`
 	OrganisationID string `json:"organisation_id"`
@@ -340,14 +355,20 @@ type Subscription struct {
 	SubscriptionRef  pgtype.Text        `json:"subscription_ref"`
 }
 
+type SystemState struct {
+	ID                     int32              `json:"id"`
+	PlatformOrganisationID pgtype.Text        `json:"platform_organisation_id"`
+	BootstrapRoleID        pgtype.Text        `json:"bootstrap_role_id"`
+	BootstrappedAt         pgtype.Timestamptz `json:"bootstrapped_at"`
+}
+
 type User struct {
-	ID            string      `json:"id"`
-	Email         string      `json:"email"`
-	Name          string      `json:"name"`
-	Status        string      `json:"status"`
-	CreatedAt     time.Time   `json:"created_at"`
-	UpdatedAt     time.Time   `json:"updated_at"`
-	PlatformAdmin bool        `json:"platform_admin"`
-	GoogleSub     pgtype.Text `json:"google_sub"`
-	AvatarUrl     string      `json:"avatar_url"`
+	ID        string      `json:"id"`
+	Email     string      `json:"email"`
+	Name      string      `json:"name"`
+	Status    string      `json:"status"`
+	CreatedAt time.Time   `json:"created_at"`
+	UpdatedAt time.Time   `json:"updated_at"`
+	GoogleSub pgtype.Text `json:"google_sub"`
+	AvatarUrl string      `json:"avatar_url"`
 }

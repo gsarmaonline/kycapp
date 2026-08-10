@@ -43,6 +43,9 @@ func TestEmailTemplatesDefaultsAndCustom(t *testing.T) {
 	created := doJSON(t, h, http.MethodPost, "/v1/organisations/"+orgID+"/email-templates", map[string]any{
 		"key": "seasonal_offer", "name": "Seasonal offer",
 		"subject": "A special offer", "body_text": "Hello {{display_name}}",
+		// Required since migration 000041 added per-template body blocks:
+		// a template must carry body_sections or body_html.
+		"body_html": "<p>Hello {{display_name}}</p>",
 	}, userAuth(token))
 	if created.Code != http.StatusCreated {
 		t.Fatalf("create status=%d body=%s", created.Code, created.Body.String())

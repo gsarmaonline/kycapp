@@ -1,6 +1,7 @@
 package httpserver
 
 import (
+	"context"
 	"net/http"
 	"net/url"
 	"strings"
@@ -59,11 +60,12 @@ func (s *Server) handleGoogleCallback(w http.ResponseWriter, r *http.Request) {
 		writeError(w, err)
 		return
 	}
-	result, err := s.svc.LoginWithGoogle(r.Context(), identity, s.platformAdminEmails)
+	result, err := s.svc.LoginWithGoogle(r.Context(), identity)
 	if err != nil {
 		writeError(w, err)
 		return
 	}
+	s.maybeBootstrapStaff(r.Context(), result.User.Email, result.User.ID)
 	// Hand the session token to the SPA via fragment (not sent to server on later navigations).
 	redirect := strings.TrimRight(s.appOrigin, "/") + "/#token=" + url.QueryEscape(result.Token)
 	http.Redirect(w, r, redirect, http.StatusFound)
@@ -82,12 +84,37 @@ func (s *Server) handleDevLogin(w http.ResponseWriter, r *http.Request) {
 		writeError(w, apperr.Validation("invalid JSON body"))
 		return
 	}
-	result, err := s.svc.DevLogin(r.Context(), body.Email, body.Name, s.platformAdminEmails)
+	result, err := s.svc.DevLogin(r.Context(), body.Email, body.Name)
 	if err != nil {
 		writeError(w, err)
 		return
 	}
+	s.maybeBootstrapStaff(r.Context(), result.User.Email, result.User.ID)
 	writeJSON(w, http.StatusOK, authResultJSON(result))
+}
+
+// maybeBootstrapStaff mints the first staff member when an address listed in
+// PLATFORM_ADMIN_EMAILS signs in and bootstrap has not run. It is a no-op
+// afterwards: from then on staff are managed as members of the platform
+// organisation, and the env list stops conferring anything.
+//
+// Failure here must not fail the login. The user is authenticated either way;
+// they simply are not staff, which is the safe direction.
+func (s *Server) maybeBootstrapStaff(ctx context.Context, email, userID string) {
+	if userID == "" || !emailListed(email, s.platformAdminEmails) {
+		return
+	}
+	_ = s.svc.BootstrapFirstStaff(ctx, userID)
+}
+
+func emailListed(email string, list []string) bool {
+	email = strings.ToLower(strings.TrimSpace(email))
+	for _, e := range list {
+		if strings.ToLower(strings.TrimSpace(e)) == email {
+			return true
+		}
+	}
+	return false
 }
 
 func (s *Server) handleLogout(w http.ResponseWriter, r *http.Request) {
@@ -130,8 +157,9 @@ func (s *Server) handleMe(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 	writeJSON(w, http.StatusOK, map[string]any{
-		"user":           userJSON(me.User),
-		"memberships":    items,
-		"platform_admin": p.PlatformAdmin || me.User.PlatformAdmin,
+		"user":        userJSON(me.User),
+		"memberships": items,
+		// Derived from the request principal, not from a stored flag.
+		"platform_admin": p.PlatformAdmin,
 	})
 }

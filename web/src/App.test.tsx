@@ -73,7 +73,6 @@ describe('App', () => {
     me.mockResolvedValue({
       user: { id: 'u1', email: 'ada@acme.com', name: 'Ada', status: 'active' },
       memberships: [],
-      platform_admin: false,
     })
     listOrganisations.mockResolvedValue({
       items: [{ id: '1', name: 'Acme', slug: 'acme', status: 'active' }],

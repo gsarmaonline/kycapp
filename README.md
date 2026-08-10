@@ -94,7 +94,7 @@ sequenceDiagram
 ## Design principles
 
 - **Organisation is the hub.** Users, authz, billing, and product packaging hang off the organisation record.
-- **Login required (to KYC).** Session tokens authenticate operators; **org API keys** authenticate the merchant backend; platform tokens are for ops.
+- **Login required (to KYC).** Session tokens authenticate operators; **org API keys** authenticate the merchant backend; a break-glass env token exists only for recovery.
 - **Tenancy by membership.** Normal users can only access organisations they belong to.
 - **Permissions ≠ entitlements.** Permissions gate what an *operator* may do in KYC; entitlements gate what the *organisation* may use — **platform capabilities** (KYC itself) vs **product features** (their customers).
 - **Configure in KYC, enforce in their API.** Never trust the browser alone for feature gates.
@@ -104,6 +104,8 @@ sequenceDiagram
 | Doc | Contents |
 | --- | --- |
 | [docs/saas-rethink.md](docs/saas-rethink.md) | SaaS gap analysis and revised roadmap |
+| [docs/authentication.md](docs/authentication.md) | Principals, credentials, resolution, bootstrap |
+| [docs/authorisation.md](docs/authorisation.md) | Capabilities, roles, grants, gates, invariants |
 | [docs/data-model.md](docs/data-model.md) | Objects, relationships, permission catalog |
 | [docs/api.md](docs/api.md) | REST `/v1` surface |
 | [docs/flows.md](docs/flows.md) | Signup, invite, ops-provision, runtime checks |
@@ -192,7 +194,7 @@ cd web && npm install && npm run dev
 | `OAUTH_STATE_SECRET` | HMAC secret for OAuth CSRF state |
 | `AUTH_DEV_LOGIN` | If `true`, enables `POST /v1/auth/dev-login` for local/tests (**never in prod**) |
 | `API_TOKENS` | Comma-separated **platform** service tokens |
-| `PLATFORM_ADMIN_EMAILS` | Emails granted `platform_admin` on Google/dev login |
+| `PLATFORM_ADMIN_EMAILS` | Emails treated as KYC staff. Evaluated per request, so removing an address demotes immediately |
 | `CHECK_RATE_LIMIT_PER_MIN` | Max check-endpoint calls per actor/minute (default 120; `0` disables) |
 | `AUTH_RATE_LIMIT_PER_MIN` | Max OAuth/dev-login starts per IP/minute (default 20; `0` disables) |
 | `UPLOAD_DIR` | Local directory for org logo files (default `data/uploads`) |
@@ -207,9 +209,13 @@ cd web && npm install && npm run dev
 
 | Principal | Can do |
 | --- | --- |
-| User session (Google or dev-login) | Own profile, orgs they belong to, RBAC-gated mutations |
-| Org API key (Platform → API keys) | That organisation only — scoped by permissions; requires `api_access` |
-| Platform admin / unscoped service token | All orgs, plan catalog, platform API keys, audit, entitlement overrides |
+| Operator — user session (Google or dev-login) | Own profile, plus the organisations they belong to, gated by their role |
+| Staff — user session, member of the platform organisation | Every organisation, but only what their role's permissions allow |
+| Org API key (Platform → API keys) | That organisation only, and never more than its **owner** can do; requires `api_access` |
+| Recovery credential (`kyc_recovery_…`) | Everything, minted by staff with a reason and a required expiry, revocable |
+| Last resort — unscoped `API_TOKENS` service token | Everything. Normally unset; the only credential that survives a broken database |
+
+Staff are ordinary members of a seeded platform organisation, so reach is derived from membership rather than from a flag. See [access control](docs/authentication.md#four-callers).
 
 Public (no Bearer): `GET /v1/auth/providers`, `GET /v1/auth/google`, `GET /v1/auth/google/callback`, `POST /v1/auth/dev-login` (if enabled), `GET /v1/public/organisations/{id}/branding/logo`, health endpoints.
 

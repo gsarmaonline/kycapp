@@ -18,7 +18,7 @@
 3. Reading cusotmer DB via streaming/logs/wal
 
 ## Tech debt/improvements
-- Revisit authentication
+- Revisit authentication — design and defects in [authentication.md](authentication.md) and [authorisation.md](authorisation.md)
 - Revisit billing
 
 

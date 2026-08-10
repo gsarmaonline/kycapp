@@ -16,7 +16,7 @@ const acceptMembership = `-- name: AcceptMembership :one
 UPDATE memberships
 SET status = 'active'
 WHERE id = $1 AND status = 'invited'
-RETURNING id, organisation_id, user_id, role_id, status, created_at
+RETURNING id, organisation_id, user_id, role_id, status, created_at, expires_at
 `
 
 func (q *Queries) AcceptMembership(ctx context.Context, id string) (Membership, error) {
@@ -29,6 +29,7 @@ func (q *Queries) AcceptMembership(ctx context.Context, id string) (Membership, 
 		&i.RoleID,
 		&i.Status,
 		&i.CreatedAt,
+		&i.ExpiresAt,
 	)
 	return i, err
 }
@@ -36,7 +37,7 @@ func (q *Queries) AcceptMembership(ctx context.Context, id string) (Membership, 
 const createMembership = `-- name: CreateMembership :one
 INSERT INTO memberships (id, organisation_id, user_id, role_id, status)
 VALUES ($1, $2, $3, $4, $5)
-RETURNING id, organisation_id, user_id, role_id, status, created_at
+RETURNING id, organisation_id, user_id, role_id, status, created_at, expires_at
 `
 
 type CreateMembershipParams struct {
@@ -63,12 +64,13 @@ func (q *Queries) CreateMembership(ctx context.Context, arg CreateMembershipPara
 		&i.RoleID,
 		&i.Status,
 		&i.CreatedAt,
+		&i.ExpiresAt,
 	)
 	return i, err
 }
 
 const getActiveMembershipByOrgAndUser = `-- name: GetActiveMembershipByOrgAndUser :one
-SELECT id, organisation_id, user_id, role_id, status, created_at FROM memberships
+SELECT id, organisation_id, user_id, role_id, status, created_at, expires_at FROM memberships
 WHERE organisation_id = $1
   AND user_id = $2
   AND status = 'active'
@@ -89,12 +91,13 @@ func (q *Queries) GetActiveMembershipByOrgAndUser(ctx context.Context, arg GetAc
 		&i.RoleID,
 		&i.Status,
 		&i.CreatedAt,
+		&i.ExpiresAt,
 	)
 	return i, err
 }
 
 const getMembership = `-- name: GetMembership :one
-SELECT id, organisation_id, user_id, role_id, status, created_at FROM memberships
+SELECT id, organisation_id, user_id, role_id, status, created_at, expires_at FROM memberships
 WHERE id = $1
 `
 
@@ -108,12 +111,13 @@ func (q *Queries) GetMembership(ctx context.Context, id string) (Membership, err
 		&i.RoleID,
 		&i.Status,
 		&i.CreatedAt,
+		&i.ExpiresAt,
 	)
 	return i, err
 }
 
 const getMembershipByOrgAndUser = `-- name: GetMembershipByOrgAndUser :one
-SELECT id, organisation_id, user_id, role_id, status, created_at FROM memberships
+SELECT id, organisation_id, user_id, role_id, status, created_at, expires_at FROM memberships
 WHERE organisation_id = $1 AND user_id = $2
 `
 
@@ -132,13 +136,14 @@ func (q *Queries) GetMembershipByOrgAndUser(ctx context.Context, arg GetMembersh
 		&i.RoleID,
 		&i.Status,
 		&i.CreatedAt,
+		&i.ExpiresAt,
 	)
 	return i, err
 }
 
 const getMembershipDetail = `-- name: GetMembershipDetail :one
 SELECT
-  m.id, m.organisation_id, m.user_id, m.role_id, m.status, m.created_at,
+  m.id, m.organisation_id, m.user_id, m.role_id, m.status, m.created_at, m.expires_at,
   u.email AS user_email,
   u.name AS user_name,
   r.key AS role_key
@@ -149,15 +154,16 @@ WHERE m.id = $1
 `
 
 type GetMembershipDetailRow struct {
-	ID             string    `json:"id"`
-	OrganisationID string    `json:"organisation_id"`
-	UserID         string    `json:"user_id"`
-	RoleID         string    `json:"role_id"`
-	Status         string    `json:"status"`
-	CreatedAt      time.Time `json:"created_at"`
-	UserEmail      string    `json:"user_email"`
-	UserName       string    `json:"user_name"`
-	RoleKey        string    `json:"role_key"`
+	ID             string             `json:"id"`
+	OrganisationID string             `json:"organisation_id"`
+	UserID         string             `json:"user_id"`
+	RoleID         string             `json:"role_id"`
+	Status         string             `json:"status"`
+	CreatedAt      time.Time          `json:"created_at"`
+	ExpiresAt      pgtype.Timestamptz `json:"expires_at"`
+	UserEmail      string             `json:"user_email"`
+	UserName       string             `json:"user_name"`
+	RoleKey        string             `json:"role_key"`
 }
 
 func (q *Queries) GetMembershipDetail(ctx context.Context, id string) (GetMembershipDetailRow, error) {
@@ -170,6 +176,7 @@ func (q *Queries) GetMembershipDetail(ctx context.Context, id string) (GetMember
 		&i.RoleID,
 		&i.Status,
 		&i.CreatedAt,
+		&i.ExpiresAt,
 		&i.UserEmail,
 		&i.UserName,
 		&i.RoleKey,
@@ -179,7 +186,7 @@ func (q *Queries) GetMembershipDetail(ctx context.Context, id string) (GetMember
 
 const listMembershipsByOrganisation = `-- name: ListMembershipsByOrganisation :many
 SELECT
-  m.id, m.organisation_id, m.user_id, m.role_id, m.status, m.created_at,
+  m.id, m.organisation_id, m.user_id, m.role_id, m.status, m.created_at, m.expires_at,
   u.email AS user_email,
   u.name AS user_name,
   r.key AS role_key
@@ -191,15 +198,16 @@ ORDER BY m.created_at, m.id
 `
 
 type ListMembershipsByOrganisationRow struct {
-	ID             string    `json:"id"`
-	OrganisationID string    `json:"organisation_id"`
-	UserID         string    `json:"user_id"`
-	RoleID         string    `json:"role_id"`
-	Status         string    `json:"status"`
-	CreatedAt      time.Time `json:"created_at"`
-	UserEmail      string    `json:"user_email"`
-	UserName       string    `json:"user_name"`
-	RoleKey        string    `json:"role_key"`
+	ID             string             `json:"id"`
+	OrganisationID string             `json:"organisation_id"`
+	UserID         string             `json:"user_id"`
+	RoleID         string             `json:"role_id"`
+	Status         string             `json:"status"`
+	CreatedAt      time.Time          `json:"created_at"`
+	ExpiresAt      pgtype.Timestamptz `json:"expires_at"`
+	UserEmail      string             `json:"user_email"`
+	UserName       string             `json:"user_name"`
+	RoleKey        string             `json:"role_key"`
 }
 
 func (q *Queries) ListMembershipsByOrganisation(ctx context.Context, organisationID string) ([]ListMembershipsByOrganisationRow, error) {
@@ -218,6 +226,7 @@ func (q *Queries) ListMembershipsByOrganisation(ctx context.Context, organisatio
 			&i.RoleID,
 			&i.Status,
 			&i.CreatedAt,
+			&i.ExpiresAt,
 			&i.UserEmail,
 			&i.UserName,
 			&i.RoleKey,
@@ -234,7 +243,7 @@ func (q *Queries) ListMembershipsByOrganisation(ctx context.Context, organisatio
 
 const listMembershipsByUser = `-- name: ListMembershipsByUser :many
 SELECT
-  m.id, m.organisation_id, m.user_id, m.role_id, m.status, m.created_at,
+  m.id, m.organisation_id, m.user_id, m.role_id, m.status, m.created_at, m.expires_at,
   o.name AS organisation_name,
   o.slug AS organisation_slug,
   o.status AS organisation_status,
@@ -247,16 +256,17 @@ ORDER BY m.created_at, m.id
 `
 
 type ListMembershipsByUserRow struct {
-	ID                 string    `json:"id"`
-	OrganisationID     string    `json:"organisation_id"`
-	UserID             string    `json:"user_id"`
-	RoleID             string    `json:"role_id"`
-	Status             string    `json:"status"`
-	CreatedAt          time.Time `json:"created_at"`
-	OrganisationName   string    `json:"organisation_name"`
-	OrganisationSlug   string    `json:"organisation_slug"`
-	OrganisationStatus string    `json:"organisation_status"`
-	RoleKey            string    `json:"role_key"`
+	ID                 string             `json:"id"`
+	OrganisationID     string             `json:"organisation_id"`
+	UserID             string             `json:"user_id"`
+	RoleID             string             `json:"role_id"`
+	Status             string             `json:"status"`
+	CreatedAt          time.Time          `json:"created_at"`
+	ExpiresAt          pgtype.Timestamptz `json:"expires_at"`
+	OrganisationName   string             `json:"organisation_name"`
+	OrganisationSlug   string             `json:"organisation_slug"`
+	OrganisationStatus string             `json:"organisation_status"`
+	RoleKey            string             `json:"role_key"`
 }
 
 func (q *Queries) ListMembershipsByUser(ctx context.Context, userID string) ([]ListMembershipsByUserRow, error) {
@@ -275,6 +285,7 @@ func (q *Queries) ListMembershipsByUser(ctx context.Context, userID string) ([]L
 			&i.RoleID,
 			&i.Status,
 			&i.CreatedAt,
+			&i.ExpiresAt,
 			&i.OrganisationName,
 			&i.OrganisationSlug,
 			&i.OrganisationStatus,
@@ -294,7 +305,7 @@ const revokeMembership = `-- name: RevokeMembership :one
 UPDATE memberships
 SET status = 'revoked'
 WHERE id = $1
-RETURNING id, organisation_id, user_id, role_id, status, created_at
+RETURNING id, organisation_id, user_id, role_id, status, created_at, expires_at
 `
 
 func (q *Queries) RevokeMembership(ctx context.Context, id string) (Membership, error) {
@@ -307,6 +318,7 @@ func (q *Queries) RevokeMembership(ctx context.Context, id string) (Membership, 
 		&i.RoleID,
 		&i.Status,
 		&i.CreatedAt,
+		&i.ExpiresAt,
 	)
 	return i, err
 }
@@ -317,7 +329,7 @@ SET
   role_id = COALESCE($1, role_id),
   status = COALESCE($2, status)
 WHERE id = $3
-RETURNING id, organisation_id, user_id, role_id, status, created_at
+RETURNING id, organisation_id, user_id, role_id, status, created_at, expires_at
 `
 
 type UpdateMembershipParams struct {
@@ -336,6 +348,7 @@ func (q *Queries) UpdateMembership(ctx context.Context, arg UpdateMembershipPara
 		&i.RoleID,
 		&i.Status,
 		&i.CreatedAt,
+		&i.ExpiresAt,
 	)
 	return i, err
 }

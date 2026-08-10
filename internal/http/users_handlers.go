@@ -9,7 +9,7 @@ import (
 )
 
 func (s *Server) handleCreateUser(w http.ResponseWriter, r *http.Request) {
-	if _, err := service.RequirePlatform(r.Context()); err != nil {
+	if _, err := s.svc.RequirePlatformCapability(r.Context(), "members:invite"); err != nil {
 		writeError(w, err)
 		return
 	}
@@ -32,7 +32,7 @@ func (s *Server) handleCreateUser(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleListUsers(w http.ResponseWriter, r *http.Request) {
-	if _, err := service.RequirePlatform(r.Context()); err != nil {
+	if _, err := s.svc.RequirePlatformCapability(r.Context(), "members:read"); err != nil {
 		writeError(w, err)
 		return
 	}

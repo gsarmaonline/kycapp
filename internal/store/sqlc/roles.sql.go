@@ -387,6 +387,99 @@ func (q *Queries) ListRolesByOrganisation(ctx context.Context, organisationID st
 	return items, nil
 }
 
+const listUserGlobalReach = `-- name: ListUserGlobalReach :many
+SELECT m.id
+FROM memberships m
+WHERE m.user_id = $1
+  AND m.status = 'active'
+  AND (m.expires_at IS NULL OR m.expires_at > now())
+  AND m.organisation_id = (SELECT platform_organisation_id FROM system_state WHERE id = 1)
+`
+
+// ListUserGlobalReach returns the user's live memberships of the platform
+// organisation. Used to report staff status without naming any role.
+func (q *Queries) ListUserGlobalReach(ctx context.Context, userID string) ([]string, error) {
+	rows, err := q.db.Query(ctx, listUserGlobalReach, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []string{}
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		items = append(items, id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listUserGrantSources = `-- name: ListUserGrantSources :many
+SELECT
+    m.organisation_id,
+    COALESCE(m.organisation_id = (SELECT platform_organisation_id FROM system_state WHERE id = 1), false)::boolean AS global_reach,
+    p.key AS permission_key
+FROM memberships m
+LEFT JOIN role_permissions rp ON rp.role_id = m.role_id
+LEFT JOIN permissions p ON p.id = rp.permission_id
+WHERE m.user_id = $1
+  AND m.status = 'active'
+  AND (m.expires_at IS NULL OR m.expires_at > now())
+  AND (
+        m.organisation_id = $2
+     OR m.organisation_id = (SELECT platform_organisation_id FROM system_state WHERE id = 1)
+  )
+ORDER BY m.organisation_id
+`
+
+type ListUserGrantSourcesParams struct {
+	UserID         string `json:"user_id"`
+	OrganisationID string `json:"organisation_id"`
+}
+
+type ListUserGrantSourcesRow struct {
+	OrganisationID string      `json:"organisation_id"`
+	GlobalReach    bool        `json:"global_reach"`
+	PermissionKey  pgtype.Text `json:"permission_key"`
+}
+
+// ListUserGrantSources returns everything a user's memberships confer that is
+// relevant to one organisation: that organisation's own membership, plus any
+// membership of the platform organisation, which is what makes someone staff.
+//
+// Global reach is derived here, never stored. A role in a merchant organisation
+// can therefore never produce one, whatever anybody sets on it.
+//
+// COALESCE keeps this failing closed: with no system_state row the comparison
+// is NULL, and nobody gets reach.
+//
+// LEFT JOIN on purpose: a membership with a permissionless role still confers
+// reach, and dropping it would make such a member invisible rather than
+// powerless.
+func (q *Queries) ListUserGrantSources(ctx context.Context, arg ListUserGrantSourcesParams) ([]ListUserGrantSourcesRow, error) {
+	rows, err := q.db.Query(ctx, listUserGrantSources, arg.UserID, arg.OrganisationID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListUserGrantSourcesRow{}
+	for rows.Next() {
+		var i ListUserGrantSourcesRow
+		if err := rows.Scan(&i.OrganisationID, &i.GlobalReach, &i.PermissionKey); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const updateRole = `-- name: UpdateRole :one
 UPDATE roles
 SET

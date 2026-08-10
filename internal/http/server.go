@@ -175,6 +175,10 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("POST /v1/api-keys", s.handleCreateAPIKey)
 	s.mux.HandleFunc("GET /v1/api-keys", s.handleListAPIKeys)
 	s.mux.HandleFunc("DELETE /v1/api-keys/{id}", s.handleRevokeAPIKey)
+	s.mux.HandleFunc("POST /v1/recovery-credentials", s.handleCreateRecoveryCredential)
+	s.mux.HandleFunc("GET /v1/recovery-credentials", s.handleListRecoveryCredentials)
+	s.mux.HandleFunc("DELETE /v1/recovery-credentials/{id}", s.handleRevokeRecoveryCredential)
+
 	s.mux.HandleFunc("GET /v1/audit-events", s.handleListAuditEvents)
 
 	s.mux.HandleFunc("POST /v1/organisations/{id}/attribute-definitions", s.handleCreateAttributeDefinition)

@@ -1,7 +1,8 @@
-.PHONY: test test-unit test-store test-web test-e2e test-sdk build run sqlc openapi sdk sdk-go sdk-ts sdk-check compose-up compose-down compose-logs web worker
+.PHONY: test test-unit test-store test-web test-e2e test-sdk test-access build run sqlc openapi sdk sdk-go sdk-ts sdk-check compose-up compose-down compose-logs web worker
 
 test:
 	go test ./... -count=1 -timeout 5m
+	$(MAKE) test-access
 	$(MAKE) test-sdk
 	$(MAKE) test-web
 
@@ -20,6 +21,11 @@ test-e2e:
 
 test-web:
 	cd web && npm test
+
+# core/access is a separate zero-dependency module (it compiles into the SDKs too),
+# so the root `go test ./...` does not reach it.
+test-access:
+	cd core/access && go vet ./... && go test ./... -count=1 -race
 
 # sdk/go is a separate module, so the root `go test ./...` does not reach it.
 test-sdk:

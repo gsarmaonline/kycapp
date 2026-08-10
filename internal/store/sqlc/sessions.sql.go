@@ -45,7 +45,7 @@ func (q *Queries) CreateSession(ctx context.Context, arg CreateSessionParams) (S
 }
 
 const getSessionByTokenHash = `-- name: GetSessionByTokenHash :one
-SELECT s.id, s.user_id, s.token_hash, s.expires_at, s.revoked_at, s.created_at, u.email AS user_email, u.name AS user_name, u.status AS user_status, u.platform_admin
+SELECT s.id, s.user_id, s.token_hash, s.expires_at, s.revoked_at, s.created_at, u.email AS user_email, u.name AS user_name, u.status AS user_status
 FROM sessions s
 JOIN users u ON u.id = s.user_id
 WHERE s.token_hash = $1
@@ -54,16 +54,15 @@ WHERE s.token_hash = $1
 `
 
 type GetSessionByTokenHashRow struct {
-	ID            string             `json:"id"`
-	UserID        string             `json:"user_id"`
-	TokenHash     string             `json:"token_hash"`
-	ExpiresAt     time.Time          `json:"expires_at"`
-	RevokedAt     pgtype.Timestamptz `json:"revoked_at"`
-	CreatedAt     time.Time          `json:"created_at"`
-	UserEmail     string             `json:"user_email"`
-	UserName      string             `json:"user_name"`
-	UserStatus    string             `json:"user_status"`
-	PlatformAdmin bool               `json:"platform_admin"`
+	ID         string             `json:"id"`
+	UserID     string             `json:"user_id"`
+	TokenHash  string             `json:"token_hash"`
+	ExpiresAt  time.Time          `json:"expires_at"`
+	RevokedAt  pgtype.Timestamptz `json:"revoked_at"`
+	CreatedAt  time.Time          `json:"created_at"`
+	UserEmail  string             `json:"user_email"`
+	UserName   string             `json:"user_name"`
+	UserStatus string             `json:"user_status"`
 }
 
 func (q *Queries) GetSessionByTokenHash(ctx context.Context, tokenHash string) (GetSessionByTokenHashRow, error) {
@@ -79,7 +78,6 @@ func (q *Queries) GetSessionByTokenHash(ctx context.Context, tokenHash string) (
 		&i.UserEmail,
 		&i.UserName,
 		&i.UserStatus,
-		&i.PlatformAdmin,
 	)
 	return i, err
 }

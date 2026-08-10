@@ -69,3 +69,14 @@ RETURNING *;
 -- name: DeleteOrganisation :exec
 DELETE FROM organisations
 WHERE id = $1;
+
+-- name: GetSystemState :one
+SELECT * FROM system_state WHERE id = 1;
+
+-- MarkBootstrapped sets the marker only if it is unset, so the bootstrap path
+-- can fire exactly once regardless of concurrency.
+-- name: MarkBootstrapped :one
+UPDATE system_state
+SET bootstrapped_at = now()
+WHERE id = 1 AND bootstrapped_at IS NULL
+RETURNING *;

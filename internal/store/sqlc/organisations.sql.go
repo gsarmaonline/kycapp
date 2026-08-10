@@ -126,6 +126,22 @@ func (q *Queries) GetOrganisation(ctx context.Context, id string) (Organisation,
 	return i, err
 }
 
+const getSystemState = `-- name: GetSystemState :one
+SELECT id, platform_organisation_id, bootstrap_role_id, bootstrapped_at FROM system_state WHERE id = 1
+`
+
+func (q *Queries) GetSystemState(ctx context.Context) (SystemState, error) {
+	row := q.db.QueryRow(ctx, getSystemState)
+	var i SystemState
+	err := row.Scan(
+		&i.ID,
+		&i.PlatformOrganisationID,
+		&i.BootstrapRoleID,
+		&i.BootstrappedAt,
+	)
+	return i, err
+}
+
 const listOrganisations = `-- name: ListOrganisations :many
 SELECT id, name, slug, status, created_at, updated_at, logo_url, primary_color, accent_color, email_footer, email_font, app_user_authority, app_user_ingest_upsert_key, app_user_attributes_mode, email_typography, email_from_name, email_from_address FROM organisations
 WHERE ($1::text IS NULL OR status = $1)
@@ -256,6 +272,27 @@ func (q *Queries) ListOrganisationsForUser(ctx context.Context, arg ListOrganisa
 		return nil, err
 	}
 	return items, nil
+}
+
+const markBootstrapped = `-- name: MarkBootstrapped :one
+UPDATE system_state
+SET bootstrapped_at = now()
+WHERE id = 1 AND bootstrapped_at IS NULL
+RETURNING id, platform_organisation_id, bootstrap_role_id, bootstrapped_at
+`
+
+// MarkBootstrapped sets the marker only if it is unset, so the bootstrap path
+// can fire exactly once regardless of concurrency.
+func (q *Queries) MarkBootstrapped(ctx context.Context) (SystemState, error) {
+	row := q.db.QueryRow(ctx, markBootstrapped)
+	var i SystemState
+	err := row.Scan(
+		&i.ID,
+		&i.PlatformOrganisationID,
+		&i.BootstrapRoleID,
+		&i.BootstrappedAt,
+	)
+	return i, err
 }
 
 const setOrganisationLogoURL = `-- name: SetOrganisationLogoURL :one
