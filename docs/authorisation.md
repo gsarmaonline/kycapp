@@ -14,7 +14,7 @@ Related: [authentication](authentication.md) · [data model](data-model.md) · [
 2. [The model](#the-model)
 3. [The gates](#the-gates)
 4. [Invariants](#invariants)
-5. [Merchant-hosted access control (proposed)](#merchant-hosted-access-control-proposed)
+5. [Merchant-hosted access control](#merchant-hosted-access-control)
 6. [Status and remaining work](#status-and-remaining-work)
 7. [Known defects](#known-defects)
 
@@ -172,9 +172,11 @@ Invariant 2 has one structural carve-out: **break-glass**, which holds everythin
 
 ---
 
-## Merchant-hosted access control (proposed)
+## Merchant-hosted access control
 
-**Not built.** Merchants need their own access model for *their* customers: projects, workspaces, environments, and roles. KYC is already the system of record for their app users, schema, features and plans, so access rules are the missing piece of the same record.
+**Shipped.** Merchants declare their own scope kinds, capabilities and roles, and grant those roles to their **app users**. KYC stores the model and returns an assembled grant set; the merchant's backend evaluates it locally.
+
+Subject is app users only. A merchant's own KYC operators keep organisation-wide roles; scoping *them* to projects would mean KYC's gates learning which project every resource belongs to, which is a much larger change and is not done.
 
 Same engine, **hard namespace partition**:
 
@@ -212,8 +214,8 @@ The README lists *"not Auth0/Clerk-for-your-customers"* as a non-goal. That is a
 | 3 | Org-scoped gates evaluate through `Decide`. | **Built** |
 | 4 | KYC as an organisation: staff are members of `org_platform`, reach is derived from that membership, memberships can expire, bootstrap is marker-gated. | **Built** |
 | 5 | Platform routes gated by capability instead of staff status. | **Built** |
-| 6 | API and UI for issuing time-boxed staff access, so just-in-time becomes the default rather than something the schema merely allows. | Not started |
-| 7 | Merchant-hosted access control. | Not started |
+| 6 | API and UI for issuing time-boxed staff access, so just-in-time becomes the default rather than something the schema merely allows. | Not started — see [todo](todo.md#access-control-follow-ups) |
+| 7 | Merchant-hosted access control: merchants declare scope kinds, capabilities and roles for their app users, with materialised inheritance, and read back a cached grant set. | **Built** |
 
 Shadow mode was skipped deliberately: it de-risks a live system, and this one is not deployed, so the existing API suite served the same purpose. The gates were swapped outright and every authorisation test passed unchanged.
 

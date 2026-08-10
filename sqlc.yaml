@@ -49,6 +49,7 @@ sql:
       - "internal/store/migrations/000044_derive_global_reach.up.sql"
       - "internal/store/migrations/000045_api_key_owner.up.sql"
       - "internal/store/migrations/000046_recovery_credentials.up.sql"
+      - "internal/store/migrations/000047_app_access.up.sql"
     gen:
       go:
         package: "sqlc"
