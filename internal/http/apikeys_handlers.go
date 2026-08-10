@@ -10,7 +10,7 @@ import (
 )
 
 func (s *Server) handleCreateAPIKey(w http.ResponseWriter, r *http.Request) {
-	if _, err := service.RequirePlatform(r.Context()); err != nil {
+	if _, err := s.svc.RequirePlatformCapability(r.Context(), "api_keys:manage"); err != nil {
 		writeError(w, err)
 		return
 	}
@@ -32,7 +32,7 @@ func (s *Server) handleCreateAPIKey(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleListAPIKeys(w http.ResponseWriter, r *http.Request) {
-	if _, err := service.RequirePlatform(r.Context()); err != nil {
+	if _, err := s.svc.RequirePlatformCapability(r.Context(), "api_keys:read"); err != nil {
 		writeError(w, err)
 		return
 	}
@@ -59,7 +59,7 @@ func (s *Server) handleRevokeAPIKey(w http.ResponseWriter, r *http.Request) {
 			writeError(w, err)
 			return
 		}
-	} else if _, err := service.RequirePlatform(r.Context()); err != nil {
+	} else if _, err := s.svc.RequirePlatformCapability(r.Context(), "api_keys:manage"); err != nil {
 		writeError(w, err)
 		return
 	}
@@ -120,7 +120,7 @@ func (s *Server) handleListOrgAPIKeys(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleListAuditEvents(w http.ResponseWriter, r *http.Request) {
-	if _, err := service.RequirePlatform(r.Context()); err != nil {
+	if _, err := s.svc.RequirePlatformCapability(r.Context(), "activity:read"); err != nil {
 		writeError(w, err)
 		return
 	}

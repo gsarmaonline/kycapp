@@ -134,12 +134,13 @@ type IdempotencyKey struct {
 }
 
 type Membership struct {
-	ID             string    `json:"id"`
-	OrganisationID string    `json:"organisation_id"`
-	UserID         string    `json:"user_id"`
-	RoleID         string    `json:"role_id"`
-	Status         string    `json:"status"`
-	CreatedAt      time.Time `json:"created_at"`
+	ID             string             `json:"id"`
+	OrganisationID string             `json:"organisation_id"`
+	UserID         string             `json:"user_id"`
+	RoleID         string             `json:"role_id"`
+	Status         string             `json:"status"`
+	CreatedAt      time.Time          `json:"created_at"`
+	ExpiresAt      pgtype.Timestamptz `json:"expires_at"`
 }
 
 type Organisation struct {
@@ -308,12 +309,13 @@ type ProductPlanPrice struct {
 }
 
 type Role struct {
-	ID             string `json:"id"`
-	OrganisationID string `json:"organisation_id"`
-	Key            string `json:"key"`
-	Name           string `json:"name"`
-	Description    string `json:"description"`
-	IsSystem       bool   `json:"is_system"`
+	ID                string `json:"id"`
+	OrganisationID    string `json:"organisation_id"`
+	Key               string `json:"key"`
+	Name              string `json:"name"`
+	Description       string `json:"description"`
+	IsSystem          bool   `json:"is_system"`
+	GrantsGlobalReach bool   `json:"grants_global_reach"`
 }
 
 type RolePermission struct {
@@ -338,6 +340,13 @@ type Subscription struct {
 	CurrentPeriodEnd pgtype.Timestamptz `json:"current_period_end"`
 	Processor        pgtype.Text        `json:"processor"`
 	SubscriptionRef  pgtype.Text        `json:"subscription_ref"`
+}
+
+type SystemState struct {
+	ID                     int32              `json:"id"`
+	PlatformOrganisationID pgtype.Text        `json:"platform_organisation_id"`
+	BootstrapRoleID        pgtype.Text        `json:"bootstrap_role_id"`
+	BootstrappedAt         pgtype.Timestamptz `json:"bootstrapped_at"`
 }
 
 type User struct {

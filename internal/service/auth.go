@@ -35,9 +35,18 @@ func (s *Service) AuthenticateBearer(ctx context.Context, raw string, envTokens 
 		if sess.UserStatus != "active" {
 			return authn.Principal{}, false
 		}
-		// Derived per request from the env list, never read from a stored flag,
-		// so removing an address demotes on the next request.
-		admin := emailInList(sess.UserEmail, platformAdminEmails)
+		// Platform status has exactly one source: a live membership whose role
+		// carries global reach. No role name appears here, so staff access is
+		// entirely expressible by granting a role, and revoking the membership
+		// is what demotes.
+		//
+		// PLATFORM_ADMIN_EMAILS no longer confers anything at this point. It
+		// only triggers bootstrap, which creates that membership.
+		reach, err := s.db.Q().ListUserGlobalReach(ctx, sess.UserID)
+		if err != nil {
+			return authn.Principal{}, false
+		}
+		admin := len(reach) > 0
 		return authn.Principal{
 			Kind:          authn.KindUser,
 			UserID:        sess.UserID,

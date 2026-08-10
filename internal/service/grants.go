@@ -101,15 +101,17 @@ func capabilityFor(key string) (access.Capability, bool) {
 func (s *Service) grantsFor(ctx context.Context, p authn.Principal, orgID string) (access.GrantSet, error) {
 	gs := access.GrantSet{PrincipalID: p.ActorLabel()}
 
-	// Platform reaches every organisation. Under the target model this stops
-	// being a bypass and becomes an ordinary grant at global scope, so it takes
-	// the same evaluation path as everyone else.
-	if p.IsPlatform() {
+	// Break-glass is the only principal that holds everything by definition.
+	// Staff are deliberately not handled here: their reach and their
+	// capabilities both come from the membership rows below, so a read-only
+	// support role stays read-only. Short-circuiting on IsPlatform would hand
+	// every staff member full power and make least privilege unexpressible.
+	if isBreakGlass(p) {
 		gs.Grants = append(gs.Grants, access.Grant{
-			ID:           "platform",
+			ID:           "break-glass",
 			Scope:        access.GlobalScope(),
 			Capabilities: allKYCCapabilities,
-			Source:       "platform",
+			Source:       "break-glass",
 		})
 		return gs, nil
 	}
@@ -139,29 +141,72 @@ func (s *Service) grantsFor(ctx context.Context, p authn.Principal, orgID string
 		return gs, nil
 	}
 
-	keys, err := s.db.Q().ListUserPermissionKeysInOrg(ctx, sqlc.ListUserPermissionKeysInOrgParams{
-		OrganisationID: orgID,
+	rows, err := s.db.Q().ListUserGrantSources(ctx, sqlc.ListUserGrantSourcesParams{
 		UserID:         p.UserID,
+		OrganisationID: orgID,
 	})
 	if err != nil {
 		return access.GrantSet{}, err
 	}
-	// No rows means either no membership or a role with no permissions. Those
-	// are different, and only the first should fail to reach the organisation.
-	member, err := s.hasActiveMembership(ctx, orgID, p.UserID)
-	if err != nil {
-		return access.GrantSet{}, err
-	}
-	if !member {
-		return gs, nil
-	}
-	gs.Grants = append(gs.Grants, access.Grant{
-		ID:           "membership:" + p.UserID,
-		Scope:        access.OrgScope(orgID),
-		Capabilities: append(capsFromKeys(keys), capMember),
-		Source:       "membership",
-	})
+	gs.Grants = append(gs.Grants, grantsFromMemberships(rows, orgID)...)
 	return gs, nil
+}
+
+// grantsFromMemberships folds membership rows into grants.
+//
+// Scope comes from the role's grants_global_reach column, never from a role
+// name: this code cannot tell "root" from any other role, which is what keeps
+// staff access expressible entirely as data.
+func grantsFromMemberships(rows []sqlc.ListUserGrantSourcesRow, orgID string) []access.Grant {
+	// One grant per membership, keyed by organisation.
+	type acc struct {
+		global bool
+		caps   []access.Capability
+		seen   map[string]struct{}
+	}
+	byOrg := map[string]*acc{}
+	order := []string{}
+
+	for _, r := range rows {
+		a := byOrg[r.OrganisationID]
+		if a == nil {
+			a = &acc{seen: map[string]struct{}{}}
+			byOrg[r.OrganisationID] = a
+			order = append(order, r.OrganisationID)
+		}
+		a.global = a.global || r.GrantsGlobalReach
+		// permission_key is NULL when the role carries no permissions. The
+		// membership still confers reach, so the row is not skipped.
+		if !r.PermissionKey.Valid {
+			continue
+		}
+		if _, dup := a.seen[r.PermissionKey.String]; dup {
+			continue
+		}
+		a.seen[r.PermissionKey.String] = struct{}{}
+		if c, ok := capabilityFor(r.PermissionKey.String); ok {
+			a.caps = append(a.caps, c)
+		}
+	}
+
+	out := make([]access.Grant, 0, len(order))
+	for _, id := range order {
+		a := byOrg[id]
+		scope := access.OrgScope(id)
+		if a.global {
+			scope = access.GlobalScope()
+		} else if id != orgID {
+			// A membership elsewhere without global reach says nothing here.
+			continue
+		}
+		out = append(out, access.Grant{
+			ID:           "membership:" + id,
+			Scope:        scope,
+			Capabilities: append(a.caps, capMember),
+			Source:       "membership",
+		})
+	}
+	return out
 }
 
 func capsFromKeys(keys []string) []access.Capability {

@@ -7,7 +7,6 @@ import (
 	"github.com/gsarmaonline/kyc/core/access"
 	"github.com/gsarmaonline/kyc/internal/apperr"
 	"github.com/gsarmaonline/kyc/internal/authn"
-	"github.com/gsarmaonline/kyc/internal/store/sqlc"
 	"github.com/jackc/pgx/v5"
 )
 
@@ -32,7 +31,11 @@ func RequireUser(ctx context.Context) (authn.Principal, error) {
 	return p, nil
 }
 
-// RequirePlatform requires a platform admin user or service principal.
+// RequirePlatform requires any principal with reach over every organisation.
+//
+// Prefer RequirePlatformCapability: this only asks whether the caller is staff,
+// not whether they may do the specific thing, so it cannot express least
+// privilege.
 func RequirePlatform(ctx context.Context) (authn.Principal, error) {
 	p, err := RequirePrincipal(ctx)
 	if err != nil {
@@ -42,6 +45,53 @@ func RequirePlatform(ctx context.Context) (authn.Principal, error) {
 		return authn.Principal{}, apperr.Forbidden("platform admin required")
 	}
 	return p, nil
+}
+
+// isBreakGlass reports whether the principal is an unscoped environment service
+// token. It is resolved before any query, which is what makes it the root of
+// trust on an empty or mis-seeded database.
+func isBreakGlass(p authn.Principal) bool {
+	return p.Kind == authn.KindService && p.OrganisationID == ""
+}
+
+func hasGlobalReach(gs access.GrantSet) bool {
+	for _, g := range gs.Grants {
+		if g.Scope.IsGlobal() {
+			return true
+		}
+	}
+	return false
+}
+
+// RequirePlatformCapability gates a platform-wide route on a named capability
+// rather than on staff status, so a read-only support role can list without
+// also being able to write.
+func (s *Service) RequirePlatformCapability(ctx context.Context, permissionKey string) (authn.Principal, error) {
+	p, err := RequirePrincipal(ctx)
+	if err != nil {
+		return authn.Principal{}, err
+	}
+	if isBreakGlass(p) {
+		return p, nil
+	}
+	cap, ok := capabilityFor(permissionKey)
+	if !ok {
+		return authn.Principal{}, apperr.Forbidden("unknown permission " + permissionKey)
+	}
+	// An empty organisation id keeps only global-scope grants: an org-scoped
+	// membership can never satisfy a platform route.
+	gs, err := s.grantsFor(ctx, p, "")
+	if err != nil {
+		return authn.Principal{}, err
+	}
+	d := access.Decide(gs, cap, access.Resource{Scope: access.ScopeRef{}}, decideNow())
+	if d.Allowed {
+		return p, nil
+	}
+	if d.Reason == access.ReasonOutOfScope {
+		return authn.Principal{}, apperr.Forbidden("platform access required")
+	}
+	return authn.Principal{}, apperr.Forbidden("missing permission " + permissionKey)
 }
 
 // RequireOrgMember requires active membership in an *active* org, platform privilege, or an org-scoped API key.
@@ -67,20 +117,28 @@ func (s *Service) requireOrgAccess(ctx context.Context, orgID string, cap access
 	if err != nil {
 		return authn.Principal{}, err
 	}
-	// Platform short-circuits before the organisation is loaded, so platform
-	// tooling can still act on an archived or partly-created tenant.
-	if p.IsPlatform() {
+	// Break-glass is the only short-circuit. It holds every capability by
+	// definition and has to work on a database that cannot answer questions.
+	if isBreakGlass(p) {
 		return p, nil
-	}
-	// Organisation lifecycle is a property of the resource, not of any grant:
-	// a suspended organisation is invisible even to its own members.
-	if err := s.assertOrgVisible(ctx, orgID, requireActiveOrg); err != nil {
-		return authn.Principal{}, err
 	}
 
 	gs, err := s.grantsFor(ctx, p, orgID)
 	if err != nil {
 		return authn.Principal{}, err
+	}
+	// Staff do not short-circuit. A global-reach role carries exactly the
+	// capabilities it was granted, so a read-only support role stays read-only
+	// inside a merchant's organisation.
+	//
+	// They do skip the visibility check, so staff can still act on an archived
+	// or suspended tenant. For everyone else, organisation lifecycle is a
+	// property of the resource: a suspended organisation is invisible even to
+	// its own members.
+	if !hasGlobalReach(gs) {
+		if err := s.assertOrgVisible(ctx, orgID, requireActiveOrg); err != nil {
+			return authn.Principal{}, err
+		}
 	}
 	d := access.Decide(gs, cap, access.Resource{Scope: orgRef(orgID)}, decideNow())
 	if d.Allowed {
@@ -118,20 +176,6 @@ func (s *Service) assertOrgVisible(ctx context.Context, orgID string, requireAct
 		return apperr.NotFound("organisation not found")
 	}
 	return nil
-}
-
-func (s *Service) hasActiveMembership(ctx context.Context, orgID, userID string) (bool, error) {
-	_, err := s.db.Q().GetActiveMembershipByOrgAndUser(ctx, sqlc.GetActiveMembershipByOrgAndUserParams{
-		OrganisationID: orgID,
-		UserID:         userID,
-	})
-	if errors.Is(err, pgx.ErrNoRows) {
-		return false, nil
-	}
-	if err != nil {
-		return false, err
-	}
-	return true, nil
 }
 
 // RequireOrgPermission requires org membership plus an RBAC permission.

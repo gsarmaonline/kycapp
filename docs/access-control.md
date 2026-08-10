@@ -43,9 +43,14 @@ Authentication decides nothing. Its only job is to produce a principal.
 | --- | --- | --- | --- |
 | **Operator** | `KindUser` | Session `kyc_sess_…` (Google OAuth) | Organisations with an active membership, gated by RBAC |
 | **Org API key** | `KindService` + `OrganisationID` | `kyc_…` | That one organisation, narrowed by `Scopes` |
-| **Platform** | `KindService` without `OrganisationID`, or any principal with `PlatformAdmin` | Env service token, or an allow-listed email | Every organisation, unconditionally |
+| **Staff** | `KindUser` with a live membership of the platform organisation whose role carries global reach | Session | Every organisation, limited to that role's capabilities |
+| **Break-glass** | `KindService` without `OrganisationID` | Env service token (`API_TOKENS`) | Everything, unconditionally |
 
-`IsPlatform()` (`principal.go:40`) encodes the last row.
+`IsPlatform()` (`principal.go:40`) reports reach, not power: a staff principal still only holds the capabilities of the role that granted it global reach.
+
+**KYC is an organisation in its own system.** Migration `000043` seeds `org_platform`, and staff are ordinary members of it. A role may carry `grants_global_reach`, which turns its membership into a global-scope grant. Authorisation code never asks "is this root?" — it reads the column, so staff access is entirely expressible as data and no role name appears in Go.
+
+Merchants cannot see the platform organisation: listing is membership scoped, and a direct read returns 404 like any other unreachable tenant.
 
 ### Terminology trap
 
@@ -91,7 +96,8 @@ Handlers never inspect the principal directly. They call one of these gates in `
 | --- | --- |
 | `RequirePrincipal` | Anyone authenticated |
 | `RequireUser` | A human session; refuses every API key |
-| `RequirePlatform` | `IsPlatform()` |
+| `RequirePlatform` | Staff status only; prefer the next row |
+| `RequirePlatformCapability(key)` | Staff **and** the named capability, at global scope |
 | `RequireOrgMember(org)` | The organisation is in reach |
 | `RequireOrgPermission(org, key)` | The above, plus the capability |
 
@@ -269,15 +275,15 @@ The flag was only ever written true, and the session read it back as
 
 Platform privilege is now derived per request from the env list and never persisted. The `users.platform_admin` column is dropped (migration `000042`), and the login paths no longer take the list at all: it is a property of the request, not of the login. `TestPlatformAdminIsDerivedNotLatched` pins this by moving the same session between servers configured with and without the address, and asserting a platform route refuses after demotion.
 
-### Platform privilege is ambient and unconditional
+### Platform privilege was ambient and unconditional — fixed
 
-Partly addressed. Platform capabilities now flow through an ordinary grant at `global` scope rather than a branch inside the permission check, so platform takes the same evaluation path as everyone else.
+Staff no longer short-circuit anything. A global-reach membership produces a grant carrying exactly its role's capabilities, evaluated on the same path as a merchant's own members, so **least privilege for KYC staff is now expressible**: the seeded `support` role reaches every organisation and can write in none of them.
 
-What remains: the gate still short-circuits before the organisation is loaded, so platform tooling can act on an archived or partly-created tenant. That short-circuit is deliberate and was preserved.
+Platform-wide routes are gated by capability rather than by staff status. `RequirePlatformCapability` replaced `RequirePlatform` at all twelve call sites, so `support` can list users but cannot create plans or platform API keys.
 
-The larger problem is untouched. Platform is still **all-or-nothing** — the global grant carries every capability — so **least privilege for KYC's own staff remains impossible**. A support engineer who needs to read one merchant's activity must still be given everything, everywhere. Phase 5 splits this into scoped roles.
+Break-glass remains the one unconditional principal, which is the point of it.
 
-It also still rides on an ordinary session, so a staff member browsing a normal screen carries full reach in every request.
+What remains: staff reach still rides on an ordinary session, so a staff member browsing a normal screen carries their full role in every request. Time-boxing exists in the schema (`memberships.expires_at`) but there is no UI or API yet for issuing a short-lived grant, so just-in-time access is not yet the default.
 
 ### Unscoped API keys are unrestricted
 
@@ -298,14 +304,15 @@ The phase that makes the rest safe is **phase 3**.
 | 1 | [`core/access`](../core/access): capability, scope, grant set, role expansion, `Decide`, delegation. A separate zero-dependency module, because the same logic must run in the API and inside both SDKs. | **Built** |
 | 2 | Grant assembly from existing relationships (`service/grants.go`), plus KYC's code-defined capability registry. | **Built** |
 | 3 | Org-scoped gates evaluate through `Decide`. | **Built** |
-| 4 | `grants` table for what no relationship expresses: time-boxed staff access, app-user tokens. | Not started |
-| 5 | Split platform into scoped roles; delete `platform_admin`. The latch defect dies here. | Not started |
+| 4 | KYC as an organisation: staff are members of `org_platform`, roles carry `grants_global_reach`, memberships can expire, bootstrap is marker-gated. | **Built** |
+| 5 | Platform routes gated by capability instead of staff status; `platform_admin` deleted. | **Built** |
+| 6 | API and UI for issuing time-boxed staff access, so just-in-time becomes the default rather than something the schema merely allows. | Not started |
 
-### No grants table yet, on purpose
+### Still no grants table, and now probably none is needed
 
-Every grant today is **derived**: platform from the principal flag, API keys from their row and scopes, users from an active membership and its role. Nothing needs storing, so nothing is stored. Membership stays the single source of truth for organisation access, which means no backfill and no dual-write.
+Every grant is **derived**: break-glass from the environment, API keys from their row and scopes, users and staff alike from an active membership and its role. Staff access turned out to be an ordinary membership of the platform organisation, and time-boxing is a column on it rather than a new entity.
 
-The table arrives in phase 4, when there is finally something with no relationship to derive from.
+A separate table only becomes necessary for a principal with no relationship to derive from. App-user tokens are the remaining candidate.
 
 ### Shadow mode was skipped
 
