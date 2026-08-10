@@ -1929,3 +1929,32 @@ html.dark-mode .docs-swagger {
 [data-theme="dark"] .error {
   color: var(--app-danger);
 }
+
+/* Collapsible sidebar entries.
+   A parent has no page of its own, so it toggles rather than navigates. */
+.nav-parent {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  background: none;
+  border: none;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.nav-caret {
+  font-size: 0.75em;
+  opacity: 0.6;
+}
+
+/* Children are indented and rule-marked so the nesting reads at a glance
+   rather than depending on indentation alone. */
+.nav-children {
+  margin-left: 0.75rem;
+  padding-left: 0.5rem;
+  border-left: 1px solid var(--border, rgba(128, 128, 128, 0.3));
+  display: flex;
+  flex-direction: column;
+}

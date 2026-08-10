@@ -16,7 +16,7 @@ import {
   type User,
 } from './api'
 import { GIT_SHA, GIT_SHA_SHORT } from './build_info'
-import { ORG_NAV_GROUPS, orgPath, sectionFromPathname } from './org_nav'
+import { ORG_NAV_GROUPS, orgPath, sectionFromPathname, type OrgNavItem } from './org_nav'
 import { getStoredTheme, toggleTheme, type ThemeMode } from './theme'
 
 function userInitials(label: string): string {
@@ -126,15 +126,25 @@ export function AppShell({ user, onLogout }: { user: User | null; onLogout: () =
                 <p className="sidebar-nav-group-label" title={group.hint}>
                   {group.label}
                 </p>
-                {group.items.map((item) => (
-                  <NavLink
-                    key={item.id}
-                    to={orgPath(routeOrgId, item.id)}
-                    className={({ isActive }) => (isActive ? 'nav-item active' : 'nav-item')}
-                  >
-                    {item.label}
-                  </NavLink>
-                ))}
+                {group.items.map((item) =>
+                  item.children ? (
+                    <NavDisclosure
+                      key={item.id}
+                      label={item.label}
+                      orgId={routeOrgId ?? ""}
+                      items={item.children}
+                      section={section}
+                    />
+                  ) : (
+                    <NavLink
+                      key={item.id}
+                      to={orgPath(routeOrgId, item.id)}
+                      className={({ isActive }) => (isActive ? 'nav-item active' : 'nav-item')}
+                    >
+                      {item.label}
+                    </NavLink>
+                  ),
+                )}
               </div>
             ))}
           </nav>
@@ -264,6 +274,62 @@ export function AppShell({ user, onLogout }: { user: User | null; onLogout: () =
           </div>
         )}
       </main>
+    </div>
+  )
+}
+
+/**
+ * A collapsible sidebar entry.
+ *
+ * Opens itself whenever one of its children is the current page, so navigating
+ * to a child can never leave you on a page that is hidden in the nav. Once
+ * open, it stays open until toggled: collapsing it out from under someone as
+ * they move between siblings would be worse than leaving it open.
+ */
+function NavDisclosure({
+  label,
+  orgId,
+  items,
+  section,
+}: {
+  label: string
+  orgId: string
+  items: OrgNavItem[]
+  section: string
+}) {
+  const hasActiveChild = items.some((i) => i.id === section)
+  const [open, setOpen] = useState(hasActiveChild)
+
+  useEffect(() => {
+    if (hasActiveChild) setOpen(true)
+  }, [hasActiveChild])
+
+  return (
+    <div className="nav-disclosure">
+      <button
+        type="button"
+        className={hasActiveChild && !open ? 'nav-item nav-parent active' : 'nav-item nav-parent'}
+        aria-expanded={open}
+        onClick={() => setOpen((v) => !v)}
+      >
+        <span>{label}</span>
+        <span aria-hidden="true" className="nav-caret">
+          {open ? '\u25be' : '\u25b8'}
+        </span>
+      </button>
+      {open && (
+        <div className="nav-children">
+          {items.map((child) => (
+            <NavLink
+              key={child.id}
+              to={orgPath(orgId, child.id)}
+              className={({ isActive }) => (isActive ? 'nav-item active' : 'nav-item')}
+            >
+              {child.label}
+            </NavLink>
+          ))}
+        </div>
+      )}
     </div>
   )
 }

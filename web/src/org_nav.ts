@@ -4,7 +4,11 @@ export type OrgSection =
   | 'roles'
   | 'users'
   | 'attributes'
-  | 'customer-access'
+  | 'customer-scope-kinds'
+  | 'customer-capabilities'
+  | 'customer-roles'
+  | 'customer-groups'
+  | 'customer-grants'
   | 'email-templates'
   | 'databases'
   | 'webhooks'
@@ -23,11 +27,20 @@ export type NavGroupId = 'product' | 'actions' | 'platform'
 
 export type OrgNavItem = { id: OrgSection; label: string; path: string }
 
+/**
+ * A sidebar entry. Either a link to a page, or a container whose children are
+ * links. A container has no page of its own, so it toggles rather than
+ * navigates.
+ */
+export type OrgNavEntry =
+  | (OrgNavItem & { children?: undefined })
+  | { id: string; label: string; children: OrgNavItem[] }
+
 export type OrgNavGroup = {
   id: NavGroupId
   label: string
   hint: string
-  items: OrgNavItem[]
+  items: OrgNavEntry[]
 }
 
 /** Flat list kept for overview tiles and path helpers. */
@@ -36,7 +49,11 @@ export const ORG_SECTIONS: OrgNavItem[] = [
   { id: 'members', label: 'Members', path: 'members' },
   { id: 'users', label: 'Users', path: 'users' },
   { id: 'attributes', label: 'User Attributes', path: 'attributes' },
-  { id: 'customer-access', label: 'Customer access', path: 'customer-access' },
+  { id: 'customer-scope-kinds', label: 'Scope kinds', path: 'customer-scope-kinds' },
+  { id: 'customer-capabilities', label: 'Capabilities', path: 'customer-capabilities' },
+  { id: 'customer-roles', label: 'Roles', path: 'customer-roles' },
+  { id: 'customer-groups', label: 'Groups', path: 'customer-groups' },
+  { id: 'customer-grants', label: 'Grants', path: 'customer-grants' },
   { id: 'email-templates', label: 'Emails', path: 'email-templates' },
   { id: 'databases', label: 'Databases', path: 'databases' },
   { id: 'webhooks', label: 'Outbound webhooks', path: 'webhooks' },
@@ -61,7 +78,19 @@ export const ORG_NAV_GROUPS: OrgNavGroup[] = [
     items: [
       { id: 'users', label: 'Users', path: 'users' },
       { id: 'attributes', label: 'User Attributes', path: 'attributes' },
-      { id: 'customer-access', label: 'Customer access', path: 'customer-access' },
+      {
+        id: 'customer-access',
+        label: 'Customer access',
+        // A container, not a page. Each child is one object type, matching how
+        // the rest of this sidebar works.
+        children: [
+          { id: 'customer-scope-kinds', label: 'Scope kinds', path: 'customer-scope-kinds' },
+          { id: 'customer-capabilities', label: 'Capabilities', path: 'customer-capabilities' },
+          { id: 'customer-roles', label: 'Roles', path: 'customer-roles' },
+          { id: 'customer-groups', label: 'Groups', path: 'customer-groups' },
+          { id: 'customer-grants', label: 'Grants', path: 'customer-grants' },
+        ],
+      },
       { id: 'automations', label: 'Automations', path: 'automations' },
       { id: 'branding', label: 'Branding', path: 'branding' },
       { id: 'product-features', label: 'Features', path: 'product-features' },
@@ -104,7 +133,11 @@ export function sectionFromPathname(pathname: string, orgId: string): OrgSection
     case 'roles':
     case 'users':
     case 'attributes':
-    case 'customer-access':
+    case 'customer-scope-kinds':
+    case 'customer-capabilities':
+    case 'customer-roles':
+    case 'customer-groups':
+    case 'customer-grants':
     case 'email-templates':
     case 'databases':
     case 'webhooks':
@@ -140,4 +173,12 @@ export function resourcePath(
   const base = orgPath(orgId, section)
   if (!parts.length) return base
   return `${base}/${parts.join('/')}`
+}
+
+/**
+ * The link entries of a group, with containers flattened to their children.
+ * Callers that care about pages rather than sidebar shape use this.
+ */
+export function navLeafItems(items: OrgNavEntry[]): OrgNavItem[] {
+  return items.flatMap((item) => (item.children ? item.children : [item]))
 }

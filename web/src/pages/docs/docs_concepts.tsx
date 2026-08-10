@@ -1,5 +1,5 @@
 import { Link, useParams } from 'react-router-dom'
-import { ORG_NAV_GROUPS, type OrgSection } from '../../org_nav'
+import { ORG_NAV_GROUPS, type OrgSection, navLeafItems } from '../../org_nav'
 import { docsBasePath } from '../../templates/paths'
 
 export type DocConcept = {
@@ -219,7 +219,7 @@ function conceptNavGroups(base: string) {
 
   const fromGroup = (groupId: string, label: string, hint: string) => {
     const group = ORG_NAV_GROUPS.find((g) => g.id === groupId)
-    const items = (group?.items ?? [])
+    const items = navLeafItems(group?.items ?? [])
       .map((item) => bySection.get(item.id))
       .filter((c): c is DocConcept => Boolean(c))
       .map((c) => ({
