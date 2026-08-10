@@ -1930,8 +1930,9 @@ html.dark-mode .docs-swagger {
   color: var(--app-danger);
 }
 
-/* Collapsible sidebar entries.
-   A parent has no page of its own, so it toggles rather than navigates. */
+/* Collapsible sidebar sections.
+   The section label is the fold, so there is one nesting mechanism and one
+   depth rather than dropdowns nested inside static headers. */
 .nav-parent {
   display: flex;
   align-items: center;
@@ -1949,12 +1950,3 @@ html.dark-mode .docs-swagger {
   opacity: 0.6;
 }
 
-/* Children are indented and rule-marked so the nesting reads at a glance
-   rather than depending on indentation alone. */
-.nav-children {
-  margin-left: 0.75rem;
-  padding-left: 0.5rem;
-  border-left: 1px solid var(--border, rgba(128, 128, 128, 0.3));
-  display: flex;
-  flex-direction: column;
-}

@@ -23,24 +23,24 @@ export type OrgSection =
   | 'activity'
   | 'docs'
 
-export type NavGroupId = 'product' | 'actions' | 'platform'
+export type NavGroupId = 'product' | 'customer-access' | 'actions' | 'platform'
 
 export type OrgNavItem = { id: OrgSection; label: string; path: string }
-
-/**
- * A sidebar entry. Either a link to a page, or a container whose children are
- * links. A container has no page of its own, so it toggles rather than
- * navigates.
- */
-export type OrgNavEntry =
-  | (OrgNavItem & { children?: undefined })
-  | { id: string; label: string; children: OrgNavItem[] }
 
 export type OrgNavGroup = {
   id: NavGroupId
   label: string
   hint: string
-  items: OrgNavEntry[]
+  items: OrgNavItem[]
+  /**
+   * Open on first render. Surfaces used daily stay open; those configured once
+   * and revisited rarely start collapsed, which is what keeps the sidebar
+   * short without hiding anything you reach for often.
+   *
+   * A collapsed group still opens itself when one of its pages is current, so
+   * you are never on a page that is invisible in the nav.
+   */
+  defaultOpen?: boolean
 }
 
 /** Flat list kept for overview tiles and path helpers. */
@@ -75,27 +75,29 @@ export const ORG_NAV_GROUPS: OrgNavGroup[] = [
     id: 'product',
     label: 'Product features',
     hint: 'What this organisation runs for its own users',
+    defaultOpen: true,
     items: [
       { id: 'users', label: 'Users', path: 'users' },
       { id: 'attributes', label: 'User Attributes', path: 'attributes' },
-      {
-        id: 'customer-access',
-        label: 'Customer access',
-        // A container, not a page. Each child is one object type, matching how
-        // the rest of this sidebar works.
-        children: [
-          { id: 'customer-scope-kinds', label: 'Scope kinds', path: 'customer-scope-kinds' },
-          { id: 'customer-capabilities', label: 'Capabilities', path: 'customer-capabilities' },
-          { id: 'customer-roles', label: 'Roles', path: 'customer-roles' },
-          { id: 'customer-groups', label: 'Groups', path: 'customer-groups' },
-          { id: 'customer-grants', label: 'Grants', path: 'customer-grants' },
-        ],
-      },
       { id: 'automations', label: 'Automations', path: 'automations' },
       { id: 'branding', label: 'Branding', path: 'branding' },
       { id: 'product-features', label: 'Features', path: 'product-features' },
       { id: 'product-plans', label: 'Plans', path: 'product-plans' },
-      { id: 'billing', label: 'Billing', path: 'billing' },
+    ],
+  },
+  {
+    // Its own section rather than a dropdown inside another one. Nesting it
+    // would put these pages three levels deep while everything else sits at
+    // two, and this surface is only going to grow.
+    id: 'customer-access',
+    label: 'Customer access',
+    hint: "What this organisation's own customers may do inside its product",
+    items: [
+      { id: 'customer-scope-kinds', label: 'Scope kinds', path: 'customer-scope-kinds' },
+      { id: 'customer-capabilities', label: 'Capabilities', path: 'customer-capabilities' },
+      { id: 'customer-roles', label: 'Roles', path: 'customer-roles' },
+      { id: 'customer-groups', label: 'Groups', path: 'customer-groups' },
+      { id: 'customer-grants', label: 'Grants', path: 'customer-grants' },
     ],
   },
   {
@@ -117,12 +119,14 @@ export const ORG_NAV_GROUPS: OrgNavGroup[] = [
       { id: 'members', label: 'Members', path: 'members' },
       { id: 'settings', label: 'Settings', path: 'settings' },
       { id: 'api-keys', label: 'API keys', path: 'api-keys' },
+      // This organisation's own subscription to KYC, not what it charges its
+      // customers. It sat under product features, which read as the latter.
+      { id: 'billing', label: 'Billing', path: 'billing' },
       { id: 'activity', label: 'Activity', path: 'activity' },
       { id: 'docs', label: 'Documentation', path: 'docs' },
     ],
   },
 ]
-
 export function sectionFromPathname(pathname: string, orgId: string): OrgSection {
   const prefix = `/orgs/${orgId}`
   if (!pathname.startsWith(prefix)) return 'overview'
@@ -173,12 +177,4 @@ export function resourcePath(
   const base = orgPath(orgId, section)
   if (!parts.length) return base
   return `${base}/${parts.join('/')}`
-}
-
-/**
- * The link entries of a group, with containers flattened to their children.
- * Callers that care about pages rather than sidebar shape use this.
- */
-export function navLeafItems(items: OrgNavEntry[]): OrgNavItem[] {
-  return items.flatMap((item) => (item.children ? item.children : [item]))
 }

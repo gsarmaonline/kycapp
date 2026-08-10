@@ -16,7 +16,7 @@ import {
   type User,
 } from './api'
 import { GIT_SHA, GIT_SHA_SHORT } from './build_info'
-import { ORG_NAV_GROUPS, orgPath, sectionFromPathname, type OrgNavItem } from './org_nav'
+import { ORG_NAV_GROUPS, orgPath, sectionFromPathname, type OrgNavGroup } from './org_nav'
 import { getStoredTheme, toggleTheme, type ThemeMode } from './theme'
 
 function userInitials(label: string): string {
@@ -122,30 +122,7 @@ export function AppShell({ user, onLogout }: { user: User | null; onLogout: () =
               Overview
             </NavLink>
             {ORG_NAV_GROUPS.map((group) => (
-              <div key={group.id} className="sidebar-nav-group">
-                <p className="sidebar-nav-group-label" title={group.hint}>
-                  {group.label}
-                </p>
-                {group.items.map((item) =>
-                  item.children ? (
-                    <NavDisclosure
-                      key={item.id}
-                      label={item.label}
-                      orgId={routeOrgId ?? ""}
-                      items={item.children}
-                      section={section}
-                    />
-                  ) : (
-                    <NavLink
-                      key={item.id}
-                      to={orgPath(routeOrgId, item.id)}
-                      className={({ isActive }) => (isActive ? 'nav-item active' : 'nav-item')}
-                    >
-                      {item.label}
-                    </NavLink>
-                  ),
-                )}
-              </div>
+              <NavSection key={group.id} group={group} orgId={routeOrgId ?? ''} section={section} />
             ))}
           </nav>
         )}
@@ -279,57 +256,57 @@ export function AppShell({ user, onLogout }: { user: User | null; onLogout: () =
 }
 
 /**
- * A collapsible sidebar entry.
+ * A collapsible sidebar section.
  *
- * Opens itself whenever one of its children is the current page, so navigating
- * to a child can never leave you on a page that is hidden in the nav. Once
- * open, it stays open until toggled: collapsing it out from under someone as
- * they move between siblings would be worse than leaving it open.
+ * Sections used to be static headers, which meant a cluster large enough to
+ * need folding had to nest inside one, putting its pages three levels deep
+ * while everything else sat at two. Making the section itself the fold keeps
+ * one mechanism and one depth.
+ *
+ * A section opens itself whenever one of its pages is current, so navigating
+ * can never leave you on a page hidden in the nav. Once open it stays open:
+ * collapsing out from under someone moving between siblings would be worse.
  */
-function NavDisclosure({
-  label,
+function NavSection({
+  group,
   orgId,
-  items,
   section,
 }: {
-  label: string
+  group: OrgNavGroup
   orgId: string
-  items: OrgNavItem[]
   section: string
 }) {
-  const hasActiveChild = items.some((i) => i.id === section)
-  const [open, setOpen] = useState(hasActiveChild)
+  const hasActiveChild = group.items.some((i) => i.id === section)
+  const [open, setOpen] = useState(hasActiveChild || Boolean(group.defaultOpen))
 
   useEffect(() => {
     if (hasActiveChild) setOpen(true)
   }, [hasActiveChild])
 
   return (
-    <div className="nav-disclosure">
+    <div className="sidebar-nav-group">
       <button
         type="button"
-        className={hasActiveChild && !open ? 'nav-item nav-parent active' : 'nav-item nav-parent'}
+        className="sidebar-nav-group-label nav-parent"
+        title={group.hint}
         aria-expanded={open}
         onClick={() => setOpen((v) => !v)}
       >
-        <span>{label}</span>
+        <span>{group.label}</span>
         <span aria-hidden="true" className="nav-caret">
           {open ? '\u25be' : '\u25b8'}
         </span>
       </button>
-      {open && (
-        <div className="nav-children">
-          {items.map((child) => (
-            <NavLink
-              key={child.id}
-              to={orgPath(orgId, child.id)}
-              className={({ isActive }) => (isActive ? 'nav-item active' : 'nav-item')}
-            >
-              {child.label}
-            </NavLink>
-          ))}
-        </div>
-      )}
+      {open &&
+        group.items.map((item) => (
+          <NavLink
+            key={item.id}
+            to={orgPath(orgId, item.id)}
+            className={({ isActive }) => (isActive ? 'nav-item active' : 'nav-item')}
+          >
+            {item.label}
+          </NavLink>
+        ))}
     </div>
   )
 }
