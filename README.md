@@ -124,6 +124,8 @@ sequenceDiagram
 
 **Merchant product surface:** app users, attributes, product features/plans, branding, email templates, automations (River + Resend), KYC billing via Stripe executor. In-app **Documentation** (OpenAPI + [variable referencing](docs/variables.md)) is under each organisation sidebar.
 
+**Merchant access control:** merchants declare their own scope kinds, capabilities and roles for their **app users**, with role inheritance, and read back a cached grant set to evaluate in their own backend. See [authorisation](docs/authorisation.md#merchant-hosted-access-control).
+
 **Merchant SDK:** the generated **transport layer** ships for Go and TypeScript ([sdk/](sdk/README.md)) — types plus a typed client for the 25 Integration API paths, regenerated from the spec by `make sdk` and drift-checked in CI.
 
 Still later: the SDK ergonomic facade, settings embed, invite email polish, full platform-admin UI.

@@ -27,6 +27,11 @@ var kycPermissionKeys = []string{
 	"activity:read",
 	"api_keys:manage",
 	"api_keys:read",
+	// Administering a merchant's own access model is a KYC permission held by
+	// their operators. It is not a capability in the merchant's namespace: they
+	// administer the model without being inside it.
+	"app_access:manage",
+	"app_access:read",
 	"app_users:read",
 	"app_users:write",
 	"attributes:manage",

@@ -24,6 +24,51 @@ type ApiKey struct {
 	UserID         pgtype.Text        `json:"user_id"`
 }
 
+type AppCapability struct {
+	ID             string    `json:"id"`
+	OrganisationID string    `json:"organisation_id"`
+	Key            string    `json:"key"`
+	Description    string    `json:"description"`
+	CreatedAt      time.Time `json:"created_at"`
+}
+
+type AppGrant struct {
+	ID             string             `json:"id"`
+	OrganisationID string             `json:"organisation_id"`
+	AppUserID      string             `json:"app_user_id"`
+	RoleID         string             `json:"role_id"`
+	ScopeKind      string             `json:"scope_kind"`
+	ScopeID        string             `json:"scope_id"`
+	ExpiresAt      pgtype.Timestamptz `json:"expires_at"`
+	GrantedBy      string             `json:"granted_by"`
+	CreatedAt      time.Time          `json:"created_at"`
+}
+
+type AppRole struct {
+	ID                    string    `json:"id"`
+	OrganisationID        string    `json:"organisation_id"`
+	Key                   string    `json:"key"`
+	Name                  string    `json:"name"`
+	Description           string    `json:"description"`
+	OwnCapabilities       []string  `json:"own_capabilities"`
+	EffectiveCapabilities []string  `json:"effective_capabilities"`
+	CreatedAt             time.Time `json:"created_at"`
+	UpdatedAt             time.Time `json:"updated_at"`
+}
+
+type AppRoleExtend struct {
+	RoleID   string `json:"role_id"`
+	ParentID string `json:"parent_id"`
+}
+
+type AppScopeType struct {
+	ID             string    `json:"id"`
+	OrganisationID string    `json:"organisation_id"`
+	Kind           string    `json:"kind"`
+	Label          string    `json:"label"`
+	CreatedAt      time.Time `json:"created_at"`
+}
+
 type AppUser struct {
 	ID             string          `json:"id"`
 	OrganisationID string          `json:"organisation_id"`
