@@ -309,13 +309,12 @@ type ProductPlanPrice struct {
 }
 
 type Role struct {
-	ID                string `json:"id"`
-	OrganisationID    string `json:"organisation_id"`
-	Key               string `json:"key"`
-	Name              string `json:"name"`
-	Description       string `json:"description"`
-	IsSystem          bool   `json:"is_system"`
-	GrantsGlobalReach bool   `json:"grants_global_reach"`
+	ID             string `json:"id"`
+	OrganisationID string `json:"organisation_id"`
+	Key            string `json:"key"`
+	Name           string `json:"name"`
+	Description    string `json:"description"`
+	IsSystem       bool   `json:"is_system"`
 }
 
 type RolePermission struct {

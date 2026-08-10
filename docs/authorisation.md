@@ -67,7 +67,7 @@ There is no grants table. Every grant comes from a relationship that already exi
 | Break-glass (environment) | Global scope, every capability |
 | Org API key row | That organisation, narrowed by `Scopes` |
 | Active membership | That organisation, with the role's capabilities |
-| Active membership whose role has `grants_global_reach` | **Global** scope, with the role's capabilities |
+| Active membership **of the platform organisation** | **Global** scope, with the role's capabilities |
 
 Membership stays the single source of truth for organisation access, so there is no backfill and no dual-write. Assembly runs once per request (`service/grants.go`); the decision is then a set lookup.
 
@@ -148,7 +148,7 @@ Out of scope is a 404, byte-identical to a resource that does not exist. Otherwi
 | 1 | **Deny by default.** Empty grants nothing. | A permissive default is the most common real escalation. |
 | 2 | **No principal may grant what it does not hold.** | Makes escalation structurally impossible, not review-dependent. |
 | 3 | **Capabilities are a closed set per namespace.** | A typo cannot reach a grant. |
-| 4 | **Global reach is issued, never assigned.** | Standing cross-tenant access should need a reason. |
+| 4 | **Global reach is derived, never set.** | It comes from membership of the platform organisation, so obtaining it means being invited there. No column to guard. |
 | 5 | **Out of scope is indistinguishable from absent.** | Tenants must not be enumerable. |
 | 6 | **Additive only. No deny rules, ever.** | Union is commutative, so multiple role inheritance is safe and diamonds need no precedence rules. |
 
@@ -198,7 +198,7 @@ The README lists *"not Auth0/Clerk-for-your-customers"* as a non-goal. That is a
 | 1 | [`core/access`](../core/access): capability, scope, grant set, role expansion, `Decide`, delegation. | **Built** |
 | 2 | Grant assembly from existing relationships, plus KYC's capability registry. | **Built** |
 | 3 | Org-scoped gates evaluate through `Decide`. | **Built** |
-| 4 | KYC as an organisation: staff are members of `org_platform`, roles carry `grants_global_reach`, memberships can expire, bootstrap is marker-gated. | **Built** |
+| 4 | KYC as an organisation: staff are members of `org_platform`, reach is derived from that membership, memberships can expire, bootstrap is marker-gated. | **Built** |
 | 5 | Platform routes gated by capability instead of staff status. | **Built** |
 | 6 | API and UI for issuing time-boxed staff access, so just-in-time becomes the default rather than something the schema merely allows. | Not started |
 | 7 | Merchant-hosted access control. | Not started |

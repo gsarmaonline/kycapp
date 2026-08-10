@@ -325,3 +325,67 @@ func TestRootRoleHasFullReach(t *testing.T) {
 		t.Fatalf("root must create plans: %d %s", plan.Code, plan.Body.String())
 	}
 }
+
+// Global reach is derived from membership of the platform organisation, never
+// stored on a role. A merchant can therefore configure their own roles however
+// they like and never reach another tenant.
+//
+// This replaced a roles.grants_global_reach column. That column was safe only
+// because no handler exposed it: adding the field to the role patch body would
+// have handed any org admin cross-tenant reach, with nothing to catch it.
+func TestMerchantRoleCannotProduceGlobalReach(t *testing.T) {
+	ctx := context.Background()
+	db := openTestDB(t, ctx)
+	h := serverWithPlatformAdmins(t, db)
+
+	// Two merchants, each with an owner holding every permission in their org.
+	a, tokenA, _ := doBootstrapOrg(t, h, "owner-a@acme.com", "Owner A", "Alpha", "alpha")
+	b, _, _ := doBootstrapOrg(t, h, "owner-b@beta.com", "Owner B", "Beta", "beta")
+	orgA := a["organisation"].(map[string]any)["id"].(string)
+	orgB := b["organisation"].(map[string]any)["id"].(string)
+
+	// Owner A creates the most powerful role their organisation allows.
+	perms := doJSON(t, h, http.MethodGet, "/v1/permissions", nil, userAuth(tokenA))
+	if perms.Code != http.StatusOK {
+		t.Fatalf("list permissions: %d %s", perms.Code, perms.Body.String())
+	}
+	var catalog struct {
+		Items []struct {
+			Key string `json:"key"`
+		} `json:"items"`
+	}
+	if err := json.Unmarshal(perms.Body.Bytes(), &catalog); err != nil {
+		t.Fatalf("decode permissions: %v", err)
+	}
+	keys := make([]string, 0, len(catalog.Items))
+	for _, p := range catalog.Items {
+		keys = append(keys, p.Key)
+	}
+
+	created := doJSON(t, h, http.MethodPost, "/v1/organisations/"+orgA+"/roles", map[string]any{
+		"key": "superpowers", "name": "Superpowers", "permission_keys": keys,
+	}, userAuth(tokenA))
+	if created.Code != http.StatusCreated {
+		t.Fatalf("create role: %d %s", created.Code, created.Body.String())
+	}
+
+	// A client cannot smuggle a reach field in either: unknown fields are
+	// rejected outright, so this fails at decode rather than being ignored.
+	smuggled := doJSON(t, h, http.MethodPost, "/v1/organisations/"+orgA+"/roles", map[string]any{
+		"key": "sneaky", "name": "Sneaky", "grants_global_reach": true,
+	}, userAuth(tokenA))
+	if smuggled.Code != http.StatusBadRequest {
+		t.Fatalf("unknown role fields must be rejected: got %d %s", smuggled.Code, smuggled.Body.String())
+	}
+
+	// Owner A still cannot see Beta, and the denial is a 404 like any other
+	// unreachable tenant.
+	reach := doJSON(t, h, http.MethodGet, "/v1/organisations/"+orgB, nil, userAuth(tokenA))
+	if reach.Code != http.StatusNotFound {
+		t.Fatalf("merchant reached another tenant: want 404, got %d %s", reach.Code, reach.Body.String())
+	}
+	read := doJSON(t, h, http.MethodGet, "/v1/organisations/"+orgB+"/app-users", nil, userAuth(tokenA))
+	if read.Code != http.StatusNotFound {
+		t.Fatalf("merchant read another tenant's app users: want 404, got %d %s", read.Code, read.Body.String())
+	}
+}

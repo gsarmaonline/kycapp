@@ -55,15 +55,15 @@ Concretely:
 | Caller | What it is |
 | --- | --- |
 | **Operator** | Priya at Acme. Signs in with Google, manages Acme. Sees only Acme. |
-| **Staff** | Dana at KYC. Signs in the same way. Because she is a member of the platform organisation with a role carrying global reach, she reaches every merchant — limited to that role's capabilities. |
+| **Staff** | Dana at KYC. Signs in the same way. Because she is a member of the platform organisation, she reaches every merchant — limited to her role's capabilities. |
 | **Org API key** | Acme's backend calling `entitlements/check` at 3am. No human involved. |
 | **Break-glass** | An ops script, or you recovering a broken database. Resolves from the environment, not from data. |
 
 ### Operator and Staff are the same mechanism
 
-Both are `KindUser`: same Google login, same session, same code path. The only difference is **which organisation they are a member of**. Staff belong to the seeded platform organisation (`org_platform`), and their role carries `grants_global_reach`.
+Both are `KindUser`: same Google login, same session, same code path. The only difference is **which organisation they are a member of**. Staff belong to the seeded platform organisation (`org_platform`); that membership is what confers reach.
 
-There is no staff flag, no staff table, and no role name in Go. Flipping that column on a role changes reach; nothing else changes.
+There is no staff flag, no staff table, and no role name in Go. Reach is **derived** from which organisation the membership is in, so a merchant can configure their own roles however they like and never reach another tenant.
 
 ### Reach is not power
 
@@ -102,7 +102,7 @@ Break-glass resolves from an environment variable **before any query runs**. Tha
 
 **Shipped.** `AuthenticateBearer` (`service/auth.go:28`) tries three things; the first match wins.
 
-1. **Session** — SHA-256 lookup in `sessions`. The SQL enforces liveness (`revoked_at IS NULL AND expires_at > now()`) and the joined user must be `active`. Platform status is then read from the data: a live membership whose role carries global reach.
+1. **Session** — SHA-256 lookup in `sessions`. The SQL enforces liveness (`revoked_at IS NULL AND expires_at > now()`) and the joined user must be `active`. Staff status is then read from the data: a live membership of the platform organisation.
 2. **Break-glass** — constant-time compare against `API_TOKENS`. Reaches everything, belongs to no organisation.
 3. **API key** — SHA-256 lookup in `api_keys`. With an organisation it is org-scoped; without one it is platform. `last_used_at` is touched on every use.
 

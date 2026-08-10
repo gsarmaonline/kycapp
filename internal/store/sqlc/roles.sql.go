@@ -56,7 +56,7 @@ func (q *Queries) CheckUserPermission(ctx context.Context, arg CheckUserPermissi
 const createRole = `-- name: CreateRole :one
 INSERT INTO roles (id, organisation_id, key, name, description, is_system)
 VALUES ($1, $2, $3, $4, $5, $6)
-RETURNING id, organisation_id, key, name, description, is_system, grants_global_reach
+RETURNING id, organisation_id, key, name, description, is_system
 `
 
 type CreateRoleParams struct {
@@ -85,7 +85,6 @@ func (q *Queries) CreateRole(ctx context.Context, arg CreateRoleParams) (Role, e
 		&i.Name,
 		&i.Description,
 		&i.IsSystem,
-		&i.GrantsGlobalReach,
 	)
 	return i, err
 }
@@ -156,7 +155,7 @@ func (q *Queries) GetPermissionByResourceAction(ctx context.Context, arg GetPerm
 }
 
 const getRole = `-- name: GetRole :one
-SELECT id, organisation_id, key, name, description, is_system, grants_global_reach FROM roles
+SELECT id, organisation_id, key, name, description, is_system FROM roles
 WHERE id = $1
 `
 
@@ -170,13 +169,12 @@ func (q *Queries) GetRole(ctx context.Context, id string) (Role, error) {
 		&i.Name,
 		&i.Description,
 		&i.IsSystem,
-		&i.GrantsGlobalReach,
 	)
 	return i, err
 }
 
 const getRoleByOrgAndKey = `-- name: GetRoleByOrgAndKey :one
-SELECT id, organisation_id, key, name, description, is_system, grants_global_reach FROM roles
+SELECT id, organisation_id, key, name, description, is_system FROM roles
 WHERE organisation_id = $1 AND key = $2
 `
 
@@ -195,7 +193,6 @@ func (q *Queries) GetRoleByOrgAndKey(ctx context.Context, arg GetRoleByOrgAndKey
 		&i.Name,
 		&i.Description,
 		&i.IsSystem,
-		&i.GrantsGlobalReach,
 	)
 	return i, err
 }
@@ -358,7 +355,7 @@ func (q *Queries) ListPermissionsFiltered(ctx context.Context, arg ListPermissio
 }
 
 const listRolesByOrganisation = `-- name: ListRolesByOrganisation :many
-SELECT id, organisation_id, key, name, description, is_system, grants_global_reach FROM roles
+SELECT id, organisation_id, key, name, description, is_system FROM roles
 WHERE organisation_id = $1
 ORDER BY key
 `
@@ -379,7 +376,6 @@ func (q *Queries) ListRolesByOrganisation(ctx context.Context, organisationID st
 			&i.Name,
 			&i.Description,
 			&i.IsSystem,
-			&i.GrantsGlobalReach,
 		); err != nil {
 			return nil, err
 		}
@@ -394,15 +390,14 @@ func (q *Queries) ListRolesByOrganisation(ctx context.Context, organisationID st
 const listUserGlobalReach = `-- name: ListUserGlobalReach :many
 SELECT m.id
 FROM memberships m
-JOIN roles r ON r.id = m.role_id
 WHERE m.user_id = $1
   AND m.status = 'active'
-  AND r.grants_global_reach
   AND (m.expires_at IS NULL OR m.expires_at > now())
+  AND m.organisation_id = (SELECT platform_organisation_id FROM system_state WHERE id = 1)
 `
 
-// ListUserGlobalReach returns the user's live global-reach memberships. Used to
-// decide platform status without naming any role.
+// ListUserGlobalReach returns the user's live memberships of the platform
+// organisation. Used to report staff status without naming any role.
 func (q *Queries) ListUserGlobalReach(ctx context.Context, userID string) ([]string, error) {
 	rows, err := q.db.Query(ctx, listUserGlobalReach, userID)
 	if err != nil {
@@ -424,15 +419,20 @@ func (q *Queries) ListUserGlobalReach(ctx context.Context, userID string) ([]str
 }
 
 const listUserGrantSources = `-- name: ListUserGrantSources :many
-SELECT m.organisation_id, r.grants_global_reach, p.key AS permission_key
+SELECT
+    m.organisation_id,
+    COALESCE(m.organisation_id = (SELECT platform_organisation_id FROM system_state WHERE id = 1), false)::boolean AS global_reach,
+    p.key AS permission_key
 FROM memberships m
-JOIN roles r ON r.id = m.role_id
 LEFT JOIN role_permissions rp ON rp.role_id = m.role_id
 LEFT JOIN permissions p ON p.id = rp.permission_id
 WHERE m.user_id = $1
   AND m.status = 'active'
   AND (m.expires_at IS NULL OR m.expires_at > now())
-  AND (m.organisation_id = $2 OR r.grants_global_reach)
+  AND (
+        m.organisation_id = $2
+     OR m.organisation_id = (SELECT platform_organisation_id FROM system_state WHERE id = 1)
+  )
 ORDER BY m.organisation_id
 `
 
@@ -442,15 +442,20 @@ type ListUserGrantSourcesParams struct {
 }
 
 type ListUserGrantSourcesRow struct {
-	OrganisationID    string      `json:"organisation_id"`
-	GrantsGlobalReach bool        `json:"grants_global_reach"`
-	PermissionKey     pgtype.Text `json:"permission_key"`
+	OrganisationID string      `json:"organisation_id"`
+	GlobalReach    bool        `json:"global_reach"`
+	PermissionKey  pgtype.Text `json:"permission_key"`
 }
 
 // ListUserGrantSources returns everything a user's memberships confer that is
-// relevant to one organisation: the organisation's own memberships, plus any
-// membership whose role carries global reach. Expired and inactive memberships
-// are excluded here so assembly never has to filter them.
+// relevant to one organisation: that organisation's own membership, plus any
+// membership of the platform organisation, which is what makes someone staff.
+//
+// Global reach is derived here, never stored. A role in a merchant organisation
+// can therefore never produce one, whatever anybody sets on it.
+//
+// COALESCE keeps this failing closed: with no system_state row the comparison
+// is NULL, and nobody gets reach.
 //
 // LEFT JOIN on purpose: a membership with a permissionless role still confers
 // reach, and dropping it would make such a member invisible rather than
@@ -464,7 +469,7 @@ func (q *Queries) ListUserGrantSources(ctx context.Context, arg ListUserGrantSou
 	items := []ListUserGrantSourcesRow{}
 	for rows.Next() {
 		var i ListUserGrantSourcesRow
-		if err := rows.Scan(&i.OrganisationID, &i.GrantsGlobalReach, &i.PermissionKey); err != nil {
+		if err := rows.Scan(&i.OrganisationID, &i.GlobalReach, &i.PermissionKey); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
@@ -481,7 +486,7 @@ SET
   name = COALESCE($1, name),
   description = COALESCE($2, description)
 WHERE id = $3
-RETURNING id, organisation_id, key, name, description, is_system, grants_global_reach
+RETURNING id, organisation_id, key, name, description, is_system
 `
 
 type UpdateRoleParams struct {
@@ -500,7 +505,6 @@ func (q *Queries) UpdateRole(ctx context.Context, arg UpdateRoleParams) (Role, e
 		&i.Name,
 		&i.Description,
 		&i.IsSystem,
-		&i.GrantsGlobalReach,
 	)
 	return i, err
 }

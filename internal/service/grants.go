@@ -154,9 +154,10 @@ func (s *Service) grantsFor(ctx context.Context, p authn.Principal, orgID string
 
 // grantsFromMemberships folds membership rows into grants.
 //
-// Scope comes from the role's grants_global_reach column, never from a role
-// name: this code cannot tell "root" from any other role, which is what keeps
-// staff access expressible entirely as data.
+// Scope comes from which organisation the membership is in: a membership of the
+// platform organisation reaches everything. There is no role name here and no
+// stored reach flag, so a role in a merchant organisation cannot produce global
+// scope however it is configured.
 func grantsFromMemberships(rows []sqlc.ListUserGrantSourcesRow, orgID string) []access.Grant {
 	// One grant per membership, keyed by organisation.
 	type acc struct {
@@ -174,7 +175,7 @@ func grantsFromMemberships(rows []sqlc.ListUserGrantSourcesRow, orgID string) []
 			byOrg[r.OrganisationID] = a
 			order = append(order, r.OrganisationID)
 		}
-		a.global = a.global || r.GrantsGlobalReach
+		a.global = a.global || r.GlobalReach
 		// permission_key is NULL when the role carries no permissions. The
 		// membership still confers reach, so the row is not skipped.
 		if !r.PermissionKey.Valid {
