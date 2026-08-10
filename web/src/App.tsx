@@ -48,6 +48,7 @@ import { ProductPlansNew } from './pages/product_plans/product_plans_new'
 import { ProductPlansShow } from './pages/product_plans/product_plans_show'
 import { UsersEdit } from './pages/users/users_edit'
 import { UsersIndex } from './pages/users/users_index'
+import { AppAccessPage } from './pages/app_access/app_access_page'
 import { UsersNew } from './pages/users/users_new'
 import { UsersShow } from './pages/users/users_show'
 import { WebhooksEdit } from './pages/webhooks/webhooks_edit'
@@ -168,6 +169,7 @@ export default function App() {
         {/* Operator roles UI hidden; seeded roles still used when inviting members. */}
         <Route path="roles/*" element={<Navigate to="../members" replace />} />
         <Route path="users" element={<UsersIndex />} />
+        <Route path="customer-access" element={<AppAccessPage />} />
         <Route path="users/new" element={<UsersNew />} />
         <Route path="users/:id" element={<UsersShow />} />
         <Route path="users/:id/edit" element={<UsersEdit />} />

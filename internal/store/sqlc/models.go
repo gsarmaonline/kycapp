@@ -35,13 +35,14 @@ type AppCapability struct {
 type AppGrant struct {
 	ID             string             `json:"id"`
 	OrganisationID string             `json:"organisation_id"`
-	AppUserID      string             `json:"app_user_id"`
+	AppUserID      pgtype.Text        `json:"app_user_id"`
 	RoleID         string             `json:"role_id"`
 	ScopeKind      string             `json:"scope_kind"`
 	ScopeID        string             `json:"scope_id"`
 	ExpiresAt      pgtype.Timestamptz `json:"expires_at"`
 	GrantedBy      string             `json:"granted_by"`
 	CreatedAt      time.Time          `json:"created_at"`
+	GroupID        pgtype.Text        `json:"group_id"`
 }
 
 type AppRole struct {
@@ -79,6 +80,22 @@ type AppUser struct {
 	Attributes     json.RawMessage `json:"attributes"`
 	CreatedAt      time.Time       `json:"created_at"`
 	UpdatedAt      time.Time       `json:"updated_at"`
+}
+
+type AppUserGroup struct {
+	ID             string    `json:"id"`
+	OrganisationID string    `json:"organisation_id"`
+	Key            string    `json:"key"`
+	Name           string    `json:"name"`
+	Description    string    `json:"description"`
+	CreatedAt      time.Time `json:"created_at"`
+	UpdatedAt      time.Time `json:"updated_at"`
+}
+
+type AppUserGroupMember struct {
+	GroupID   string    `json:"group_id"`
+	AppUserID string    `json:"app_user_id"`
+	CreatedAt time.Time `json:"created_at"`
 }
 
 type AttributeDefinition struct {

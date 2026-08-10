@@ -1232,3 +1232,203 @@ export function listOrgUsage(orgId: string, opts?: { from?: string; to?: string 
   const q = params.toString() ? `?${params}` : ''
   return request<{ items: UsageCounter[] }>(`/v1/organisations/${orgId}/usage${q}`)
 }
+
+// --- Merchant-hosted access control ---
+//
+// The merchant's own model for their app users: scope kinds, capabilities,
+// roles with inheritance, groups, and grants. Distinct from KYC's own roles and
+// permissions, which govern the operators configuring all this.
+
+export type AppScopeType = { id: string; kind: string; label: string }
+export type AppCapability = { id: string; key: string; description: string }
+
+export type AppRole = {
+  id: string
+  key: string
+  name: string
+  description: string
+  own_capabilities: string[]
+  /** What the role resolves to once inheritance is applied. */
+  effective_capabilities: string[]
+}
+
+export type AppUserGroup = {
+  id: string
+  key: string
+  name: string
+  description: string
+  member_count: number
+}
+
+export type AppGrant = {
+  id: string
+  role_key: string
+  scope_kind: string
+  scope_id: string
+  subject_kind: 'app_user' | 'group'
+  subject_label: string
+  expires_at?: string
+}
+
+export type AppGroupMember = {
+  id: string
+  email: string | null
+  display_name: string
+  status: string
+}
+
+export function listAppScopeTypes(orgId: string) {
+  return request<{ items: AppScopeType[] }>(`/v1/organisations/${orgId}/app-scope-types`)
+}
+
+export function createAppScopeType(orgId: string, body: { kind: string; label?: string }) {
+  return request<AppScopeType>(`/v1/organisations/${orgId}/app-scope-types`, {
+    method: 'POST',
+    body: JSON.stringify(body),
+  })
+}
+
+export function deleteAppScopeType(orgId: string, id: string) {
+  return request<void>(`/v1/organisations/${orgId}/app-scope-types/${id}`, { method: 'DELETE' })
+}
+
+export function listAppCapabilities(orgId: string) {
+  return request<{ items: AppCapability[] }>(`/v1/organisations/${orgId}/app-capabilities`)
+}
+
+export function createAppCapability(orgId: string, body: { key: string; description?: string }) {
+  return request<AppCapability>(`/v1/organisations/${orgId}/app-capabilities`, {
+    method: 'POST',
+    body: JSON.stringify(body),
+  })
+}
+
+export function deleteAppCapability(orgId: string, id: string) {
+  return request<void>(`/v1/organisations/${orgId}/app-capabilities/${id}`, { method: 'DELETE' })
+}
+
+export function listAppRoles(orgId: string) {
+  return request<{ items: AppRole[] }>(`/v1/organisations/${orgId}/app-roles`)
+}
+
+export function createAppRole(
+  orgId: string,
+  body: { key: string; name?: string; description?: string; capabilities?: string[]; extends?: string[] },
+) {
+  return request<AppRole>(`/v1/organisations/${orgId}/app-roles`, {
+    method: 'POST',
+    body: JSON.stringify(body),
+  })
+}
+
+export function updateAppRole(
+  orgId: string,
+  roleId: string,
+  body: { name?: string; description?: string; capabilities?: string[]; extends?: string[] },
+) {
+  return request<AppRole>(`/v1/organisations/${orgId}/app-roles/${roleId}`, {
+    method: 'PATCH',
+    body: JSON.stringify(body),
+  })
+}
+
+export function deleteAppRole(orgId: string, roleId: string) {
+  return request<void>(`/v1/organisations/${orgId}/app-roles/${roleId}`, { method: 'DELETE' })
+}
+
+export function listAppUserGroups(orgId: string) {
+  return request<{ items: AppUserGroup[] }>(`/v1/organisations/${orgId}/app-user-groups`)
+}
+
+export function createAppUserGroup(orgId: string, body: { key: string; name?: string; description?: string }) {
+  return request<AppUserGroup>(`/v1/organisations/${orgId}/app-user-groups`, {
+    method: 'POST',
+    body: JSON.stringify(body),
+  })
+}
+
+export function deleteAppUserGroup(orgId: string, groupId: string) {
+  return request<void>(`/v1/organisations/${orgId}/app-user-groups/${groupId}`, { method: 'DELETE' })
+}
+
+export function listAppGroupMembers(orgId: string, groupId: string) {
+  return request<{ items: AppGroupMember[] }>(
+    `/v1/organisations/${orgId}/app-user-groups/${groupId}/members`,
+  )
+}
+
+export function addAppGroupMember(orgId: string, groupId: string, appUserId: string) {
+  return request<{ ok: boolean }>(`/v1/organisations/${orgId}/app-user-groups/${groupId}/members`, {
+    method: 'POST',
+    body: JSON.stringify({ app_user_id: appUserId }),
+  })
+}
+
+export function removeAppGroupMember(orgId: string, groupId: string, appUserId: string) {
+  return request<void>(
+    `/v1/organisations/${orgId}/app-user-groups/${groupId}/members/${appUserId}`,
+    { method: 'DELETE' },
+  )
+}
+
+export function listAppGrants(orgId: string) {
+  return request<{ items: AppGrant[] }>(`/v1/organisations/${orgId}/app-grants`)
+}
+
+export function createAppGrant(
+  orgId: string,
+  body: {
+    app_user_id?: string
+    group_id?: string
+    role_id: string
+    scope_kind: string
+    scope_id: string
+    expires_at?: string
+  },
+) {
+  return request<{ id: string }>(`/v1/organisations/${orgId}/app-grants`, {
+    method: 'POST',
+    body: JSON.stringify(body),
+  })
+}
+
+export function deleteAppGrant(orgId: string, grantId: string) {
+  return request<void>(`/v1/organisations/${orgId}/app-grants/${grantId}`, { method: 'DELETE' })
+}
+
+export function updateAppUserGroup(
+  orgId: string,
+  groupId: string,
+  body: { name?: string; description?: string },
+) {
+  return request<AppUserGroup>(`/v1/organisations/${orgId}/app-user-groups/${groupId}`, {
+    method: 'PATCH',
+    body: JSON.stringify(body),
+  })
+}
+
+/** Which groups a customer belongs to. Half of "why do they have this access?". */
+export function listGroupsForAppUser(appUserId: string) {
+  return request<{ items: { id: string; key: string; name: string }[] }>(
+    `/v1/app-users/${appUserId}/groups`,
+  )
+}
+
+export type AppAccessSet = {
+  app_user_id: string
+  namespace: string
+  version: number
+  grants: {
+    id: string
+    scope_kind: string
+    scope_id: string
+    capabilities: string[]
+    /** Names the group a capability came through, when it did. */
+    source: string
+    expires_at?: string
+  }[]
+}
+
+export function getAppUserAccess(appUserId: string) {
+  return request<AppAccessSet>(`/v1/app-users/${appUserId}/access`)
+}

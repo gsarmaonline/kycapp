@@ -295,8 +295,11 @@ func (s *Service) assertDeclaredCapabilities(ctx context.Context, orgID string, 
 
 // --- Grants ---
 
+// AppGrantInput carries exactly one subject: an app user or a group. A grant
+// with neither would apply to nobody; one with both would be ambiguous.
 type AppGrantInput struct {
 	AppUserID string
+	GroupID   string
 	RoleID    string
 	ScopeKind string
 	ScopeID   string
@@ -337,10 +340,122 @@ func (s *Service) CreateAppGrant(ctx context.Context, orgID string, in AppGrantI
 	if in.ExpiresAt != nil {
 		expires = pgtype.Timestamptz{Time: in.ExpiresAt.UTC(), Valid: true}
 	}
-	return s.db.Q().CreateAppGrant(ctx, sqlc.CreateAppGrantParams{
-		ID: ids.New(), OrganisationID: orgID, AppUserID: in.AppUserID, RoleID: in.RoleID,
+	if (in.AppUserID == "") == (in.GroupID == "") {
+		return sqlc.AppGrant{}, apperr.Validation("provide exactly one of app_user_id or group_id")
+	}
+	if in.GroupID != "" {
+		group, err := s.db.Q().GetAppUserGroup(ctx, in.GroupID)
+		if errors.Is(err, pgx.ErrNoRows) || (err == nil && group.OrganisationID != orgID) {
+			return sqlc.AppGrant{}, apperr.Validation("unknown group")
+		}
+		if err != nil {
+			return sqlc.AppGrant{}, err
+		}
+		return s.db.Q().CreateAppGroupGrant(ctx, sqlc.CreateAppGroupGrantParams{
+			ID: ids.New(), OrganisationID: orgID, GroupID: textArg(in.GroupID), RoleID: in.RoleID,
+			ScopeKind: kind, ScopeID: scopeID, ExpiresAt: expires, GrantedBy: in.GrantedBy,
+		})
+	}
+	return s.db.Q().CreateAppUserGrant(ctx, sqlc.CreateAppUserGrantParams{
+		ID: ids.New(), OrganisationID: orgID, AppUserID: textArg(in.AppUserID), RoleID: in.RoleID,
 		ScopeKind: kind, ScopeID: scopeID, ExpiresAt: expires, GrantedBy: in.GrantedBy,
 	})
+}
+
+// --- Groups ---
+//
+// A group answers "which principals"; a scope answers "which resources". Keeping
+// them separate is what lets a grant gain a subject without changing shape.
+//
+// Membership is an explicit list. Rules over attributes would make every
+// attribute write a permission change, which needs its own audit story and is
+// deliberately not built here.
+
+type AppUserGroupInput struct {
+	Key         string
+	Name        string
+	Description string
+}
+
+func (s *Service) CreateAppUserGroup(ctx context.Context, orgID string, in AppUserGroupInput) (sqlc.AppUserGroup, error) {
+	key := strings.ToLower(strings.TrimSpace(in.Key))
+	if !scopeKindPattern.MatchString(key) {
+		return sqlc.AppUserGroup{}, apperr.Validation("group key must be lowercase letters, digits and underscores")
+	}
+	name := strings.TrimSpace(in.Name)
+	if name == "" {
+		name = key
+	}
+	row, err := s.db.Q().CreateAppUserGroup(ctx, sqlc.CreateAppUserGroupParams{
+		ID: ids.New(), OrganisationID: orgID, Key: key, Name: name,
+		Description: strings.TrimSpace(in.Description),
+	})
+	if store.IsUniqueViolation(err) {
+		return sqlc.AppUserGroup{}, apperr.Conflict("group key already exists")
+	}
+	return row, err
+}
+
+func (s *Service) ListAppUserGroups(ctx context.Context, orgID string) ([]sqlc.ListAppUserGroupsRow, error) {
+	return s.db.Q().ListAppUserGroups(ctx, orgID)
+}
+
+func (s *Service) UpdateAppUserGroup(ctx context.Context, orgID, id string, in AppUserGroupInput) (sqlc.AppUserGroup, error) {
+	params := sqlc.UpdateAppUserGroupParams{ID: id, OrganisationID: orgID}
+	if in.Name != "" {
+		params.Name = pgtype.Text{String: in.Name, Valid: true}
+	}
+	if in.Description != "" {
+		params.Description = pgtype.Text{String: in.Description, Valid: true}
+	}
+	row, err := s.db.Q().UpdateAppUserGroup(ctx, params)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return sqlc.AppUserGroup{}, apperr.NotFound("group not found")
+	}
+	return row, err
+}
+
+func (s *Service) DeleteAppUserGroup(ctx context.Context, orgID, id string) error {
+	return s.db.Q().DeleteAppUserGroup(ctx, sqlc.DeleteAppUserGroupParams{ID: id, OrganisationID: orgID})
+}
+
+// SetAppUserGroupMember adds or removes one member, after checking the group and
+// the app user belong to the same organisation. Without that check a merchant
+// could add another tenant's customer to their group.
+func (s *Service) SetAppUserGroupMember(ctx context.Context, orgID, groupID, appUserID string, member bool) error {
+	group, err := s.db.Q().GetAppUserGroup(ctx, groupID)
+	if errors.Is(err, pgx.ErrNoRows) || (err == nil && group.OrganisationID != orgID) {
+		return apperr.NotFound("group not found")
+	}
+	if err != nil {
+		return err
+	}
+	user, err := s.GetAppUser(ctx, appUserID)
+	if err != nil {
+		return err
+	}
+	if user.OrganisationID != orgID {
+		return apperr.NotFound("app user not found")
+	}
+	if member {
+		return s.db.Q().AddAppUserToGroup(ctx, sqlc.AddAppUserToGroupParams{GroupID: groupID, AppUserID: appUserID})
+	}
+	return s.db.Q().RemoveAppUserFromGroup(ctx, sqlc.RemoveAppUserFromGroupParams{GroupID: groupID, AppUserID: appUserID})
+}
+
+func (s *Service) ListAppUserGroupMembers(ctx context.Context, groupID string) ([]sqlc.ListAppUserGroupMembersRow, error) {
+	return s.db.Q().ListAppUserGroupMembers(ctx, groupID)
+}
+
+func (s *Service) ListGroupsForAppUser(ctx context.Context, appUserID string) ([]sqlc.ListGroupsForAppUserRow, error) {
+	return s.db.Q().ListGroupsForAppUser(ctx, appUserID)
+}
+
+func (s *Service) ListAppGrantsForOrg(ctx context.Context, orgID string, limit int32) ([]sqlc.ListAppGrantsForOrgRow, error) {
+	if limit <= 0 || limit > 500 {
+		limit = 200
+	}
+	return s.db.Q().ListAppGrantsForOrg(ctx, sqlc.ListAppGrantsForOrgParams{OrganisationID: orgID, Limit: limit})
 }
 
 func (s *Service) DeleteAppGrant(ctx context.Context, orgID, id string) error {
@@ -362,7 +477,7 @@ type AppAccessSet struct {
 // core/access grants because the merchant's SDK evaluates it with the same
 // Decide the API uses.
 func (s *Service) AppAccessFor(ctx context.Context, orgID, appUserID string) (AppAccessSet, error) {
-	rows, err := s.db.Q().ListAppGrantsForUser(ctx, appUserID)
+	rows, err := s.db.Q().ListAppGrantsForUser(ctx, textArg(appUserID))
 	if err != nil {
 		return AppAccessSet{}, err
 	}
@@ -385,11 +500,17 @@ func (s *Service) AppAccessFor(ctx context.Context, orgID, appUserID string) (Ap
 			// A role carrying nothing simply contributes nothing.
 			continue
 		}
+		source := "app-role:" + r.RoleKey
+		if r.GroupKey != "" {
+			// Provenance: a capability held through a group should say so, or
+			// "why does this customer have this?" is unanswerable.
+			source = "group:" + r.GroupKey + " app-role:" + r.RoleKey
+		}
 		g := access.Grant{
 			ID:           r.ID,
 			Scope:        access.Scope{Kind: r.ScopeKind, ID: r.ScopeID},
 			Capabilities: caps,
-			Source:       "app-role:" + r.RoleKey,
+			Source:       source,
 		}
 		if r.ExpiresAt.Valid {
 			t := r.ExpiresAt.Time

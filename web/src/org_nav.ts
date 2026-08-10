@@ -4,6 +4,7 @@ export type OrgSection =
   | 'roles'
   | 'users'
   | 'attributes'
+  | 'customer-access'
   | 'email-templates'
   | 'databases'
   | 'webhooks'
@@ -35,6 +36,7 @@ export const ORG_SECTIONS: OrgNavItem[] = [
   { id: 'members', label: 'Members', path: 'members' },
   { id: 'users', label: 'Users', path: 'users' },
   { id: 'attributes', label: 'User Attributes', path: 'attributes' },
+  { id: 'customer-access', label: 'Customer access', path: 'customer-access' },
   { id: 'email-templates', label: 'Emails', path: 'email-templates' },
   { id: 'databases', label: 'Databases', path: 'databases' },
   { id: 'webhooks', label: 'Outbound webhooks', path: 'webhooks' },
@@ -59,6 +61,7 @@ export const ORG_NAV_GROUPS: OrgNavGroup[] = [
     items: [
       { id: 'users', label: 'Users', path: 'users' },
       { id: 'attributes', label: 'User Attributes', path: 'attributes' },
+      { id: 'customer-access', label: 'Customer access', path: 'customer-access' },
       { id: 'automations', label: 'Automations', path: 'automations' },
       { id: 'branding', label: 'Branding', path: 'branding' },
       { id: 'product-features', label: 'Features', path: 'product-features' },
@@ -101,6 +104,7 @@ export function sectionFromPathname(pathname: string, orgId: string): OrgSection
     case 'roles':
     case 'users':
     case 'attributes':
+    case 'customer-access':
     case 'email-templates':
     case 'databases':
     case 'webhooks':

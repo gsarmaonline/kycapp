@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 	"testing"
 )
 
@@ -353,5 +354,147 @@ func TestAppAccessAdministrationIsGated(t *testing.T) {
 		map[string]any{"key": "sneak:in"}, userAuth(mateToken))
 	if denied.Code != http.StatusForbidden {
 		t.Fatalf("declaring capabilities needs app_access:manage: want 403, got %d %s", denied.Code, denied.Body.String())
+	}
+}
+
+func (f appAccessFixture) createGroup(t *testing.T, key string) string {
+	t.Helper()
+	code, out := f.post(t, "/app-user-groups", map[string]any{"key": key, "name": key})
+	if code != http.StatusCreated {
+		t.Fatalf("create group %q: %d %v", key, code, out)
+	}
+	return out["id"].(string)
+}
+
+func (f appAccessFixture) addToGroup(t *testing.T, groupID, appUserID string) {
+	t.Helper()
+	res := doJSON(t, f.h, http.MethodPost,
+		"/v1/organisations/"+f.orgID+"/app-user-groups/"+groupID+"/members",
+		map[string]any{"app_user_id": appUserID}, userAuth(f.token))
+	if res.Code != http.StatusCreated {
+		t.Fatalf("add to group: %d %s", res.Code, res.Body.String())
+	}
+}
+
+// A grant to a group reaches every member, so a merchant configures a set once
+// instead of once per customer.
+func TestGroupGrantReachesMembers(t *testing.T) {
+	f := newAppAccess(t, "groups")
+	f.declareScope(t, "project")
+	f.declareCapability(t, "deploy:read")
+	roleID := f.createRole(t, "reader", []string{"deploy:read"}, nil)
+
+	groupID := f.createGroup(t, "au_customers")
+	inGroup := f.createAppUser(t, "in@customer.com")
+	outside := f.createAppUser(t, "out@customer.com")
+	f.addToGroup(t, groupID, inGroup)
+
+	if code, out := f.post(t, "/app-grants", map[string]any{
+		"group_id": groupID, "role_id": roleID, "scope_kind": "project", "scope_id": "p1",
+	}); code != http.StatusCreated {
+		t.Fatalf("group grant: %d %v", code, out)
+	}
+
+	member := f.accessFor(t, inGroup)
+	grants := member["grants"].([]any)
+	if len(grants) != 1 {
+		t.Fatalf("a member must inherit the group grant, got %v", grants)
+	}
+	// Provenance: holding a capability through a group must say so, or "why
+	// does this customer have this?" is unanswerable.
+	if src := grants[0].(map[string]any)["source"].(string); !strings.Contains(src, "group:au_customers") {
+		t.Errorf("source must name the group, got %q", src)
+	}
+
+	if other := f.accessFor(t, outside); len(other["grants"].([]any)) != 0 {
+		t.Errorf("a non-member must get nothing, got %v", other["grants"])
+	}
+}
+
+// Group and direct grants union, and removing someone from a group takes their
+// group-derived access with them while leaving anything granted directly.
+func TestGroupAndDirectGrantsUnion(t *testing.T) {
+	f := newAppAccess(t, "union")
+	f.declareScope(t, "project")
+	f.declareCapability(t, "deploy:read")
+	f.declareCapability(t, "billing:read")
+	readRole := f.createRole(t, "reader", []string{"deploy:read"}, nil)
+	billRole := f.createRole(t, "biller", []string{"billing:read"}, nil)
+
+	groupID := f.createGroup(t, "everyone")
+	userID := f.createAppUser(t, "both@customer.com")
+	f.addToGroup(t, groupID, userID)
+
+	f.post(t, "/app-grants", map[string]any{
+		"group_id": groupID, "role_id": readRole, "scope_kind": "project", "scope_id": "p1",
+	})
+	f.post(t, "/app-grants", map[string]any{
+		"app_user_id": userID, "role_id": billRole, "scope_kind": "project", "scope_id": "p1",
+	})
+
+	if got := len(f.accessFor(t, userID)["grants"].([]any)); got != 2 {
+		t.Fatalf("group and direct grants must union, got %d", got)
+	}
+
+	res := doJSON(t, f.h, http.MethodDelete,
+		"/v1/organisations/"+f.orgID+"/app-user-groups/"+groupID+"/members/"+userID, nil, userAuth(f.token))
+	if res.Code != http.StatusNoContent {
+		t.Fatalf("remove member: %d %s", res.Code, res.Body.String())
+	}
+	after := f.accessFor(t, userID)["grants"].([]any)
+	if len(after) != 1 {
+		t.Fatalf("removing from a group must drop only the group grant, got %v", after)
+	}
+	if src := after[0].(map[string]any)["source"].(string); strings.Contains(src, "group:") {
+		t.Errorf("the surviving grant must be the direct one, got %q", src)
+	}
+}
+
+// A grant needs exactly one subject. Neither would apply to nobody; both would
+// be ambiguous.
+func TestGrantRequiresExactlyOneSubject(t *testing.T) {
+	f := newAppAccess(t, "subject")
+	f.declareScope(t, "project")
+	f.declareCapability(t, "deploy:read")
+	roleID := f.createRole(t, "reader", []string{"deploy:read"}, nil)
+	groupID := f.createGroup(t, "g")
+	userID := f.createAppUser(t, "s@customer.com")
+
+	if code, _ := f.post(t, "/app-grants", map[string]any{
+		"role_id": roleID, "scope_kind": "project", "scope_id": "p1",
+	}); code != http.StatusBadRequest {
+		t.Errorf("no subject must be rejected, got %d", code)
+	}
+	if code, _ := f.post(t, "/app-grants", map[string]any{
+		"app_user_id": userID, "group_id": groupID,
+		"role_id": roleID, "scope_kind": "project", "scope_id": "p1",
+	}); code != http.StatusBadRequest {
+		t.Errorf("two subjects must be rejected, got %d", code)
+	}
+}
+
+// The cache version must move when a group grant or a membership changes,
+// otherwise a merchant's cached set silently serves the wrong permissions.
+func TestAccessVersionMovesOnGroupChanges(t *testing.T) {
+	f := newAppAccess(t, "version")
+	f.declareScope(t, "project")
+	f.declareCapability(t, "deploy:read")
+	roleID := f.createRole(t, "reader", []string{"deploy:read"}, nil)
+	groupID := f.createGroup(t, "g")
+	userID := f.createAppUser(t, "v@customer.com")
+
+	before := f.accessFor(t, userID)["version"].(float64)
+
+	f.post(t, "/app-grants", map[string]any{
+		"group_id": groupID, "role_id": roleID, "scope_kind": "project", "scope_id": "p1",
+	})
+	f.addToGroup(t, groupID, userID)
+
+	after := f.accessFor(t, userID)
+	if after["version"].(float64) < before {
+		t.Errorf("version must not go backwards: %v -> %v", before, after["version"])
+	}
+	if len(after["grants"].([]any)) != 1 {
+		t.Fatalf("membership must take effect, got %v", after["grants"])
 	}
 }
