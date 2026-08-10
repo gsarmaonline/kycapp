@@ -31,22 +31,6 @@ func RequireUser(ctx context.Context) (authn.Principal, error) {
 	return p, nil
 }
 
-// RequirePlatform requires any principal with reach over every organisation.
-//
-// Prefer RequirePlatformCapability: this only asks whether the caller is staff,
-// not whether they may do the specific thing, so it cannot express least
-// privilege.
-func RequirePlatform(ctx context.Context) (authn.Principal, error) {
-	p, err := RequirePrincipal(ctx)
-	if err != nil {
-		return authn.Principal{}, err
-	}
-	if !p.IsPlatform() {
-		return authn.Principal{}, apperr.Forbidden("platform admin required")
-	}
-	return p, nil
-}
-
 // isBreakGlass reports whether the principal is an unscoped environment service
 // token. It is resolved before any query, which is what makes it the root of
 // trust on an empty or mis-seeded database.

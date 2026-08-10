@@ -58,7 +58,7 @@ flowchart TB
 | 1 | App login / sessions | **Done** | Google OAuth → `kyc_sess_…`; `GET /v1/me`; logout. Dev-login for local/tests only. |
 | 2 | Tenancy / authz hole | **Done** | Org routes require active membership; lists scoped to user’s orgs; RBAC on mutations; **403** when denied. |
 | 3 | Merchant vs ops UI | **Partial** | Login-gated merchant UI (orgs, members, roles, billing read). No separate platform-admin console yet. |
-| 4 | Auth model | **Partial** | Humans = Google session. Machines = `API_TOKENS` / DB API keys (platform). Works, but platform privilege is ambient and all-or-nothing, `platform_admin` never clears once set, and unscoped keys grant full org access. See [access-control.md](./access-control.md#part-5--known-defects). |
+| 4 | Auth model | **Partial** | Humans = Google session. Machines = `API_TOKENS` / DB API keys (platform). Works, but platform privilege is ambient and all-or-nothing, `platform_admin` never clears once set, and unscoped keys grant full org access. See [authentication.md](./authentication.md#open-questions) and [authorisation.md](./authorisation.md#known-defects). |
 | 5 | Real billing | **Partial** | Stripe executor (Checkout/Portal/webhooks → subscription). See [billing-plans.md](./billing-plans.md). Metering / Connect later. |
 | 6 | Invite email | **Partial** | Invite + accept-while-logged-in works; no email delivery or magic invite links. |
 | 7 | Platform admin | **Partial** | `platform_admin` flag + `PLATFORM_ADMIN_EMAILS`; no dedicated admin UI. |

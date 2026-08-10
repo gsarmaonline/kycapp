@@ -104,7 +104,8 @@ sequenceDiagram
 | Doc | Contents |
 | --- | --- |
 | [docs/saas-rethink.md](docs/saas-rethink.md) | SaaS gap analysis and revised roadmap |
-| [docs/access-control.md](docs/access-control.md) | Principals, authentication, authorisation, entitlements — and the target grant model |
+| [docs/authentication.md](docs/authentication.md) | Principals, credentials, resolution, bootstrap |
+| [docs/authorisation.md](docs/authorisation.md) | Capabilities, roles, grants, gates, invariants |
 | [docs/data-model.md](docs/data-model.md) | Objects, relationships, permission catalog |
 | [docs/api.md](docs/api.md) | REST `/v1` surface |
 | [docs/flows.md](docs/flows.md) | Signup, invite, ops-provision, runtime checks |
