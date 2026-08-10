@@ -19,13 +19,13 @@ func productFeatureJSON(v service.ProductFeatureView) map[string]any {
 		})
 	}
 	out := map[string]any{
-		"id":                  e.ID,
-		"key":                 e.Key,
-		"description":         e.Description,
-		"scope":               e.Scope,
-		"enabled":             e.Enabled,
-		"rollout_percentage":  e.RolloutPercentage,
-		"overrides":           overrides,
+		"id":                 e.ID,
+		"key":                e.Key,
+		"description":        e.Description,
+		"scope":              e.Scope,
+		"enabled":            e.Enabled,
+		"rollout_percentage": e.RolloutPercentage,
+		"overrides":          overrides,
 	}
 	if e.OrganisationID.Valid {
 		out["organisation_id"] = e.OrganisationID.String
@@ -68,10 +68,6 @@ func productPlanJSON(v service.ProductPlanView) map[string]any {
 
 func (s *Server) handleCreateProductFeature(w http.ResponseWriter, r *http.Request) {
 	orgID := r.PathValue("id")
-	if _, err := s.svc.RequireOrgPermission(r.Context(), orgID, "product_features:manage"); err != nil {
-		writeError(w, err)
-		return
-	}
 	var body struct {
 		Key               string `json:"key"`
 		Description       string `json:"description"`
@@ -97,10 +93,6 @@ func (s *Server) handleCreateProductFeature(w http.ResponseWriter, r *http.Reque
 
 func (s *Server) handleListProductFeatures(w http.ResponseWriter, r *http.Request) {
 	orgID := r.PathValue("id")
-	if _, err := s.svc.RequireOrgPermission(r.Context(), orgID, "product_features:read"); err != nil {
-		writeError(w, err)
-		return
-	}
 	items, err := s.svc.ListProductFeatures(r.Context(), orgID)
 	if err != nil {
 		writeError(w, err)
@@ -213,10 +205,6 @@ func (s *Server) handleDeleteProductFeature(w http.ResponseWriter, r *http.Reque
 
 func (s *Server) handleCreateProductPlan(w http.ResponseWriter, r *http.Request) {
 	orgID := r.PathValue("id")
-	if _, err := s.svc.RequireOrgPermission(r.Context(), orgID, "product_features:manage"); err != nil {
-		writeError(w, err)
-		return
-	}
 	var body struct {
 		Key   string `json:"key"`
 		Name  string `json:"name"`
@@ -250,10 +238,6 @@ func (s *Server) handleCreateProductPlan(w http.ResponseWriter, r *http.Request)
 
 func (s *Server) handleListProductPlans(w http.ResponseWriter, r *http.Request) {
 	orgID := r.PathValue("id")
-	if _, err := s.svc.RequireOrgPermission(r.Context(), orgID, "product_features:read"); err != nil {
-		writeError(w, err)
-		return
-	}
 	items, err := s.svc.ListProductPlans(r.Context(), orgID)
 	if err != nil {
 		writeError(w, err)
@@ -405,10 +389,6 @@ func (s *Server) handleDeleteProductPlan(w http.ResponseWriter, r *http.Request)
 
 func (s *Server) handleSetActiveProductPlan(w http.ResponseWriter, r *http.Request) {
 	orgID := r.PathValue("id")
-	if _, err := s.svc.RequireOrgPermission(r.Context(), orgID, "product_features:manage"); err != nil {
-		writeError(w, err)
-		return
-	}
 	var body struct {
 		ProductPlanID string `json:"product_plan_id"`
 	}
@@ -430,10 +410,6 @@ func (s *Server) handleSetActiveProductPlan(w http.ResponseWriter, r *http.Reque
 
 func (s *Server) handleGetActiveProductPlan(w http.ResponseWriter, r *http.Request) {
 	orgID := r.PathValue("id")
-	if _, err := s.svc.RequireOrgPermission(r.Context(), orgID, "product_features:read"); err != nil {
-		writeError(w, err)
-		return
-	}
 	plan, err := s.svc.GetActiveProductPlan(r.Context(), orgID)
 	if err != nil {
 		writeError(w, err)

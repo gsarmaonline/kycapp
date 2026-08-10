@@ -498,3 +498,67 @@ func TestAccessVersionMovesOnGroupChanges(t *testing.T) {
 		t.Fatalf("membership must take effect, got %v", after["grants"])
 	}
 }
+
+// The gate that now enforces most organisation routes has to actually deny.
+// The declarations in the route table are only worth something if the rule they
+// name is applied before the handler runs, so this drives real requests rather
+// than inspecting the table.
+func TestRouteTableGateDeniesForReal(t *testing.T) {
+	f := newAppAccess(t, "gate")
+	f.declareCapability(t, "deploy:read")
+
+	// A member with a role holding only organisation:read.
+	roles := doJSON(t, f.h, http.MethodPost, "/v1/organisations/"+f.orgID+"/roles", map[string]any{
+		"key": "readonly", "name": "Read only", "permission_keys": []string{"organisation:read"},
+	}, userAuth(f.token))
+	if roles.Code != http.StatusCreated {
+		t.Fatalf("create role: %d %s", roles.Code, roles.Body.String())
+	}
+	var role struct {
+		ID string `json:"id"`
+	}
+	if err := json.Unmarshal(roles.Body.Bytes(), &role); err != nil {
+		t.Fatalf("decode role: %v", err)
+	}
+	_, mateToken := doDevLogin(t, f.h, "readonly@merchant.com", "Read Only")
+	me := doJSON(t, f.h, http.MethodGet, "/v1/me", nil, userAuth(mateToken))
+	var meBody struct {
+		User struct {
+			ID string `json:"id"`
+		} `json:"user"`
+	}
+	if err := json.Unmarshal(me.Body.Bytes(), &meBody); err != nil {
+		t.Fatalf("decode me: %v", err)
+	}
+	if add := doJSON(t, f.h, http.MethodPost, "/v1/organisations/"+f.orgID+"/memberships", map[string]any{
+		"user_id": meBody.User.ID, "role_id": role.ID, "status": "active",
+	}, userAuth(f.token)); add.Code != http.StatusCreated && add.Code != http.StatusOK {
+		t.Fatalf("add member: %d %s", add.Code, add.Body.String())
+	}
+
+	// Reads they hold are allowed; writes they do not hold are refused, and the
+	// refusal comes from the gate rather than from inside the handler.
+	if ok := doJSON(t, f.h, http.MethodGet, "/v1/organisations/"+f.orgID, nil, userAuth(mateToken)); ok.Code != http.StatusOK {
+		t.Fatalf("organisation:read must be allowed: %d %s", ok.Code, ok.Body.String())
+	}
+	for _, tc := range []struct{ method, path string }{
+		{http.MethodPost, "/app-capabilities"},
+		{http.MethodPost, "/app-user-groups"},
+		{http.MethodPost, "/app-roles"},
+		{http.MethodPost, "/app-users"},
+		{http.MethodPost, "/roles"},
+	} {
+		res := doJSON(t, f.h, tc.method, "/v1/organisations/"+f.orgID+tc.path,
+			map[string]any{"key": "x", "name": "X", "email": "x@y.com"}, userAuth(mateToken))
+		if res.Code != http.StatusForbidden {
+			t.Errorf("%s %s: want 403 from the gate, got %d %s", tc.method, tc.path, res.Code, res.Body.String())
+		}
+	}
+
+	// A caller with no membership at all sees 404, not 403, so the gate keeps
+	// the non-disclosure property rather than leaking that the tenant exists.
+	_, strangerToken := doDevLogin(t, f.h, "stranger@elsewhere.com", "Stranger")
+	if res := doJSON(t, f.h, http.MethodGet, "/v1/organisations/"+f.orgID+"/app-roles", nil, userAuth(strangerToken)); res.Code != http.StatusNotFound {
+		t.Errorf("non-member: want 404 from the gate, got %d %s", res.Code, res.Body.String())
+	}
+}

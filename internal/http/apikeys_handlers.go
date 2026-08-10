@@ -75,10 +75,6 @@ func (s *Server) handleRevokeAPIKey(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleCreateOrgAPIKey(w http.ResponseWriter, r *http.Request) {
 	orgID := r.PathValue("id")
-	if _, err := s.svc.RequireOrgPermission(r.Context(), orgID, "api_keys:manage"); err != nil {
-		writeError(w, err)
-		return
-	}
 	var body struct {
 		Name   string   `json:"name"`
 		Scopes []string `json:"scopes"`
@@ -103,10 +99,6 @@ func (s *Server) handleCreateOrgAPIKey(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleListOrgAPIKeys(w http.ResponseWriter, r *http.Request) {
 	orgID := r.PathValue("id")
-	if _, err := s.svc.RequireOrgPermission(r.Context(), orgID, "api_keys:read"); err != nil {
-		writeError(w, err)
-		return
-	}
 	keys, err := s.svc.ListOrganisationAPIKeys(r.Context(), orgID)
 	if err != nil {
 		writeError(w, err)

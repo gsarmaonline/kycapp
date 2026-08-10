@@ -78,174 +78,175 @@ func New(db DBPinger, opts Options) *Server {
 }
 
 func (s *Server) routes() {
-	s.mux.HandleFunc("GET /healthz", s.handleHealthz)
-	s.mux.HandleFunc("GET /readyz", s.handleReadyz)
-
-	if s.svc == nil {
-		return
+	for _, rt := range s.routeTable() {
+		s.mux.HandleFunc(rt.Method+" "+rt.Pattern, s.gate(rt.Auth, rt.Handler))
 	}
+}
 
-	s.mux.HandleFunc("GET /v1/auth/providers", s.handleAuthProviders)
-	s.mux.HandleFunc("GET /v1/auth/google", s.handleGoogleStart)
-	s.mux.HandleFunc("GET /v1/auth/google/callback", s.handleGoogleCallback)
-	s.mux.HandleFunc("POST /v1/auth/dev-login", s.handleDevLogin)
-	s.mux.HandleFunc("POST /v1/auth/logout", s.handleLogout)
-	s.mux.HandleFunc("GET /v1/me", s.handleMe)
-
-	s.mux.HandleFunc("POST /v1/organisations", s.handleCreateOrganisation)
-	s.mux.HandleFunc("GET /v1/organisations", s.handleListOrganisations)
-	s.mux.HandleFunc("GET /v1/organisations/{id}", s.handleGetOrganisation)
-	s.mux.HandleFunc("PATCH /v1/organisations/{id}", s.handlePatchOrganisation)
-	s.mux.HandleFunc("GET /v1/organisations/{id}/onboarding", s.handleGetOrgOnboarding)
-	s.mux.HandleFunc("PATCH /v1/organisations/{id}/onboarding", s.handlePatchOrgOnboarding)
-	s.mux.HandleFunc("GET /v1/organisations/{id}/activity", s.handleListOrgActivity)
-	s.mux.HandleFunc("GET /v1/organisations/{id}/usage", s.handleListOrgUsage)
-	s.mux.HandleFunc("POST /v1/organisations/{id}/archive", s.handleArchiveOrganisation)
-	s.mux.HandleFunc("DELETE /v1/organisations/{id}", s.handleDeleteOrganisation)
-	s.mux.HandleFunc("GET /v1/organisations/{id}/integrations", s.handleListOrgIntegrations)
-	s.mux.HandleFunc("PUT /v1/organisations/{id}/integrations/stripe", s.handleUpsertStripeIntegration)
-	s.mux.HandleFunc("GET /v1/organisations/{id}/integrations/stripe/catalog", s.handleListStripeCatalog)
-	s.mux.HandleFunc("POST /v1/organisations/{id}/integrations/stripe/import", s.handleImportStripeCatalog)
-	s.mux.HandleFunc("POST /v1/organisations/{id}/integrations/stripe/sync", s.handleSyncProductPlansToStripe)
-	s.mux.HandleFunc("DELETE /v1/organisations/{id}/integrations/{provider}", s.handleDeleteOrgIntegration)
-	s.mux.HandleFunc("GET /v1/organisations/{id}/databases", s.handleListOrgDatabases)
-	s.mux.HandleFunc("POST /v1/organisations/{id}/databases", s.handleCreateOrgDatabase)
-	s.mux.HandleFunc("GET /v1/organisations/{id}/databases/{dbId}", s.handleGetOrgDatabase)
-	s.mux.HandleFunc("PATCH /v1/organisations/{id}/databases/{dbId}", s.handlePatchOrgDatabase)
-	s.mux.HandleFunc("POST /v1/organisations/{id}/databases/{dbId}/check", s.handleCheckOrgDatabase)
-	s.mux.HandleFunc("POST /v1/organisations/{id}/databases/{dbId}/disconnect", s.handleDisconnectOrgDatabase)
-	s.mux.HandleFunc("DELETE /v1/organisations/{id}/databases/{dbId}", s.handleDeleteOrgDatabase)
-	s.mux.HandleFunc("GET /v1/organisations/{id}/webhooks", s.handleListOrgWebhooks)
-	s.mux.HandleFunc("POST /v1/organisations/{id}/webhooks", s.handleCreateOrgWebhook)
-	s.mux.HandleFunc("GET /v1/organisations/{id}/webhooks/{webhookId}", s.handleGetOrgWebhook)
-	s.mux.HandleFunc("PATCH /v1/organisations/{id}/webhooks/{webhookId}", s.handlePatchOrgWebhook)
-	s.mux.HandleFunc("DELETE /v1/organisations/{id}/webhooks/{webhookId}", s.handleDeleteOrgWebhook)
-	s.mux.HandleFunc("GET /v1/organisations/{id}/inbound-webhooks", s.handleListInboundWebhooks)
-	s.mux.HandleFunc("POST /v1/organisations/{id}/inbound-webhooks", s.handleCreateInboundWebhook)
-	s.mux.HandleFunc("GET /v1/organisations/{id}/inbound-webhooks/{hookId}", s.handleGetInboundWebhook)
-	s.mux.HandleFunc("PATCH /v1/organisations/{id}/inbound-webhooks/{hookId}", s.handlePatchInboundWebhook)
-	s.mux.HandleFunc("DELETE /v1/organisations/{id}/inbound-webhooks/{hookId}", s.handleDeleteInboundWebhook)
-	s.mux.HandleFunc("POST /v1/hooks/inbound/{hookId}", s.handleInboundWebhook)
-	s.mux.HandleFunc("POST /v1/hooks/inbound/{hookId}/{token}", s.handleInboundWebhookWithPathToken)
-	s.mux.HandleFunc("POST /v1/organisations/{id}/api-keys", s.handleCreateOrgAPIKey)
-	s.mux.HandleFunc("GET /v1/organisations/{id}/api-keys", s.handleListOrgAPIKeys)
-	s.mux.HandleFunc("POST /v1/organisations/{id}/branding/logo", s.handleUploadOrganisationLogo)
-	s.mux.HandleFunc("DELETE /v1/organisations/{id}/branding/logo", s.handleDeleteOrganisationLogo)
-	s.mux.HandleFunc("GET /v1/public/organisations/{id}/branding/logo", s.handlePublicOrganisationLogo)
-	s.mux.HandleFunc("GET /v1/organisations/{id}/roles", s.handleListRoles)
-	s.mux.HandleFunc("POST /v1/organisations/{id}/roles", s.handleCreateRole)
-	s.mux.HandleFunc("POST /v1/organisations/{id}/memberships", s.handleCreateMembership)
-	s.mux.HandleFunc("GET /v1/organisations/{id}/memberships", s.handleListMemberships)
-
-	s.mux.HandleFunc("POST /v1/users", s.handleCreateUser)
-	s.mux.HandleFunc("GET /v1/users", s.handleListUsers)
-	s.mux.HandleFunc("GET /v1/users/{id}", s.handleGetUser)
-	s.mux.HandleFunc("PATCH /v1/users/{id}", s.handlePatchUser)
-	s.mux.HandleFunc("GET /v1/users/{id}/memberships", s.handleListUserMemberships)
-
-	s.mux.HandleFunc("POST /v1/memberships/{id}/accept", s.handleAcceptMembership)
-	s.mux.HandleFunc("GET /v1/memberships/{id}", s.handleGetMembership)
-	s.mux.HandleFunc("PATCH /v1/memberships/{id}", s.handlePatchMembership)
-	s.mux.HandleFunc("DELETE /v1/memberships/{id}", s.handleRevokeMembership)
-
-	s.mux.HandleFunc("GET /v1/permissions", s.handleListPermissions)
-	s.mux.HandleFunc("GET /v1/permissions/{key}", s.handleGetPermission)
-	s.mux.HandleFunc("GET /v1/roles/{id}", s.handleGetRole)
-	s.mux.HandleFunc("PATCH /v1/roles/{id}", s.handlePatchRole)
-	s.mux.HandleFunc("DELETE /v1/roles/{id}", s.handleDeleteRole)
-	s.mux.HandleFunc("POST /v1/authz/check", s.handleAuthzCheck)
-
-	s.mux.HandleFunc("POST /v1/plans", s.handleCreatePlan)
-	s.mux.HandleFunc("GET /v1/plans", s.handleListPlans)
-	s.mux.HandleFunc("GET /v1/plans/{id}", s.handleGetPlan)
-	s.mux.HandleFunc("PUT /v1/plans/{id}/entitlements", s.handleSetPlanEntitlements)
-	s.mux.HandleFunc("POST /v1/entitlements", s.handleCreateEntitlement)
-	s.mux.HandleFunc("GET /v1/entitlements", s.handleListEntitlementsCatalog)
-	s.mux.HandleFunc("PUT /v1/organisations/{id}/subscription", s.handleUpsertSubscription)
-	s.mux.HandleFunc("GET /v1/organisations/{id}/subscription", s.handleGetSubscription)
-	s.mux.HandleFunc("PUT /v1/organisations/{id}/entitlements", s.handleSetOrgEntitlements)
-	s.mux.HandleFunc("GET /v1/organisations/{id}/entitlements", s.handleGetOrgEntitlements)
-	s.mux.HandleFunc("POST /v1/entitlements/check", s.handleEntitlementsCheck)
-	s.mux.HandleFunc("PUT /v1/plans/{id}/price", s.handleUpsertPlanPrice)
-	s.mux.HandleFunc("GET /v1/plans/{id}/prices", s.handleListPlanPrices)
-	s.mux.HandleFunc("POST /v1/organisations/{id}/billing/checkout", s.handleBillingCheckout)
-	s.mux.HandleFunc("POST /v1/organisations/{id}/billing/portal", s.handleBillingPortal)
-	s.mux.HandleFunc("POST /v1/billing/webhooks/{provider}", s.handleBillingWebhook)
-
-	s.mux.HandleFunc("POST /v1/api-keys", s.handleCreateAPIKey)
-	s.mux.HandleFunc("GET /v1/api-keys", s.handleListAPIKeys)
-	s.mux.HandleFunc("DELETE /v1/api-keys/{id}", s.handleRevokeAPIKey)
-	s.mux.HandleFunc("GET /v1/organisations/{id}/app-scope-types", s.handleListAppScopeTypes)
-	s.mux.HandleFunc("POST /v1/organisations/{id}/app-scope-types", s.handleCreateAppScopeType)
-	s.mux.HandleFunc("DELETE /v1/organisations/{id}/app-scope-types/{typeId}", s.handleDeleteAppScopeType)
-	s.mux.HandleFunc("GET /v1/organisations/{id}/app-capabilities", s.handleListAppCapabilities)
-	s.mux.HandleFunc("POST /v1/organisations/{id}/app-capabilities", s.handleCreateAppCapability)
-	s.mux.HandleFunc("DELETE /v1/organisations/{id}/app-capabilities/{capId}", s.handleDeleteAppCapability)
-	s.mux.HandleFunc("GET /v1/organisations/{id}/app-roles", s.handleListAppRoles)
-	s.mux.HandleFunc("POST /v1/organisations/{id}/app-roles", s.handleCreateAppRole)
-	s.mux.HandleFunc("PATCH /v1/organisations/{id}/app-roles/{roleId}", s.handlePatchAppRole)
-	s.mux.HandleFunc("DELETE /v1/organisations/{id}/app-roles/{roleId}", s.handleDeleteAppRole)
-	s.mux.HandleFunc("POST /v1/organisations/{id}/app-grants", s.handleCreateAppGrant)
-	s.mux.HandleFunc("DELETE /v1/organisations/{id}/app-grants/{grantId}", s.handleDeleteAppGrant)
-	s.mux.HandleFunc("GET /v1/organisations/{id}/app-grants", s.handleListAppGrants)
-	s.mux.HandleFunc("GET /v1/organisations/{id}/app-user-groups", s.handleListAppUserGroups)
-	s.mux.HandleFunc("POST /v1/organisations/{id}/app-user-groups", s.handleCreateAppUserGroup)
-	s.mux.HandleFunc("PATCH /v1/organisations/{id}/app-user-groups/{groupId}", s.handlePatchAppUserGroup)
-	s.mux.HandleFunc("DELETE /v1/organisations/{id}/app-user-groups/{groupId}", s.handleDeleteAppUserGroup)
-	s.mux.HandleFunc("GET /v1/organisations/{id}/app-user-groups/{groupId}/members", s.handleListAppUserGroupMembers)
-	s.mux.HandleFunc("POST /v1/organisations/{id}/app-user-groups/{groupId}/members", s.handleAddAppUserGroupMember)
-	s.mux.HandleFunc("DELETE /v1/organisations/{id}/app-user-groups/{groupId}/members/{appUserId}", s.handleRemoveAppUserGroupMember)
-	s.mux.HandleFunc("GET /v1/app-users/{id}/access", s.handleAppUserAccess)
-	s.mux.HandleFunc("GET /v1/app-users/{id}/groups", s.handleAppUserGroups)
-
-	s.mux.HandleFunc("POST /v1/recovery-credentials", s.handleCreateRecoveryCredential)
-	s.mux.HandleFunc("GET /v1/recovery-credentials", s.handleListRecoveryCredentials)
-	s.mux.HandleFunc("DELETE /v1/recovery-credentials/{id}", s.handleRevokeRecoveryCredential)
-
-	s.mux.HandleFunc("GET /v1/audit-events", s.handleListAuditEvents)
-
-	s.mux.HandleFunc("POST /v1/organisations/{id}/attribute-definitions", s.handleCreateAttributeDefinition)
-	s.mux.HandleFunc("GET /v1/organisations/{id}/attribute-definitions", s.handleListAttributeDefinitions)
-	s.mux.HandleFunc("GET /v1/attribute-definitions/{id}", s.handleGetAttributeDefinition)
-	s.mux.HandleFunc("PATCH /v1/attribute-definitions/{id}", s.handlePatchAttributeDefinition)
-	s.mux.HandleFunc("DELETE /v1/attribute-definitions/{id}", s.handleDeleteAttributeDefinition)
-	s.mux.HandleFunc("POST /v1/organisations/{id}/app-users", s.handleCreateAppUser)
-	s.mux.HandleFunc("PUT /v1/organisations/{id}/app-users/ingest", s.handleIngestAppUser)
-	s.mux.HandleFunc("GET /v1/organisations/{id}/app-users", s.handleListAppUsers)
-	s.mux.HandleFunc("GET /v1/app-users/{id}", s.handleGetAppUser)
-	s.mux.HandleFunc("PATCH /v1/app-users/{id}", s.handlePatchAppUser)
-	s.mux.HandleFunc("DELETE /v1/app-users/{id}", s.handleDeleteAppUser)
-
-	s.mux.HandleFunc("POST /v1/organisations/{id}/email-templates", s.handleCreateEmailTemplate)
-	s.mux.HandleFunc("GET /v1/organisations/{id}/email-templates", s.handleListEmailTemplates)
-	s.mux.HandleFunc("GET /v1/email-templates/{id}", s.handleGetEmailTemplate)
-	s.mux.HandleFunc("PATCH /v1/email-templates/{id}", s.handlePatchEmailTemplate)
-	s.mux.HandleFunc("DELETE /v1/email-templates/{id}", s.handleDeleteEmailTemplate)
-
-	s.mux.HandleFunc("POST /v1/organisations/{id}/automations", s.handleCreateAutomation)
-	s.mux.HandleFunc("GET /v1/organisations/{id}/automations/catalog", s.handleAutomationCatalog)
-	s.mux.HandleFunc("GET /v1/organisations/{id}/automations", s.handleListAutomations)
-	s.mux.HandleFunc("GET /v1/organisations/{id}/automation-runs", s.handleListAutomationRuns)
-	s.mux.HandleFunc("GET /v1/automations/{id}", s.handleGetAutomation)
-	s.mux.HandleFunc("PATCH /v1/automations/{id}", s.handlePatchAutomation)
-	s.mux.HandleFunc("DELETE /v1/automations/{id}", s.handleDeleteAutomation)
-
-	s.mux.HandleFunc("POST /v1/organisations/{id}/product-features", s.handleCreateProductFeature)
-	s.mux.HandleFunc("GET /v1/organisations/{id}/product-features", s.handleListProductFeatures)
-	s.mux.HandleFunc("GET /v1/product-features/{id}", s.handleGetProductFeature)
-	s.mux.HandleFunc("PATCH /v1/product-features/{id}", s.handlePatchProductFeature)
-	s.mux.HandleFunc("PUT /v1/product-features/{id}/overrides", s.handleSetProductFeatureOverrides)
-	s.mux.HandleFunc("DELETE /v1/product-features/{id}", s.handleDeleteProductFeature)
-	s.mux.HandleFunc("POST /v1/organisations/{id}/product-plans", s.handleCreateProductPlan)
-	s.mux.HandleFunc("GET /v1/organisations/{id}/product-plans", s.handleListProductPlans)
-	s.mux.HandleFunc("GET /v1/product-plans/{id}", s.handleGetProductPlan)
-	s.mux.HandleFunc("PATCH /v1/product-plans/{id}", s.handlePatchProductPlan)
-	s.mux.HandleFunc("PUT /v1/product-plans/{id}/features", s.handleSetProductPlanFeatures)
-	s.mux.HandleFunc("PUT /v1/product-plans/{id}/price", s.handleUpsertProductPlanPrice)
-	s.mux.HandleFunc("GET /v1/product-plans/{id}/prices", s.handleListProductPlanPrices)
-	s.mux.HandleFunc("DELETE /v1/product-plans/{id}", s.handleDeleteProductPlan)
-	s.mux.HandleFunc("PUT /v1/organisations/{id}/product-plan", s.handleSetActiveProductPlan)
-	s.mux.HandleFunc("GET /v1/organisations/{id}/product-plan", s.handleGetActiveProductPlan)
+// routeTable is every route the server serves, with how each is authorised.
+// See routes.go for what the declarations mean and why they exist.
+//
+// Health checks are registered even without a service, so the container has
+// something to probe while the rest is unavailable.
+func (s *Server) routeTable() []route {
+	table := []route{
+		{"GET", "/healthz", s.handleHealthz, public()},
+		{"GET", "/readyz", s.handleReadyz, public()},
+	}
+	if s.svc == nil {
+		return table
+	}
+	return append(table, []route{
+		{"GET", "/v1/auth/providers", s.handleAuthProviders, public()},
+		{"GET", "/v1/auth/google", s.handleGoogleStart, public()},
+		{"GET", "/v1/auth/google/callback", s.handleGoogleCallback, public()},
+		{"POST", "/v1/auth/dev-login", s.handleDevLogin, public()},
+		{"POST", "/v1/auth/logout", s.handleLogout, user()},
+		{"GET", "/v1/me", s.handleMe, user()},
+		{"POST", "/v1/organisations", s.handleCreateOrganisation, principal()},
+		{"GET", "/v1/organisations", s.handleListOrganisations, principal()},
+		{"GET", "/v1/organisations/{id}", s.handleGetOrganisation, orgMemberAnyStatus()},
+		{"PATCH", "/v1/organisations/{id}", s.handlePatchOrganisation, orgPermissionAnyStatus("organisation:update")},
+		{"GET", "/v1/organisations/{id}/onboarding", s.handleGetOrgOnboarding, inService()},
+		{"PATCH", "/v1/organisations/{id}/onboarding", s.handlePatchOrgOnboarding, inService()},
+		{"GET", "/v1/organisations/{id}/activity", s.handleListOrgActivity, orgPermission("activity:read")},
+		{"GET", "/v1/organisations/{id}/usage", s.handleListOrgUsage, orgPermission("usage:read")},
+		{"POST", "/v1/organisations/{id}/archive", s.handleArchiveOrganisation, orgPermissionAnyStatus("organisation:update")},
+		{"DELETE", "/v1/organisations/{id}", s.handleDeleteOrganisation, orgPermissionAnyStatus("organisation:update")},
+		{"GET", "/v1/organisations/{id}/integrations", s.handleListOrgIntegrations, orgPermission("organisation:update")},
+		{"PUT", "/v1/organisations/{id}/integrations/stripe", s.handleUpsertStripeIntegration, orgPermission("organisation:update")},
+		{"GET", "/v1/organisations/{id}/integrations/stripe/catalog", s.handleListStripeCatalog, orgPermission("organisation:update")},
+		{"POST", "/v1/organisations/{id}/integrations/stripe/import", s.handleImportStripeCatalog, orgPermission("organisation:update")},
+		{"POST", "/v1/organisations/{id}/integrations/stripe/sync", s.handleSyncProductPlansToStripe, orgPermission("organisation:update")},
+		{"DELETE", "/v1/organisations/{id}/integrations/{provider}", s.handleDeleteOrgIntegration, orgPermission("organisation:update")},
+		{"GET", "/v1/organisations/{id}/databases", s.handleListOrgDatabases, orgPermission("organisation:update")},
+		{"POST", "/v1/organisations/{id}/databases", s.handleCreateOrgDatabase, orgPermission("organisation:update")},
+		{"GET", "/v1/organisations/{id}/databases/{dbId}", s.handleGetOrgDatabase, orgPermission("organisation:update")},
+		{"PATCH", "/v1/organisations/{id}/databases/{dbId}", s.handlePatchOrgDatabase, orgPermission("organisation:update")},
+		{"POST", "/v1/organisations/{id}/databases/{dbId}/check", s.handleCheckOrgDatabase, orgPermission("organisation:update")},
+		{"POST", "/v1/organisations/{id}/databases/{dbId}/disconnect", s.handleDisconnectOrgDatabase, orgPermission("organisation:update")},
+		{"DELETE", "/v1/organisations/{id}/databases/{dbId}", s.handleDeleteOrgDatabase, orgPermission("organisation:update")},
+		{"GET", "/v1/organisations/{id}/webhooks", s.handleListOrgWebhooks, orgPermission("organisation:update")},
+		{"POST", "/v1/organisations/{id}/webhooks", s.handleCreateOrgWebhook, orgPermission("organisation:update")},
+		{"GET", "/v1/organisations/{id}/webhooks/{webhookId}", s.handleGetOrgWebhook, orgPermission("organisation:update")},
+		{"PATCH", "/v1/organisations/{id}/webhooks/{webhookId}", s.handlePatchOrgWebhook, orgPermission("organisation:update")},
+		{"DELETE", "/v1/organisations/{id}/webhooks/{webhookId}", s.handleDeleteOrgWebhook, orgPermission("organisation:update")},
+		{"GET", "/v1/organisations/{id}/inbound-webhooks", s.handleListInboundWebhooks, orgPermission("organisation:update")},
+		{"POST", "/v1/organisations/{id}/inbound-webhooks", s.handleCreateInboundWebhook, orgPermission("organisation:update")},
+		{"GET", "/v1/organisations/{id}/inbound-webhooks/{hookId}", s.handleGetInboundWebhook, orgPermission("organisation:update")},
+		{"PATCH", "/v1/organisations/{id}/inbound-webhooks/{hookId}", s.handlePatchInboundWebhook, orgPermission("organisation:update")},
+		{"DELETE", "/v1/organisations/{id}/inbound-webhooks/{hookId}", s.handleDeleteInboundWebhook, orgPermission("organisation:update")},
+		{"POST", "/v1/hooks/inbound/{hookId}", s.handleInboundWebhook, public()},
+		{"POST", "/v1/hooks/inbound/{hookId}/{token}", s.handleInboundWebhookWithPathToken, public()},
+		{"POST", "/v1/organisations/{id}/api-keys", s.handleCreateOrgAPIKey, orgPermission("api_keys:manage")},
+		{"GET", "/v1/organisations/{id}/api-keys", s.handleListOrgAPIKeys, orgPermission("api_keys:read")},
+		{"POST", "/v1/organisations/{id}/branding/logo", s.handleUploadOrganisationLogo, orgPermission("organisation:update")},
+		{"DELETE", "/v1/organisations/{id}/branding/logo", s.handleDeleteOrganisationLogo, orgPermission("organisation:update")},
+		{"GET", "/v1/public/organisations/{id}/branding/logo", s.handlePublicOrganisationLogo, public()},
+		{"GET", "/v1/organisations/{id}/roles", s.handleListRoles, orgPermission("roles:read")},
+		{"POST", "/v1/organisations/{id}/roles", s.handleCreateRole, orgPermission("roles:manage")},
+		{"POST", "/v1/organisations/{id}/memberships", s.handleCreateMembership, orgPermission("members:invite")},
+		{"GET", "/v1/organisations/{id}/memberships", s.handleListMemberships, orgPermission("members:read")},
+		{"POST", "/v1/users", s.handleCreateUser, platform("members:invite")},
+		{"GET", "/v1/users", s.handleListUsers, platform("members:read")},
+		{"GET", "/v1/users/{id}", s.handleGetUser, principal()},
+		{"PATCH", "/v1/users/{id}", s.handlePatchUser, principal()},
+		{"GET", "/v1/users/{id}/memberships", s.handleListUserMemberships, principal()},
+		{"POST", "/v1/memberships/{id}/accept", s.handleAcceptMembership, user()},
+		{"GET", "/v1/memberships/{id}", s.handleGetMembership, orgFromResource("members:read")},
+		{"PATCH", "/v1/memberships/{id}", s.handlePatchMembership, orgFromResource("members:invite")},
+		{"DELETE", "/v1/memberships/{id}", s.handleRevokeMembership, orgFromResource("members:remove")},
+		{"GET", "/v1/permissions", s.handleListPermissions, principal()},
+		{"GET", "/v1/permissions/{key}", s.handleGetPermission, principal()},
+		{"GET", "/v1/roles/{id}", s.handleGetRole, orgFromResource("roles:read")},
+		{"PATCH", "/v1/roles/{id}", s.handlePatchRole, orgFromResource("roles:manage")},
+		{"DELETE", "/v1/roles/{id}", s.handleDeleteRole, orgFromResource("roles:manage")},
+		{"POST", "/v1/authz/check", s.handleAuthzCheck, orgFromBody()},
+		{"POST", "/v1/plans", s.handleCreatePlan, platform("billing:manage")},
+		{"GET", "/v1/plans", s.handleListPlans, principal()},
+		{"GET", "/v1/plans/{id}", s.handleGetPlan, principal()},
+		{"PUT", "/v1/plans/{id}/entitlements", s.handleSetPlanEntitlements, platform("billing:manage")},
+		{"POST", "/v1/entitlements", s.handleCreateEntitlement, platform("billing:manage")},
+		{"GET", "/v1/entitlements", s.handleListEntitlementsCatalog, principal()},
+		{"PUT", "/v1/organisations/{id}/subscription", s.handleUpsertSubscription, platform("billing:manage")},
+		{"GET", "/v1/organisations/{id}/subscription", s.handleGetSubscription, orgPermission("billing:read")},
+		{"PUT", "/v1/organisations/{id}/entitlements", s.handleSetOrgEntitlements, platform("billing:manage")},
+		{"GET", "/v1/organisations/{id}/entitlements", s.handleGetOrgEntitlements, orgPermission("billing:read")},
+		{"POST", "/v1/entitlements/check", s.handleEntitlementsCheck, orgFromBody()},
+		{"PUT", "/v1/plans/{id}/price", s.handleUpsertPlanPrice, platform("billing:manage")},
+		{"GET", "/v1/plans/{id}/prices", s.handleListPlanPrices, principal()},
+		{"POST", "/v1/organisations/{id}/billing/checkout", s.handleBillingCheckout, orgPermission("billing:manage")},
+		{"POST", "/v1/organisations/{id}/billing/portal", s.handleBillingPortal, orgPermission("billing:manage")},
+		{"POST", "/v1/billing/webhooks/{provider}", s.handleBillingWebhook, public()},
+		{"POST", "/v1/api-keys", s.handleCreateAPIKey, platform("api_keys:manage")},
+		{"GET", "/v1/api-keys", s.handleListAPIKeys, platform("api_keys:read")},
+		{"DELETE", "/v1/api-keys/{id}", s.handleRevokeAPIKey, orgFromResource("api_keys:manage")},
+		{"GET", "/v1/organisations/{id}/app-scope-types", s.handleListAppScopeTypes, orgPermission("app_access:read")},
+		{"POST", "/v1/organisations/{id}/app-scope-types", s.handleCreateAppScopeType, orgPermission("app_access:manage")},
+		{"DELETE", "/v1/organisations/{id}/app-scope-types/{typeId}", s.handleDeleteAppScopeType, orgPermission("app_access:manage")},
+		{"GET", "/v1/organisations/{id}/app-capabilities", s.handleListAppCapabilities, orgPermission("app_access:read")},
+		{"POST", "/v1/organisations/{id}/app-capabilities", s.handleCreateAppCapability, orgPermission("app_access:manage")},
+		{"DELETE", "/v1/organisations/{id}/app-capabilities/{capId}", s.handleDeleteAppCapability, orgPermission("app_access:manage")},
+		{"GET", "/v1/organisations/{id}/app-roles", s.handleListAppRoles, orgPermission("app_access:read")},
+		{"POST", "/v1/organisations/{id}/app-roles", s.handleCreateAppRole, orgPermission("app_access:manage")},
+		{"PATCH", "/v1/organisations/{id}/app-roles/{roleId}", s.handlePatchAppRole, orgPermission("app_access:manage")},
+		{"DELETE", "/v1/organisations/{id}/app-roles/{roleId}", s.handleDeleteAppRole, orgPermission("app_access:manage")},
+		{"POST", "/v1/organisations/{id}/app-grants", s.handleCreateAppGrant, orgPermission("app_access:manage")},
+		{"DELETE", "/v1/organisations/{id}/app-grants/{grantId}", s.handleDeleteAppGrant, orgPermission("app_access:manage")},
+		{"GET", "/v1/organisations/{id}/app-grants", s.handleListAppGrants, orgPermission("app_access:read")},
+		{"GET", "/v1/organisations/{id}/app-user-groups", s.handleListAppUserGroups, orgPermission("app_access:read")},
+		{"POST", "/v1/organisations/{id}/app-user-groups", s.handleCreateAppUserGroup, orgPermission("app_access:manage")},
+		{"PATCH", "/v1/organisations/{id}/app-user-groups/{groupId}", s.handlePatchAppUserGroup, orgPermission("app_access:manage")},
+		{"DELETE", "/v1/organisations/{id}/app-user-groups/{groupId}", s.handleDeleteAppUserGroup, orgPermission("app_access:manage")},
+		{"GET", "/v1/organisations/{id}/app-user-groups/{groupId}/members", s.handleListAppUserGroupMembers, orgPermission("app_access:read")},
+		{"POST", "/v1/organisations/{id}/app-user-groups/{groupId}/members", s.handleAddAppUserGroupMember, orgPermission("app_access:manage")},
+		{"DELETE", "/v1/organisations/{id}/app-user-groups/{groupId}/members/{appUserId}", s.handleRemoveAppUserGroupMember, orgPermission("app_access:manage")},
+		{"GET", "/v1/app-users/{id}/access", s.handleAppUserAccess, orgFromResource("app_access:read")},
+		{"GET", "/v1/app-users/{id}/groups", s.handleAppUserGroups, orgFromResource("app_access:read")},
+		{"POST", "/v1/recovery-credentials", s.handleCreateRecoveryCredential, platform("api_keys:manage")},
+		{"GET", "/v1/recovery-credentials", s.handleListRecoveryCredentials, platform("api_keys:read")},
+		{"DELETE", "/v1/recovery-credentials/{id}", s.handleRevokeRecoveryCredential, platform("api_keys:manage")},
+		{"GET", "/v1/audit-events", s.handleListAuditEvents, platform("activity:read")},
+		{"POST", "/v1/organisations/{id}/attribute-definitions", s.handleCreateAttributeDefinition, orgPermission("attributes:manage")},
+		{"GET", "/v1/organisations/{id}/attribute-definitions", s.handleListAttributeDefinitions, orgPermission("attributes:read")},
+		{"GET", "/v1/attribute-definitions/{id}", s.handleGetAttributeDefinition, orgFromResource("attributes:read")},
+		{"PATCH", "/v1/attribute-definitions/{id}", s.handlePatchAttributeDefinition, orgFromResource("attributes:manage")},
+		{"DELETE", "/v1/attribute-definitions/{id}", s.handleDeleteAttributeDefinition, orgFromResource("attributes:manage")},
+		{"POST", "/v1/organisations/{id}/app-users", s.handleCreateAppUser, orgPermission("app_users:write")},
+		{"PUT", "/v1/organisations/{id}/app-users/ingest", s.handleIngestAppUser, orgPermission("app_users:write")},
+		{"GET", "/v1/organisations/{id}/app-users", s.handleListAppUsers, orgPermission("app_users:read")},
+		{"GET", "/v1/app-users/{id}", s.handleGetAppUser, orgFromResource("app_users:read")},
+		{"PATCH", "/v1/app-users/{id}", s.handlePatchAppUser, orgFromResource("app_users:write")},
+		{"DELETE", "/v1/app-users/{id}", s.handleDeleteAppUser, orgFromResource("app_users:write")},
+		{"POST", "/v1/organisations/{id}/email-templates", s.handleCreateEmailTemplate, orgPermission("email_templates:manage")},
+		{"GET", "/v1/organisations/{id}/email-templates", s.handleListEmailTemplates, orgPermission("email_templates:read")},
+		{"GET", "/v1/email-templates/{id}", s.handleGetEmailTemplate, orgFromResource("email_templates:read")},
+		{"PATCH", "/v1/email-templates/{id}", s.handlePatchEmailTemplate, orgFromResource("email_templates:manage")},
+		{"DELETE", "/v1/email-templates/{id}", s.handleDeleteEmailTemplate, orgFromResource("email_templates:manage")},
+		{"POST", "/v1/organisations/{id}/automations", s.handleCreateAutomation, orgPermission("automations:manage")},
+		{"GET", "/v1/organisations/{id}/automations/catalog", s.handleAutomationCatalog, orgPermission("automations:read")},
+		{"GET", "/v1/organisations/{id}/automations", s.handleListAutomations, orgPermission("automations:read")},
+		{"GET", "/v1/organisations/{id}/automation-runs", s.handleListAutomationRuns, orgPermission("automations:read")},
+		{"GET", "/v1/automations/{id}", s.handleGetAutomation, orgFromResource("automations:read")},
+		{"PATCH", "/v1/automations/{id}", s.handlePatchAutomation, orgFromResource("automations:manage")},
+		{"DELETE", "/v1/automations/{id}", s.handleDeleteAutomation, orgFromResource("automations:manage")},
+		{"POST", "/v1/organisations/{id}/product-features", s.handleCreateProductFeature, orgPermission("product_features:manage")},
+		{"GET", "/v1/organisations/{id}/product-features", s.handleListProductFeatures, orgPermission("product_features:read")},
+		{"GET", "/v1/product-features/{id}", s.handleGetProductFeature, orgFromResource("product_features:read")},
+		{"PATCH", "/v1/product-features/{id}", s.handlePatchProductFeature, orgFromResource("product_features:manage")},
+		{"PUT", "/v1/product-features/{id}/overrides", s.handleSetProductFeatureOverrides, orgFromResource("product_features:manage")},
+		{"DELETE", "/v1/product-features/{id}", s.handleDeleteProductFeature, orgFromResource("product_features:manage")},
+		{"POST", "/v1/organisations/{id}/product-plans", s.handleCreateProductPlan, orgPermission("product_features:manage")},
+		{"GET", "/v1/organisations/{id}/product-plans", s.handleListProductPlans, orgPermission("product_features:read")},
+		{"GET", "/v1/product-plans/{id}", s.handleGetProductPlan, orgFromResource("product_features:read")},
+		{"PATCH", "/v1/product-plans/{id}", s.handlePatchProductPlan, orgFromResource("product_features:manage")},
+		{"PUT", "/v1/product-plans/{id}/features", s.handleSetProductPlanFeatures, orgFromResource("product_features:manage")},
+		{"PUT", "/v1/product-plans/{id}/price", s.handleUpsertProductPlanPrice, orgFromResource("product_features:manage")},
+		{"GET", "/v1/product-plans/{id}/prices", s.handleListProductPlanPrices, orgFromResource("product_features:read")},
+		{"DELETE", "/v1/product-plans/{id}", s.handleDeleteProductPlan, orgFromResource("product_features:manage")},
+		{"PUT", "/v1/organisations/{id}/product-plan", s.handleSetActiveProductPlan, orgPermission("product_features:manage")},
+		{"GET", "/v1/organisations/{id}/product-plan", s.handleGetActiveProductPlan, orgPermission("product_features:read")},
+	}...)
 }
 
 // Handler returns the root handler with auth, audit, rate limit, and optional CORS.

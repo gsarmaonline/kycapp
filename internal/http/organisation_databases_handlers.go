@@ -34,10 +34,6 @@ func organisationDatabaseJSON(v service.OrganisationDatabaseView) map[string]any
 
 func (s *Server) handleListOrgDatabases(w http.ResponseWriter, r *http.Request) {
 	orgID := r.PathValue("id")
-	if _, err := s.svc.RequireOrgPermission(r.Context(), orgID, "organisation:update"); err != nil {
-		writeError(w, err)
-		return
-	}
 	items, err := s.svc.ListOrganisationDatabases(r.Context(), orgID)
 	if err != nil {
 		writeError(w, err)
@@ -52,10 +48,6 @@ func (s *Server) handleListOrgDatabases(w http.ResponseWriter, r *http.Request) 
 
 func (s *Server) handleCreateOrgDatabase(w http.ResponseWriter, r *http.Request) {
 	orgID := r.PathValue("id")
-	if _, err := s.svc.RequireOrgPermission(r.Context(), orgID, "organisation:update"); err != nil {
-		writeError(w, err)
-		return
-	}
 	var body struct {
 		Name         string `json:"name"`
 		Host         string `json:"host"`
@@ -83,10 +75,6 @@ func (s *Server) handleCreateOrgDatabase(w http.ResponseWriter, r *http.Request)
 func (s *Server) handleGetOrgDatabase(w http.ResponseWriter, r *http.Request) {
 	orgID := r.PathValue("id")
 	dbID := r.PathValue("dbId")
-	if _, err := s.svc.RequireOrgPermission(r.Context(), orgID, "organisation:update"); err != nil {
-		writeError(w, err)
-		return
-	}
 	view, err := s.svc.GetOrganisationDatabase(r.Context(), orgID, dbID)
 	if err != nil {
 		writeError(w, err)
@@ -98,10 +86,6 @@ func (s *Server) handleGetOrgDatabase(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handlePatchOrgDatabase(w http.ResponseWriter, r *http.Request) {
 	orgID := r.PathValue("id")
 	dbID := r.PathValue("dbId")
-	if _, err := s.svc.RequireOrgPermission(r.Context(), orgID, "organisation:update"); err != nil {
-		writeError(w, err)
-		return
-	}
 	var body struct {
 		Name         *string `json:"name"`
 		Host         *string `json:"host"`
@@ -129,10 +113,6 @@ func (s *Server) handlePatchOrgDatabase(w http.ResponseWriter, r *http.Request) 
 func (s *Server) handleCheckOrgDatabase(w http.ResponseWriter, r *http.Request) {
 	orgID := r.PathValue("id")
 	dbID := r.PathValue("dbId")
-	if _, err := s.svc.RequireOrgPermission(r.Context(), orgID, "organisation:update"); err != nil {
-		writeError(w, err)
-		return
-	}
 	view, err := s.svc.CheckOrganisationDatabase(r.Context(), orgID, dbID)
 	if err != nil {
 		writeError(w, err)
@@ -144,10 +124,6 @@ func (s *Server) handleCheckOrgDatabase(w http.ResponseWriter, r *http.Request) 
 func (s *Server) handleDisconnectOrgDatabase(w http.ResponseWriter, r *http.Request) {
 	orgID := r.PathValue("id")
 	dbID := r.PathValue("dbId")
-	if _, err := s.svc.RequireOrgPermission(r.Context(), orgID, "organisation:update"); err != nil {
-		writeError(w, err)
-		return
-	}
 	view, err := s.svc.SetOrganisationDatabaseDisconnected(r.Context(), orgID, dbID)
 	if err != nil {
 		writeError(w, err)
@@ -159,10 +135,6 @@ func (s *Server) handleDisconnectOrgDatabase(w http.ResponseWriter, r *http.Requ
 func (s *Server) handleDeleteOrgDatabase(w http.ResponseWriter, r *http.Request) {
 	orgID := r.PathValue("id")
 	dbID := r.PathValue("dbId")
-	if _, err := s.svc.RequireOrgPermission(r.Context(), orgID, "organisation:update"); err != nil {
-		writeError(w, err)
-		return
-	}
 	if err := s.svc.DeleteOrganisationDatabase(r.Context(), orgID, dbID); err != nil {
 		writeError(w, err)
 		return

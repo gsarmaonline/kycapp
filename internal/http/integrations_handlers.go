@@ -20,10 +20,6 @@ func integrationJSON(v service.IntegrationView) map[string]any {
 
 func (s *Server) handleListOrgIntegrations(w http.ResponseWriter, r *http.Request) {
 	orgID := r.PathValue("id")
-	if _, err := s.svc.RequireOrgPermission(r.Context(), orgID, "organisation:update"); err != nil {
-		writeError(w, err)
-		return
-	}
 	items, err := s.svc.ListOrganisationIntegrations(r.Context(), orgID)
 	if err != nil {
 		writeError(w, err)
@@ -38,10 +34,6 @@ func (s *Server) handleListOrgIntegrations(w http.ResponseWriter, r *http.Reques
 
 func (s *Server) handleUpsertStripeIntegration(w http.ResponseWriter, r *http.Request) {
 	orgID := r.PathValue("id")
-	if _, err := s.svc.RequireOrgPermission(r.Context(), orgID, "organisation:update"); err != nil {
-		writeError(w, err)
-		return
-	}
 	var body struct {
 		SecretKey      string `json:"secret_key"`
 		PublishableKey string `json:"publishable_key"`
@@ -62,10 +54,6 @@ func (s *Server) handleUpsertStripeIntegration(w http.ResponseWriter, r *http.Re
 
 func (s *Server) handleListStripeCatalog(w http.ResponseWriter, r *http.Request) {
 	orgID := r.PathValue("id")
-	if _, err := s.svc.RequireOrgPermission(r.Context(), orgID, "organisation:update"); err != nil {
-		writeError(w, err)
-		return
-	}
 	items, err := s.svc.ListStripeCatalog(r.Context(), orgID)
 	if err != nil {
 		writeError(w, err)
@@ -88,10 +76,6 @@ func (s *Server) handleListStripeCatalog(w http.ResponseWriter, r *http.Request)
 
 func (s *Server) handleImportStripeCatalog(w http.ResponseWriter, r *http.Request) {
 	orgID := r.PathValue("id")
-	if _, err := s.svc.RequireOrgPermission(r.Context(), orgID, "organisation:update"); err != nil {
-		writeError(w, err)
-		return
-	}
 	var body struct {
 		Items []struct {
 			PriceRef string `json:"price_ref"`
@@ -119,10 +103,6 @@ func (s *Server) handleImportStripeCatalog(w http.ResponseWriter, r *http.Reques
 
 func (s *Server) handleSyncProductPlansToStripe(w http.ResponseWriter, r *http.Request) {
 	orgID := r.PathValue("id")
-	if _, err := s.svc.RequireOrgPermission(r.Context(), orgID, "organisation:update"); err != nil {
-		writeError(w, err)
-		return
-	}
 	result, err := s.svc.SyncProductPlansToStripe(r.Context(), orgID)
 	if err != nil {
 		writeError(w, err)
@@ -149,10 +129,6 @@ func stripeCatalogSyncJSON(result service.StripeCatalogSyncResult) map[string]an
 
 func (s *Server) handleDeleteOrgIntegration(w http.ResponseWriter, r *http.Request) {
 	orgID := r.PathValue("id")
-	if _, err := s.svc.RequireOrgPermission(r.Context(), orgID, "organisation:update"); err != nil {
-		writeError(w, err)
-		return
-	}
 	if err := s.svc.DeleteOrganisationIntegration(r.Context(), orgID, r.PathValue("provider")); err != nil {
 		writeError(w, err)
 		return

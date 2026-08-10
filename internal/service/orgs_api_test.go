@@ -74,3 +74,47 @@ func TestTenancyBlocksCrossOrgAccess(t *testing.T) {
 		t.Fatalf("want 401, got %d", unauth.Code)
 	}
 }
+
+// Suspending or archiving an organisation must be reversible.
+//
+// Status is settable through PATCH, but every organisation route except delete
+// required an *active* organisation, so setting either status made the tenant
+// unreachable, including by the very route that would restore it. The only
+// remaining operation was deletion, which turned "suspend for non-payment" into
+// a one-way door.
+//
+// Lifecycle routes (read, update, delete) therefore work on any status; every
+// other route stays active-only, which is the point of suspending.
+func TestSuspendedOrganisationCanBeRestored(t *testing.T) {
+	ctx := context.Background()
+	db := openTestDB(t, ctx)
+	h := testServer(t, db)
+
+	org, token, _ := doBootstrapOrg(t, h, "owner@susp.com", "Owner", "Suspendable", "suspendable")
+	orgID := org["organisation"].(map[string]any)["id"].(string)
+
+	suspend := doJSON(t, h, http.MethodPatch, "/v1/organisations/"+orgID,
+		map[string]any{"status": "suspended"}, userAuth(token))
+	if suspend.Code != http.StatusOK {
+		t.Fatalf("suspend: %d %s", suspend.Code, suspend.Body.String())
+	}
+
+	// Still visible to its own owner, so the state can be seen and acted on.
+	if read := doJSON(t, h, http.MethodGet, "/v1/organisations/"+orgID, nil, userAuth(token)); read.Code != http.StatusOK {
+		t.Fatalf("a suspended organisation must remain readable by its members: %d %s", read.Code, read.Body.String())
+	}
+
+	// Data operations are closed while suspended. That is what suspension is.
+	if closed := doJSON(t, h, http.MethodGet, "/v1/organisations/"+orgID+"/app-users", nil, userAuth(token)); closed.Code != http.StatusNotFound {
+		t.Errorf("suspension must close data routes: want 404, got %d %s", closed.Code, closed.Body.String())
+	}
+
+	restore := doJSON(t, h, http.MethodPatch, "/v1/organisations/"+orgID,
+		map[string]any{"status": "active"}, userAuth(token))
+	if restore.Code != http.StatusOK {
+		t.Fatalf("a suspended organisation must be restorable: %d %s", restore.Code, restore.Body.String())
+	}
+	if reopened := doJSON(t, h, http.MethodGet, "/v1/organisations/"+orgID+"/app-users", nil, userAuth(token)); reopened.Code != http.StatusOK {
+		t.Fatalf("restoring must reopen data routes: %d %s", reopened.Code, reopened.Body.String())
+	}
+}

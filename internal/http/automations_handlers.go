@@ -12,10 +12,6 @@ import (
 
 func (s *Server) handleCreateAutomation(w http.ResponseWriter, r *http.Request) {
 	orgID := r.PathValue("id")
-	if _, err := s.svc.RequireOrgPermission(r.Context(), orgID, "automations:manage"); err != nil {
-		writeError(w, err)
-		return
-	}
 	var body struct {
 		Name          string          `json:"name"`
 		Trigger       string          `json:"trigger"`
@@ -41,10 +37,6 @@ func (s *Server) handleCreateAutomation(w http.ResponseWriter, r *http.Request) 
 
 func (s *Server) handleAutomationCatalog(w http.ResponseWriter, r *http.Request) {
 	orgID := r.PathValue("id")
-	if _, err := s.svc.RequireOrgPermission(r.Context(), orgID, "automations:read"); err != nil {
-		writeError(w, err)
-		return
-	}
 	catalog, err := s.svc.AutomationCatalog(r.Context(), orgID)
 	if err != nil {
 		writeError(w, err)
@@ -55,10 +47,6 @@ func (s *Server) handleAutomationCatalog(w http.ResponseWriter, r *http.Request)
 
 func (s *Server) handleListAutomations(w http.ResponseWriter, r *http.Request) {
 	orgID := r.PathValue("id")
-	if _, err := s.svc.RequireOrgPermission(r.Context(), orgID, "automations:read"); err != nil {
-		writeError(w, err)
-		return
-	}
 	rows, err := s.svc.ListAutomations(r.Context(), orgID)
 	if err != nil {
 		writeError(w, err)
@@ -136,10 +124,6 @@ func (s *Server) handleDeleteAutomation(w http.ResponseWriter, r *http.Request) 
 
 func (s *Server) handleListAutomationRuns(w http.ResponseWriter, r *http.Request) {
 	orgID := r.PathValue("id")
-	if _, err := s.svc.RequireOrgPermission(r.Context(), orgID, "automations:read"); err != nil {
-		writeError(w, err)
-		return
-	}
 	rows, err := s.svc.ListAutomationRuns(r.Context(), orgID, r.URL.Query().Get("automation_id"), 50)
 	if err != nil {
 		writeError(w, err)
