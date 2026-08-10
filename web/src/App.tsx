@@ -48,11 +48,24 @@ import { ProductPlansNew } from './pages/product_plans/product_plans_new'
 import { ProductPlansShow } from './pages/product_plans/product_plans_show'
 import { UsersEdit } from './pages/users/users_edit'
 import { UsersIndex } from './pages/users/users_index'
-import { CapabilitiesPage } from './pages/app_access/capabilities_page'
-import { CustomerGrantsPage } from './pages/app_access/grants_page'
-import { CustomerGroupsPage } from './pages/app_access/groups_page'
-import { CustomerRolesPage } from './pages/app_access/roles_page'
-import { ScopeKindsPage } from './pages/app_access/scope_kinds_page'
+import { CustomerCapabilitiesEdit } from './pages/customer_capabilities/customer_capabilities_edit'
+import { CustomerCapabilitiesIndex } from './pages/customer_capabilities/customer_capabilities_index'
+import { CustomerCapabilitiesNew } from './pages/customer_capabilities/customer_capabilities_new'
+import { CustomerCapabilitiesShow } from './pages/customer_capabilities/customer_capabilities_show'
+import { CustomerGrantsIndex } from './pages/customer_grants/customer_grants_index'
+import { CustomerGrantsNew } from './pages/customer_grants/customer_grants_new'
+import { CustomerGroupsEdit } from './pages/customer_groups/customer_groups_edit'
+import { CustomerGroupsIndex } from './pages/customer_groups/customer_groups_index'
+import { CustomerGroupsNew } from './pages/customer_groups/customer_groups_new'
+import { CustomerGroupsShow } from './pages/customer_groups/customer_groups_show'
+import { CustomerRolesEdit } from './pages/customer_roles/customer_roles_edit'
+import { CustomerRolesIndex } from './pages/customer_roles/customer_roles_index'
+import { CustomerRolesNew } from './pages/customer_roles/customer_roles_new'
+import { CustomerRolesShow } from './pages/customer_roles/customer_roles_show'
+import { CustomerScopeKindsEdit } from './pages/customer_scope_kinds/customer_scope_kinds_edit'
+import { CustomerScopeKindsIndex } from './pages/customer_scope_kinds/customer_scope_kinds_index'
+import { CustomerScopeKindsNew } from './pages/customer_scope_kinds/customer_scope_kinds_new'
+import { CustomerScopeKindsShow } from './pages/customer_scope_kinds/customer_scope_kinds_show'
 import { UsersNew } from './pages/users/users_new'
 import { UsersShow } from './pages/users/users_show'
 import { WebhooksEdit } from './pages/webhooks/webhooks_edit'
@@ -173,11 +186,25 @@ export default function App() {
         {/* Operator roles UI hidden; seeded roles still used when inviting members. */}
         <Route path="roles/*" element={<Navigate to="../members" replace />} />
         <Route path="users" element={<UsersIndex />} />
-        <Route path="customer-scope-kinds" element={<ScopeKindsPage />} />
-        <Route path="customer-capabilities" element={<CapabilitiesPage />} />
-        <Route path="customer-roles" element={<CustomerRolesPage />} />
-        <Route path="customer-groups" element={<CustomerGroupsPage />} />
-        <Route path="customer-grants" element={<CustomerGrantsPage />} />
+        <Route path="customer-scope-kinds" element={<CustomerScopeKindsIndex />} />
+        <Route path="customer-scope-kinds/new" element={<CustomerScopeKindsNew />} />
+        <Route path="customer-scope-kinds/:id" element={<CustomerScopeKindsShow />} />
+        <Route path="customer-scope-kinds/:id/edit" element={<CustomerScopeKindsEdit />} />
+        <Route path="customer-capabilities" element={<CustomerCapabilitiesIndex />} />
+        <Route path="customer-capabilities/new" element={<CustomerCapabilitiesNew />} />
+        <Route path="customer-capabilities/:id" element={<CustomerCapabilitiesShow />} />
+        <Route path="customer-capabilities/:id/edit" element={<CustomerCapabilitiesEdit />} />
+        <Route path="customer-roles" element={<CustomerRolesIndex />} />
+        <Route path="customer-roles/new" element={<CustomerRolesNew />} />
+        <Route path="customer-roles/:id" element={<CustomerRolesShow />} />
+        <Route path="customer-roles/:id/edit" element={<CustomerRolesEdit />} />
+        <Route path="customer-groups" element={<CustomerGroupsIndex />} />
+        <Route path="customer-groups/new" element={<CustomerGroupsNew />} />
+        <Route path="customer-groups/:id" element={<CustomerGroupsShow />} />
+        <Route path="customer-groups/:id/edit" element={<CustomerGroupsEdit />} />
+        {/* Grants are issued and revoked, never edited, so there is no show or edit. */}
+        <Route path="customer-grants" element={<CustomerGrantsIndex />} />
+        <Route path="customer-grants/new" element={<CustomerGrantsNew />} />
         <Route path="users/new" element={<UsersNew />} />
         <Route path="users/:id" element={<UsersShow />} />
         <Route path="users/:id/edit" element={<UsersEdit />} />

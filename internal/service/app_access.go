@@ -520,3 +520,77 @@ func (s *Service) AppAccessFor(ctx context.Context, orgID, appUserID string) (Ap
 	}
 	return out, nil
 }
+
+// --- Single-object reads and edits ---
+//
+// The admin UI follows an index / new / show / edit shape for every object, so
+// each of these needs to be fetchable and editable on its own rather than only
+// as a row in a list.
+
+func (s *Service) GetAppScopeType(ctx context.Context, orgID, id string) (sqlc.AppScopeType, error) {
+	row, err := s.db.Q().GetAppScopeType(ctx, id)
+	if errors.Is(err, pgx.ErrNoRows) || (err == nil && row.OrganisationID != orgID) {
+		return sqlc.AppScopeType{}, apperr.NotFound("scope kind not found")
+	}
+	return row, err
+}
+
+func (s *Service) UpdateAppScopeType(ctx context.Context, orgID, id, label string) (sqlc.AppScopeType, error) {
+	row, err := s.db.Q().UpdateAppScopeType(ctx, sqlc.UpdateAppScopeTypeParams{
+		ID: id, OrganisationID: orgID,
+		Label: pgtype.Text{String: strings.TrimSpace(label), Valid: true},
+	})
+	if errors.Is(err, pgx.ErrNoRows) {
+		return sqlc.AppScopeType{}, apperr.NotFound("scope kind not found")
+	}
+	return row, err
+}
+
+func (s *Service) GetAppCapability(ctx context.Context, orgID, id string) (sqlc.AppCapability, error) {
+	row, err := s.db.Q().GetAppCapability(ctx, id)
+	if errors.Is(err, pgx.ErrNoRows) || (err == nil && row.OrganisationID != orgID) {
+		return sqlc.AppCapability{}, apperr.NotFound("capability not found")
+	}
+	return row, err
+}
+
+func (s *Service) UpdateAppCapability(ctx context.Context, orgID, id, description string) (sqlc.AppCapability, error) {
+	row, err := s.db.Q().UpdateAppCapability(ctx, sqlc.UpdateAppCapabilityParams{
+		ID: id, OrganisationID: orgID,
+		Description: pgtype.Text{String: strings.TrimSpace(description), Valid: true},
+	})
+	if errors.Is(err, pgx.ErrNoRows) {
+		return sqlc.AppCapability{}, apperr.NotFound("capability not found")
+	}
+	return row, err
+}
+
+// AppRoleView is a role with the ids of the roles it builds on, which an edit
+// form needs and the list does not.
+type AppRoleView struct {
+	Role    sqlc.AppRole
+	Extends []string
+}
+
+func (s *Service) GetAppRoleView(ctx context.Context, orgID, id string) (AppRoleView, error) {
+	role, err := s.db.Q().GetAppRole(ctx, id)
+	if errors.Is(err, pgx.ErrNoRows) || (err == nil && role.OrganisationID != orgID) {
+		return AppRoleView{}, apperr.NotFound("role not found")
+	}
+	if err != nil {
+		return AppRoleView{}, err
+	}
+	parents, err := s.db.Q().ListAppRoleParents(ctx, id)
+	if err != nil {
+		return AppRoleView{}, err
+	}
+	return AppRoleView{Role: role, Extends: parents}, nil
+}
+
+func (s *Service) GetAppUserGroupByID(ctx context.Context, orgID, id string) (sqlc.AppUserGroup, error) {
+	row, err := s.db.Q().GetAppUserGroup(ctx, id)
+	if errors.Is(err, pgx.ErrNoRows) || (err == nil && row.OrganisationID != orgID) {
+		return sqlc.AppUserGroup{}, apperr.NotFound("group not found")
+	}
+	return row, err
+}

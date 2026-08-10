@@ -449,3 +449,78 @@ func (s *Server) handleAppUserGroups(w http.ResponseWriter, r *http.Request) {
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"items": items})
 }
+
+// Single-object reads and edits, so each object has the index / new / show /
+// edit shape the rest of the admin UI uses.
+
+func (s *Server) handleGetAppScopeType(w http.ResponseWriter, r *http.Request) {
+	row, err := s.svc.GetAppScopeType(r.Context(), r.PathValue("id"), r.PathValue("typeId"))
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"id": row.ID, "kind": row.Kind, "label": row.Label})
+}
+
+func (s *Server) handlePatchAppScopeType(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		Label string `json:"label"`
+	}
+	if err := decodeJSON(r, &body); err != nil {
+		writeError(w, apperr.Validation("invalid JSON body"))
+		return
+	}
+	row, err := s.svc.UpdateAppScopeType(r.Context(), r.PathValue("id"), r.PathValue("typeId"), body.Label)
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"id": row.ID, "kind": row.Kind, "label": row.Label})
+}
+
+func (s *Server) handleGetAppCapability(w http.ResponseWriter, r *http.Request) {
+	row, err := s.svc.GetAppCapability(r.Context(), r.PathValue("id"), r.PathValue("capId"))
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"id": row.ID, "key": row.Key, "description": row.Description})
+}
+
+func (s *Server) handlePatchAppCapability(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		Description string `json:"description"`
+	}
+	if err := decodeJSON(r, &body); err != nil {
+		writeError(w, apperr.Validation("invalid JSON body"))
+		return
+	}
+	row, err := s.svc.UpdateAppCapability(r.Context(), r.PathValue("id"), r.PathValue("capId"), body.Description)
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"id": row.ID, "key": row.Key, "description": row.Description})
+}
+
+func (s *Server) handleGetAppRole(w http.ResponseWriter, r *http.Request) {
+	view, err := s.svc.GetAppRoleView(r.Context(), r.PathValue("id"), r.PathValue("roleId"))
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	out := appRoleJSON(view.Role)
+	out["extends"] = view.Extends
+	writeJSON(w, http.StatusOK, out)
+}
+
+func (s *Server) handleGetAppUserGroup(w http.ResponseWriter, r *http.Request) {
+	row, err := s.svc.GetAppUserGroupByID(r.Context(), r.PathValue("id"), r.PathValue("groupId"))
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{
+		"id": row.ID, "key": row.Key, "name": row.Name, "description": row.Description,
+	})
+}

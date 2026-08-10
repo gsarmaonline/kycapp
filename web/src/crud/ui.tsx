@@ -26,10 +26,13 @@ export function ResourceTable({
   columns,
   rows,
   empty,
+  /** Set false for a table you can only read, so it gets no empty Actions column. */
+  actions = true,
 }: {
   columns: string[]
   rows: { key: string; cells: ReactNode[]; actions?: ReactNode }[]
   empty: string
+  actions?: boolean
 }) {
   return (
     <div className="table-wrap">
@@ -39,13 +42,13 @@ export function ResourceTable({
             {columns.map((c) => (
               <th key={c}>{c}</th>
             ))}
-            <th className="actions-col">Actions</th>
+            {actions && <th className="actions-col">Actions</th>}
           </tr>
         </thead>
         <tbody>
           {rows.length === 0 && (
             <tr>
-              <td colSpan={columns.length + 1} className="empty">
+              <td colSpan={columns.length + (actions ? 1 : 0)} className="empty">
                 {empty}
               </td>
             </tr>
@@ -55,9 +58,11 @@ export function ResourceTable({
               {row.cells.map((cell, i) => (
                 <td key={i}>{cell}</td>
               ))}
-              <td className="actions-col">
-                <div className="row-actions">{row.actions}</div>
-              </td>
+              {actions && (
+                <td className="actions-col">
+                  <div className="row-actions">{row.actions}</div>
+                </td>
+              )}
             </tr>
           ))}
         </tbody>
