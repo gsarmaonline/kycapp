@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { deleteAppScopeType, listAppScopeTypes, type AppScopeType } from '../../api'
+import { ConceptDocsLink } from '../../components/ConceptDocsLink'
 import { PageHeader, ResourceTable, RowActions } from '../../crud/ui'
 import { resourcePath } from '../../org_nav'
 
@@ -45,7 +46,8 @@ export function CustomerScopeKindsIndex() {
       />
       <p className="muted">
         The levels your product has, such as <code>project</code>. You declare the kind; the ids stay
-        in your system and are never registered here.
+        in your system and are never registered here.{' '}
+        <ConceptDocsLink slug="customer-scope-kinds" label="How scope kinds are used" />
       </p>
       {error && <p className="error">{error}</p>}
       {loading ? (

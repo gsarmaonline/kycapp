@@ -7,6 +7,10 @@ export type DocConcept = {
   title: string
   summary: string
   body: string[]
+  /** An ordered flow, for concepts where the sequence is the explanation. */
+  steps?: { title: string; detail: string }[]
+  /** One request or response worth showing verbatim. */
+  sample?: { label: string; code: string }
   related?: { label: string; slug?: string; path?: string }[]
   section?: OrgSection
 }
@@ -42,7 +46,11 @@ export const DOC_CONCEPTS: DocConcept[] = [
       'Authority can be kyc (create/edit in KYC) or external (ingest from Clerk, Auth0, your DB). Ingest upserts by external_id or email and can discover new attribute keys.',
     ],
     section: 'users',
-    related: [{ label: 'User attributes', slug: 'attributes' }, { label: 'Variables', path: 'variables' }],
+    related: [
+      { label: 'User attributes', slug: 'attributes' },
+      { label: 'Customer access', slug: 'customer-access' },
+      { label: 'Variables', path: 'variables' },
+    ],
   },
   {
     slug: 'attributes',
@@ -186,6 +194,153 @@ export const DOC_CONCEPTS: DocConcept[] = [
     section: 'activity',
   },
   {
+    slug: 'customer-access',
+    title: 'Customer access',
+    summary:
+      'Authorisation you run for your own customers. You declare the vocabulary, KYC stores the grants, your backend decides.',
+    body: [
+      'Members and permissions govern who may operate KYC. Customer access is the other side: which of your customers may do what inside your product — the project a person can edit, the region an account may read.',
+      'KYC does not enforce this. It has no idea what a project of yours is, and asking it on every request would put a network hop inside your app and make KYC own your latency. Instead you declare the vocabulary here, grant roles over your own scopes, and read back an assembled grant set that your backend evaluates locally.',
+      'Because the vocabulary is yours, the capability set is open: anything you declare is valid. KYC keeps it inside your organisation and can never be used to grant power inside KYC itself. The two namespaces never mix.',
+    ],
+    steps: [
+      {
+        title: 'Declare your scope kinds',
+        detail:
+          'The levels your product has, such as project or region. You register the kind; the ids stay in your system.',
+      },
+      {
+        title: 'Declare your capabilities',
+        detail:
+          'The verbs your backend checks, written resource:action. A role can only use capabilities declared here, so a typo is caught rather than silently granting nothing.',
+      },
+      {
+        title: 'Compose roles',
+        detail:
+          'Name a set of capabilities. A role may build on other roles, and what it resolves to is recomputed when you change it, so every holder follows.',
+      },
+      {
+        title: 'Group customers, if it helps',
+        detail:
+          'A group is a set of customers you grant to once instead of one at a time. Membership is an explicit list you manage on the group.',
+      },
+      {
+        title: 'Issue grants',
+        detail:
+          'A grant gives one subject — a customer or a group — one role over one scope, optionally with an expiry.',
+      },
+      {
+        title: 'Read the grant set back',
+        detail:
+          'Your backend fetches a customer’s assembled access, caches it against the version, and decides locally.',
+      },
+    ],
+    sample: {
+      label: 'Reading a customer’s access',
+      code: `GET /v1/app-users/{id}/access
+
+{
+  "app_user_id": "01J…",
+  "namespace": "org:01J…",
+  "version": 1786374167,
+  "grants": [
+    {
+      "scope_kind": "project",
+      "scope_id": "apollo",
+      "capabilities": ["docs:read", "docs:write"],
+      "source": "group:au_customers app-role:editor"
+    }
+  ]
+}`,
+    },
+    related: [
+      { label: 'Scope kinds', slug: 'customer-scope-kinds' },
+      { label: 'Capabilities', slug: 'customer-capabilities' },
+      { label: 'Roles', slug: 'customer-roles' },
+      { label: 'Groups', slug: 'customer-groups' },
+      { label: 'Grants', slug: 'customer-grants' },
+      { label: 'Users (app users)', slug: 'users' },
+      { label: 'Permissions vs entitlements', slug: 'permissions-entitlements' },
+      { label: 'Integration API', path: 'api' },
+    ],
+  },
+  {
+    slug: 'customer-scope-kinds',
+    title: 'Scope kinds',
+    summary: 'The levels your product has — project, region, account — that access can be granted over.',
+    body: [
+      'A scope kind names a level in your product. You register the kind once; the ids underneath it stay in your system and are never uploaded. A grant then reads as a role over project apollo, where project is the kind and apollo is your id.',
+      'Kinds are flat and independent, not a tree. If a resource belongs to several containers at once, list all of them when you check: an object in two projects is reachable through either, and adding it to a third only ever widens access.',
+    ],
+    section: 'customer-scope-kinds',
+    related: [
+      { label: 'Customer access', slug: 'customer-access' },
+      { label: 'Grants', slug: 'customer-grants' },
+    ],
+  },
+  {
+    slug: 'customer-capabilities',
+    title: 'Capabilities',
+    summary: 'The verbs your backend checks, written resource:action.',
+    body: [
+      'A capability is one thing a customer may do, such as invoices:read or docs:write. Declare the ones your product actually checks; they are yours, and KYC only stores them.',
+      'A role can use nothing that is not declared here. That is the point of declaring them: a mistyped capability is rejected when you build the role, instead of quietly granting nothing at the moment it matters.',
+    ],
+    section: 'customer-capabilities',
+    related: [
+      { label: 'Customer access', slug: 'customer-access' },
+      { label: 'Roles', slug: 'customer-roles' },
+    ],
+  },
+  {
+    slug: 'customer-roles',
+    title: 'Roles',
+    summary: 'Named sets of capabilities, which may build on other roles.',
+    body: [
+      'A role is a capability set with a name. Grants carry roles rather than raw capabilities, so you can change what maintainer means in one place and everyone holding it follows.',
+      'A role may build on others. What it resolves to is worked out and stored when you save it, so a check never has to walk a chain, and editing a base role updates everything built on it. The detail page shows which capabilities are the role’s own and which are inherited.',
+      'Roles never subtract. Building on a role can only add capabilities, which is what keeps the resolved set predictable no matter how deep the chain runs.',
+    ],
+    section: 'customer-roles',
+    related: [
+      { label: 'Customer access', slug: 'customer-access' },
+      { label: 'Capabilities', slug: 'customer-capabilities' },
+      { label: 'Grants', slug: 'customer-grants' },
+    ],
+  },
+  {
+    slug: 'customer-groups',
+    title: 'Groups',
+    summary: 'Sets of customers you grant to once instead of one at a time.',
+    body: [
+      'A group is a named set of your customers. Granting a role to a group reaches every member, so onboarding a person becomes adding them to a group rather than reissuing their grants.',
+      'Membership is an explicit list, managed on the group’s own page. It is not a query over attributes: a rule that recomputes silently would change who has access without anyone issuing anything, and the reason for that change would be invisible on the day it mattered.',
+      'A customer keeps whatever they hold directly as well. Group access and direct access add together, and a customer’s page shows which grant came through which group.',
+    ],
+    section: 'customer-groups',
+    related: [
+      { label: 'Customer access', slug: 'customer-access' },
+      { label: 'Grants', slug: 'customer-grants' },
+      { label: 'Users (app users)', slug: 'users' },
+    ],
+  },
+  {
+    slug: 'customer-grants',
+    title: 'Grants',
+    summary: 'One subject, one role, one scope, optionally until a date.',
+    body: [
+      'A grant is the only thing that actually gives access. Everything else is vocabulary: a grant binds a subject — one customer or one group — to a role over a scope, such as the editor role over project apollo.',
+      'Grants are issued and revoked, never edited. Changing one in place would rewrite what someone had at a past moment; revoking and issuing leaves a history you can read. Set an expiry when access should end on its own.',
+      'Access is additive and denied by default. There are no deny rules, so no grant can take away what another gives, and a customer with no grant for a scope cannot tell it apart from a scope that does not exist.',
+    ],
+    section: 'customer-grants',
+    related: [
+      { label: 'Customer access', slug: 'customer-access' },
+      { label: 'Roles', slug: 'customer-roles' },
+      { label: 'Groups', slug: 'customer-groups' },
+    ],
+  },
+  {
     slug: 'permissions-entitlements',
     title: 'Permissions vs entitlements',
     summary: 'RBAC gates operators in KYC; entitlements gate org capabilities and customer features.',
@@ -195,6 +350,7 @@ export const DOC_CONCEPTS: DocConcept[] = [
     ],
     related: [
       { label: 'Features', slug: 'product-features' },
+      { label: 'Customer access', slug: 'customer-access' },
       { label: 'Integration API', path: 'api' },
     ],
   },
@@ -231,7 +387,7 @@ function conceptNavGroups(base: string) {
     return { id: groupId, label, hint, items }
   }
 
-  const core = ['organisation', 'permissions-entitlements'].map((slug) => {
+  const core = ['organisation', 'permissions-entitlements', 'customer-access'].map((slug) => {
     const c = BY_SLUG.get(slug)!
     return {
       slug: c.slug,
@@ -249,6 +405,11 @@ function conceptNavGroups(base: string) {
       items: core,
     },
     fromGroup('product', 'Product', 'What the organisation runs for its customers'),
+    fromGroup(
+      'customer-access',
+      'Customer access',
+      'What the organisation’s own customers may do inside its product',
+    ),
     fromGroup('actions', 'Actions', 'Destinations and inbound triggers for automations'),
     fromGroup('platform', 'Platform', 'What the organisation uses inside KYC'),
   ]
@@ -315,6 +476,27 @@ export function DocsConceptPage() {
       {concept.body.map((para) => (
         <p key={para.slice(0, 48)}>{para}</p>
       ))}
+      {concept.steps && concept.steps.length > 0 && (
+        <>
+          <h3>How it fits together</h3>
+          <ol className="docs-concept-steps">
+            {concept.steps.map((step) => (
+              <li key={step.title}>
+                <strong>{step.title}</strong>
+                <span>{step.detail}</span>
+              </li>
+            ))}
+          </ol>
+        </>
+      )}
+      {concept.sample && (
+        <>
+          <h3>{concept.sample.label}</h3>
+          <pre className="docs-concept-sample">
+            <code>{concept.sample.code}</code>
+          </pre>
+        </>
+      )}
       {concept.related && concept.related.length > 0 && (
         <>
           <h3>Related</h3>

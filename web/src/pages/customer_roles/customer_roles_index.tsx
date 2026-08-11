@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { deleteAppRole, listAppRoles, type AppRole } from '../../api'
+import { ConceptDocsLink } from '../../components/ConceptDocsLink'
 import { PageHeader, ResourceTable, RowActions } from '../../crud/ui'
 import { resourcePath } from '../../org_nav'
 
@@ -45,7 +46,8 @@ export function CustomerRolesIndex() {
       />
       <p className="muted">
         Named sets of capabilities. A role may build on others, and editing it reaches everyone
-        holding it.
+        holding it.{' '}
+        <ConceptDocsLink slug="customer-roles" label="How roles resolve" />
       </p>
       {error && <p className="error">{error}</p>}
       {loading ? (

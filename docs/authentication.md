@@ -191,7 +191,7 @@ Break-glass cannot own a key: it is an environment credential with no person beh
 
 `Kind` has no app-user value, so a merchant's customer cannot call KYC from a browser. This blocks the settings embed and any browser-side SDK.
 
-It does **not** block [merchant-hosted access control](authorisation.md#merchant-hosted-access-control), which is shipped: the merchant's own backend performs the check.
+It does **not** block [customer access](customer-access.md), which is shipped: the merchant's own backend performs the check.
 
 ### Staff reach is ambient
 

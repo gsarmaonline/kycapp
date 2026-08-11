@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { deleteAppUserGroup, listAppUserGroups, type AppUserGroup } from '../../api'
+import { ConceptDocsLink } from '../../components/ConceptDocsLink'
 import { PageHeader, ResourceTable, RowActions } from '../../crud/ui'
 import { resourcePath } from '../../org_nav'
 
@@ -45,7 +46,8 @@ export function CustomerGroupsIndex() {
       />
       <p className="muted">
         Sets of your customers. Granting a role to a group reaches every member. Membership is an
-        explicit list, managed on the group.
+        explicit list, managed on the group.{' '}
+        <ConceptDocsLink slug="customer-groups" label="How groups are used" />
       </p>
       {error && <p className="error">{error}</p>}
       {loading ? (
