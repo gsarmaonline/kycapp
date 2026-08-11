@@ -51,6 +51,7 @@ sql:
       - "internal/store/migrations/000046_recovery_credentials.up.sql"
       - "internal/store/migrations/000047_app_access.up.sql"
       - "internal/store/migrations/000048_app_user_groups.up.sql"
+      - "internal/store/migrations/000049_app_grant_exceptions.up.sql"
     gen:
       go:
         package: "sqlc"

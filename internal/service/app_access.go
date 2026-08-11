@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"regexp"
 	"strings"
@@ -295,17 +296,45 @@ func (s *Service) assertDeclaredCapabilities(ctx context.Context, orgID string, 
 
 // --- Grants ---
 
-// AppGrantInput carries exactly one subject: an app user or a group. A grant
-// with neither would apply to nobody; one with both would be ambiguous.
+// AppGrantInput carries exactly one subject: one customer, one group, or
+// everyone. A grant with none would apply to nobody; one with two would be
+// ambiguous.
+//
+// The exception lists are the counterpart to the wildcards beside them. A
+// wildcard claims a set nobody can enumerate; an exception names the members
+// that do not belong. Each narrows this grant alone, never another, which is
+// what keeps grants unordered and additive.
 type AppGrantInput struct {
-	AppUserID string
-	GroupID   string
-	RoleID    string
-	ScopeKind string
-	ScopeID   string
-	ExpiresAt *time.Time
-	GrantedBy string
+	SubjectKind string // app_user | group | everyone
+	AppUserID   string
+	GroupID     string
+	RoleID      string
+	ScopeKind   string
+	ScopeID     string
+	ExpiresAt   *time.Time
+	GrantedBy   string
+
+	// AllCapabilities carries every capability in the organisation's namespace,
+	// including ones declared later. RoleID must be empty when it is set.
+	AllCapabilities    bool
+	ExceptCapabilities []string
+	ExceptScopes       []AppScopeRef
+	ExceptAppUserIDs   []string
+	Constraint         string // "" | self_subject
 }
+
+// AppScopeRef is one excluded scope. Kind and id stay paired, which is why the
+// column is JSONB rather than two parallel arrays.
+type AppScopeRef struct {
+	Kind string `json:"kind"`
+	ID   string `json:"id"`
+}
+
+const (
+	subjectAppUser  = "app_user"
+	subjectGroup    = "group"
+	subjectEveryone = "everyone"
+)
 
 func (s *Service) CreateAppGrant(ctx context.Context, orgID string, in AppGrantInput) (sqlc.AppGrant, error) {
 	kind := strings.ToLower(strings.TrimSpace(in.ScopeKind))
@@ -317,33 +346,81 @@ func (s *Service) CreateAppGrant(ctx context.Context, orgID string, in AppGrantI
 	if err != nil {
 		return sqlc.AppGrant{}, err
 	}
-	known := false
+	declaredKinds := make(map[string]struct{}, len(declared))
 	for _, d := range declared {
-		if d.Kind == kind {
-			known = true
-		}
+		declaredKinds[d.Kind] = struct{}{}
 	}
-	if !known {
+	if _, ok := declaredKinds[kind]; !ok {
 		// The kind is checked; the id deliberately is not. An undeclared kind
 		// would silently match nothing, which is the worst way to fail.
 		return sqlc.AppGrant{}, apperr.Validation("scope kind not declared: " + kind)
 	}
-	role, err := s.db.Q().GetAppRole(ctx, in.RoleID)
-	if errors.Is(err, pgx.ErrNoRows) || (err == nil && role.OrganisationID != orgID) {
-		return sqlc.AppGrant{}, apperr.Validation("unknown role")
+
+	// A grant carries a role or the wildcard, never both and never neither.
+	roleID := pgtype.Text{}
+	switch {
+	case in.AllCapabilities && in.RoleID != "":
+		return sqlc.AppGrant{}, apperr.Validation("a wildcard grant carries no role")
+	case !in.AllCapabilities && in.RoleID == "":
+		return sqlc.AppGrant{}, apperr.Validation("role_id is required unless all_capabilities is set")
+	case !in.AllCapabilities:
+		role, err := s.db.Q().GetAppRole(ctx, in.RoleID)
+		if errors.Is(err, pgx.ErrNoRows) || (err == nil && role.OrganisationID != orgID) {
+			return sqlc.AppGrant{}, apperr.Validation("unknown role")
+		}
+		if err != nil {
+			return sqlc.AppGrant{}, err
+		}
+		roleID = textArg(in.RoleID)
 	}
+
+	exceptCaps, err := s.validateExceptCapabilities(ctx, orgID, in)
 	if err != nil {
 		return sqlc.AppGrant{}, err
+	}
+	exceptScopes, err := validateExceptScopes(in.ExceptScopes, declaredKinds)
+	if err != nil {
+		return sqlc.AppGrant{}, err
+	}
+	constraint := strings.TrimSpace(in.Constraint)
+	if constraint != "" && constraint != string(access.SelfSubject) {
+		return sqlc.AppGrant{}, apperr.Validation("unknown constraint: " + constraint)
 	}
 
 	var expires pgtype.Timestamptz
 	if in.ExpiresAt != nil {
 		expires = pgtype.Timestamptz{Time: in.ExpiresAt.UTC(), Valid: true}
 	}
-	if (in.AppUserID == "") == (in.GroupID == "") {
-		return sqlc.AppGrant{}, apperr.Validation("provide exactly one of app_user_id or group_id")
+
+	subject := strings.TrimSpace(in.SubjectKind)
+	if subject == "" {
+		// Older callers sent no kind and inferred it from whichever id was set.
+		subject = subjectAppUser
+		if in.GroupID != "" {
+			subject = subjectGroup
+		}
 	}
-	if in.GroupID != "" {
+
+	switch subject {
+	case subjectEveryone:
+		if in.AppUserID != "" || in.GroupID != "" {
+			return sqlc.AppGrant{}, apperr.Validation("an everyone grant names no subject")
+		}
+		excluded, err := s.validateExcludedUsers(ctx, orgID, in.ExceptAppUserIDs)
+		if err != nil {
+			return sqlc.AppGrant{}, err
+		}
+		return s.db.Q().CreateAppEveryoneGrant(ctx, sqlc.CreateAppEveryoneGrantParams{
+			ID: ids.New(), OrganisationID: orgID, RoleID: roleID,
+			ScopeKind: kind, ScopeID: scopeID, ExpiresAt: expires, GrantedBy: in.GrantedBy,
+			AllCapabilities: in.AllCapabilities, ExceptCapabilities: exceptCaps,
+			ExceptScopes: exceptScopes, ExceptAppUserIds: excluded, ConstraintKind: constraint,
+		})
+
+	case subjectGroup:
+		if in.GroupID == "" || in.AppUserID != "" {
+			return sqlc.AppGrant{}, apperr.Validation("a group grant needs exactly a group_id")
+		}
 		group, err := s.db.Q().GetAppUserGroup(ctx, in.GroupID)
 		if errors.Is(err, pgx.ErrNoRows) || (err == nil && group.OrganisationID != orgID) {
 			return sqlc.AppGrant{}, apperr.Validation("unknown group")
@@ -351,15 +428,105 @@ func (s *Service) CreateAppGrant(ctx context.Context, orgID string, in AppGrantI
 		if err != nil {
 			return sqlc.AppGrant{}, err
 		}
+		excluded, err := s.validateExcludedUsers(ctx, orgID, in.ExceptAppUserIDs)
+		if err != nil {
+			return sqlc.AppGrant{}, err
+		}
 		return s.db.Q().CreateAppGroupGrant(ctx, sqlc.CreateAppGroupGrantParams{
-			ID: ids.New(), OrganisationID: orgID, GroupID: textArg(in.GroupID), RoleID: in.RoleID,
+			ID: ids.New(), OrganisationID: orgID, GroupID: textArg(in.GroupID), RoleID: roleID,
 			ScopeKind: kind, ScopeID: scopeID, ExpiresAt: expires, GrantedBy: in.GrantedBy,
+			AllCapabilities: in.AllCapabilities, ExceptCapabilities: exceptCaps,
+			ExceptScopes: exceptScopes, ExceptAppUserIds: excluded, ConstraintKind: constraint,
+		})
+
+	case subjectAppUser:
+		if in.AppUserID == "" || in.GroupID != "" {
+			return sqlc.AppGrant{}, apperr.Validation("a customer grant needs exactly an app_user_id")
+		}
+		if len(in.ExceptAppUserIDs) > 0 {
+			// Excluding people from a grant that names one person is either a
+			// mistake or a way to write a grant that reaches nobody.
+			return sqlc.AppGrant{}, apperr.Validation("except_app_user_ids applies only to group and everyone grants")
+		}
+		return s.db.Q().CreateAppUserGrant(ctx, sqlc.CreateAppUserGrantParams{
+			ID: ids.New(), OrganisationID: orgID, AppUserID: textArg(in.AppUserID), RoleID: roleID,
+			ScopeKind: kind, ScopeID: scopeID, ExpiresAt: expires, GrantedBy: in.GrantedBy,
+			AllCapabilities: in.AllCapabilities, ExceptCapabilities: exceptCaps,
+			ExceptScopes: exceptScopes, ConstraintKind: constraint,
 		})
 	}
-	return s.db.Q().CreateAppUserGrant(ctx, sqlc.CreateAppUserGrantParams{
-		ID: ids.New(), OrganisationID: orgID, AppUserID: textArg(in.AppUserID), RoleID: in.RoleID,
-		ScopeKind: kind, ScopeID: scopeID, ExpiresAt: expires, GrantedBy: in.GrantedBy,
-	})
+	return sqlc.AppGrant{}, apperr.Validation("unknown subject_kind: " + subject)
+}
+
+// validateExceptCapabilities refuses carve-outs that would mislead: one without
+// a wildcard does nothing, and one naming an undeclared capability protects
+// against nothing while reading as though it does.
+func (s *Service) validateExceptCapabilities(ctx context.Context, orgID string, in AppGrantInput) ([]string, error) {
+	out := make([]string, 0, len(in.ExceptCapabilities))
+	if len(in.ExceptCapabilities) == 0 {
+		return out, nil
+	}
+	if !in.AllCapabilities {
+		return nil, apperr.Validation("except_capabilities needs all_capabilities; a role already lists what it grants")
+	}
+	declared, err := s.db.Q().ListAppCapabilities(ctx, orgID)
+	if err != nil {
+		return nil, err
+	}
+	known := make(map[string]struct{}, len(declared))
+	for _, d := range declared {
+		known[d.Key] = struct{}{}
+	}
+	for _, raw := range in.ExceptCapabilities {
+		key := strings.ToLower(strings.TrimSpace(raw))
+		if key == "" {
+			continue
+		}
+		if _, ok := known[key]; !ok {
+			return nil, apperr.Validation("capability not declared: " + key)
+		}
+		out = append(out, key)
+	}
+	return out, nil
+}
+
+// validateExceptScopes keeps an excluded scope to a declared kind, for the same
+// reason a granted one is checked: an undeclared kind excludes nothing.
+func validateExceptScopes(refs []AppScopeRef, declaredKinds map[string]struct{}) (json.RawMessage, error) {
+	out := make([]AppScopeRef, 0, len(refs))
+	for _, r := range refs {
+		kind := strings.ToLower(strings.TrimSpace(r.Kind))
+		id := strings.TrimSpace(r.ID)
+		if kind == "" || id == "" {
+			return nil, apperr.Validation("an excluded scope needs a kind and an id")
+		}
+		if _, ok := declaredKinds[kind]; !ok {
+			return nil, apperr.Validation("scope kind not declared: " + kind)
+		}
+		out = append(out, AppScopeRef{Kind: kind, ID: id})
+	}
+	return json.Marshal(out)
+}
+
+// validateExcludedUsers checks every excluded customer belongs to the
+// organisation, so a typo cannot silently exclude nobody.
+func (s *Service) validateExcludedUsers(ctx context.Context, orgID string, ids []string) ([]string, error) {
+	out := make([]string, 0, len(ids))
+	for _, id := range ids {
+		id = strings.TrimSpace(id)
+		if id == "" {
+			continue
+		}
+		u, err := s.db.Q().GetAppUser(ctx, id)
+		if errors.Is(err, pgx.ErrNoRows) || (err == nil && u.OrganisationID != orgID) {
+			return nil, apperr.Validation("unknown customer in except_app_user_ids")
+		}
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, id)
+	}
+	return out, nil
 }
 
 // --- Groups ---
@@ -477,7 +644,9 @@ type AppAccessSet struct {
 // core/access grants because the merchant's SDK evaluates it with the same
 // Decide the API uses.
 func (s *Service) AppAccessFor(ctx context.Context, orgID, appUserID string) (AppAccessSet, error) {
-	rows, err := s.db.Q().ListAppGrantsForUser(ctx, textArg(appUserID))
+	rows, err := s.db.Q().ListAppGrantsForUser(ctx, sqlc.ListAppGrantsForUserParams{
+		AppUserID: textArg(appUserID), OrganisationID: orgID,
+	})
 	if err != nil {
 		return AppAccessSet{}, err
 	}
@@ -495,22 +664,25 @@ func (s *Service) AppAccessFor(ctx context.Context, orgID, appUserID string) (Ap
 		for _, k := range r.EffectiveCapabilities {
 			caps = append(caps, access.Capability{Namespace: ns, Key: k})
 		}
-		if len(caps) == 0 {
+		if len(caps) == 0 && !r.AllCapabilities {
 			// An empty grant is invalid and would be rejected by the evaluator.
-			// A role carrying nothing simply contributes nothing.
+			// A role carrying nothing simply contributes nothing. A wildcard
+			// carries plenty while listing none, so it is exempt.
 			continue
-		}
-		source := "app-role:" + r.RoleKey
-		if r.GroupKey != "" {
-			// Provenance: a capability held through a group should say so, or
-			// "why does this customer have this?" is unanswerable.
-			source = "group:" + r.GroupKey + " app-role:" + r.RoleKey
 		}
 		g := access.Grant{
 			ID:           r.ID,
 			Scope:        access.Scope{Kind: r.ScopeKind, ID: r.ScopeID},
+			Except:       decodeExceptScopes(r.ExceptScopes),
 			Capabilities: caps,
-			Source:       source,
+			Constraint:   access.Constraint(r.ConstraintKind),
+			Source:       grantSource(r.SubjectKind, r.GroupKey, r.RoleKey, r.AllCapabilities),
+		}
+		if r.AllCapabilities {
+			g.AllCapabilitiesIn = ns
+			for _, k := range r.ExceptCapabilities {
+				g.ExceptCapabilities = append(g.ExceptCapabilities, access.Capability{Namespace: ns, Key: k})
+			}
 		}
 		if r.ExpiresAt.Valid {
 			t := r.ExpiresAt.Time
@@ -519,6 +691,43 @@ func (s *Service) AppAccessFor(ctx context.Context, orgID, appUserID string) (Ap
 		out.Grants = append(out.Grants, g)
 	}
 	return out, nil
+}
+
+// grantSource records how a customer came to hold a grant. Provenance is the
+// whole answer to "why does this person have this?", and a grant that arrives
+// through a group or through the everyone rule is exactly the case where nobody
+// can work it out from the grants list alone.
+func grantSource(subjectKind, groupKey, roleKey string, wildcard bool) string {
+	what := "app-role:" + roleKey
+	if wildcard {
+		what = "all-capabilities"
+	}
+	switch subjectKind {
+	case subjectEveryone:
+		return "everyone " + what
+	case subjectGroup:
+		return "group:" + groupKey + " " + what
+	default:
+		return what
+	}
+}
+
+// decodeExceptScopes turns the stored JSON into scopes. A row that will not
+// parse is treated as having no exclusions, which widens the grant, so it is
+// stored as JSONB and validated on the way in rather than trusted here.
+func decodeExceptScopes(raw json.RawMessage) []access.Scope {
+	if len(raw) == 0 {
+		return nil
+	}
+	var refs []AppScopeRef
+	if err := json.Unmarshal(raw, &refs); err != nil {
+		return nil
+	}
+	out := make([]access.Scope, 0, len(refs))
+	for _, r := range refs {
+		out = append(out, access.Scope{Kind: r.Kind, ID: r.ID})
+	}
+	return out
 }
 
 // --- Single-object reads and edits ---

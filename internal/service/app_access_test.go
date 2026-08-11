@@ -562,3 +562,221 @@ func TestRouteTableGateDeniesForReal(t *testing.T) {
 		t.Errorf("non-member: want 404 from the gate, got %d %s", res.Code, res.Body.String())
 	}
 }
+
+// --- Wildcards and exceptions ---
+//
+// A wildcard claims a set nobody can enumerate; an exception names the members
+// that do not belong. They are one feature, and these tests pin the properties
+// that make the pairing safe rather than a deny rule in disguise.
+
+// The everyone subject exists so a baseline does not need per-customer
+// bookkeeping. One row, and a customer who signs up later is covered by
+// construction.
+func TestEveryoneGrantCoversFutureCustomers(t *testing.T) {
+	f := newAppAccess(t, "everyone")
+	f.declareScope(t, "tenant")
+	f.declareCapability(t, "profile:read")
+	roleID := f.createRole(t, "self_manager", []string{"profile:read"}, nil)
+
+	existing := f.createAppUser(t, "before@customer.com")
+	if code, out := f.post(t, "/app-grants", map[string]any{
+		"subject_kind": "everyone", "role_id": roleID,
+		"scope_kind": "tenant", "scope_id": "acme",
+	}); code != http.StatusCreated {
+		t.Fatalf("everyone grant: %d %v", code, out)
+	}
+	// Created after the grant, and never touched by anyone.
+	later := f.createAppUser(t, "after@customer.com")
+
+	for _, id := range []string{existing, later} {
+		grants := f.accessFor(t, id)["grants"].([]any)
+		if len(grants) != 1 {
+			t.Fatalf("customer %s must hold the everyone grant, got %v", id, grants)
+		}
+		if src := grants[0].(map[string]any)["source"].(string); !strings.Contains(src, "everyone") {
+			t.Errorf("source must say the grant came from the everyone rule, got %q", src)
+		}
+	}
+}
+
+// The counterpart to the subject wildcard: offboard one person without
+// enumerating everyone else.
+func TestEveryoneGrantExcludesNamedCustomers(t *testing.T) {
+	f := newAppAccess(t, "everyoneexcept")
+	f.declareScope(t, "tenant")
+	f.declareCapability(t, "profile:read")
+	roleID := f.createRole(t, "reader", []string{"profile:read"}, nil)
+
+	kept := f.createAppUser(t, "kept@customer.com")
+	dropped := f.createAppUser(t, "dropped@customer.com")
+
+	if code, out := f.post(t, "/app-grants", map[string]any{
+		"subject_kind": "everyone", "role_id": roleID,
+		"scope_kind": "tenant", "scope_id": "acme",
+		"except_app_user_ids": []string{dropped},
+	}); code != http.StatusCreated {
+		t.Fatalf("everyone grant: %d %v", code, out)
+	}
+
+	if got := len(f.accessFor(t, kept)["grants"].([]any)); got != 1 {
+		t.Errorf("an unexcluded customer keeps the grant, got %d", got)
+	}
+	if got := len(f.accessFor(t, dropped)["grants"].([]any)); got != 0 {
+		t.Errorf("an excluded customer must hold nothing, got %d", got)
+	}
+
+	// A typo here would silently exclude nobody, so an unknown id is refused.
+	if code, _ := f.post(t, "/app-grants", map[string]any{
+		"subject_kind": "everyone", "role_id": roleID,
+		"scope_kind": "tenant", "scope_id": "other",
+		"except_app_user_ids": []string{"not-a-real-customer"},
+	}); code != http.StatusBadRequest {
+		t.Errorf("an unknown excluded customer must be rejected, got %d", code)
+	}
+}
+
+// The capability wildcard carries verbs declared after the grant was written.
+// That is the whole point, and also the risk the merchant is accepting.
+func TestCapabilityWildcardCoversLaterDeclarations(t *testing.T) {
+	f := newAppAccess(t, "wildcard")
+	f.declareScope(t, "tenant")
+	f.declareCapability(t, "docs:read")
+
+	userID := f.createAppUser(t, "wild@customer.com")
+	if code, out := f.post(t, "/app-grants", map[string]any{
+		"app_user_id": userID, "all_capabilities": true,
+		"scope_kind": "tenant", "scope_id": "acme",
+	}); code != http.StatusCreated {
+		t.Fatalf("wildcard grant: %d %v", code, out)
+	}
+
+	grants := f.accessFor(t, userID)["grants"].([]any)
+	if len(grants) != 1 {
+		t.Fatalf("want one grant, got %v", grants)
+	}
+	g := grants[0].(map[string]any)
+	if g["all_capabilities"] != true {
+		t.Error("the wire format must say the grant is a wildcard, or a backend reads it as granting nothing")
+	}
+	if src := g["source"].(string); !strings.Contains(src, "all-capabilities") {
+		t.Errorf("source must name the wildcard, got %q", src)
+	}
+
+	// A wildcard grant carries no role, so asking for both is a contradiction.
+	roleID := f.createRole(t, "reader", []string{"docs:read"}, nil)
+	if code, _ := f.post(t, "/app-grants", map[string]any{
+		"app_user_id": userID, "all_capabilities": true, "role_id": roleID,
+		"scope_kind": "tenant", "scope_id": "other",
+	}); code != http.StatusBadRequest {
+		t.Errorf("a wildcard grant with a role must be rejected, got %d", code)
+	}
+}
+
+// A carve-out with no wildcard beside it does nothing while reading as though
+// it does, and one naming an undeclared capability protects against nothing.
+func TestCapabilityExceptionsAreCheckedAndCarried(t *testing.T) {
+	f := newAppAccess(t, "capexcept")
+	f.declareScope(t, "tenant")
+	f.declareCapability(t, "docs:read")
+	f.declareCapability(t, "account:delete")
+	userID := f.createAppUser(t, "carve@customer.com")
+
+	if code, out := f.post(t, "/app-grants", map[string]any{
+		"app_user_id": userID, "all_capabilities": true,
+		"scope_kind": "tenant", "scope_id": "acme",
+		"except_capabilities": []string{"account:delete"},
+	}); code != http.StatusCreated {
+		t.Fatalf("wildcard with carve-out: %d %v", code, out)
+	}
+	g := f.accessFor(t, userID)["grants"].([]any)[0].(map[string]any)
+	except := g["except_capabilities"].([]any)
+	if len(except) != 1 || except[0].(string) != "account:delete" {
+		t.Errorf("the carve-out must reach the merchant's backend, got %v", except)
+	}
+
+	roleID := f.createRole(t, "reader", []string{"docs:read"}, nil)
+	if code, _ := f.post(t, "/app-grants", map[string]any{
+		"app_user_id": userID, "role_id": roleID,
+		"scope_kind": "tenant", "scope_id": "b",
+		"except_capabilities": []string{"account:delete"},
+	}); code != http.StatusBadRequest {
+		t.Errorf("a carve-out without a wildcard must be rejected, got %d", code)
+	}
+	if code, _ := f.post(t, "/app-grants", map[string]any{
+		"app_user_id": userID, "all_capabilities": true,
+		"scope_kind": "tenant", "scope_id": "c",
+		"except_capabilities": []string{"never:declared"},
+	}); code != http.StatusBadRequest {
+		t.Errorf("an undeclared carve-out must be rejected, got %d", code)
+	}
+}
+
+// Scope exceptions exist for the case positive scoping cannot express: a huge
+// include set and a tiny exclusion. They must reach the merchant's backend,
+// which is the only place they can be enforced.
+func TestScopeExceptionsAreCheckedAndCarried(t *testing.T) {
+	f := newAppAccess(t, "scopeexcept")
+	f.declareScope(t, "tenant")
+	f.declareScope(t, "project")
+	f.declareCapability(t, "docs:read")
+	roleID := f.createRole(t, "reader", []string{"docs:read"}, nil)
+	userID := f.createAppUser(t, "carve@customer.com")
+
+	if code, out := f.post(t, "/app-grants", map[string]any{
+		"app_user_id": userID, "role_id": roleID,
+		"scope_kind": "tenant", "scope_id": "acme",
+		"except_scopes": []map[string]string{{"kind": "project", "id": "salaries"}},
+	}); code != http.StatusCreated {
+		t.Fatalf("grant with an excluded scope: %d %v", code, out)
+	}
+	g := f.accessFor(t, userID)["grants"].([]any)[0].(map[string]any)
+	except := g["except_scopes"].([]any)
+	if len(except) != 1 {
+		t.Fatalf("the exclusion must reach the backend, got %v", except)
+	}
+	if got := except[0].(map[string]any)["id"].(string); got != "salaries" {
+		t.Errorf("want the excluded scope id, got %q", got)
+	}
+
+	// An undeclared kind excludes nothing, for the same reason it grants
+	// nothing: it silently matches no resource.
+	if code, _ := f.post(t, "/app-grants", map[string]any{
+		"app_user_id": userID, "role_id": roleID,
+		"scope_kind": "tenant", "scope_id": "b",
+		"except_scopes": []map[string]string{{"kind": "undeclared", "id": "x"}},
+	}); code != http.StatusBadRequest {
+		t.Errorf("an undeclared excluded kind must be rejected, got %d", code)
+	}
+}
+
+// The self constraint is how "everyone may manage their own things" becomes one
+// row. KYC cannot enforce it, so the only thing that matters here is that it
+// survives to the merchant's backend intact.
+func TestSelfConstraintReachesTheBackend(t *testing.T) {
+	f := newAppAccess(t, "selfconstraint")
+	f.declareScope(t, "tenant")
+	f.declareCapability(t, "profile:write")
+	roleID := f.createRole(t, "self_manager", []string{"profile:write"}, nil)
+	userID := f.createAppUser(t, "self@customer.com")
+
+	if code, out := f.post(t, "/app-grants", map[string]any{
+		"subject_kind": "everyone", "role_id": roleID,
+		"scope_kind": "tenant", "scope_id": "acme",
+		"constraint": "self_subject",
+	}); code != http.StatusCreated {
+		t.Fatalf("self grant: %d %v", code, out)
+	}
+	g := f.accessFor(t, userID)["grants"].([]any)[0].(map[string]any)
+	if g["constraint"] != "self_subject" {
+		t.Errorf("the constraint must be on the wire, got %v", g["constraint"])
+	}
+
+	// An unrecognised constraint must be refused rather than stored and
+	// ignored, or it reads as a restriction that is not applied.
+	if code, _ := f.post(t, "/app-grants", map[string]any{
+		"subject_kind": "everyone", "role_id": roleID,
+		"scope_kind": "tenant", "scope_id": "b", "constraint": "invented",
+	}); code != http.StatusBadRequest {
+		t.Errorf("an unknown constraint must be rejected, got %d", code)
+	}
+}

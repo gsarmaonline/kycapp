@@ -1260,14 +1260,23 @@ export type AppUserGroup = {
   member_count: number
 }
 
+/** One excluded scope. Kind and id stay paired, never two parallel lists. */
+export type AppScopeRef = { kind: string; id: string }
+
 export type AppGrant = {
   id: string
   role_key: string
   scope_kind: string
   scope_id: string
-  subject_kind: 'app_user' | 'group'
+  subject_kind: 'app_user' | 'group' | 'everyone'
   subject_label: string
   expires_at?: string
+  /** Carries every capability in the org's namespace, including later ones. */
+  all_capabilities: boolean
+  except_capabilities: string[]
+  except_scopes: AppScopeRef[]
+  except_app_users: string[]
+  constraint: '' | 'self_subject'
 }
 
 export type AppGroupMember = {
@@ -1378,12 +1387,19 @@ export function listAppGrants(orgId: string) {
 export function createAppGrant(
   orgId: string,
   body: {
+    subject_kind: 'app_user' | 'group' | 'everyone'
     app_user_id?: string
     group_id?: string
-    role_id: string
+    /** Omitted when all_capabilities is set: a wildcard grant carries no role. */
+    role_id?: string
     scope_kind: string
     scope_id: string
     expires_at?: string
+    all_capabilities?: boolean
+    except_capabilities?: string[]
+    except_scopes?: AppScopeRef[]
+    except_app_user_ids?: string[]
+    constraint?: '' | 'self_subject'
   },
 ) {
   return request<{ id: string }>(`/v1/organisations/${orgId}/app-grants`, {
@@ -1423,9 +1439,13 @@ export type AppAccessSet = {
     scope_kind: string
     scope_id: string
     capabilities: string[]
-    /** Names the group a capability came through, when it did. */
+    /** Names the group or rule a capability came through, when it did. */
     source: string
     expires_at?: string
+    all_capabilities: boolean
+    except_capabilities: string[]
+    except_scopes: AppScopeRef[]
+    constraint: '' | 'self_subject'
   }[]
 }
 

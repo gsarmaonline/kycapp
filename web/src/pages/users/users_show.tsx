@@ -21,10 +21,36 @@ function describeSource(source: string): string {
   const parts = source.split(' ')
   const group = parts.find((p) => p.startsWith('group:'))?.slice('group:'.length)
   const role = parts.find((p) => p.startsWith('app-role:'))?.slice('app-role:'.length)
-  if (group && role) return `the ${role} role, via the ${group} group`
-  if (role) return `the ${role} role, granted directly`
-  if (group) return `the ${group} group`
-  return source
+  // The capabilities column already says what the grant carries, so a wildcard
+  // adds nothing here and would just repeat itself.
+  const via = role ? `the ${role} role, ` : ''
+  // The everyone rule is the one grant nobody issued for this person in
+  // particular, so it has to name itself plainly.
+  if (parts.includes('everyone')) return `${via}granted to every customer`
+  if (group) return `${via}via the ${group} group`
+  return `${via}granted directly`
+}
+
+type AccessGrant = AppAccessSet['grants'][number]
+
+/**
+ * A wildcard grant lists no capabilities, so rendering the list alone would
+ * show "none" for the grant that carries the most. Exclusions matter for the
+ * same reason: a row that reads wider than it is sends someone looking for a
+ * grant that does not exist.
+ */
+function describeCapabilities(g: AccessGrant): string {
+  const base = g.all_capabilities ? 'every capability' : g.capabilities.join(', ') || 'none'
+  const parts = [base]
+  if (g.except_capabilities.length) parts.push(`except ${g.except_capabilities.join(', ')}`)
+  if (g.constraint === 'self_subject') parts.push('on their own rows only')
+  return parts.join(', ')
+}
+
+function describeScope(g: AccessGrant): string {
+  const base = `${g.scope_kind} / ${g.scope_id}`
+  if (!g.except_scopes.length) return base
+  return `${base}, except ${g.except_scopes.map((s) => `${s.kind}/${s.id}`).join(', ')}`
 }
 
 export function UsersShow() {
@@ -98,8 +124,8 @@ export function UsersShow() {
         rows={(access?.grants ?? []).map((g) => ({
           key: g.id,
           cells: [
-            `${g.scope_kind} / ${g.scope_id}`,
-            g.capabilities.join(', ') || 'none',
+            describeScope(g),
+            describeCapabilities(g),
             describeSource(g.source),
             g.expires_at ? new Date(g.expires_at).toLocaleDateString() : 'never',
           ],

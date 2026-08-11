@@ -202,6 +202,7 @@ export const DOC_CONCEPTS: DocConcept[] = [
       'Members and permissions govern who may operate KYC. Customer access is the other side: which of your customers may do what inside your product — the project a person can edit, the region an account may read.',
       'KYC does not enforce this. It has no idea what a project of yours is, and asking it on every request would put a network hop inside your app and make KYC own your latency. Instead you declare the vocabulary here, grant roles over your own scopes, and read back an assembled grant set that your backend evaluates locally.',
       'Because the vocabulary is yours, the capability set is open: anything you declare is valid. KYC keeps it inside your organisation and can never be used to grant power inside KYC itself. The two namespaces never mix.',
+      'Because your backend decides, every field of a grant matters to it. A grant may carry a wildcard, exceptions, or a self constraint, and code that reads only the capability list will allow more than you granted. KYC cannot catch that, because the check runs in your process.',
     ],
     steps: [
       {
@@ -227,7 +228,7 @@ export const DOC_CONCEPTS: DocConcept[] = [
       {
         title: 'Issue grants',
         detail:
-          'A grant gives one subject — a customer or a group — one role over one scope, optionally with an expiry.',
+          'A grant gives one subject — a customer, a group, or everyone — one set of capabilities over one scope, optionally with an expiry and exceptions.',
       },
       {
         title: 'Read the grant set back',
@@ -248,7 +249,11 @@ export const DOC_CONCEPTS: DocConcept[] = [
       "scope_kind": "project",
       "scope_id": "apollo",
       "capabilities": ["docs:read", "docs:write"],
-      "source": "group:au_customers app-role:editor"
+      "source": "group:au_customers app-role:editor",
+      "all_capabilities": false,
+      "except_capabilities": [],
+      "except_scopes": [{ "kind": "project", "id": "salaries" }],
+      "constraint": ""
     }
   ]
 }`,
@@ -327,11 +332,35 @@ export const DOC_CONCEPTS: DocConcept[] = [
   {
     slug: 'customer-grants',
     title: 'Grants',
-    summary: 'One subject, one role, one scope, optionally until a date.',
+    summary: 'One subject, one set of capabilities, one scope — with wildcards and exceptions where a list will not do.',
     body: [
-      'A grant is the only thing that actually gives access. Everything else is vocabulary: a grant binds a subject — one customer or one group — to a role over a scope, such as the editor role over project apollo.',
+      'A grant is the only thing that actually gives access. Everything else is vocabulary: a grant binds a subject to a set of capabilities over a scope, such as the editor role over project apollo.',
+      'The subject is one customer, one group, or everyone — every customer you have, including ones who sign up later, from a single row. The capabilities come from a role, or from the wildcard: everything in your namespace, including capabilities you declare later.',
+      'A grant can narrow itself. Each wildcard has an exception list beside it: everyone except these customers, everything except account:delete, all of Acme except the salaries project. A wildcard claims a set nobody can enumerate; an exception names the members that do not belong.',
+      'Every exception narrows the grant it sits on and nothing else. No grant can take away what another gives, which is what keeps the order of your grants irrelevant. The limit that follows: an exception is not a lock. If a second grant reaches an excluded resource, that grant allows, so a hard "nobody" means issuing nothing that reaches it.',
       'Grants are issued and revoked, never edited. Changing one in place would rewrite what someone had at a past moment; revoking and issuing leaves a history you can read. Set an expiry when access should end on its own.',
-      'Access is additive and denied by default. There are no deny rules, so no grant can take away what another gives, and a customer with no grant for a scope cannot tell it apart from a scope that does not exist.',
+    ],
+    steps: [
+      {
+        title: 'Everyone, for a baseline',
+        detail:
+          'One row covering every customer you have and every one you will have. The alternative is adding each person to a group as they sign up, which costs a row each and says the same thing.',
+      },
+      {
+        title: 'Only their own resources',
+        detail:
+          'The self constraint applies a grant to rows belonging to the holder. Together with the everyone subject, that is "customers may manage their own things" in one grant. It says nothing about which verbs are allowed — leave account:delete out of the role for that.',
+      },
+      {
+        title: 'Every capability, with carve-outs',
+        detail:
+          'The wildcard carries capabilities you have not declared yet. That is the point and also the risk: a new capability reaches every holder without anyone editing the grant. The carve-out list names the dangerous verbs you know of today.',
+      },
+      {
+        title: 'Except these scopes',
+        detail:
+          'For what narrower scoping cannot say. Ten thousand projects and one confidential would need 9,999 grants to express positively; one exception says it directly.',
+      },
     ],
     section: 'customer-grants',
     related: [

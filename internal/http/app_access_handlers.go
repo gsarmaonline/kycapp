@@ -1,8 +1,11 @@
 package httpserver
 
 import (
+	"encoding/json"
 	"net/http"
 	"time"
+
+	"github.com/gsarmaonline/kyc/core/access"
 
 	"github.com/gsarmaonline/kyc/internal/apperr"
 	"github.com/gsarmaonline/kyc/internal/service"
@@ -194,21 +197,34 @@ func (s *Server) handleCreateAppGrant(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var body struct {
-		AppUserID string `json:"app_user_id"`
-		GroupID   string `json:"group_id"`
-		RoleID    string `json:"role_id"`
-		ScopeKind string `json:"scope_kind"`
-		ScopeID   string `json:"scope_id"`
-		ExpiresAt string `json:"expires_at"`
+		SubjectKind string `json:"subject_kind"`
+		AppUserID   string `json:"app_user_id"`
+		GroupID     string `json:"group_id"`
+		RoleID      string `json:"role_id"`
+		ScopeKind   string `json:"scope_kind"`
+		ScopeID     string `json:"scope_id"`
+		ExpiresAt   string `json:"expires_at"`
+
+		AllCapabilities    bool                  `json:"all_capabilities"`
+		ExceptCapabilities []string              `json:"except_capabilities"`
+		ExceptScopes       []service.AppScopeRef `json:"except_scopes"`
+		ExceptAppUserIDs   []string              `json:"except_app_user_ids"`
+		Constraint         string                `json:"constraint"`
 	}
 	if err := decodeJSON(r, &body); err != nil {
 		writeError(w, apperr.Validation("invalid JSON body"))
 		return
 	}
 	in := service.AppGrantInput{
-		AppUserID: body.AppUserID, GroupID: body.GroupID, RoleID: body.RoleID,
+		SubjectKind: body.SubjectKind,
+		AppUserID:   body.AppUserID, GroupID: body.GroupID, RoleID: body.RoleID,
 		ScopeKind: body.ScopeKind, ScopeID: body.ScopeID,
-		GrantedBy: p.ActorLabel(),
+		GrantedBy:          p.ActorLabel(),
+		AllCapabilities:    body.AllCapabilities,
+		ExceptCapabilities: body.ExceptCapabilities,
+		ExceptScopes:       body.ExceptScopes,
+		ExceptAppUserIDs:   body.ExceptAppUserIDs,
+		Constraint:         body.Constraint,
 	}
 	if body.ExpiresAt != "" {
 		at, parseErr := time.Parse(time.RFC3339, body.ExpiresAt)
@@ -225,7 +241,9 @@ func (s *Server) handleCreateAppGrant(w http.ResponseWriter, r *http.Request) {
 	}
 	writeJSON(w, http.StatusCreated, map[string]any{
 		"id": grant.ID, "app_user_id": grant.AppUserID.String, "group_id": grant.GroupID.String,
-		"role_id": grant.RoleID, "scope_kind": grant.ScopeKind, "scope_id": grant.ScopeID,
+		"subject_kind": grant.SubjectKind, "role_id": grant.RoleID.String,
+		"scope_kind": grant.ScopeKind, "scope_id": grant.ScopeID,
+		"all_capabilities": grant.AllCapabilities, "constraint": grant.ConstraintKind,
 	})
 }
 
@@ -269,6 +287,14 @@ func (s *Server) handleAppUserAccess(w http.ResponseWriter, r *http.Request) {
 			"id": g.ID, "scope_kind": g.Scope.Kind, "scope_id": g.Scope.ID,
 			"capabilities": caps, "source": g.Source,
 		}
+		// Everything the evaluator needs must be on the wire. A backend that
+		// reads only capabilities would treat a narrowed grant as a plain one
+		// and allow more than the merchant granted, so these are always
+		// present rather than omitted when empty.
+		item["all_capabilities"] = g.AllCapabilitiesIn != ""
+		item["except_capabilities"] = capabilityKeys(g.ExceptCapabilities)
+		item["except_scopes"] = scopeRefs(g.Except)
+		item["constraint"] = string(g.Constraint)
 		if g.ExpiresAt != nil {
 			item["expires_at"] = g.ExpiresAt.UTC().Format(time.RFC3339Nano)
 		}
@@ -389,11 +415,18 @@ func (s *Server) handleListAppGrants(w http.ResponseWriter, r *http.Request) {
 		item := map[string]any{
 			"id": g.ID, "role_key": g.RoleKey,
 			"scope_kind": g.ScopeKind, "scope_id": g.ScopeID,
-			"subject_kind": "app_user", "subject_label": g.AppUserEmail,
+			"subject_kind": g.SubjectKind, "subject_label": g.AppUserEmail,
+			"all_capabilities":    g.AllCapabilities,
+			"except_capabilities": stringsOrEmpty(g.ExceptCapabilities),
+			"except_scopes":       exceptScopesJSON(g.ExceptScopes),
+			"except_app_users":    stringsOrEmpty(g.ExceptAppUserIds),
+			"constraint":          g.ConstraintKind,
 		}
-		if g.GroupID.Valid {
-			item["subject_kind"] = "group"
+		switch g.SubjectKind {
+		case "group":
 			item["subject_label"] = g.GroupKey
+		case "everyone":
+			item["subject_label"] = "every customer"
 		}
 		if g.ExpiresAt.Valid {
 			item["expires_at"] = g.ExpiresAt.Time.UTC().Format(time.RFC3339Nano)
@@ -401,6 +434,40 @@ func (s *Server) handleListAppGrants(w http.ResponseWriter, r *http.Request) {
 		items = append(items, item)
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"items": items})
+}
+
+func capabilityKeys(caps []access.Capability) []string {
+	out := make([]string, 0, len(caps))
+	for _, c := range caps {
+		out = append(out, c.Key)
+	}
+	return out
+}
+
+func scopeRefs(scopes []access.Scope) []service.AppScopeRef {
+	out := make([]service.AppScopeRef, 0, len(scopes))
+	for _, sc := range scopes {
+		out = append(out, service.AppScopeRef{Kind: sc.Kind, ID: sc.ID})
+	}
+	return out
+}
+
+// stringsOrEmpty keeps a null out of the JSON: the client renders a list, and a
+// missing array and an empty one should not read differently.
+func stringsOrEmpty(in []string) []string {
+	if in == nil {
+		return []string{}
+	}
+	return in
+}
+
+func exceptScopesJSON(raw json.RawMessage) []service.AppScopeRef {
+	out := []service.AppScopeRef{}
+	if len(raw) == 0 {
+		return out
+	}
+	_ = json.Unmarshal(raw, &out)
+	return out
 }
 
 func (s *Server) handlePatchAppUserGroup(w http.ResponseWriter, r *http.Request) {
