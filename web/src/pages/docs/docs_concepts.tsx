@@ -11,6 +11,12 @@ export type DocConcept = {
   steps?: { title: string; detail: string }[]
   /** One request or response worth showing verbatim. */
   sample?: { label: string; code: string }
+  /**
+   * Worked examples: a thing someone wants to express, and the grant that
+   * expresses it. `note` carries the catch, which is usually the part that
+   * matters.
+   */
+  examples?: { title: string; problem: string; grant: string; note?: string }[]
   related?: { label: string; slug?: string; path?: string }[]
   section?: OrgSection
 }
@@ -202,6 +208,7 @@ export const DOC_CONCEPTS: DocConcept[] = [
       'Members and permissions govern who may operate KYC. Customer access is the other side: which of your customers may do what inside your product — the project a person can edit, the region an account may read.',
       'KYC does not enforce this. It has no idea what a project of yours is, and asking it on every request would put a network hop inside your app and make KYC own your latency. Instead you declare the vocabulary here, grant roles over your own scopes, and read back an assembled grant set that your backend evaluates locally.',
       'Because the vocabulary is yours, the capability set is open: anything you declare is valid. KYC keeps it inside your organisation and can never be used to grant power inside KYC itself. The two namespaces never mix.',
+      'Because your backend decides, every field of a grant matters to it. A grant may carry a wildcard, exceptions, or a self constraint, and code that reads only the capability list will allow more than you granted. KYC cannot catch that, because the check runs in your process.',
     ],
     steps: [
       {
@@ -227,7 +234,7 @@ export const DOC_CONCEPTS: DocConcept[] = [
       {
         title: 'Issue grants',
         detail:
-          'A grant gives one subject — a customer or a group — one role over one scope, optionally with an expiry.',
+          'A grant gives one subject — a customer, a group, or everyone — one set of capabilities over one scope, optionally with an expiry and exceptions.',
       },
       {
         title: 'Read the grant set back',
@@ -248,12 +255,17 @@ export const DOC_CONCEPTS: DocConcept[] = [
       "scope_kind": "project",
       "scope_id": "apollo",
       "capabilities": ["docs:read", "docs:write"],
-      "source": "group:au_customers app-role:editor"
+      "source": "group:au_customers app-role:editor",
+      "all_capabilities": false,
+      "except_capabilities": [],
+      "except_scopes": [{ "kind": "project", "id": "salaries" }],
+      "constraint": ""
     }
   ]
 }`,
     },
     related: [
+      { label: 'Access recipes', slug: 'customer-access-examples' },
       { label: 'Scope kinds', slug: 'customer-scope-kinds' },
       { label: 'Capabilities', slug: 'customer-capabilities' },
       { label: 'Roles', slug: 'customer-roles' },
@@ -327,15 +339,154 @@ export const DOC_CONCEPTS: DocConcept[] = [
   {
     slug: 'customer-grants',
     title: 'Grants',
-    summary: 'One subject, one role, one scope, optionally until a date.',
+    summary: 'One subject, one set of capabilities, one scope — with wildcards and exceptions where a list will not do.',
     body: [
-      'A grant is the only thing that actually gives access. Everything else is vocabulary: a grant binds a subject — one customer or one group — to a role over a scope, such as the editor role over project apollo.',
+      'A grant is the only thing that actually gives access. Everything else is vocabulary: a grant binds a subject to a set of capabilities over a scope, such as the editor role over project apollo.',
+      'The subject is one customer, one group, or everyone — every customer you have, including ones who sign up later, from a single row. The capabilities come from a role, or from the wildcard: everything in your namespace, including capabilities you declare later.',
+      'A grant can narrow itself. Each wildcard has an exception list beside it: everyone except these customers, everything except account:delete, all of Acme except the salaries project. A wildcard claims a set nobody can enumerate; an exception names the members that do not belong.',
+      'Every exception narrows the grant it sits on and nothing else. No grant can take away what another gives, which is what keeps the order of your grants irrelevant. The limit that follows: an exception is not a lock. If a second grant reaches an excluded resource, that grant allows, so a hard "nobody" means issuing nothing that reaches it.',
       'Grants are issued and revoked, never edited. Changing one in place would rewrite what someone had at a past moment; revoking and issuing leaves a history you can read. Set an expiry when access should end on its own.',
-      'Access is additive and denied by default. There are no deny rules, so no grant can take away what another gives, and a customer with no grant for a scope cannot tell it apart from a scope that does not exist.',
+    ],
+    steps: [
+      {
+        title: 'Everyone, for a baseline',
+        detail:
+          'One row covering every customer you have and every one you will have. The alternative is adding each person to a group as they sign up, which costs a row each and says the same thing.',
+      },
+      {
+        title: 'Only their own resources',
+        detail:
+          'The self constraint applies a grant to rows belonging to the holder. Together with the everyone subject, that is "customers may manage their own things" in one grant. It says nothing about which verbs are allowed — leave account:delete out of the role for that.',
+      },
+      {
+        title: 'Every capability, with carve-outs',
+        detail:
+          'The wildcard carries capabilities you have not declared yet. That is the point and also the risk: a new capability reaches every holder without anyone editing the grant. The carve-out list names the dangerous verbs you know of today.',
+      },
+      {
+        title: 'Except these scopes',
+        detail:
+          'For what narrower scoping cannot say. Ten thousand projects and one confidential would need 9,999 grants to express positively; one exception says it directly.',
+      },
     ],
     section: 'customer-grants',
     related: [
+      { label: 'Access recipes', slug: 'customer-access-examples' },
       { label: 'Customer access', slug: 'customer-access' },
+      { label: 'Roles', slug: 'customer-roles' },
+      { label: 'Groups', slug: 'customer-groups' },
+    ],
+  },
+  {
+    slug: 'customer-access-examples',
+    title: 'Access recipes',
+    summary:
+      'The common access rules, each written as the grant that expresses it — and the ones this model deliberately will not.',
+    body: [
+      'One model, many shapes. Role-based access, ownership, per-project access, time-boxed access and a customer-wide baseline are not different systems here. Each is a particular way of filling in a grant.',
+      'Every recipe below is a subject, a set of capabilities, a scope, and sometimes a constraint or an exception. Read them as a menu: find the sentence you are trying to say, and copy the grant beside it.',
+    ],
+    examples: [
+      {
+        title: 'A role over a place',
+        problem:
+          'The ordinary case, and the one every other recipe varies. Priya edits documents in the Apollo project, and nowhere else.',
+        grant: `subject: Priya
+role:    editor          (docs:read, docs:write)
+scope:   project / apollo`,
+        note: 'Change what editor means and every holder follows, because the grant carries the role rather than a copy of its capabilities.',
+      },
+      {
+        title: 'Seniority, without repeating yourself',
+        problem:
+          'A maintainer can do everything an editor can, plus publish. You want to say that once, not maintain two lists that drift.',
+        grant: `viewer                    docs:read
+editor      builds on viewer    + docs:write
+maintainer  builds on editor    + docs:publish`,
+        note: 'Roles only ever add. Two paths to the same capability give the same answer, so a role built on two others needs no tie-break rule.',
+      },
+      {
+        title: 'Their own things',
+        problem:
+          'Every customer may read and edit their own profile, and nobody else’s. This is the most common rule in any product, and the one people reach for a special case to express.',
+        grant: `subject:    every customer
+role:       self_manager     (profile:read, profile:write)
+scope:      tenant / acme
+constraint: only their own resources`,
+        note: 'The constraint answers "is this thing yours?" and nothing else. It has no opinion on which verbs are allowed: account deletion is prevented by leaving it out of the role.',
+      },
+      {
+        title: 'A baseline for everyone, including tomorrow',
+        problem:
+          'Every customer should start with something, and you do not want to issue a grant each time somebody signs up.',
+        grant: `subject: every customer
+role:    starter
+scope:   tenant / acme`,
+        note: 'One row, however many customers you have. A person who signs up next year is covered without anyone touching it.',
+      },
+      {
+        title: 'Everyone except a few',
+        problem:
+          'A customer is being offboarded, or one account is under investigation. You want them out of the baseline without listing everybody else.',
+        grant: `subject: every customer
+         except: dana@customer.com
+role:    starter
+scope:   tenant / acme`,
+        note: 'The exception narrows this grant alone. If Dana holds another grant that reaches the same scope, that one still allows.',
+      },
+      {
+        title: 'Someone on several projects',
+        problem:
+          'Priya is an editor on Apollo and a viewer on two others, and a document belongs to two projects at once.',
+        grant: `grants:   (project / apollo,   editor)
+          (project / borealis, viewer)
+          (project / ceres,    viewer)
+
+document: project: [apollo, ceres]`,
+        note: 'Matching any one coordinate is enough. Adding the document to a fourth project can only widen who reaches it, never narrow it, so you never have to reason about ordering.',
+      },
+      {
+        title: 'Access by attribute, without attribute rules',
+        problem:
+          'Everyone in Australia should get regional access. You want it to apply automatically, not by hand.',
+        grant: `group: au_customers      (explicit membership)
+grant: (au_customers, regional_reader, region / apac)`,
+        note: 'The rule that decides membership runs in your onboarding or an automation on app_user.created. What lands here is the decision, at a known moment. Access then changes when someone changes access, not when someone edits a phone number.',
+      },
+      {
+        title: 'Access that ends by itself',
+        problem:
+          'A contractor needs elevated access for a fortnight. You would rather not rely on remembering to revoke it.',
+        grant: `subject: Priya
+role:    incident_responder
+scope:   tenant / acme
+expires: 12 August 2026`,
+        note: 'An expired grant is invisible rather than denied, so it reads exactly like access that was never granted.',
+      },
+      {
+        title: 'Everything except the dangerous verb',
+        problem:
+          'An internal tools account should do whatever your product supports, but never delete an account.',
+        grant: `subject: tools@acme.com
+carries: every capability
+         except: account:delete
+scope:   tenant / acme`,
+        note: 'A wildcard carries capabilities you have not declared yet. That is the point, and the risk: declare billing:refund next quarter and this grant carries it, with nobody editing anything. The carve-out names the verbs you know about today, not tomorrow’s.',
+      },
+      {
+        title: 'Everything except one place',
+        problem:
+          'Everyone can read across the organisation, apart from the folder holding salary reviews. You have ten thousand projects and one of them is confidential.',
+        grant: `subject: every customer
+role:    reader
+scope:   tenant / acme
+         except: project / salaries`,
+        note: 'Written positively this needs 9,999 grants. But an exception is not a lock: if another grant reaches the salaries project, that grant allows. For a hard "nobody", issue nothing that reaches it.',
+      },
+    ],
+    related: [
+      { label: 'Customer access', slug: 'customer-access' },
+      { label: 'Grants', slug: 'customer-grants' },
       { label: 'Roles', slug: 'customer-roles' },
       { label: 'Groups', slug: 'customer-groups' },
     ],
@@ -373,29 +524,31 @@ function conceptNavGroups(base: string) {
     DOC_CONCEPTS.filter((c) => c.section).map((c) => [c.section!, c]),
   )
 
-  const fromGroup = (groupId: string, label: string, hint: string) => {
+  const asItem = (c: DocConcept) => ({
+    slug: c.slug,
+    title: c.title,
+    summary: c.summary,
+    href: `${base}/concepts/${c.slug}`,
+  })
+
+  // extraSlugs carries concepts with no workspace page of their own, such as
+  // the recipes, which belong in a group without being an object you can open.
+  const fromGroup = (groupId: string, label: string, hint: string, extraSlugs: string[] = []) => {
     const group = ORG_NAV_GROUPS.find((g) => g.id === groupId)
     const items = (group?.items ?? [])
       .map((item) => bySection.get(item.id))
       .filter((c): c is DocConcept => Boolean(c))
-      .map((c) => ({
-        slug: c.slug,
-        title: c.title,
-        summary: c.summary,
-        href: `${base}/concepts/${c.slug}`,
-      }))
+      .map(asItem)
+    for (const slug of extraSlugs) {
+      const c = BY_SLUG.get(slug)
+      if (c) items.push(asItem(c))
+    }
     return { id: groupId, label, hint, items }
   }
 
-  const core = ['organisation', 'permissions-entitlements', 'customer-access'].map((slug) => {
-    const c = BY_SLUG.get(slug)!
-    return {
-      slug: c.slug,
-      title: c.title,
-      summary: c.summary,
-      href: `${base}/concepts/${c.slug}`,
-    }
-  })
+  const core = ['organisation', 'permissions-entitlements', 'customer-access'].map((slug) =>
+    asItem(BY_SLUG.get(slug)!),
+  )
 
   return [
     {
@@ -409,6 +562,7 @@ function conceptNavGroups(base: string) {
       'customer-access',
       'Customer access',
       'What the organisation’s own customers may do inside its product',
+      ['customer-access-examples'],
     ),
     fromGroup('actions', 'Actions', 'Destinations and inbound triggers for automations'),
     fromGroup('platform', 'Platform', 'What the organisation uses inside KYC'),
@@ -497,6 +651,16 @@ export function DocsConceptPage() {
           </pre>
         </>
       )}
+      {concept.examples?.map((ex) => (
+        <section className="docs-example" key={ex.title}>
+          <h3>{ex.title}</h3>
+          <p>{ex.problem}</p>
+          <pre className="docs-concept-sample">
+            <code>{ex.grant}</code>
+          </pre>
+          {ex.note && <p className="docs-example-note">{ex.note}</p>}
+        </section>
+      ))}
       {concept.related && concept.related.length > 0 && (
         <>
           <h3>Related</h3>

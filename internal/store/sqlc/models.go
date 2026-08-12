@@ -33,16 +33,22 @@ type AppCapability struct {
 }
 
 type AppGrant struct {
-	ID             string             `json:"id"`
-	OrganisationID string             `json:"organisation_id"`
-	AppUserID      pgtype.Text        `json:"app_user_id"`
-	RoleID         string             `json:"role_id"`
-	ScopeKind      string             `json:"scope_kind"`
-	ScopeID        string             `json:"scope_id"`
-	ExpiresAt      pgtype.Timestamptz `json:"expires_at"`
-	GrantedBy      string             `json:"granted_by"`
-	CreatedAt      time.Time          `json:"created_at"`
-	GroupID        pgtype.Text        `json:"group_id"`
+	ID                 string             `json:"id"`
+	OrganisationID     string             `json:"organisation_id"`
+	AppUserID          pgtype.Text        `json:"app_user_id"`
+	RoleID             pgtype.Text        `json:"role_id"`
+	ScopeKind          string             `json:"scope_kind"`
+	ScopeID            string             `json:"scope_id"`
+	ExpiresAt          pgtype.Timestamptz `json:"expires_at"`
+	GrantedBy          string             `json:"granted_by"`
+	CreatedAt          time.Time          `json:"created_at"`
+	GroupID            pgtype.Text        `json:"group_id"`
+	SubjectKind        string             `json:"subject_kind"`
+	ExceptAppUserIds   []string           `json:"except_app_user_ids"`
+	ExceptScopes       json.RawMessage    `json:"except_scopes"`
+	AllCapabilities    bool               `json:"all_capabilities"`
+	ExceptCapabilities []string           `json:"except_capabilities"`
+	ConstraintKind     string             `json:"constraint_kind"`
 }
 
 type AppRole struct {

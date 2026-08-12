@@ -298,15 +298,36 @@ function NavSection({
         </span>
       </button>
       {open &&
-        group.items.map((item) => (
-          <NavLink
-            key={item.id}
-            to={orgPath(orgId, item.id)}
-            className={({ isActive }) => (isActive ? 'nav-item active' : 'nav-item')}
-          >
-            {item.label}
-          </NavLink>
-        ))}
+        group.items.map((item) =>
+          // Documentation opens in its own tab, against the public docs rather
+          // than the workspace copy. You read docs while working, not instead
+          // of working, and losing your place in the dashboard to look
+          // something up is the whole complaint. The public page is also the
+          // one worth sending to a teammate.
+          item.id === 'docs' ? (
+            <a
+              key={item.id}
+              className="nav-item"
+              href="/docs"
+              target="_blank"
+              rel="noreferrer"
+            >
+              {item.label}
+              <span aria-hidden="true" className="nav-external">
+                ↗
+              </span>
+              <span className="sr-only"> (opens in a new tab)</span>
+            </a>
+          ) : (
+            <NavLink
+              key={item.id}
+              to={orgPath(orgId, item.id)}
+              className={({ isActive }) => (isActive ? 'nav-item active' : 'nav-item')}
+            >
+              {item.label}
+            </NavLink>
+          ),
+        )}
     </div>
   )
 }

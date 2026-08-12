@@ -35,7 +35,7 @@ The subject is **app users only**. A merchant's own KYC operators keep organisat
 2. **Declare capabilities** — the verbs the backend checks, as `resource:action`.
 3. **Compose roles** — named capability sets, which may build on other roles.
 4. **Group customers** *(optional)* — grant to a set once instead of one at a time.
-5. **Issue grants** — one subject, one role, one scope, optionally with an expiry.
+5. **Issue grants** — one subject, one set of capabilities, one scope, optionally with an expiry and exceptions.
 6. **Read the grant set back** — cache it against `version`, decide locally.
 
 ## The objects
@@ -66,9 +66,33 @@ Membership is an **explicit list**, not a query over attributes. A rule that rec
 
 ### Grants
 
-The only object that actually gives access; everything above is vocabulary. A grant binds one subject — a customer or a group — to one role over one scope, optionally until a date.
+The only object that actually gives access; everything above is vocabulary. A grant binds one subject to one set of capabilities over one scope, optionally until a date.
 
 Grants are **issued and revoked, never edited**. Editing in place would rewrite what someone held at a past moment; revoke-and-reissue leaves a history that can be read.
+
+**Subject** is one customer, one group, or **everyone** — every customer of the organisation, present and future, from a single row. The everyone subject exists so a baseline needs no per-customer bookkeeping: materialising a membership per person costs a row and a queue job each and says exactly the same thing.
+
+**Capabilities** come from a role, or from the wildcard: every capability in your namespace, including ones you declare later.
+
+**A grant may narrow itself.** Three exclusion lists, one per wildcard:
+
+| Wildcard | Exclusion | Reads as |
+| --- | --- | --- |
+| everyone | `except_app_user_ids` | everyone except these customers |
+| all capabilities | `except_capabilities` | everything except `account:delete` |
+| a wide scope | `except_scopes` | all of Acme except `project:salaries` |
+
+A wildcard is a claim about a set nobody can enumerate; an exception names the members that do not belong. They are one feature, and each exception narrows **the grant it sits on and nothing else**. So no grant subtracts from another, grants stay unordered, and deleting one still removes access rather than adding it.
+
+The limit that follows: an exclusion is **not a lock**. If a second grant reaches an excluded resource, that grant allows. For a hard "nobody reaches this", issue nothing that reaches it.
+
+**Constraint** narrows a grant with something only the request knows. There is one: `self_subject`, which applies the grant only to resources belonging to the holder. Combined with the everyone subject it is the whole "customers may manage their own things" rule, in one row:
+
+```
+subject: everyone   role: self_manager   scope: tenant:acme   constraint: self_subject
+```
+
+Note what the constraint does **not** do. It has no opinion on which verbs are allowed. Account deletion is prevented by leaving `account:delete` out of the role, never by the constraint, which only ever answers "is this thing yours?".
 
 ## Reading access back
 
@@ -87,11 +111,24 @@ GET /v1/app-users/{id}/access
       "scope_kind": "project",
       "scope_id": "apollo",
       "capabilities": ["docs:read", "docs:write"],
-      "source": "group:au_customers app-role:editor"
+      "source": "group:au_customers app-role:editor",
+      "all_capabilities": false,
+      "except_capabilities": [],
+      "except_scopes": [{ "kind": "project", "id": "salaries" }],
+      "constraint": ""
     }
   ]
 }
 ```
+
+**Every field here is load-bearing, and your backend must honour all of them.**
+A grant with `all_capabilities` lists no capabilities and carries the most; one
+with `except_scopes` reaches less than its scope suggests; one with
+`"constraint": "self_subject"` applies only to rows the holder owns. Code that
+reads `capabilities` alone will allow more than was granted, and KYC cannot stop
+it — the evaluation happens in your process. Embed
+[`core/access`](../core/access) if you are in Go; it is a zero-dependency module
+for exactly this reason.
 
 `expires_at` appears only on a grant that has one. The backend caches the set against `version` and evaluates locally through the SDK.
 
@@ -103,8 +140,8 @@ This is the whole read surface: there is **no per-request check endpoint**, buil
 
 These are the [invariants](authorisation.md#invariants) as they apply to this namespace.
 
-1. **Deny by default.** No grant, no access.
-2. **Additive only.** There are no deny rules, so no grant can take away what another gives.
+1. **Deny by default.** No grant, no access. A new customer holds nothing until a grant reaches them.
+2. **No grant subtracts from another.** A grant may narrow itself with exceptions; it can never veto a different grant. That is what keeps grants unordered and evaluation first-match.
 3. **Capabilities are closed per namespace.** Open for the merchant, closed for KYC. The boundary is structural rather than checked: a merchant capability is stored in a table scoped to the organisation and stamped `org:<id>` whenever it is read, so it has no way to name anything in `kyc`. `CreateAppCapability` additionally validates the key through the evaluator's own registry, so a merchant cannot declare a shape KYC would reject.
 4. **Out of scope is indistinguishable from absent.** A customer with no grant for a scope cannot tell it apart from a scope that does not exist.
 5. **No principal grants what it does not hold.** `CanGrantInNamespace` in `core/access` implements this, but nothing calls it yet — the boundary currently rests on point 3 alone. Tracked in [authorisation.md](authorisation.md#merchant-hosted-access-control).

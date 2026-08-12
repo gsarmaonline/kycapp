@@ -63,16 +63,31 @@ func CanGrant(granter GrantSet, proposed Grant, proposedAt ScopeRef, carve Carve
 		return fmt.Errorf("%w: only a global grant may issue global scope", ErrEscalation)
 	}
 
-	held := granter.Capabilities(proposedAt, now)
-	index := make(map[Capability]struct{}, len(held))
-	for _, c := range held {
-		index[c] = struct{}{}
+	// A wildcard may only be issued by a granter who holds one in the same
+	// namespace, and it must carry forward every carve-out the granter has.
+	// Without that second half, "everything except refunds" hands out refunds
+	// by proposing "everything".
+	if ns := proposed.AllCapabilitiesIn; ns != "" {
+		holds, granterExcept := granter.HoldsAllIn(ns, proposedAt, now)
+		if !holds {
+			return fmt.Errorf("%w: granter holds no wildcard in %s", ErrEscalation, ns)
+		}
+		proposedExcept := make(map[Capability]struct{}, len(proposed.ExceptCapabilities))
+		for _, c := range proposed.ExceptCapabilities {
+			proposedExcept[c] = struct{}{}
+		}
+		for _, c := range granterExcept {
+			if _, ok := proposedExcept[c]; !ok {
+				return fmt.Errorf("%w: granter does not hold %s, excluded from its own wildcard", ErrEscalation, c)
+			}
+		}
 	}
-	if len(index) == 0 {
-		return fmt.Errorf("%w: granter holds nothing at %s", ErrEscalation, proposed.Scope)
-	}
+
+	// Concrete capabilities are checked one at a time rather than against an
+	// enumerated set, because a granter holding a wildcard holds capabilities
+	// no enumeration can list.
 	for _, c := range proposed.Capabilities {
-		if _, ok := index[c]; !ok {
+		if !granter.Holds(c, proposedAt, now) {
 			return fmt.Errorf("%w: granter does not hold %s", ErrEscalation, c)
 		}
 	}

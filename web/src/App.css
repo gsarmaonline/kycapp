@@ -1816,6 +1816,59 @@ button.link-btn.danger:hover {
   font-size: inherit;
 }
 
+/* Visible to screen readers only, for text that a glyph conveys visually. */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.nav-external {
+  margin-left: 0.3rem;
+  font-size: 0.7rem;
+  opacity: 0.6;
+}
+
+.docs-search {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  margin: 0.85rem 0 0.25rem;
+  max-width: 26rem;
+}
+
+.docs-search input {
+  flex: 1;
+  min-width: 0;
+}
+
+.docs-search-count {
+  color: var(--app-fg-muted);
+  font-size: 0.92rem;
+}
+
+.docs-example {
+  margin-top: 1.5rem;
+}
+
+.docs-example h3 {
+  margin-bottom: 0.35rem;
+}
+
+/* The catch, set apart from the explanation so it is not read as more of it. */
+.docs-example-note {
+  border-left: 2px solid var(--app-border);
+  padding-left: 0.75rem;
+  color: var(--app-fg-muted);
+  font-size: 0.92rem;
+}
+
 .docs-concept-sample {
   overflow-x: auto;
   padding: 0.85rem 1rem;

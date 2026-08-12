@@ -55,7 +55,10 @@ func Decide(gs GrantSet, cap Capability, r Resource, now time.Time) Decision {
 		if !g.Active(now) {
 			continue
 		}
-		if !g.Scope.Contains(r.Scope) {
+		if !g.Reaches(r.Scope) {
+			// Out of scope and carved out of scope are the same answer here.
+			// A grant that excludes a resource simply does not cover it, which
+			// is why exclusions need no precedence rule against other grants.
 			continue
 		}
 		reached = true
