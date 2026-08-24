@@ -171,6 +171,12 @@ type ArrowTerm struct {
 // ever adds.
 type Union struct{ Terms []Expr }
 
+// Intersect requires every term. It is what expresses a principal narrowed by
+// two independent things at once: a key that carries its owner's reach *and*
+// stays inside its own scope. Like the rest of the grammar it is a set
+// operation evaluated at one point, so it introduces no ordering.
+type Intersect struct{ Terms []Expr }
+
 // Exclude subtracts. It lives in a rule, never as a free-floating deny edge: a
 // set expression evaluates at one point, so no priority field and no conflict
 // resolution appear anywhere.
@@ -183,18 +189,23 @@ func (RelationTerm) isExpr() {}
 func (RuleTerm) isExpr()     {}
 func (ArrowTerm) isExpr()    {}
 func (Union) isExpr()        {}
+func (Intersect) isExpr()    {}
 func (Exclude) isExpr()      {}
 
 func (e RelationTerm) String() string { return e.Relation }
 func (e RuleTerm) String() string     { return e.Action }
 func (e ArrowTerm) String() string    { return e.Relation + "->" + e.Target }
 
-func (e Union) String() string {
-	parts := make([]string, 0, len(e.Terms))
-	for _, t := range e.Terms {
+func (e Union) String() string { return joinTerms(e.Terms, " + ") }
+
+func (e Intersect) String() string { return joinTerms(e.Terms, " & ") }
+
+func joinTerms(terms []Expr, sep string) string {
+	parts := make([]string, 0, len(terms))
+	for _, t := range terms {
 		parts = append(parts, t.String())
 	}
-	return strings.Join(parts, " + ")
+	return strings.Join(parts, sep)
 }
 
 func (e Exclude) String() string { return e.Base.String() + " - " + e.Subtract.String() }
@@ -357,6 +368,15 @@ func (s *Schema) validateExpr(t *TypeDef, e Expr) error {
 				return err
 			}
 		}
+	case Intersect:
+		if len(x.Terms) == 0 {
+			return errors.New("empty intersection")
+		}
+		for _, term := range x.Terms {
+			if err := s.validateExpr(t, term); err != nil {
+				return err
+			}
+		}
 	case Exclude:
 		if err := s.validateExpr(t, x.Base); err != nil {
 			return err
@@ -386,6 +406,12 @@ func (s *Schema) checkRuleCycle(t *TypeDef, start, current string, seen map[stri
 					return err
 				}
 			}
+		case Intersect:
+			for _, term := range x.Terms {
+				if err := walk(term); err != nil {
+					return err
+				}
+			}
 		case Exclude:
 			if err := walk(x.Base); err != nil {
 				return err
@@ -395,6 +421,120 @@ func (s *Schema) checkRuleCycle(t *TypeDef, start, current string, seen map[stri
 		return nil
 	}
 	return walk(t.Rules[current])
+}
+
+// Warnings returns declarations that are inert: true as written, but with no
+// effect on any decision. They are not errors, because a schema under
+// construction legitimately passes through this state. They are reported
+// because a schema that says something the engine ignores is worse than one
+// that says nothing, and the reader has no way to tell the difference.
+//
+// Callers that want strictness treat a non-empty result as fatal at load time.
+func (s *Schema) Warnings() []string {
+	var out []string
+	bare := s.bareRelations()
+	used := s.usedRelations()
+
+	names := make([]string, 0, len(s.Relations))
+	for name := range s.Relations {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+
+	for _, name := range names {
+		def := s.Relations[name]
+		if _, ok := used[name]; !ok {
+			out = append(out, fmt.Sprintf("relation %q is declared but no type carries it", name))
+			continue
+		}
+		if def.Transitive {
+			if _, ok := bare[name]; !ok {
+				// Transitivity is read only where a relation is evaluated on
+				// its own. A relation that appears solely on the near side of
+				// an arrow is followed exactly one hop, and the depth comes
+				// from the far rule referring to the arrow again.
+				out = append(out, fmt.Sprintf(
+					"relation %q is transitive but only ever crossed by an arrow, so the flag has no effect",
+					name))
+			}
+		}
+	}
+
+	for _, action := range s.Actions {
+		if !s.anyTypeResolves(action) {
+			out = append(out, fmt.Sprintf("action %q is declared but no type resolves it", action))
+		}
+	}
+	return out
+}
+
+// bareRelations is the set of relations that are ever evaluated on their own,
+// which is the only place the transitive flag is read. Three things reach that
+// state: a relation term in a rule, a userset target, and the far side of an
+// arrow when the target type answers with a relation rather than a rule.
+func (s *Schema) bareRelations() map[string]struct{} {
+	out := map[string]struct{}{}
+
+	for _, t := range s.Types {
+		for _, targets := range t.Relations {
+			for _, target := range targets {
+				if target.Relation != "" {
+					out[target.Relation] = struct{}{}
+				}
+			}
+		}
+		for _, expr := range t.Rules {
+			s.collectBare(t, expr, out)
+		}
+	}
+	return out
+}
+
+func (s *Schema) collectBare(t *TypeDef, expr Expr, out map[string]struct{}) {
+	switch x := expr.(type) {
+	case RelationTerm:
+		out[x.Relation] = struct{}{}
+	case ArrowTerm:
+		for _, target := range t.Relations[x.Relation] {
+			far, ok := s.Types[target.Type]
+			if !ok {
+				continue
+			}
+			if _, isRule := far.Rules[x.Target]; !isRule {
+				out[x.Target] = struct{}{}
+			}
+		}
+	case Union:
+		for _, term := range x.Terms {
+			s.collectBare(t, term, out)
+		}
+	case Intersect:
+		for _, term := range x.Terms {
+			s.collectBare(t, term, out)
+		}
+	case Exclude:
+		s.collectBare(t, x.Base, out)
+		s.collectBare(t, x.Subtract, out)
+	}
+}
+
+func (s *Schema) usedRelations() map[string]struct{} {
+	out := map[string]struct{}{}
+	for _, t := range s.Types {
+		for name := range t.Relations {
+			out[name] = struct{}{}
+		}
+	}
+	return out
+}
+
+func (s *Schema) anyTypeResolves(action string) bool {
+	for _, t := range s.Types {
+		if _, ok := t.Rules[action]; ok {
+			return true
+		}
+	}
+	return false
 }
 
 func validIdent(s string) error {

@@ -278,6 +278,22 @@ func (r *run) satisfies(obj NodeRef, expr Expr, depth int) (bool, []Step, error)
 			}
 		}
 		return false, nil, nil
+	case Intersect:
+		// Every term must match. The returned path carries all of them, because
+		// each one is part of the reason and an audit that showed only the first
+		// would misreport why this was allowed.
+		var path []Step
+		for _, term := range x.Terms {
+			ok, sub, err := r.satisfies(obj, term, depth)
+			if err != nil {
+				return false, nil, err
+			}
+			if !ok {
+				return false, nil, nil
+			}
+			path = append(path, sub...)
+		}
+		return true, path, nil
 	case Exclude:
 		ok, path, err := r.satisfies(obj, x.Base, depth)
 		if err != nil || !ok {

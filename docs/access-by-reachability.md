@@ -1,6 +1,7 @@
 # Access by reachability
 
-> **Status: the engine is built and tested; nothing is wired to it yet.**
+> **Status: the engine and KYC's own domain schema are built and tested;
+> nothing is wired to a request path yet.**
 > [`core/reach`](../core/reach) is a standalone Go module with no dependencies
 > outside the standard library. The system it replaces is documented in
 > [authorisation.md](authorisation.md), which stays authoritative until the
@@ -182,9 +183,11 @@ type document
   rule share = write - banned
 ```
 
-The grammar is exactly: **union**, **traversal**, **subtraction**, and a
-**reference to another rule on the same type**. No comparison operator, no
-arithmetic, no function call.
+The grammar is exactly: **union** (`+`), **intersection** (`&`),
+**subtraction** (`-`), **traversal** (`->`), and a **reference to another rule
+on the same type**. No comparison operator, no arithmetic, no function call.
+Operators associate to the left and there are no parentheses, so `a + b & c`
+reads as `(a + b) & c`.
 
 A few rules the validator enforces, each of which has caught a real mistake in
 the tests:
@@ -195,6 +198,14 @@ the tests:
 - `parent->read` requires the far type to answer `read`, as a rule or a relation.
 - A rule may not reference itself, directly or through a chain.
 - An `identity` relation may not accept a wildcard.
+
+`Schema.Warnings()` reports declarations that are true as written but inert:
+a relation nothing carries, an action no type resolves, and a relation marked
+`transitive` that is only ever crossed by an arrow. The last one is a real
+footgun, because transitivity is read only where a relation is evaluated on its
+own; a relation appearing solely on the near side of an arrow is followed
+exactly one hop, and the depth comes from the far rule naming the arrow again.
+`accessmodel.Load` treats any warning as fatal.
 
 A non-transitive relation pointing at a group needs the explicit userset form
 (`group:ops#member`). A transitive relation chains plain nodes on its own.
@@ -438,26 +449,61 @@ authorisation and nothing to compare against.
 
 | Phase | Work | Where |
 | --- | --- | --- |
-| 1 | Schema language and validator | `schema.go`, `parse.go` |
-| 2 | `Resolver` interface, in-memory implementation | `graph.go` |
-| 3 | The walk: visited set, depth bound, path, reasons | `walk.go` |
-| 4 | The delegation check | `delegate.go` |
+| 1 | Schema language and validator | `core/reach/schema.go`, `parse.go` |
+| 2 | `Resolver` interface, in-memory implementation | `core/reach/graph.go` |
+| 3 | The walk: visited set, depth bound, path, reasons | `core/reach/walk.go` |
+| 4 | The delegation check | `core/reach/delegate.go` |
+| 5 | KYC's own domain expressed in the schema | [`internal/accessmodel`](../internal/accessmodel) |
 
-47 tests pass, including all thirteen worked examples from the design.
+All thirteen worked examples from the design run as tests, and
+`TestEveryPermissionKeyMaps` checks the projection table against the registry
+the current system boots from, so a permission added on either side without the
+other fails the build.
+
+### What modelling the domain found
+
+Expressing the current system in the new model produced three results worth
+recording.
+
+**Intersection was missing, and is now in the grammar.** Nothing else expresses
+a principal narrowed by two independent things at once. It is a set operation
+evaluated at one point, so it introduces no ordering and keeps the delegation
+subset question decidable.
+
+**Global reach became an edge, and least privilege came free.** Platform-org
+membership projects to the same `can_<action>` edge written on a star node.
+There is no flag and no privileged role name, so a read-only support role stays
+read-only in every tenant, which is a defect the current system documents but
+cannot fix without this change.
+
+**Scoped API keys are not expressible, and this is the open problem.** The
+current system narrows a key to the intersection of its owner's grants and its
+own scopes. Identity expansion merges the key into its owner before any rule is
+evaluated, so a rule cannot tell the request arrived through the key. Three
+options, none free:
+
+| Option | Cost |
+| --- | --- |
+| Unscoped keys only | Loses scope narrowing. This is what is implemented. |
+| Materialise owner-reach ∩ scopes at key creation | Loses live derivation: demoting the owner would not demote the key. |
+| Give the walk a **subject context**, so a rule can name the requesting principal's own edges | Preserves both. A real engine change. |
+
+The third is the recommendation. `TestScopedAPIKeysAreNotYetExpressible` asserts
+the current gap, so the day it closes the test fails and has to be revisited.
 
 **Not done, in the order it should happen:**
 
-1. **Model the current domain as a schema.** Express organisations, memberships,
-   roles, API keys and the app-user tier in the DSL. This is a paper exercise
-   and it is where the design will be tested hardest.
-2. **A Postgres `Resolver`**, plus the edge tables and a migration that projects
+1. **A Postgres `Resolver`**, plus the edge tables and a migration that projects
    the existing `permissions`, `roles`, `role_permissions`, `memberships`,
    `app_grants` and `app_role_extends` rows into edges.
-3. **Run both engines side by side** on the same requests and log every
+2. **Run both engines side by side** on the same requests and log every
    disagreement. The current suite becomes the differential test.
-4. **Cut the gates over**, one authorisation kind at a time, starting with the
+3. **Cut the gates over**, one authorisation kind at a time, starting with the
    route table's `authOrgPermission` rules because they are enforced from one
    place.
+4. **Model the merchant tier.** The app-user side is not yet expressed, and it
+   is the half with open vocabulary, so it will exercise the namespace boundary
+   harder than KYC's own tier did.
 5. **Delete the old implementation** and its migrations once nothing calls it.
 6. **The reverse index**, behind an unchanged interface. Not before there is a
    storage engine to index.

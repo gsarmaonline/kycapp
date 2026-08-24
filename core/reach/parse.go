@@ -260,22 +260,32 @@ func parseExpr(body string) (Expr, error) {
 		if err != nil {
 			return nil, err
 		}
-		if op == '+' {
+		switch op {
+		case '+':
 			if u, ok := cur.(Union); ok {
 				u.Terms = append(u.Terms, next)
 				cur = u
 				continue
 			}
 			cur = Union{Terms: []Expr{cur, next}}
-			continue
+		case '&':
+			if i, ok := cur.(Intersect); ok {
+				i.Terms = append(i.Terms, next)
+				cur = i
+				continue
+			}
+			cur = Intersect{Terms: []Expr{cur, next}}
+		default:
+			cur = Exclude{Base: cur, Subtract: next}
 		}
-		cur = Exclude{Base: cur, Subtract: next}
 	}
 	return cur, nil
 }
 
-// splitTerms separates a rule body on + and -, taking care that the - in an
-// arrow belongs to the term rather than to the grammar.
+// splitTerms separates a rule body on +, & and -, taking care that the - in an
+// arrow belongs to the term rather than to the grammar. Operators associate to
+// the left and there are no parentheses, so a mixed body reads strictly in
+// order: a + b & c is (a + b) & c.
 func splitTerms(body string) ([]string, []byte, error) {
 	var (
 		terms []string
@@ -295,11 +305,11 @@ func splitTerms(body string) ([]string, []byte, error) {
 	for i := 0; i < len(body); i++ {
 		c := body[i]
 		switch {
-		case c == '+':
+		case c == '+' || c == '&':
 			if err := flush(); err != nil {
 				return nil, nil, err
 			}
-			ops = append(ops, '+')
+			ops = append(ops, c)
 		case c == '-' && i+1 < len(body) && body[i+1] == '>':
 			cur.WriteString("->")
 			i++
@@ -361,15 +371,17 @@ func resolveIdents(t *TypeDef, e Expr) (Expr, error) {
 		}
 		return nil, fmt.Errorf("%q is neither a relation nor a rule on this type", x.Name)
 	case Union:
-		out := make([]Expr, 0, len(x.Terms))
-		for _, term := range x.Terms {
-			r, err := resolveIdents(t, term)
-			if err != nil {
-				return nil, err
-			}
-			out = append(out, r)
+		out, err := resolveAll(t, x.Terms)
+		if err != nil {
+			return nil, err
 		}
 		return Union{Terms: out}, nil
+	case Intersect:
+		out, err := resolveAll(t, x.Terms)
+		if err != nil {
+			return nil, err
+		}
+		return Intersect{Terms: out}, nil
 	case Exclude:
 		base, err := resolveIdents(t, x.Base)
 		if err != nil {
@@ -383,4 +395,16 @@ func resolveIdents(t *TypeDef, e Expr) (Expr, error) {
 	default:
 		return e, nil
 	}
+}
+
+func resolveAll(t *TypeDef, terms []Expr) ([]Expr, error) {
+	out := make([]Expr, 0, len(terms))
+	for _, term := range terms {
+		r, err := resolveIdents(t, term)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, r)
+	}
+	return out, nil
 }

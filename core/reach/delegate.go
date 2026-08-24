@@ -150,6 +150,16 @@ func (e *Evaluator) exprFeeds(t *TypeDef, expr Expr, relation string, seen map[s
 			}
 		}
 		return false
+	case Intersect:
+		// Conservative on purpose. A relation inside an intersection cannot
+		// grant the action alone, but requiring the granter to hold the action
+		// anyway errs toward refusing a delegation, never toward allowing one.
+		for _, term := range x.Terms {
+			if e.exprFeeds(t, term, relation, seen) {
+				return true
+			}
+		}
+		return false
 	case Exclude:
 		return e.exprFeeds(t, x.Base, relation, seen)
 	default:

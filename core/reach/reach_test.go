@@ -387,6 +387,88 @@ type doc
 	}
 }
 
+// --- Inert declarations ---
+
+func TestWarnsAboutDecorativeTransitivity(t *testing.T) {
+	// parent appears only on the near side of an arrow, so the walk follows it
+	// exactly one hop and the depth comes from folder.write referring to the
+	// arrow again. The flag reads as though it does something.
+	s := MustParse(`
+namespace n
+action write
+relation parent : transitive
+relation editor : direct
+type user
+type folder
+  relation parent -> folder
+  relation editor -> user
+  rule write = editor + parent->write`)
+
+	warnings := s.Warnings()
+	if len(warnings) != 1 || !strings.Contains(warnings[0], "no effect") {
+		t.Fatalf("warnings = %v, wanted one about an ineffective transitive flag", warnings)
+	}
+}
+
+func TestNoWarningWhenTransitivityIsLoadBearing(t *testing.T) {
+	// member is reached through a userset target, which evaluates it on its
+	// own, so the flag is read and the chain works.
+	s := MustParse(`
+namespace n
+action read
+relation member : transitive
+relation admin  : direct
+type user
+type group
+  relation member -> user | group#member
+type org
+  relation admin -> user | group#member
+  rule read = admin`)
+
+	if w := s.Warnings(); len(w) != 0 {
+		t.Fatalf("warnings = %v, wanted none", w)
+	}
+}
+
+func TestWarnsAboutUnusedDeclarations(t *testing.T) {
+	s := MustParse(`
+namespace n
+action read, write
+relation viewer : direct
+relation ghost  : direct
+type user
+type doc
+  relation viewer -> user
+  rule read = viewer`)
+
+	warnings := strings.Join(s.Warnings(), "\n")
+	if !strings.Contains(warnings, `relation "ghost"`) {
+		t.Errorf("warnings %q, wanted the unused relation named", warnings)
+	}
+	if !strings.Contains(warnings, `action "write"`) {
+		t.Errorf("warnings %q, wanted the unresolved action named", warnings)
+	}
+}
+
+func TestPublishedExamplesCarryNoInertDeclarations(t *testing.T) {
+	for name, src := range map[string]string{
+		"role":       schemaRole,
+		"tree":       schemaTree,
+		"own":        schemaOwn,
+		"close":      schemaClose,
+		"classified": schemaClassified,
+		"key":        schemaKey,
+		"wildcard":   schemaWildcard,
+		"tenants":    schemaTenants,
+	} {
+		t.Run(name, func(t *testing.T) {
+			if w := MustParse(src).Warnings(); len(w) != 0 {
+				t.Fatalf("warnings = %v", w)
+			}
+		})
+	}
+}
+
 func TestParseRejectsAChainedArrow(t *testing.T) {
 	_, err := Parse(`
 namespace n

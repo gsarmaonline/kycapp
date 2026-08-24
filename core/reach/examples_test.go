@@ -112,13 +112,17 @@ func TestExample02NestingAtAnyDepth(t *testing.T) {
 
 // --- 03. Inheritance down a tree ---
 
+// parent is declared direct on purpose. Depth comes from folder.write naming
+// the arrow again, so a transitive flag here would be inert: the walk reads it
+// only where a relation is evaluated on its own.
 const schemaTree = `
 namespace org:acme
 action read, write
 
 relation member : transitive
-relation parent : transitive
+relation parent : direct
 relation editor : direct
+relation viewer : direct
 
 type user
 
@@ -132,6 +136,8 @@ type folder
 
 type document
   relation parent -> folder
+  relation viewer -> user | group#member
+  rule read  = viewer
   rule write = parent->write
 `
 
@@ -263,11 +269,11 @@ func TestExample07AccessExpires(t *testing.T) {
 
 const schemaKey = `
 namespace org:acme
-action read, write
+action write
 
 relation member : transitive
 relation editor : direct
-relation parent : transitive
+relation parent : direct
 relation actor  : identity
 
 type user
@@ -359,7 +365,7 @@ namespace org:acme
 action read
 
 relation member : transitive
-relation parent : transitive
+relation parent : direct
 relation editor : direct
 relation admin  : direct
 relation org    : direct
