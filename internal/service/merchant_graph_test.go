@@ -166,6 +166,115 @@ func TestMerchantSchemaFollowsTheVocabulary(t *testing.T) {
 	}
 }
 
+// The reverse index, end to end. A listing page asks one question instead of
+// one per row, which is the difference between a page that renders and a page
+// that cannot be built.
+func TestListObjectsAnswersAListingPage(t *testing.T) {
+	f := newAppAccess(t, "mlist")
+	f.declareScope(t, "project")
+	f.declareCapability(t, "document:read")
+
+	f.writeEdges(t,
+		map[string]any{
+			"object_type": "role", "object_id": "editor", "relation": "holder",
+			"subject_type": "app_user", "subject_id": "ana",
+		},
+		map[string]any{
+			"object_type": "project", "object_id": "apollo", "relation": "can_read",
+			"subject_type": "role", "subject_id": "editor", "subject_relation": "holder",
+		},
+		map[string]any{
+			"object_type": "document", "object_id": "d1", "relation": "parent",
+			"subject_type": "project", "subject_id": "apollo",
+		},
+		map[string]any{
+			"object_type": "document", "object_id": "d2", "relation": "parent",
+			"subject_type": "project", "subject_id": "apollo",
+		},
+		// A document in a project nobody granted her.
+		map[string]any{
+			"object_type": "document", "object_id": "d9", "relation": "parent",
+			"subject_type": "project", "subject_id": "zeus",
+		},
+	)
+
+	code, out := f.post(t, "/list-objects", map[string]any{
+		"subject_id": "ana", "action": "read", "resource_type": "document",
+	})
+	if code != http.StatusOK {
+		t.Fatalf("list objects: %d %v", code, out)
+	}
+	got := out["object_ids"].([]any)
+	if len(got) != 2 || got[0] != "d1" || got[1] != "d2" {
+		t.Fatalf("object_ids = %v, wanted [d1 d2] sorted", got)
+	}
+	if out["all"] != false {
+		t.Errorf("no wildcard grant exists, got all=%v", out["all"])
+	}
+	if out["truncated"] != false {
+		t.Errorf("the walk should not have truncated, got %v", out["truncated"])
+	}
+}
+
+// The share dialog. Ana reaches d1 only through a role and a container, so
+// nothing on the document names her.
+func TestListSubjectsAnswersAShareDialog(t *testing.T) {
+	f := newAppAccess(t, "mwho")
+	f.declareScope(t, "project")
+	f.declareCapability(t, "document:read")
+
+	f.writeEdges(t,
+		map[string]any{
+			"object_type": "role", "object_id": "editor", "relation": "holder",
+			"subject_type": "app_user", "subject_id": "ana",
+		},
+		map[string]any{
+			"object_type": "project", "object_id": "apollo", "relation": "can_read",
+			"subject_type": "role", "subject_id": "editor", "subject_relation": "holder",
+		},
+		map[string]any{
+			"object_type": "document", "object_id": "d1", "relation": "parent",
+			"subject_type": "project", "subject_id": "apollo",
+		},
+	)
+
+	code, out := f.post(t, "/list-subjects", map[string]any{
+		"action": "read", "resource_type": "document", "resource_id": "d1",
+	})
+	if code != http.StatusOK {
+		t.Fatalf("list subjects: %d %v", code, out)
+	}
+	subjects := out["subjects"].([]any)
+	if len(subjects) != 1 {
+		t.Fatalf("wanted just ana, got %v", subjects)
+	}
+	s := subjects[0].(map[string]any)
+	if s["type"] != "app_user" || s["id"] != "ana" {
+		t.Errorf("subject = %v, wanted app_user:ana", s)
+	}
+}
+
+// A wildcard grant is unbounded by construction. Reporting it beats returning a
+// list that could never be complete, because a backend filtering a page by that
+// list would hide rows the customer may in fact see.
+func TestReverseQueriesReportWildcardsRatherThanGuessing(t *testing.T) {
+	f := newAppAccess(t, "mwild")
+	f.declareScope(t, "project")
+	f.declareCapability(t, "document:read")
+
+	f.writeEdges(t, map[string]any{
+		"object_type": "document", "object_id": "*", "relation": "can_read",
+		"subject_type": "app_user", "subject_id": "zoe",
+	})
+
+	_, objects := f.post(t, "/list-objects", map[string]any{
+		"subject_id": "zoe", "action": "read", "resource_type": "document",
+	})
+	if objects["all"] != true {
+		t.Errorf("a wildcard grant must be reported: %v", objects)
+	}
+}
+
 // An edge naming something the merchant never declared is refused at write
 // time. Not a security boundary, since it would reach nothing anyway: it is
 // there so the failure is loud when it is written rather than silent when it is

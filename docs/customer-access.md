@@ -33,6 +33,21 @@ One grant on a container reaches everything inside it. `project:apollo #can_read
 
 The tenancy boundary is the namespace an edge is written in and nothing else. Every edge query filters on it and a resolver carries exactly one, so a walk physically cannot read another merchant's edges. No type name is reserved, because a name was never what kept them apart: a scope kind called `global` inside `org:acme` reaches nothing outside it.
 
+### Listing pages and share dialogs
+
+`POST /v1/organisations/{id}/list-objects` answers *what can this customer see?* and `POST .../list-subjects` answers *who can see this?*. They are what make a listing page and a share dialog possible without a check per row: fifty documents would be fifty walks, and ten thousand could not be rendered at all.
+
+Both work the same way. A cheap walk gathers candidates, and every candidate is confirmed by the same check that answers a single question. Running the graph backwards exactly is not possible in general, because subtraction and intersection do not invert, so the walk is allowed to be generous and correctness comes from the verify step. There are no false positives, because the authority is the same engine.
+
+Two fields on the answer matter:
+
+| Field | Means |
+| --- | --- |
+| `all` | A wildcard grant covers every object of this type, including ones KYC holds no edge for. The list is a **lower bound**, and filtering a page by it would hide rows. |
+| `truncated` | The candidate walk hit its bound. The answer is a subset, said out loud rather than returned as a short list that reads as complete. |
+
+The cost tracks what the subject touches, not how many objects exist. A customer on three projects generates a handful of candidates whether the table holds a hundred rows or a hundred million.
+
 The older model still works and is unchanged. `GET /v1/app-users/{id}/access` returns an assembled grant set for a backend that wants to decide locally, which is now an optimisation rather than the only route.
 
 ### What KYC could not do before

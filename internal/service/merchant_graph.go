@@ -172,6 +172,84 @@ func validMerchantEdge(schema *reach.Schema, e MerchantEdge) (reach.Edge, error)
 	return edge, nil
 }
 
+// MerchantObjects is what a customer can reach, for a listing page.
+type MerchantObjects struct {
+	ObjectIDs []string `json:"object_ids"`
+	// All means a wildcard grant covers every object of this type, including
+	// ones no edge names. ObjectIDs is then a lower bound, and a backend that
+	// filtered a page by it would wrongly hide rows.
+	All bool `json:"all"`
+	// Truncated means the candidate walk hit its bound, so the answer is a
+	// subset. Saying so beats a short list that reads as complete.
+	Truncated bool `json:"truncated"`
+}
+
+// ListMerchantObjects answers "what can this customer see?".
+//
+// The alternative is a check per row, which is what makes an authorisation
+// service unusable on a listing page: fifty documents become fifty walks, and
+// ten thousand cannot be rendered at all.
+func (s *Service) ListMerchantObjects(ctx context.Context, orgID, subjectType, subjectID, action, resourceType string) (MerchantObjects, error) {
+	e, err := s.merchantEvaluator(ctx, orgID, action)
+	if err != nil {
+		return MerchantObjects{}, err
+	}
+	got, err := e.ListObjects(ctx, reach.Node(subjectType, subjectID), action, resourceType, decideNow())
+	if err != nil {
+		return MerchantObjects{}, apperr.Validation(err.Error())
+	}
+	out := MerchantObjects{All: got.All, Truncated: got.Truncated, ObjectIDs: []string{}}
+	for _, n := range got.Objects {
+		out.ObjectIDs = append(out.ObjectIDs, n.ID)
+	}
+	return out, nil
+}
+
+// MerchantSubjects is who reaches one object, for a share dialog or an audit.
+type MerchantSubjects struct {
+	Subjects []MerchantSubject `json:"subjects"`
+	// All means an everyone grant reaches this, so Subjects is a lower bound.
+	All       bool `json:"all"`
+	Truncated bool `json:"truncated"`
+}
+
+// MerchantSubject is one principal that reaches an object.
+type MerchantSubject struct {
+	Type string `json:"type"`
+	ID   string `json:"id"`
+}
+
+// ListMerchantSubjects answers "who can see this?".
+func (s *Service) ListMerchantSubjects(ctx context.Context, orgID, action, resourceType, resourceID string) (MerchantSubjects, error) {
+	e, err := s.merchantEvaluator(ctx, orgID, action)
+	if err != nil {
+		return MerchantSubjects{}, err
+	}
+	got, err := e.ListSubjects(ctx, reach.Node(resourceType, resourceID), action, decideNow())
+	if err != nil {
+		return MerchantSubjects{}, apperr.Validation(err.Error())
+	}
+	out := MerchantSubjects{All: got.All, Truncated: got.Truncated, Subjects: []MerchantSubject{}}
+	for _, n := range got.Subjects {
+		out.Subjects = append(out.Subjects, MerchantSubject{Type: n.Type, ID: n.ID})
+	}
+	return out, nil
+}
+
+// merchantEvaluator builds the evaluator for one merchant's namespace, after
+// checking the action is one they declared. An undeclared action reaches
+// nothing, and saying so beats an empty list the caller has to interpret.
+func (s *Service) merchantEvaluator(ctx context.Context, orgID, action string) (*reach.Evaluator, error) {
+	schema, err := s.MerchantSchema(ctx, orgID)
+	if err != nil {
+		return nil, err
+	}
+	if !schema.HasAction(action) {
+		return nil, apperr.Validation("unknown action: " + action)
+	}
+	return reach.New(schema, accessmodel.NewResolverIn(s.db.Q(), accessmodel.MerchantNamespace(orgID)))
+}
+
 // MerchantDecision is one answer, with the route the walk took to it.
 type MerchantDecision struct {
 	Allowed bool      `json:"allowed"`

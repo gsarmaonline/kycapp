@@ -121,6 +121,55 @@ func (s *Server) handleCheckMerchant(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, d)
 }
 
+// handleListMerchantObjects answers "what can this customer see?", which is
+// every listing page in a merchant's product. The alternative is a check per
+// row, and a page of ten thousand cannot be rendered that way at all.
+func (s *Server) handleListMerchantObjects(w http.ResponseWriter, r *http.Request) {
+	orgID := r.PathValue("id")
+	var body struct {
+		SubjectType  string `json:"subject_type"`
+		SubjectID    string `json:"subject_id"`
+		Action       string `json:"action"`
+		ResourceType string `json:"resource_type"`
+	}
+	if err := decodeJSON(r, &body); err != nil {
+		writeError(w, apperr.Validation("invalid JSON body"))
+		return
+	}
+	if body.SubjectType == "" {
+		body.SubjectType = "app_user"
+	}
+	out, err := s.svc.ListMerchantObjects(r.Context(), orgID,
+		body.SubjectType, body.SubjectID, body.Action, body.ResourceType)
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, out)
+}
+
+// handleListMerchantSubjects answers "who can see this?": the share dialog, and
+// the question an audit asks.
+func (s *Server) handleListMerchantSubjects(w http.ResponseWriter, r *http.Request) {
+	orgID := r.PathValue("id")
+	var body struct {
+		Action       string `json:"action"`
+		ResourceType string `json:"resource_type"`
+		ResourceID   string `json:"resource_id"`
+	}
+	if err := decodeJSON(r, &body); err != nil {
+		writeError(w, apperr.Validation("invalid JSON body"))
+		return
+	}
+	out, err := s.svc.ListMerchantSubjects(r.Context(), orgID,
+		body.Action, body.ResourceType, body.ResourceID)
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, out)
+}
+
 // handleMerchantSchema returns the schema a merchant's own vocabulary resolves
 // as, derived from their rows rather than stored. It is what the customer
 // access map draws, and what makes the model inspectable rather than implied.
