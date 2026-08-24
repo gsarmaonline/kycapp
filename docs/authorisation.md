@@ -13,13 +13,15 @@
 >
 > Still current: the **merchant-hosted tier** in
 > [Merchant-hosted access control](#merchant-hosted-access-control), which has
-> not been modelled in the new engine and still uses `core/access`.
+> not been modelled in the new engine. It no longer shares an evaluator with
+> anything: it owns its wire format in `internal/service/app_grant.go` and
+> flattens role inheritance with `reach.ExpandSets`.
 
 **May this caller do this, here?** This document covers the access decision and the model behind it.
 
 How the caller was identified is [authentication](authentication.md). Authorisation never asks how someone signed in: an operator, a staff member, an API key and break-glass all take the same evaluation path.
 
-Related: [authentication](authentication.md) · [data model](data-model.md) · [api](api.md) · [`core/access`](../core/access)
+Related: [authentication](authentication.md) · [access by reachability](access-by-reachability.md) · [data model](data-model.md) · [api](api.md)
 
 > Sections are marked **Shipped** or **Proposed**. Nothing here describes intent as if it were behaviour.
 
@@ -113,7 +115,7 @@ The rule to hold: **add scope kinds, never add depth.** A level that nests insid
 
 ### The evaluator is portable
 
-[`core/access`](../core/access) is a separate module with **zero dependencies**, asserted in CI. The same logic has to run in the API, the Go SDK, and eventually the TypeScript SDK, because merchants will cache a grant set and evaluate locally. A dependency would make it unembeddable.
+This described `core/access`, a zero-dependency module the API and the SDKs could share. It has been deleted. The portability argument survived it: [`core/reach`](../core/reach) is that module now, asserted the same way.
 
 ```
 Decide(grantSet, capability, resource, now) -> decision
@@ -169,7 +171,7 @@ Out of scope is a 404, byte-identical to a resource that does not exist. Otherwi
 
 ## Invariants
 
-**Partly shipped.** These are enforced in [`core/access`](../core/access) and tested as properties rather than examples.
+**Historic.** These were enforced in `core/access`, since deleted. The ones that survived, and the ones that did not, are in [access-by-reachability.md](access-by-reachability.md).
 
 | # | Invariant | Why |
 | --- | --- | --- |
@@ -433,7 +435,7 @@ without that property ticks every box in the role form instead, which expands at
 authoring time and stores concrete.
 
 The registry still refuses to let anyone **declare** a capability named `*`
-([capability.go](../core/access/capability.go)). The wildcard lives on the
+(since removed). The wildcard lives on the
 grant, never in the vocabulary.
 
 ### 13. What this model will not express
@@ -458,7 +460,7 @@ reach this?" answerable at all.
 
 | Phase | Work | Status |
 | --- | --- | --- |
-| 1 | [`core/access`](../core/access): capability, scope, grant set, role expansion, `Decide`, delegation. | **Built** |
+| 1 | `core/access`: capability, scope, grant set, role expansion, `Decide`, delegation. | **Deleted** |
 | 2 | Grant assembly from existing relationships, plus KYC's capability registry. | **Built** |
 | 3 | Org-scoped gates evaluate through `Decide`. | **Built** |
 | 4 | KYC as an organisation: staff are members of `org_platform`, reach is derived from that membership, memberships can expire, bootstrap is marker-gated. | **Built** |

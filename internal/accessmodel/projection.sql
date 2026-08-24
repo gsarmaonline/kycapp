@@ -55,6 +55,15 @@ FROM roles r
 WHERE COALESCE(r.organisation_id = (SELECT platform_organisation_id FROM system_state WHERE id = 1), false)
 ON CONFLICT DO NOTHING;
 
+-- Role inheritance. role_id extends parent_id, so whoever holds the child also
+-- holds the parent: an admin picks up everything granted to member. Stored as a
+-- userset rather than expanded, so the walk resolves the chain and editing a
+-- base role reaches everything built on it with no recomputation.
+INSERT INTO reach_edges (namespace, object_type, object_id, relation, subject_type, subject_id, subject_relation, source)
+SELECT DISTINCT 'kyc', 'role', re.parent_id, 'holder', 'role', re.role_id, 'holder', 'role_extends'
+FROM role_extends re
+ON CONFLICT DO NOTHING;
+
 -- A membership becomes a holder edge, carrying its expiry unchanged. Nothing
 -- has to run on time for a time-boxed membership to lapse.
 INSERT INTO reach_edges (namespace, object_type, object_id, relation, subject_type, subject_id, subject_relation, expires_at, source)

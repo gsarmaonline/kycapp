@@ -123,3 +123,16 @@ WHERE m.user_id = sqlc.arg('user_id')
   AND m.status = 'active'
   AND (m.expires_at IS NULL OR m.expires_at > now())
   AND m.organisation_id = (SELECT platform_organisation_id FROM system_state WHERE id = 1);
+
+-- Role inheritance. The child gains what the parent holds, the same direction
+-- app_role_extends uses for the merchant tier.
+
+-- name: AddRoleExtends :exec
+INSERT INTO role_extends (role_id, parent_id) VALUES ($1, $2)
+ON CONFLICT DO NOTHING;
+
+-- name: RemoveRoleExtends :exec
+DELETE FROM role_extends WHERE role_id = $1 AND parent_id = $2;
+
+-- name: ListRoleParents :many
+SELECT parent_id FROM role_extends WHERE role_id = $1 ORDER BY parent_id;

@@ -11,6 +11,24 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const addRoleExtends = `-- name: AddRoleExtends :exec
+
+INSERT INTO role_extends (role_id, parent_id) VALUES ($1, $2)
+ON CONFLICT DO NOTHING
+`
+
+type AddRoleExtendsParams struct {
+	RoleID   string `json:"role_id"`
+	ParentID string `json:"parent_id"`
+}
+
+// Role inheritance. The child gains what the parent holds, the same direction
+// app_role_extends uses for the merchant tier.
+func (q *Queries) AddRoleExtends(ctx context.Context, arg AddRoleExtendsParams) error {
+	_, err := q.db.Exec(ctx, addRoleExtends, arg.RoleID, arg.ParentID)
+	return err
+}
+
 const addRolePermission = `-- name: AddRolePermission :exec
 INSERT INTO role_permissions (role_id, permission_id)
 VALUES ($1, $2)
@@ -354,6 +372,30 @@ func (q *Queries) ListPermissionsFiltered(ctx context.Context, arg ListPermissio
 	return items, nil
 }
 
+const listRoleParents = `-- name: ListRoleParents :many
+SELECT parent_id FROM role_extends WHERE role_id = $1 ORDER BY parent_id
+`
+
+func (q *Queries) ListRoleParents(ctx context.Context, roleID string) ([]string, error) {
+	rows, err := q.db.Query(ctx, listRoleParents, roleID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []string{}
+	for rows.Next() {
+		var parent_id string
+		if err := rows.Scan(&parent_id); err != nil {
+			return nil, err
+		}
+		items = append(items, parent_id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listRolesByOrganisation = `-- name: ListRolesByOrganisation :many
 SELECT id, organisation_id, key, name, description, is_system FROM roles
 WHERE organisation_id = $1
@@ -478,6 +520,20 @@ func (q *Queries) ListUserGrantSources(ctx context.Context, arg ListUserGrantSou
 		return nil, err
 	}
 	return items, nil
+}
+
+const removeRoleExtends = `-- name: RemoveRoleExtends :exec
+DELETE FROM role_extends WHERE role_id = $1 AND parent_id = $2
+`
+
+type RemoveRoleExtendsParams struct {
+	RoleID   string `json:"role_id"`
+	ParentID string `json:"parent_id"`
+}
+
+func (q *Queries) RemoveRoleExtends(ctx context.Context, arg RemoveRoleExtendsParams) error {
+	_, err := q.db.Exec(ctx, removeRoleExtends, arg.RoleID, arg.ParentID)
+	return err
 }
 
 const updateRole = `-- name: UpdateRole :one

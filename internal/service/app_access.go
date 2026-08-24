@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gsarmaonline/kyc/core/access"
+	"github.com/gsarmaonline/kyc/core/reach"
 	"github.com/gsarmaonline/kyc/internal/apperr"
 	"github.com/gsarmaonline/kyc/internal/ids"
 	"github.com/gsarmaonline/kyc/internal/store"
@@ -26,7 +26,7 @@ import (
 //
 // Two boundaries hold this together:
 //
-//   - Namespace. Merchant capabilities live in access.OrgNamespace(orgID) and
+//   - Namespace. Merchant capabilities live in AppNamespace(orgID) and
 //     can never name a KYC capability. A merchant administers their model
 //     without being inside it.
 //   - Opaque scope ids. KYC stores scope_id as a string it never resolves. A
@@ -45,7 +45,7 @@ func (s *Service) CreateAppScopeType(ctx context.Context, orgID, kind, label str
 	if !scopeKindPattern.MatchString(kind) {
 		return sqlc.AppScopeType{}, apperr.Validation("kind must be lowercase letters, digits and underscores")
 	}
-	if kind == access.ScopeGlobal || kind == access.ScopeOrganisation {
+	if kind == AppScopeGlobal || kind == AppScopeOrganisation {
 		// These are KYC's own levels. Letting a merchant redefine them would
 		// let a declared scope collide with the tenancy boundary.
 		return sqlc.AppScopeType{}, apperr.Validation("kind is reserved: " + kind)
@@ -74,9 +74,9 @@ func (s *Service) CreateAppCapability(ctx context.Context, orgID, key, descripti
 	if !appKeyPattern.MatchString(key) {
 		return sqlc.AppCapability{}, apperr.Validation("capability must be resource:action, lowercase")
 	}
-	// Validate through the evaluator's own rules so a merchant capability can
-	// never be shaped in a way KYC's registry would reject, including wildcards.
-	if _, err := access.NewRegistry(access.OrgNamespace(orgID), key); err != nil {
+	// The same shape rule KYC's own keys follow, so a merchant capability can
+	// never be written in a form the vocabulary would reject, wildcards included.
+	if err := ValidAppCapabilityKey(key); err != nil {
 		return sqlc.AppCapability{}, apperr.Validation(err.Error())
 	}
 	row, err := s.db.Q().CreateAppCapability(ctx, sqlc.CreateAppCapabilityParams{
@@ -237,32 +237,19 @@ func (s *Service) recomputeAppRoles(ctx context.Context, orgID string) error {
 		parents[e.RoleID] = append(parents[e.RoleID], e.ParentID)
 	}
 
-	ns := access.OrgNamespace(orgID)
-	in := make([]access.Role, 0, len(roles))
+	in := make([]reach.Set, 0, len(roles))
 	for _, r := range roles {
-		own := make([]access.Capability, 0, len(r.OwnCapabilities))
-		for _, k := range r.OwnCapabilities {
-			own = append(own, access.Capability{Namespace: ns, Key: k})
-		}
-		in = append(in, access.Role{ID: r.ID, Own: own, Extends: parents[r.ID]})
+		in = append(in, reach.Set{ID: r.ID, Own: r.OwnCapabilities, Extends: parents[r.ID]})
 	}
 
-	expanded, err := access.ExpandRoles(in)
+	expanded, err := reach.ExpandSets(in, MaxAppRoleDepth)
 	if err != nil {
-		switch {
-		case errors.Is(err, access.ErrRoleCycle):
+		if errors.Is(err, reach.ErrSetCycle) {
 			return apperr.Validation("role inheritance contains a cycle")
-		case errors.Is(err, access.ErrRoleDepth):
-			return apperr.Validation(err.Error())
-		default:
-			return apperr.Validation(err.Error())
 		}
+		return apperr.Validation(err.Error())
 	}
-	for id, caps := range expanded {
-		keys := make([]string, 0, len(caps))
-		for _, c := range caps {
-			keys = append(keys, c.Key)
-		}
+	for id, keys := range expanded {
 		if err := s.db.Q().SetAppRoleEffectiveCapabilities(ctx, sqlc.SetAppRoleEffectiveCapabilitiesParams{
 			ID: id, EffectiveCapabilities: keys,
 		}); err != nil {
@@ -383,7 +370,7 @@ func (s *Service) CreateAppGrant(ctx context.Context, orgID string, in AppGrantI
 		return sqlc.AppGrant{}, err
 	}
 	constraint := strings.TrimSpace(in.Constraint)
-	if constraint != "" && constraint != string(access.SelfSubject) {
+	if constraint != "" && constraint != string(AppSelfSubject) {
 		return sqlc.AppGrant{}, apperr.Validation("unknown constraint: " + constraint)
 	}
 
@@ -634,15 +621,15 @@ type AppAccessSet struct {
 	AppUserID string
 	Namespace string
 	Version   int64
-	Grants    []access.Grant
+	Grants    []AppGrant
 }
 
 // AppAccessFor assembles a customer's grant set.
 //
 // Capabilities come from the role's materialised set, so this never walks the
 // inheritance graph however deep the merchant built it. The result is shaped as
-// core/access grants because the merchant's SDK evaluates it with the same
-// Decide the API uses.
+// AppGrants, which is the wire shape the merchant's backend evaluates against
+// in its own process.
 func (s *Service) AppAccessFor(ctx context.Context, orgID, appUserID string) (AppAccessSet, error) {
 	rows, err := s.db.Q().ListAppGrantsForUser(ctx, sqlc.ListAppGrantsForUserParams{
 		AppUserID: textArg(appUserID), OrganisationID: orgID,
@@ -657,32 +644,26 @@ func (s *Service) AppAccessFor(ctx context.Context, orgID, appUserID string) (Ap
 		return AppAccessSet{}, err
 	}
 
-	ns := access.OrgNamespace(orgID)
-	out := AppAccessSet{AppUserID: appUserID, Namespace: ns, Version: version}
+	out := AppAccessSet{AppUserID: appUserID, Namespace: AppNamespace(orgID), Version: version}
 	for _, r := range rows {
-		caps := make([]access.Capability, 0, len(r.EffectiveCapabilities))
-		for _, k := range r.EffectiveCapabilities {
-			caps = append(caps, access.Capability{Namespace: ns, Key: k})
-		}
+		caps := append([]string(nil), r.EffectiveCapabilities...)
 		if len(caps) == 0 && !r.AllCapabilities {
 			// An empty grant is invalid and would be rejected by the evaluator.
 			// A role carrying nothing simply contributes nothing. A wildcard
 			// carries plenty while listing none, so it is exempt.
 			continue
 		}
-		g := access.Grant{
+		g := AppGrant{
 			ID:           r.ID,
-			Scope:        access.Scope{Kind: r.ScopeKind, ID: r.ScopeID},
+			Scope:        AppScope{Kind: r.ScopeKind, ID: r.ScopeID},
 			Except:       decodeExceptScopes(r.ExceptScopes),
 			Capabilities: caps,
-			Constraint:   access.Constraint(r.ConstraintKind),
+			Constraint:   AppConstraint(r.ConstraintKind),
 			Source:       grantSource(r.SubjectKind, r.GroupKey, r.RoleKey, r.AllCapabilities),
 		}
 		if r.AllCapabilities {
-			g.AllCapabilitiesIn = ns
-			for _, k := range r.ExceptCapabilities {
-				g.ExceptCapabilities = append(g.ExceptCapabilities, access.Capability{Namespace: ns, Key: k})
-			}
+			g.AllCapabilities = true
+			g.ExceptCapabilities = append(g.ExceptCapabilities, r.ExceptCapabilities...)
 		}
 		if r.ExpiresAt.Valid {
 			t := r.ExpiresAt.Time
@@ -715,7 +696,7 @@ func grantSource(subjectKind, groupKey, roleKey string, wildcard bool) string {
 // decodeExceptScopes turns the stored JSON into scopes. A row that will not
 // parse is treated as having no exclusions, which widens the grant, so it is
 // stored as JSONB and validated on the way in rather than trusted here.
-func decodeExceptScopes(raw json.RawMessage) []access.Scope {
+func decodeExceptScopes(raw json.RawMessage) []AppScope {
 	if len(raw) == 0 {
 		return nil
 	}
@@ -723,9 +704,9 @@ func decodeExceptScopes(raw json.RawMessage) []access.Scope {
 	if err := json.Unmarshal(raw, &refs); err != nil {
 		return nil
 	}
-	out := make([]access.Scope, 0, len(refs))
+	out := make([]AppScope, 0, len(refs))
 	for _, r := range refs {
-		out = append(out, access.Scope{Kind: r.Kind, ID: r.ID})
+		out = append(out, AppScope{Kind: r.Kind, ID: r.ID})
 	}
 	return out
 }
