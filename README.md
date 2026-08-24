@@ -106,6 +106,7 @@ sequenceDiagram
 | [docs/saas-rethink.md](docs/saas-rethink.md) | SaaS gap analysis and revised roadmap |
 | [docs/authentication.md](docs/authentication.md) | Principals, credentials, resolution, bootstrap |
 | [docs/authorisation.md](docs/authorisation.md) | Capabilities, roles, grants, gates, invariants |
+| [docs/access-by-reachability.md](docs/access-by-reachability.md) | Successor design: nodes, edges, one walk. Engine built, not yet wired |
 | [docs/customer-access.md](docs/customer-access.md) | Authorisation merchants run for their own customers |
 | [docs/data-model.md](docs/data-model.md) | Objects, relationships, permission catalog |
 | [docs/api.md](docs/api.md) | REST `/v1` surface |

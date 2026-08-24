@@ -1,5 +1,12 @@
 # Authorisation
 
+> **This describes the system in production today, and it stays authoritative
+> until it is replaced.** A successor is designed and its engine is built and
+> tested in [`core/reach`](../core/reach): see
+> [access-by-reachability.md](access-by-reachability.md). Nothing is wired to it
+> yet, and the migration sequence is at the end of that document. Change this
+> system, not the successor, until step 4 of that sequence begins.
+
 **May this caller do this, here?** This document covers the access decision and the model behind it.
 
 How the caller was identified is [authentication](authentication.md). Authorisation never asks how someone signed in: an operator, a staff member, an API key and break-glass all take the same evaluation path.
