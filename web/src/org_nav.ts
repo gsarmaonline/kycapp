@@ -9,6 +9,9 @@ export type OrgSection =
   | 'customer-roles'
   | 'customer-groups'
   | 'customer-grants'
+  | 'customer-map'
+  | 'customer-edges'
+  | 'customer-playground'
   | 'email-templates'
   | 'databases'
   | 'webhooks'
@@ -55,6 +58,9 @@ export const ORG_SECTIONS: OrgNavItem[] = [
   { id: 'customer-roles', label: 'Roles', path: 'customer-roles' },
   { id: 'customer-groups', label: 'Groups', path: 'customer-groups' },
   { id: 'customer-grants', label: 'Grants', path: 'customer-grants' },
+  { id: 'customer-map', label: 'Map', path: 'customer-map' },
+  { id: 'customer-edges', label: 'Edges', path: 'customer-edges' },
+  { id: 'customer-playground', label: 'Playground', path: 'customer-playground' },
   { id: 'email-templates', label: 'Emails', path: 'email-templates' },
   { id: 'databases', label: 'Databases', path: 'databases' },
   { id: 'webhooks', label: 'Outbound webhooks', path: 'webhooks' },
@@ -100,6 +106,12 @@ export const ORG_NAV_GROUPS: OrgNavGroup[] = [
       { id: 'customer-roles', label: 'Roles', path: 'customer-roles' },
       { id: 'customer-groups', label: 'Groups', path: 'customer-groups' },
       { id: 'customer-grants', label: 'Grants', path: 'customer-grants' },
+      // The five above declare a vocabulary. These three are the graph that
+      // vocabulary adds up to, and the questions it answers, which had no page
+      // at all while KYC only stored a description of authority.
+      { id: 'customer-map', label: 'Map', path: 'customer-map' },
+      { id: 'customer-edges', label: 'Edges', path: 'customer-edges' },
+      { id: 'customer-playground', label: 'Playground', path: 'customer-playground' },
     ],
   },
   {
@@ -149,6 +161,9 @@ export function sectionFromPathname(pathname: string, orgId: string): OrgSection
     case 'customer-roles':
     case 'customer-groups':
     case 'customer-grants':
+    case 'customer-map':
+    case 'customer-edges':
+    case 'customer-playground':
     case 'email-templates':
     case 'databases':
     case 'webhooks':
@@ -181,7 +196,16 @@ export function resourcePath(
   orgId: string,
   section: Exclude<
     OrgSection,
-    'overview' | 'billing' | 'branding' | 'settings' | 'docs' | 'activity' | 'authorisation'
+    | 'overview'
+    | 'billing'
+    | 'branding'
+    | 'settings'
+    | 'docs'
+    | 'activity'
+    | 'authorisation'
+    | 'customer-map'
+    | 'customer-edges'
+    | 'customer-playground'
   >,
   ...parts: string[]
 ) {

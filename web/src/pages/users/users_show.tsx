@@ -8,6 +8,7 @@ import {
   type AppUser,
 } from '../../api'
 import { ConceptDocsLink } from '../../components/ConceptDocsLink'
+import { ReachablePanel } from './reachable_panel'
 import { DetailList, PageHeader, ResourceTable } from '../../crud/ui'
 import { resourcePath } from '../../org_nav'
 
@@ -131,6 +132,8 @@ export function UsersShow() {
           ],
         }))}
       />
+
+      <ReachablePanel appUserId={item.id} />
 
       <div className="form-actions">
         <Link className="ghost" to={resourcePath(orgId, 'users')}>

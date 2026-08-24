@@ -54,11 +54,18 @@ export function CustomerGroupsIndex() {
         <p>Loading…</p>
       ) : (
         <ResourceTable
-          columns={['Name', 'Key', 'Members']}
+          columns={['Name', 'Key', 'Members', 'Extends']}
           empty="No groups yet."
           rows={items.map((g) => ({
             key: g.id,
-            cells: [g.name, g.key, String(g.member_count)],
+            cells: [
+              g.name,
+              g.key,
+              String(g.member_count),
+              // Nesting changes who a grant on this group reaches, so it belongs
+              // in the list rather than behind a click into the edit form.
+              g.parent_count ? `${g.parent_count} group${g.parent_count === 1 ? '' : 's'}` : '—',
+            ],
             actions: (
               <RowActions
                 viewTo={resourcePath(orgId, 'customer-groups', g.id)}

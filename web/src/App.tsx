@@ -78,6 +78,9 @@ import { InboundWebhooksNew } from './pages/inbound_webhooks/inbound_webhooks_ne
 import { InboundWebhooksShow } from './pages/inbound_webhooks/inbound_webhooks_show'
 import { DocsConceptPage, DocsConceptsIndex } from './pages/docs/docs_concepts'
 import { AuthorisationPage } from './pages/authorisation/authorisation_page'
+import { CustomerEdgesPage } from './pages/customer_edges/customer_edges_page'
+import { CustomerMapPage } from './pages/customer_map/customer_map_page'
+import { CustomerPlaygroundPage } from './pages/customer_playground/customer_playground_page'
 import { DocsIntegrationApiPage, DocsOperatorApiPage } from './pages/docs/docs_api'
 import { DocsLayout } from './pages/docs/docs_layout'
 import { DocsVariablesPage } from './pages/docs/docs_variables'
@@ -254,6 +257,9 @@ export default function App() {
         <Route path="api-keys/new" element={<APIKeysNew />} />
         <Route path="activity" element={<ActivityPage />} />
         <Route path="authorisation" element={<AuthorisationPage />} />
+        <Route path="customer-map" element={<CustomerMapPage />} />
+        <Route path="customer-edges" element={<CustomerEdgesPage />} />
+        <Route path="customer-playground" element={<CustomerPlaygroundPage />} />
         <Route path="docs" element={<DocsLayout />}>
           <Route index element={<DocsConceptsIndex />} />
           <Route path="concepts/:slug" element={<DocsConceptPage />} />

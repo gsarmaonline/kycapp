@@ -1379,6 +1379,24 @@ export type AppGrant = {
   except_scopes: AppScopeRef[]
   except_app_users: string[]
   constraint: '' | 'self_subject'
+  /**
+   * Every scope of every kind: the widest a grant can be, since an organisation
+   * is where a merchant's world ends. scope_kind and scope_id are empty when set.
+   */
+  all_scopes?: boolean
+}
+
+/**
+ * How wide a grant's scope actually is.
+ *
+ * The index used to print scope_kind:scope_id, which cannot tell one project
+ * from every project from the whole organisation. Those mean wildly different
+ * things and looked identical.
+ */
+export function grantScopeLabel(g: Pick<AppGrant, 'scope_kind' | 'scope_id' | 'all_scopes'>) {
+  if (g.all_scopes) return 'everywhere'
+  if (g.scope_id === '*') return `every ${g.scope_kind}`
+  return `${g.scope_kind}:${g.scope_id}`
 }
 
 export type AppGroupMember = {
@@ -1445,6 +1463,96 @@ export function updateAppRole(
 
 export function deleteAppRole(orgId: string, roleId: string) {
   return request<void>(`/v1/organisations/${orgId}/app-roles/${roleId}`, { method: 'DELETE' })
+}
+
+/** One fact a merchant states about their own product. */
+export type MerchantEdge = {
+  object_type: string
+  object_id: string
+  relation: string
+  subject_type: string
+  subject_id: string
+  subject_relation?: string
+  expires_at?: string
+}
+
+export function writeMerchantEdges(orgId: string, edges: MerchantEdge[]) {
+  return request<{ written: number }>(`/v1/organisations/${orgId}/edges`, {
+    method: 'POST',
+    body: JSON.stringify({ edges }),
+  })
+}
+
+export function deleteMerchantEdge(orgId: string, edge: MerchantEdge) {
+  return request<void>(`/v1/organisations/${orgId}/edges`, {
+    method: 'DELETE',
+    body: JSON.stringify(edge),
+  })
+}
+
+/** One answer, with the route the walk took to it. */
+export type MerchantDecision = {
+  allowed: boolean
+  reason: 'allowed' | 'unreachable' | 'no_rule' | 'excluded'
+  path: PathHop[]
+}
+
+export function checkMerchant(
+  orgId: string,
+  body: {
+    subject_type?: string
+    subject_id: string
+    action: string
+    resource_type: string
+    resource_id: string
+  },
+) {
+  return request<MerchantDecision>(`/v1/organisations/${orgId}/check`, {
+    method: 'POST',
+    body: JSON.stringify(body),
+  })
+}
+
+/**
+ * `all` means a wildcard covers every object of the type, including ones KYC
+ * holds no edge for, so the list is a lower bound. `truncated` means the walk
+ * hit its bound. Filtering a page by an incomplete list would hide rows.
+ */
+export type MerchantObjects = {
+  object_ids: string[]
+  all: boolean
+  truncated: boolean
+}
+
+export function listMerchantObjects(
+  orgId: string,
+  body: { subject_type?: string; subject_id: string; action: string; resource_type: string },
+) {
+  return request<MerchantObjects>(`/v1/organisations/${orgId}/list-objects`, {
+    method: 'POST',
+    body: JSON.stringify(body),
+  })
+}
+
+export type MerchantSubjects = {
+  subjects: { type: string; id: string }[]
+  all: boolean
+  truncated: boolean
+}
+
+export function listMerchantSubjects(
+  orgId: string,
+  body: { action: string; resource_type: string; resource_id: string },
+) {
+  return request<MerchantSubjects>(`/v1/organisations/${orgId}/list-subjects`, {
+    method: 'POST',
+    body: JSON.stringify(body),
+  })
+}
+
+/** The merchant's own model, derived from the vocabulary they declared. */
+export function getMerchantSchema(orgId: string) {
+  return request<Record<string, unknown>>(`/v1/organisations/${orgId}/access-schema`)
 }
 
 export function listAppUserGroups(orgId: string) {
