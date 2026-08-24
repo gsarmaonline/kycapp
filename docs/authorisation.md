@@ -1,11 +1,19 @@
 # Authorisation
 
-> **This describes the system in production today, and it stays authoritative
-> until it is replaced.** A successor is designed and its engine is built and
-> tested in [`core/reach`](../core/reach): see
-> [access-by-reachability.md](access-by-reachability.md). Nothing is wired to it
-> yet, and the migration sequence is at the end of that document. Change this
-> system, not the successor, until step 4 of that sequence begins.
+> **Superseded for KYC's own gates.** Every gate described here now evaluates
+> through the relation-graph engine in [`core/reach`](../core/reach): see
+> [access-by-reachability.md](access-by-reachability.md), which is the document
+> to change.
+>
+> What survives is **state**. The tables below, `permissions`, `roles`,
+> `role_permissions` and `memberships`, are still where authorisation is
+> written, and the new engine reads them through the `reach_edges_live` view. So
+> the model of *who holds what* here is accurate; the account of how a decision
+> is reached is not.
+>
+> Still current: the **merchant-hosted tier** in
+> [Merchant-hosted access control](#merchant-hosted-access-control), which has
+> not been modelled in the new engine and still uses `core/access`.
 
 **May this caller do this, here?** This document covers the access decision and the model behind it.
 
