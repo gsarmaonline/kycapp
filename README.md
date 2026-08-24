@@ -105,7 +105,8 @@ sequenceDiagram
 | --- | --- |
 | [docs/saas-rethink.md](docs/saas-rethink.md) | SaaS gap analysis and revised roadmap |
 | [docs/authentication.md](docs/authentication.md) | Principals, credentials, resolution, bootstrap |
-| [docs/authorisation.md](docs/authorisation.md) | Capabilities, roles, grants, gates, invariants |
+| [docs/access-by-reachability.md](docs/access-by-reachability.md) | How authorisation decides: nodes, edges, one walk |
+| [docs/authorisation.md](docs/authorisation.md) | The tables authorisation is written to, and the merchant tier |
 | [docs/customer-access.md](docs/customer-access.md) | Authorisation merchants run for their own customers |
 | [docs/data-model.md](docs/data-model.md) | Objects, relationships, permission catalog |
 | [docs/api.md](docs/api.md) | REST `/v1` surface |
@@ -124,6 +125,8 @@ sequenceDiagram
 **App login + API tenancy complete:** Google OAuth, sessions, membership-scoped org APIs, org-scoped API keys (Platform → API keys), login-gated UI.
 
 **Merchant product surface:** app users, attributes, product features/plans, branding, email templates, automations (River + Resend), KYC billing via Stripe executor. In-app **Documentation** (concepts, OpenAPI, [variable referencing](docs/variables.md), and a search across all of it) opens in its own tab from each organisation sidebar, and is public at `/docs`.
+
+**Authorisation decides by reachability:** every KYC gate now resolves by walking a typed graph, where subjects, groups, roles, containers and actions are all nodes and grouping, containment and ownership are all edges. A decision returns the path it took, so "why can this person reach this?" is answerable rather than inferred. State is unchanged: roles, permissions and memberships are still where authorisation is written, read through a view that presents them as edges. See [access by reachability](docs/access-by-reachability.md). The merchant tier still uses the previous evaluator and is modelled next.
 
 **Merchant access control:** merchants declare their own scope kinds, capabilities and roles for their **app users**, with role inheritance, grant them to a customer, a **group** of customers, or **everyone** (present and future, from one row), and read back a cached grant set to evaluate in their own backend. A grant may carry a **wildcard** on capabilities and an **exception** list on each of subject, capabilities and scope, plus a `self_subject` constraint for "their own rows only". Exceptions narrow the grant they sit on and never another, so grants stay unordered. Configured under each organisation's **Customer access** section in the sidebar, one page per object: scope kinds, capabilities, roles, groups and grants. See [customer access](docs/customer-access.md) for the guide, [authorisation](docs/authorisation.md#worked-examples) for worked examples of every access model, and in-app **Documentation → Access recipes** for the merchant-facing versions.
 

@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"errors"
+	"github.com/gsarmaonline/kyc/core/reach"
 	"strings"
 
 	"github.com/gsarmaonline/kyc/internal/apperr"
@@ -28,6 +29,8 @@ type Service struct {
 	mailer             mailer.Mailer
 	checkoutSuccessURL string
 	checkoutCancelURL  string
+	// reach is the authorisation evaluator, built once on first use.
+	reach *reach.Evaluator
 }
 
 // Enqueuer inserts background jobs (River). Optional — nil skips enqueue.

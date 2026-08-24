@@ -5,13 +5,14 @@ import (
 	"sort"
 	"testing"
 
+	"github.com/gsarmaonline/kyc/internal/accessmodel"
 	"github.com/gsarmaonline/kyc/internal/service"
 )
 
-// Invariant 3 only holds if the code-defined registry stays in step with the
-// permissions the migrations seed. Code is authoritative; this fails when a
-// migration adds a permission no gate can ask for, or removes one a gate names.
-func TestCapabilityRegistryMatchesSeededPermissions(t *testing.T) {
+// The catalog in code only holds if it stays in step with the permissions the
+// migrations seed. Code is authoritative; this fails when a migration adds a
+// permission no gate can ask for, or removes one a gate names.
+func TestCatalogMatchesSeededPermissions(t *testing.T) {
 	ctx := context.Background()
 	db := openTestDB(t, ctx)
 	svc := service.New(db)
@@ -23,26 +24,43 @@ func TestCapabilityRegistryMatchesSeededPermissions(t *testing.T) {
 	seeded := make([]string, 0, len(rows))
 	for _, r := range rows {
 		seeded = append(seeded, r.Key)
-		if r.Key == service.CapOrganisationMember {
-			t.Errorf("%s must not be a seeded permission: it is inherent to holding any grant, not something a role hands out", service.CapOrganisationMember)
+		if r.Key == accessmodel.CapOrganisationMember {
+			t.Errorf("%s must not be a seeded permission: it is inherent to holding any role, not something a role hands out",
+				accessmodel.CapOrganisationMember)
 		}
 	}
 	sort.Strings(seeded)
 
-	// The registry is the seeded permissions plus the inherent capability.
-	registered := []string{}
-	for _, k := range service.KYCCapabilities.Keys() {
-		if k != service.CapOrganisationMember {
-			registered = append(registered, k)
+	// The catalog is the seeded permissions plus the inherent capability.
+	catalogued := []string{}
+	for key := range accessmodel.Permissions {
+		if key != accessmodel.CapOrganisationMember {
+			catalogued = append(catalogued, key)
 		}
 	}
-	sort.Strings(registered)
+	sort.Strings(catalogued)
 
-	if missing := difference(seeded, registered); len(missing) > 0 {
-		t.Errorf("seeded but not registered in code: %v", missing)
+	if missing := difference(seeded, catalogued); len(missing) > 0 {
+		t.Errorf("seeded but absent from the catalog: %v", missing)
 	}
-	if extra := difference(registered, seeded); len(extra) > 0 {
-		t.Errorf("registered in code but not seeded: %v", extra)
+	if extra := difference(catalogued, seeded); len(extra) > 0 {
+		t.Errorf("in the catalog but not seeded: %v", extra)
+	}
+}
+
+// Every catalogued permission must resolve to a type and action the schema can
+// actually answer, or a gate naming it would deny for the wrong reason.
+func TestEveryCataloguedPermissionResolves(t *testing.T) {
+	schema := accessmodel.MustLoad()
+	for key, p := range accessmodel.Permissions {
+		typ, ok := schema.Type(p.Type)
+		if !ok {
+			t.Errorf("%s: type %q is not declared", key, p.Type)
+			continue
+		}
+		if _, ok := typ.Rules[p.Action]; !ok {
+			t.Errorf("%s: type %q has no rule %q", key, p.Type, p.Action)
+		}
 	}
 }
 
