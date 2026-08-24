@@ -175,6 +175,65 @@ func (q *Queries) ListLiveEdgesForSubject(ctx context.Context, arg ListLiveEdges
 	return items, nil
 }
 
+const listOperatorRoleHierarchy = `-- name: ListOperatorRoleHierarchy :many
+SELECT r.id, r.key, r.name,
+       COALESCE(ARRAY(
+         SELECT p.key FROM role_extends e
+         JOIN roles p ON p.id = e.parent_id
+         WHERE e.role_id = r.id
+         ORDER BY p.key
+       ), '{}')::text[] AS parent_keys,
+       COALESCE(ARRAY(
+         SELECT pm.key FROM role_permissions rp
+         JOIN permissions pm ON pm.id = rp.permission_id
+         WHERE rp.role_id = r.id
+         ORDER BY pm.key
+       ), '{}')::text[] AS permission_keys
+FROM roles r
+WHERE r.organisation_id = $1
+ORDER BY r.key
+`
+
+type ListOperatorRoleHierarchyRow struct {
+	ID             string   `json:"id"`
+	Key            string   `json:"key"`
+	Name           string   `json:"name"`
+	ParentKeys     []string `json:"parent_keys"`
+	PermissionKeys []string `json:"permission_keys"`
+}
+
+// ListOperatorRoleHierarchy answers "what do owner, admin and member actually
+// mean here?", which the schema map cannot: those three are rows, not types.
+//
+// The chain was real in the database from the moment role_extends landed and
+// visible nowhere, because the operator roles UI is hidden and a membership
+// shows only its own role key.
+func (q *Queries) ListOperatorRoleHierarchy(ctx context.Context, organisationID string) ([]ListOperatorRoleHierarchyRow, error) {
+	rows, err := q.db.Query(ctx, listOperatorRoleHierarchy, organisationID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListOperatorRoleHierarchyRow{}
+	for rows.Next() {
+		var i ListOperatorRoleHierarchyRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Key,
+			&i.Name,
+			&i.ParentKeys,
+			&i.PermissionKeys,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listReachEdges = `-- name: ListReachEdges :many
 
 SELECT namespace, object_type, object_id, relation, subject_type, subject_id, subject_relation, expires_at, source, created_at FROM reach_edges

@@ -366,6 +366,17 @@ func (f appAccessFixture) createGroup(t *testing.T, key string) string {
 	return out["id"].(string)
 }
 
+func (f appAccessFixture) createNestedGroup(t *testing.T, key string, parents ...string) string {
+	t.Helper()
+	code, out := f.post(t, "/app-user-groups", map[string]any{
+		"key": key, "name": key, "parents": parents,
+	})
+	if code != http.StatusCreated {
+		t.Fatalf("create nested group %q: %d %v", key, code, out)
+	}
+	return out["id"].(string)
+}
+
 func (f appAccessFixture) addToGroup(t *testing.T, groupID, appUserID string) {
 	t.Helper()
 	res := doJSON(t, f.h, http.MethodPost,
@@ -408,6 +419,81 @@ func TestGroupGrantReachesMembers(t *testing.T) {
 
 	if other := f.accessFor(t, outside); len(other["grants"].([]any)) != 0 {
 		t.Errorf("a non-member must get nothing, got %v", other["grants"])
+	}
+}
+
+// Nesting is the same mechanism for a group as for a role. A grant written on a
+// parent group has to reach a member of the child, or "enterprise customers are
+// also beta customers" stays something a merchant can only express by adding
+// every member to both groups and keeping them in step by hand.
+func TestNestedGroupGrantReachesTheChildsMembers(t *testing.T) {
+	f := newAppAccess(t, "nested")
+	f.declareScope(t, "project")
+	f.declareCapability(t, "beta:read")
+	roleID := f.createRole(t, "beta_reader", []string{"beta:read"}, nil)
+
+	beta := f.createGroup(t, "beta")
+	enterprise := f.createNestedGroup(t, "enterprise", beta)
+
+	member := f.createAppUser(t, "ent@customer.com")
+	f.addToGroup(t, enterprise, member)
+	outsider := f.createAppUser(t, "free@customer.com")
+
+	// Granted on the parent only. Nobody is a direct member of it.
+	if code, out := f.post(t, "/app-grants", map[string]any{
+		"group_id": beta, "role_id": roleID, "scope_kind": "project", "scope_id": "p1",
+	}); code != http.StatusCreated {
+		t.Fatalf("grant on parent group: %d %v", code, out)
+	}
+
+	grants := f.accessFor(t, member)["grants"].([]any)
+	if len(grants) != 1 {
+		t.Fatalf("a member of enterprise must inherit the beta grant, got %v", grants)
+	}
+	if caps := grants[0].(map[string]any)["capabilities"].([]any); len(caps) != 1 || caps[0] != "beta:read" {
+		t.Errorf("capabilities = %v, wanted [beta:read]", caps)
+	}
+
+	if other := f.accessFor(t, outsider)["grants"].([]any); len(other) != 0 {
+		t.Errorf("a customer in neither group must get nothing, got %v", other)
+	}
+}
+
+// Nesting adds, it does not replace. A grant on the child must not leak upward
+// to members of the parent, or extending a group would silently widen it.
+func TestNestingDoesNotReachUpward(t *testing.T) {
+	f := newAppAccess(t, "upward")
+	f.declareScope(t, "project")
+	f.declareCapability(t, "beta:read")
+	roleID := f.createRole(t, "beta_reader", []string{"beta:read"}, nil)
+
+	beta := f.createGroup(t, "beta")
+	enterprise := f.createNestedGroup(t, "enterprise", beta)
+
+	betaOnly := f.createAppUser(t, "beta@customer.com")
+	f.addToGroup(t, beta, betaOnly)
+
+	f.post(t, "/app-grants", map[string]any{
+		"group_id": enterprise, "role_id": roleID, "scope_kind": "project", "scope_id": "p1",
+	})
+
+	if got := f.accessFor(t, betaOnly)["grants"].([]any); len(got) != 0 {
+		t.Errorf("a grant on the child must not reach the parent's members, got %v", got)
+	}
+}
+
+// A cycle has to be refused at write time. Accepting one would either hang the
+// expansion or leave the stored sets half-written.
+func TestGroupNestingRejectsCycles(t *testing.T) {
+	f := newAppAccess(t, "groupcycle")
+	a := f.createGroup(t, "a")
+	b := f.createNestedGroup(t, "b", a)
+
+	res := doJSON(t, f.h, http.MethodPatch,
+		"/v1/organisations/"+f.orgID+"/app-user-groups/"+a,
+		map[string]any{"parents": []string{b}}, userAuth(f.token))
+	if res.Code < 400 {
+		t.Fatalf("a cycle was accepted: %d %s", res.Code, res.Body.String())
 	}
 }
 

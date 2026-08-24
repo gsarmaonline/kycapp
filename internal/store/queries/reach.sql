@@ -62,3 +62,27 @@ WHERE namespace = $1
 SELECT * FROM reach_edges_live
 WHERE namespace = $1 AND subject_type = $2 AND subject_id = $3
 ORDER BY object_type, object_id, relation;
+
+-- ListOperatorRoleHierarchy answers "what do owner, admin and member actually
+-- mean here?", which the schema map cannot: those three are rows, not types.
+--
+-- The chain was real in the database from the moment role_extends landed and
+-- visible nowhere, because the operator roles UI is hidden and a membership
+-- shows only its own role key.
+-- name: ListOperatorRoleHierarchy :many
+SELECT r.id, r.key, r.name,
+       COALESCE(ARRAY(
+         SELECT p.key FROM role_extends e
+         JOIN roles p ON p.id = e.parent_id
+         WHERE e.role_id = r.id
+         ORDER BY p.key
+       ), '{}')::text[] AS parent_keys,
+       COALESCE(ARRAY(
+         SELECT pm.key FROM role_permissions rp
+         JOIN permissions pm ON pm.id = rp.permission_id
+         WHERE rp.role_id = r.id
+         ORDER BY pm.key
+       ), '{}')::text[] AS permission_keys
+FROM roles r
+WHERE r.organisation_id = $1
+ORDER BY r.key;

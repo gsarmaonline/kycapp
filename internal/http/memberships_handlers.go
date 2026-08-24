@@ -146,6 +146,18 @@ func (s *Server) handleRevokeMembership(w http.ResponseWriter, r *http.Request) 
 // The gate lives in the service rather than here, because the organisation is
 // only known after the membership is loaded, and because the same call decides
 // how much of each route this caller may be shown.
+// handleListOperatorRoles returns the organisation's roles and what each
+// inherits. It is what makes owner, admin and member legible: the schema map
+// draws the model, and these are instances of it.
+func (s *Server) handleListOperatorRoles(w http.ResponseWriter, r *http.Request) {
+	out, err := s.svc.ListOperatorRoles(r.Context(), r.PathValue("id"))
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"items": out})
+}
+
 func (s *Server) handleExplainMembershipAccess(w http.ResponseWriter, r *http.Request) {
 	out, err := s.svc.ExplainMembershipAccess(r.Context(), r.PathValue("id"))
 	if err != nil {
