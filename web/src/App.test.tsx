@@ -121,10 +121,16 @@ describe('App', () => {
       </MemoryRouter>,
     )
     expect(await screen.findByRole('heading', { name: 'Documentation' })).toBeInTheDocument()
-    const tabs = screen.getByRole('navigation', { name: 'Documentation sections' })
-    expect(tabs.querySelector('a[href="/docs"]')).toBeTruthy()
-    expect(tabs.querySelector('a[href="/docs/api"]')).toBeTruthy()
-    expect(tabs.querySelector('a[href="/docs/variables"]')).toBeTruthy()
+    const nav = screen.getByRole('navigation', { name: 'Documentation sections' })
+    expect(nav.querySelector('a[href="/docs"]')).toBeTruthy()
+    expect(nav.querySelector('a[href="/docs/api"]')).toBeTruthy()
+    expect(nav.querySelector('a[href="/docs/variables"]')).toBeTruthy()
+    // Both API references are reachable from anywhere in the docs now, not only
+    // once you are already inside the API section.
+    expect(nav.querySelector('a[href="/docs/api/operator"]')).toBeTruthy()
+    // Individual concepts are in the sidebar rather than only on the index, so
+    // reading one no longer costs a trip through a list.
+    expect(nav.querySelector('a[href="/docs/concepts/organisation"]')).toBeTruthy()
     expect(await screen.findByRole('heading', { name: 'Core ideas' })).toBeInTheDocument()
     expect(
       document.querySelector('a[href="/docs/concepts/organisation"]'),
@@ -139,10 +145,26 @@ describe('App', () => {
         <App />
       </MemoryRouter>,
     )
-    expect(await screen.findByRole('navigation', { name: 'API reference' })).toBeInTheDocument()
-    const apiNav = screen.getByRole('navigation', { name: 'API reference' })
-    expect(apiNav.querySelector('a[href="/docs/api"]')).toBeTruthy()
-    expect(apiNav.querySelector('a[href="/docs/api/operator"]')).toBeTruthy()
+    // The two references used to appear in a second tab row that only rendered
+    // once you were inside the API section. They live in the one sidebar now.
+    const nav = await screen.findByRole('navigation', { name: 'Documentation sections' })
+    expect(nav.querySelector('a[href="/docs/api"]')).toBeTruthy()
+    expect(nav.querySelector('a[href="/docs/api/operator"]')).toBeTruthy()
+  })
+
+  it('marks the current docs page in the sidebar', async () => {
+    vi.mocked(getToken).mockReturnValue(null)
+    render(
+      <MemoryRouter initialEntries={['/docs/variables']}>
+        <App />
+      </MemoryRouter>,
+    )
+    const nav = await screen.findByRole('navigation', { name: 'Documentation sections' })
+    const current = nav.querySelector('a[href="/docs/variables"]')
+    expect(current?.className).toContain('active')
+    // Showing the whole tree is only useful if the current page is findable in
+    // it, which is the thing a tab row was hiding.
+    expect(nav.querySelector('a[href="/docs/api"]')?.className).not.toContain('active')
   })
 
   it('shows Dashboard on the landing page when signed in', async () => {
