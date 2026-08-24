@@ -408,3 +408,80 @@ func countEdges(t *testing.T, pool *pgxpool.Pool) int {
 	}
 	return n
 }
+
+// --- Role inheritance ---
+
+func TestRoleInheritanceFlowsUpTheChain(t *testing.T) {
+	db := openDB(t)
+	pool := db.Pool()
+
+	// The shape signup creates: owner extends admin extends member.
+	seedTenant(t, pool, "acme", "acme_member", "rank_file", "members:read")
+	seedTenant(t, pool, "acme", "acme_admin", "boss", "billing:manage")
+	exec(t, pool, `INSERT INTO role_extends (role_id, parent_id)
+		VALUES ('acme_admin', 'acme_member') ON CONFLICT DO NOTHING`)
+	project(t, pool)
+
+	e := evaluator(t, db)
+	boss := reach.Node("user", "boss")
+	rank := reach.Node("user", "rank_file")
+
+	// An admin picks up what member was granted, without member being edited.
+	assertHolds(t, e, boss, "members:read", "acme", true)
+	assertHolds(t, e, boss, "billing:manage", "acme", true)
+	// Inheritance runs one way only.
+	assertHolds(t, e, rank, "members:read", "acme", true)
+	assertHolds(t, e, rank, "billing:manage", "acme", false)
+}
+
+func TestRoleInheritanceDoesNotCrossTenants(t *testing.T) {
+	db := openDB(t)
+	pool := db.Pool()
+
+	seedTenant(t, pool, "acme", "acme_member", "u9", "members:read")
+	seedTenant(t, pool, "globex", "globex_admin", "u12", "billing:manage")
+	// A chain that should never have been written. It must not widen anything
+	// across the boundary even if it is.
+	exec(t, pool, `INSERT INTO role_extends (role_id, parent_id)
+		VALUES ('globex_admin', 'acme_member') ON CONFLICT DO NOTHING`)
+	project(t, pool)
+
+	e := evaluator(t, db)
+	// u12 inherits acme_member's grant, but that grant is scoped to acme's
+	// members area, so it confers nothing in globex and nothing over acme
+	// either: reaching acme needs a belongs edge u12 does not have.
+	assertHolds(t, e, reach.Node("user", "u12"), "members:read", "globex", false)
+}
+
+func TestSeededRolesFormAChain(t *testing.T) {
+	db := openDB(t)
+	pool := db.Pool()
+
+	// The migration seeds the chain for organisations that already existed.
+	exec(t, pool, `INSERT INTO organisations (id, name, slug, status)
+		VALUES ('acme', 'acme', 'acme', 'active') ON CONFLICT (id) DO NOTHING`)
+	for _, key := range []string{"owner", "admin", "member"} {
+		exec(t, pool, `INSERT INTO roles (id, organisation_id, key, name)
+			VALUES ($1, 'acme', $2, $2) ON CONFLICT (id) DO NOTHING`, "acme_"+key, key)
+	}
+	exec(t, pool, `INSERT INTO role_extends (role_id, parent_id)
+		SELECT child.id, parent.id
+		FROM roles child
+		JOIN roles parent ON parent.organisation_id = child.organisation_id
+		WHERE (child.key = 'admin' AND parent.key = 'member')
+		   OR (child.key = 'owner' AND parent.key = 'admin')
+		ON CONFLICT DO NOTHING`)
+
+	exec(t, pool, `INSERT INTO users (id, email, name, status)
+		VALUES ('boss', 'boss@example.test', 'boss', 'active') ON CONFLICT (id) DO NOTHING`)
+	exec(t, pool, `INSERT INTO memberships (id, organisation_id, user_id, role_id, status)
+		VALUES ('m_boss', 'acme', 'boss', 'acme_owner', 'active') ON CONFLICT (id) DO NOTHING`)
+	exec(t, pool, `INSERT INTO role_permissions (role_id, permission_id)
+		SELECT 'acme_member', p.id FROM permissions p WHERE p.key = 'members:read'
+		ON CONFLICT DO NOTHING`)
+	project(t, pool)
+
+	// Two hops: owner -> admin -> member.
+	e := evaluator(t, db)
+	assertHolds(t, e, reach.Node("user", "boss"), "members:read", "acme", true)
+}

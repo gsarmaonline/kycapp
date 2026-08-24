@@ -424,6 +424,11 @@ type Role struct {
 	IsSystem       bool   `json:"is_system"`
 }
 
+type RoleExtend struct {
+	RoleID   string `json:"role_id"`
+	ParentID string `json:"parent_id"`
+}
+
 type RolePermission struct {
 	RoleID       string `json:"role_id"`
 	PermissionID string `json:"permission_id"`

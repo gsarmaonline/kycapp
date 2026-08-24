@@ -105,6 +105,15 @@ func seedSystemRoles(ctx context.Context, q *sqlc.Queries, orgID string) (owner,
 		return
 	}
 
+	// owner extends admin extends member, so anything granted to a base role
+	// reaches everyone above it. Without this the three are flat sets that only
+	// look like a hierarchy.
+	for _, pair := range [][2]string{{admin.ID, member.ID}, {owner.ID, admin.ID}} {
+		if err = q.AddRoleExtends(ctx, sqlc.AddRoleExtendsParams{RoleID: pair[0], ParentID: pair[1]}); err != nil {
+			return
+		}
+	}
+
 	for _, roleID := range []string{owner.ID, admin.ID} {
 		for _, pid := range permIDs {
 			if err = q.AddRolePermission(ctx, sqlc.AddRolePermissionParams{RoleID: roleID, PermissionID: pid}); err != nil {
