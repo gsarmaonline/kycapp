@@ -308,7 +308,7 @@ func (q *Queries) CreateAppGroupGrant(ctx context.Context, arg CreateAppGroupGra
 const createAppRole = `-- name: CreateAppRole :one
 INSERT INTO app_roles (id, organisation_id, key, name, description, own_capabilities)
 VALUES ($1, $2, $3, $4, $5, $6)
-RETURNING id, organisation_id, key, name, description, own_capabilities, effective_capabilities, created_at, updated_at
+RETURNING id, organisation_id, key, name, description, own_capabilities, effective_capabilities, created_at, updated_at, source
 `
 
 type CreateAppRoleParams struct {
@@ -340,8 +340,41 @@ func (q *Queries) CreateAppRole(ctx context.Context, arg CreateAppRoleParams) (A
 		&i.EffectiveCapabilities,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.Source,
 	)
 	return i, err
+}
+
+const createAppRoleFromTemplate = `-- name: CreateAppRoleFromTemplate :exec
+INSERT INTO app_roles (id, organisation_id, key, name, description, own_capabilities, source)
+VALUES ($1, $2, $3, $4, $5, $6, $7)
+ON CONFLICT (organisation_id, key) DO NOTHING
+`
+
+type CreateAppRoleFromTemplateParams struct {
+	ID              string   `json:"id"`
+	OrganisationID  string   `json:"organisation_id"`
+	Key             string   `json:"key"`
+	Name            string   `json:"name"`
+	Description     string   `json:"description"`
+	OwnCapabilities []string `json:"own_capabilities"`
+	Source          string   `json:"source"`
+}
+
+// Applying a template twice must converge rather than fail, and must never
+// relabel a role the merchant has since written by hand. DO NOTHING rather than
+// an upsert: a key that exists is already declared, whoever declared it.
+func (q *Queries) CreateAppRoleFromTemplate(ctx context.Context, arg CreateAppRoleFromTemplateParams) error {
+	_, err := q.db.Exec(ctx, createAppRoleFromTemplate,
+		arg.ID,
+		arg.OrganisationID,
+		arg.Key,
+		arg.Name,
+		arg.Description,
+		arg.OwnCapabilities,
+		arg.Source,
+	)
+	return err
 }
 
 const createAppScopeType = `-- name: CreateAppScopeType :one
@@ -574,7 +607,7 @@ func (q *Queries) GetAppCapability(ctx context.Context, id string) (AppCapabilit
 }
 
 const getAppRole = `-- name: GetAppRole :one
-SELECT id, organisation_id, key, name, description, own_capabilities, effective_capabilities, created_at, updated_at FROM app_roles WHERE id = $1
+SELECT id, organisation_id, key, name, description, own_capabilities, effective_capabilities, created_at, updated_at, source FROM app_roles WHERE id = $1
 `
 
 func (q *Queries) GetAppRole(ctx context.Context, id string) (AppRole, error) {
@@ -590,6 +623,34 @@ func (q *Queries) GetAppRole(ctx context.Context, id string) (AppRole, error) {
 		&i.EffectiveCapabilities,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.Source,
+	)
+	return i, err
+}
+
+const getAppRoleByKey = `-- name: GetAppRoleByKey :one
+SELECT id, organisation_id, key, name, description, own_capabilities, effective_capabilities, created_at, updated_at, source FROM app_roles WHERE organisation_id = $1 AND key = $2
+`
+
+type GetAppRoleByKeyParams struct {
+	OrganisationID string `json:"organisation_id"`
+	Key            string `json:"key"`
+}
+
+func (q *Queries) GetAppRoleByKey(ctx context.Context, arg GetAppRoleByKeyParams) (AppRole, error) {
+	row := q.db.QueryRow(ctx, getAppRoleByKey, arg.OrganisationID, arg.Key)
+	var i AppRole
+	err := row.Scan(
+		&i.ID,
+		&i.OrganisationID,
+		&i.Key,
+		&i.Name,
+		&i.Description,
+		&i.OwnCapabilities,
+		&i.EffectiveCapabilities,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.Source,
 	)
 	return i, err
 }
@@ -915,7 +976,7 @@ func (q *Queries) ListAppRoleParents(ctx context.Context, roleID string) ([]stri
 }
 
 const listAppRoles = `-- name: ListAppRoles :many
-SELECT id, organisation_id, key, name, description, own_capabilities, effective_capabilities, created_at, updated_at FROM app_roles WHERE organisation_id = $1 ORDER BY key
+SELECT id, organisation_id, key, name, description, own_capabilities, effective_capabilities, created_at, updated_at, source FROM app_roles WHERE organisation_id = $1 ORDER BY key
 `
 
 func (q *Queries) ListAppRoles(ctx context.Context, organisationID string) ([]AppRole, error) {
@@ -937,6 +998,7 @@ func (q *Queries) ListAppRoles(ctx context.Context, organisationID string) ([]Ap
 			&i.EffectiveCapabilities,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.Source,
 		); err != nil {
 			return nil, err
 		}
@@ -1256,7 +1318,7 @@ SET name = COALESCE($1, name),
     own_capabilities = COALESCE($3, own_capabilities),
     updated_at = now()
 WHERE id = $4 AND organisation_id = $5
-RETURNING id, organisation_id, key, name, description, own_capabilities, effective_capabilities, created_at, updated_at
+RETURNING id, organisation_id, key, name, description, own_capabilities, effective_capabilities, created_at, updated_at, source
 `
 
 type UpdateAppRoleParams struct {
@@ -1286,6 +1348,7 @@ func (q *Queries) UpdateAppRole(ctx context.Context, arg UpdateAppRoleParams) (A
 		&i.EffectiveCapabilities,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.Source,
 	)
 	return i, err
 }

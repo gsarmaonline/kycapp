@@ -142,6 +142,9 @@ func appRoleJSON(r sqlc.AppRole) map[string]any {
 		"description":            r.Description,
 		"own_capabilities":       r.OwnCapabilities,
 		"effective_capabilities": r.EffectiveCapabilities,
+		// Provenance, matching capabilities. A template row and an authored row
+		// are otherwise identical.
+		"source": r.Source,
 	}
 }
 

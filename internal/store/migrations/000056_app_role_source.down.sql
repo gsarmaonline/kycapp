@@ -1,0 +1,1 @@
+ALTER TABLE app_roles DROP COLUMN IF EXISTS source;

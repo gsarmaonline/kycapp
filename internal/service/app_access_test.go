@@ -976,6 +976,123 @@ func TestCapabilityTemplateIsAppliedAndMarked(t *testing.T) {
 	}
 }
 
+// A template carries the shape as well as the vocabulary. Almost every product
+// has admin extending member extending viewer, and a template that stopped at
+// capabilities left every merchant building that chain by hand.
+func TestCapabilityTemplateCreatesRolesAndInheritance(t *testing.T) {
+	f := newAppAccess(t, "tplroles")
+
+	if code, out := f.post(t, "/app-capability-templates/apply", map[string]any{
+		"template": "team_accounts",
+	}); code != http.StatusCreated {
+		t.Fatalf("apply template: %d %v", code, out)
+	}
+
+	_, roles := f.get(t, "/app-roles")
+	byKey := map[string]map[string]any{}
+	for _, raw := range roles["items"].([]any) {
+		r := raw.(map[string]any)
+		byKey[r["key"].(string)] = r
+		if r["source"] != "template:team_accounts" {
+			t.Errorf("%v must be marked as template-sourced", r["key"])
+		}
+	}
+	for _, key := range []string{"viewer", "member", "admin"} {
+		if _, ok := byKey[key]; !ok {
+			t.Fatalf("template did not create %q: %v", key, roles["items"])
+		}
+	}
+
+	// The chain is the point. admin resolving to only its own capabilities
+	// would mean the inheritance was never wired, which is exactly the hand
+	// work the template exists to remove.
+	own := byKey["admin"]["own_capabilities"].([]any)
+	effective := byKey["admin"]["effective_capabilities"].([]any)
+	if len(effective) <= len(own) {
+		t.Errorf("admin effective = %v, own = %v: inheritance did not resolve", effective, own)
+	}
+	var readsProfile bool
+	for _, c := range effective {
+		if c == "profile:read" {
+			readsProfile = true
+		}
+	}
+	if !readsProfile {
+		// profile:read is declared on viewer, two levels down.
+		t.Errorf("admin must inherit through member to viewer, got %v", effective)
+	}
+}
+
+// The line a template must never cross. A role confers nothing until a grant
+// carries it, so seeding roles is a starting point a merchant edits, while
+// seeding a grant would be issuing access nobody authorised.
+func TestTemplatesNeverIssueAGrant(t *testing.T) {
+	f := newAppAccess(t, "tplnogrant")
+
+	for _, key := range []string{"team_accounts", "content_workspace"} {
+		if code, out := f.post(t, "/app-capability-templates/apply", map[string]any{
+			"template": key,
+		}); code != http.StatusCreated {
+			t.Fatalf("apply %s: %d %v", key, code, out)
+		}
+	}
+
+	_, grants := f.get(t, "/app-grants")
+	if items := grants["items"].([]any); len(items) != 0 {
+		t.Fatalf("a template issued access nobody asked for: %v", items)
+	}
+}
+
+// Re-applying converges rather than duplicating or failing, which matters more
+// for roles than capabilities: a second pass must not rebuild the chain into
+// something different.
+func TestReApplyingATemplateConvergesOnRoles(t *testing.T) {
+	f := newAppAccess(t, "tplagain")
+
+	f.post(t, "/app-capability-templates/apply", map[string]any{"template": "team_accounts"})
+	_, first := f.get(t, "/app-roles")
+
+	if code, _ := f.post(t, "/app-capability-templates/apply", map[string]any{
+		"template": "team_accounts",
+	}); code != http.StatusCreated {
+		t.Fatalf("re-applying must not fail, got %d", code)
+	}
+	_, second := f.get(t, "/app-roles")
+
+	if len(first["items"].([]any)) != len(second["items"].([]any)) {
+		t.Errorf("re-applying changed the role count: %d then %d",
+			len(first["items"].([]any)), len(second["items"].([]any)))
+	}
+}
+
+// Every template must be internally consistent: a role may only extend one
+// named before it, and may only carry capabilities the same template declares.
+// Both are checked here rather than discovered by the first merchant to apply
+// one.
+func TestEveryTemplateRoleIsConsistent(t *testing.T) {
+	for _, tpl := range service.CapabilityTemplates {
+		declared := map[string]struct{}{}
+		for _, item := range tpl.Items {
+			declared[item.Key] = struct{}{}
+		}
+		seen := map[string]struct{}{}
+		for _, role := range tpl.Roles {
+			for _, c := range role.Capabilities {
+				if _, ok := declared[c]; !ok {
+					t.Errorf("template %q: role %q carries undeclared %q", tpl.Key, role.Key, c)
+				}
+			}
+			for _, parent := range role.Extends {
+				if _, ok := seen[parent]; !ok {
+					t.Errorf("template %q: role %q extends %q, which is not declared before it",
+						tpl.Key, role.Key, parent)
+				}
+			}
+			seen[role.Key] = struct{}{}
+		}
+	}
+}
+
 // An authored capability keeps its authored provenance even when a template
 // later names the same key. Relabelling it would rewrite history about who
 // decided what.
