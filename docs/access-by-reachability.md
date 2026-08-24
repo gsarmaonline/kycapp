@@ -270,6 +270,35 @@ A merchant's own schema cannot work that way. Theirs is derived per request
 from the vocabulary they declared, and served from
 `GET /v1/organisations/{id}/access-schema`.
 
+### The reverse index
+
+`Check` answers one question. `ListObjects` and `ListSubjects` answer the two a
+product asks on every listing page and every share dialog, and answering those
+with a check per row is what makes an authorisation service unusable at size.
+
+Both are candidates then verification. `ListObjects` walks backwards from the
+subject through `EdgesForSubject`, which the edge table already indexes on
+`(namespace, subject_type, subject_id)`. `ListSubjects` expands forwards from
+the resource. Either way the walk is over-approximate and every candidate is
+confirmed by `Check`.
+
+That shape is not a shortcut. Running the graph backwards exactly is impossible
+in general: an exclusion cannot be inverted, since knowing an edge grants
+something says nothing about whether another rule removed it, and inverting an
+intersection means computing two candidate sets exactly rather than cheaply. So
+the walk is allowed to be generous and `Check` is the authority. There can be no
+false positives, because it is the same engine.
+
+What it cannot see is objects with no edges. That is correct for anything
+reached through containment, which needs a parent edge to be reachable at all,
+and wrong for a wildcard grant, which covers objects nobody has written about.
+That case is reported through `All` rather than guessed at, and `Truncated`
+reports a walk that hit its bound, because a short list that reads as complete
+is worse than a stated subset.
+
+`ReverseResolver` is a separate interface, so a store that only ever answers
+`Check` does not have to build an index it will not use.
+
 ### One engine, two namespaces
 
 A merchant's model is the same engine over the same table, separated only by

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 )
@@ -183,6 +184,28 @@ func (m *MemoryStore) Delete(e Edge) bool {
 	}
 	m.byKey[k] = append(m.byKey[k][:i], m.byKey[k][i+1:]...)
 	return true
+}
+
+// EdgesForSubject makes MemoryStore a ReverseResolver.
+//
+// It scans, which is exactly what a real store must not do: the Postgres
+// resolver answers this from an index on (namespace, subject_type, subject_id).
+// The scan is fine here because this store exists to be small and to be the
+// reference the tests run against.
+func (m *MemoryStore) EdgesForSubject(_ context.Context, subject NodeRef) ([]Edge, error) {
+	var out []Edge
+	for _, edges := range m.byKey {
+		for _, e := range edges {
+			if e.Subject.Node == subject {
+				out = append(out, e)
+			}
+		}
+	}
+	// Map iteration is randomised, and a reverse query that returned candidates
+	// in a different order each call would make its own tests flaky rather than
+	// wrong, which is worse.
+	sort.Slice(out, func(i, j int) bool { return out[i].String() < out[j].String() })
+	return out, nil
 }
 
 func indexOfEdge(list []Edge, want Edge) int {

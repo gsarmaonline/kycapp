@@ -194,6 +194,10 @@ func (s *Server) routeTable() []route {
 		{"POST", "/v1/organisations/{id}/edges", s.handleWriteMerchantEdges, orgPermission("app_access:manage")},
 		{"DELETE", "/v1/organisations/{id}/edges", s.handleDeleteMerchantEdge, orgPermission("app_access:manage")},
 		{"POST", "/v1/organisations/{id}/check", s.handleCheckMerchant, orgPermission("app_access:read")},
+		// The reverse index. POST rather than GET because both take a body of
+		// several fields, and a listing page is not a cacheable URL anyway.
+		{"POST", "/v1/organisations/{id}/list-objects", s.handleListMerchantObjects, orgPermission("app_access:read")},
+		{"POST", "/v1/organisations/{id}/list-subjects", s.handleListMerchantSubjects, orgPermission("app_access:read")},
 		{"GET", "/v1/organisations/{id}/access-schema", s.handleMerchantSchema, orgPermission("app_access:read")},
 		{"GET", "/v1/organisations/{id}/app-capability-templates", s.handleListCapabilityTemplates, orgPermission("app_access:read")},
 		{"POST", "/v1/organisations/{id}/app-capability-templates/apply", s.handleApplyCapabilityTemplate, orgPermission("app_access:manage")},
