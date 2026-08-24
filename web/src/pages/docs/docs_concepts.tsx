@@ -519,7 +519,7 @@ function relatedHref(base: string, related: { slug?: string; path?: string }): s
   return base
 }
 
-function conceptNavGroups(base: string) {
+export function conceptNavGroups(base: string) {
   const bySection = new Map(
     DOC_CONCEPTS.filter((c) => c.section).map((c) => [c.section!, c]),
   )

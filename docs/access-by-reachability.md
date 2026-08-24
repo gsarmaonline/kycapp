@@ -248,11 +248,19 @@ first, but they are not all the same: they split into four rule sets, and only
 the largest has eight members. `members` answers `invite` and `remove`,
 `app_users` answers `write`, `activity` and `usage` answer `read` alone. Counting
 the arrows rather than the rules overstates the repetition, which is exactly the
-mistake a picture invites and a test prevents. `shapeGroups` in the web app
-compares both, and its test fails if the count moves.
+mistake a picture invites and a test prevents. `Graph.shapes()` compares both,
+and `TestRepeatedShapesStayAtEight` fails if the count moves. It is computed
+once, in Go, and shipped inside the artefact: a second implementation in
+whatever draws the picture could disagree with the first.
 
 The graph is generated into `web/public/access-schema.json` by `make openapi`,
-and the docs render it from there. It is a build artefact rather than an
+and the app renders it under **Platform capabilities > Authorisation**. That
+group is what an organisation uses inside KYC, which is what this graph is: one
+model, the same for every tenant, and not something a tenant can edit. A
+merchant's own model is a different graph and belongs in customer access, once
+that tier is on the graph.
+
+It is a build artefact rather than an
 endpoint because the schema is a compile-time constant: serving it would mean
 answering an authorisation question about the authorisation model, and a stale
 file is a wrong diagram rather than a disclosure. `make sdk-check` already diffs

@@ -77,8 +77,8 @@ import { InboundWebhooksIndex } from './pages/inbound_webhooks/inbound_webhooks_
 import { InboundWebhooksNew } from './pages/inbound_webhooks/inbound_webhooks_new'
 import { InboundWebhooksShow } from './pages/inbound_webhooks/inbound_webhooks_show'
 import { DocsConceptPage, DocsConceptsIndex } from './pages/docs/docs_concepts'
+import { AuthorisationPage } from './pages/authorisation/authorisation_page'
 import { DocsIntegrationApiPage, DocsOperatorApiPage } from './pages/docs/docs_api'
-import { DocsAuthorisationPage } from './pages/docs/docs_authorisation'
 import { DocsLayout } from './pages/docs/docs_layout'
 import { DocsVariablesPage } from './pages/docs/docs_variables'
 import { initTheme } from './theme'
@@ -165,8 +165,13 @@ export default function App() {
         <Route path="api" element={<DocsIntegrationApiPage />} />
         <Route path="api/operator" element={<DocsOperatorApiPage />} />
         <Route path="variables" element={<DocsVariablesPage />} />
-        <Route path="authorisation" element={<DocsAuthorisationPage />} />
         <Route path="operator" element={<Navigate to="api/operator" replace />} />
+        {/*
+          The schema map moved into the app, where it sits beside the other
+          platform pages. The public docs have no organisation in scope, so
+          there is nowhere to send this but the index.
+        */}
+        <Route path="authorisation" element={<Navigate to="/docs" replace />} />
       </Route>
       <Route
         path="/app"
@@ -248,14 +253,15 @@ export default function App() {
         <Route path="api-keys" element={<APIKeysIndex />} />
         <Route path="api-keys/new" element={<APIKeysNew />} />
         <Route path="activity" element={<ActivityPage />} />
+        <Route path="authorisation" element={<AuthorisationPage />} />
         <Route path="docs" element={<DocsLayout />}>
           <Route index element={<DocsConceptsIndex />} />
           <Route path="concepts/:slug" element={<DocsConceptPage />} />
           <Route path="api" element={<DocsIntegrationApiPage />} />
           <Route path="api/operator" element={<DocsOperatorApiPage />} />
           <Route path="variables" element={<DocsVariablesPage />} />
-        <Route path="authorisation" element={<DocsAuthorisationPage />} />
           <Route path="operator" element={<Navigate to="api/operator" replace />} />
+          <Route path="authorisation" element={<Navigate to="../../authorisation" replace />} />
         </Route>
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
