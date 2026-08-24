@@ -525,6 +525,25 @@ export function explainMembershipAccess(id: string) {
   return request<AccessExplanation>(`/v1/memberships/${id}/access`)
 }
 
+/**
+ * One of the organisation's own roles.
+ *
+ * `extends` is why owner, admin and member are not in the schema map: they are
+ * rows, not types. The map draws what the model permits; these are instances of
+ * it, and the inheritance between them is real but was visible nowhere.
+ */
+export type OperatorRole = {
+  id: string
+  key: string
+  name: string
+  extends: string[]
+  permissions: string[]
+}
+
+export function listOperatorRoles(orgId: string) {
+  return request<{ items: OperatorRole[] }>(`/v1/organisations/${orgId}/operator-roles`)
+}
+
 export function inviteMember(orgId: string, email: string, roleId: string) {
   return request<Membership>(`/v1/organisations/${orgId}/memberships`, {
     method: 'POST',
@@ -1295,6 +1314,13 @@ export type AppUserGroup = {
   name: string
   description: string
   member_count: number
+  /**
+   * Groups this one extends. A member of this group counts as a member of every
+   * one of them, which is the same relation roles have always had. Absent on
+   * responses that predate nesting.
+   */
+  parents?: string[]
+  parent_count?: number
 }
 
 /** One excluded scope. Kind and id stay paired, never two parallel lists. */
@@ -1386,7 +1412,10 @@ export function listAppUserGroups(orgId: string) {
   return request<{ items: AppUserGroup[] }>(`/v1/organisations/${orgId}/app-user-groups`)
 }
 
-export function createAppUserGroup(orgId: string, body: { key: string; name?: string; description?: string }) {
+export function createAppUserGroup(
+  orgId: string,
+  body: { key: string; name?: string; description?: string; parents?: string[] },
+) {
   return request<AppUserGroup>(`/v1/organisations/${orgId}/app-user-groups`, {
     method: 'POST',
     body: JSON.stringify(body),
@@ -1452,7 +1481,7 @@ export function deleteAppGrant(orgId: string, grantId: string) {
 export function updateAppUserGroup(
   orgId: string,
   groupId: string,
-  body: { name?: string; description?: string },
+  body: { name?: string; description?: string; parents?: string[] },
 ) {
   return request<AppUserGroup>(`/v1/organisations/${orgId}/app-user-groups/${groupId}`, {
     method: 'PATCH',

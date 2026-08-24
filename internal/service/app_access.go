@@ -529,6 +529,11 @@ type AppUserGroupInput struct {
 	Key         string
 	Name        string
 	Description string
+	// Parents are groups this one extends. A member of this group is treated as
+	// a member of every parent, which is the relation app_role_extends already
+	// gave roles. Multiple parents are allowed because membership only ever
+	// adds, so a diamond resolves the same way whatever order it is walked.
+	Parents []string
 }
 
 func (s *Service) CreateAppUserGroup(ctx context.Context, orgID string, in AppUserGroupInput) (sqlc.AppUserGroup, error) {
@@ -547,7 +552,93 @@ func (s *Service) CreateAppUserGroup(ctx context.Context, orgID string, in AppUs
 	if store.IsUniqueViolation(err) {
 		return sqlc.AppUserGroup{}, apperr.Conflict("group key already exists")
 	}
-	return row, err
+	if err != nil {
+		return sqlc.AppUserGroup{}, err
+	}
+	if err := s.setAppUserGroupParents(ctx, orgID, row.ID, in.Parents); err != nil {
+		return sqlc.AppUserGroup{}, err
+	}
+	if err := s.recomputeAppUserGroups(ctx, orgID); err != nil {
+		return sqlc.AppUserGroup{}, err
+	}
+	return row, nil
+}
+
+// setAppUserGroupParents replaces a group's parents, mirroring
+// setAppRoleParents exactly. Roles and groups are one mechanism, so a
+// divergence between these two functions is a bug rather than a design.
+func (s *Service) setAppUserGroupParents(ctx context.Context, orgID, groupID string, parents []string) error {
+	if err := s.db.Q().ReplaceAppUserGroupExtends(ctx, groupID); err != nil {
+		return err
+	}
+	for _, parent := range parents {
+		if parent == groupID {
+			return apperr.Validation("a group cannot extend itself")
+		}
+		row, err := s.db.Q().GetAppUserGroup(ctx, parent)
+		if errors.Is(err, pgx.ErrNoRows) || (err == nil && row.OrganisationID != orgID) {
+			return apperr.Validation("unknown parent group: " + parent)
+		}
+		if err != nil {
+			return err
+		}
+		if err := s.db.Q().AddAppUserGroupExtends(ctx, sqlc.AddAppUserGroupExtendsParams{
+			GroupID: groupID, ParentID: parent,
+		}); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// recomputeAppUserGroups materialises nesting for every group in the
+// organisation.
+//
+// It stores, per group, the set of groups a member of it effectively belongs
+// to: itself plus everything it extends, transitively. Grant assembly joins
+// straight through that array and walks nothing on the read path, which is the
+// same trade a role's effective_capabilities makes, and for the same reason: a
+// merchant's backend reads the assembled answer without this graph.
+//
+// Recomputing the whole set is deliberate, exactly as recomputeAppRoles does.
+// Group counts are small, edits are rare, and doing it wholesale removes any
+// question of which descendants needed refreshing.
+func (s *Service) recomputeAppUserGroups(ctx context.Context, orgID string) error {
+	groups, err := s.db.Q().ListAppUserGroups(ctx, orgID)
+	if err != nil {
+		return err
+	}
+	edges, err := s.db.Q().ListAppUserGroupExtends(ctx, orgID)
+	if err != nil {
+		return err
+	}
+	parents := map[string][]string{}
+	for _, e := range edges {
+		parents[e.GroupID] = append(parents[e.GroupID], e.ParentID)
+	}
+
+	in := make([]reach.Set, 0, len(groups))
+	for _, g := range groups {
+		// Own is the group's own id, so the expansion answers "which groups does
+		// a member of this one belong to" and always contains the group itself.
+		in = append(in, reach.Set{ID: g.ID, Own: []string{g.ID}, Extends: parents[g.ID]})
+	}
+
+	expanded, err := reach.ExpandSets(in, MaxAppRoleDepth)
+	if err != nil {
+		if errors.Is(err, reach.ErrSetCycle) {
+			return apperr.Validation("group nesting contains a cycle")
+		}
+		return apperr.Validation(err.Error())
+	}
+	for id, reached := range expanded {
+		if err := s.db.Q().SetAppUserGroupEffectiveParents(ctx, sqlc.SetAppUserGroupEffectiveParentsParams{
+			ID: id, EffectiveParentIds: reached,
+		}); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (s *Service) ListAppUserGroups(ctx context.Context, orgID string) ([]sqlc.ListAppUserGroupsRow, error) {
@@ -566,11 +657,28 @@ func (s *Service) UpdateAppUserGroup(ctx context.Context, orgID, id string, in A
 	if errors.Is(err, pgx.ErrNoRows) {
 		return sqlc.AppUserGroup{}, apperr.NotFound("group not found")
 	}
-	return row, err
+	if err != nil {
+		return sqlc.AppUserGroup{}, err
+	}
+	// Parents are replaced wholesale, like a role's. A nil slice therefore
+	// clears them, which is what an edit form submitting no parents means.
+	if err := s.setAppUserGroupParents(ctx, orgID, row.ID, in.Parents); err != nil {
+		return sqlc.AppUserGroup{}, err
+	}
+	if err := s.recomputeAppUserGroups(ctx, orgID); err != nil {
+		return sqlc.AppUserGroup{}, err
+	}
+	return row, nil
 }
 
 func (s *Service) DeleteAppUserGroup(ctx context.Context, orgID, id string) error {
-	return s.db.Q().DeleteAppUserGroup(ctx, sqlc.DeleteAppUserGroupParams{ID: id, OrganisationID: orgID})
+	if err := s.db.Q().DeleteAppUserGroup(ctx, sqlc.DeleteAppUserGroupParams{ID: id, OrganisationID: orgID}); err != nil {
+		return err
+	}
+	// The cascade removes the extends rows, but every descendant still carries
+	// the deleted id in its stored expansion. Leaving those behind would keep
+	// joining grants through a group that no longer exists.
+	return s.recomputeAppUserGroups(ctx, orgID)
 }
 
 // SetAppUserGroupMember adds or removes one member, after checking the group and
@@ -595,6 +703,23 @@ func (s *Service) SetAppUserGroupMember(ctx context.Context, orgID, groupID, app
 		return s.db.Q().AddAppUserToGroup(ctx, sqlc.AddAppUserToGroupParams{GroupID: groupID, AppUserID: appUserID})
 	}
 	return s.db.Q().RemoveAppUserFromGroup(ctx, sqlc.RemoveAppUserFromGroupParams{GroupID: groupID, AppUserID: appUserID})
+}
+
+// ListAppUserGroupParents returns the ids a group extends, after checking the
+// group belongs to the organisation. Without that check one merchant could read
+// another's nesting by guessing an id.
+func (s *Service) ListAppUserGroupParents(ctx context.Context, orgID, groupID string) ([]string, error) {
+	if _, err := s.GetAppUserGroupByID(ctx, orgID, groupID); err != nil {
+		return nil, err
+	}
+	ids, err := s.db.Q().ListAppUserGroupParents(ctx, groupID)
+	if err != nil {
+		return nil, err
+	}
+	if ids == nil {
+		ids = []string{}
+	}
+	return ids, nil
 }
 
 func (s *Service) ListAppUserGroupMembers(ctx context.Context, groupID string) ([]sqlc.ListAppUserGroupMembersRow, error) {

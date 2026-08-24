@@ -89,13 +89,19 @@ type AppUser struct {
 }
 
 type AppUserGroup struct {
-	ID             string    `json:"id"`
-	OrganisationID string    `json:"organisation_id"`
-	Key            string    `json:"key"`
-	Name           string    `json:"name"`
-	Description    string    `json:"description"`
-	CreatedAt      time.Time `json:"created_at"`
-	UpdatedAt      time.Time `json:"updated_at"`
+	ID                 string    `json:"id"`
+	OrganisationID     string    `json:"organisation_id"`
+	Key                string    `json:"key"`
+	Name               string    `json:"name"`
+	Description        string    `json:"description"`
+	CreatedAt          time.Time `json:"created_at"`
+	UpdatedAt          time.Time `json:"updated_at"`
+	EffectiveParentIds []string  `json:"effective_parent_ids"`
+}
+
+type AppUserGroupExtend struct {
+	GroupID  string `json:"group_id"`
+	ParentID string `json:"parent_id"`
 }
 
 type AppUserGroupMember struct {

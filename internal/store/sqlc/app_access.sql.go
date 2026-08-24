@@ -28,6 +28,21 @@ func (q *Queries) AddAppRoleExtends(ctx context.Context, arg AddAppRoleExtendsPa
 	return err
 }
 
+const addAppUserGroupExtends = `-- name: AddAppUserGroupExtends :exec
+INSERT INTO app_user_group_extends (group_id, parent_id) VALUES ($1, $2)
+ON CONFLICT DO NOTHING
+`
+
+type AddAppUserGroupExtendsParams struct {
+	GroupID  string `json:"group_id"`
+	ParentID string `json:"parent_id"`
+}
+
+func (q *Queries) AddAppUserGroupExtends(ctx context.Context, arg AddAppUserGroupExtendsParams) error {
+	_, err := q.db.Exec(ctx, addAppUserGroupExtends, arg.GroupID, arg.ParentID)
+	return err
+}
+
 const addAppUserToGroup = `-- name: AddAppUserToGroup :exec
 INSERT INTO app_user_group_members (group_id, app_user_id) VALUES ($1, $2)
 ON CONFLICT DO NOTHING
@@ -380,7 +395,7 @@ func (q *Queries) CreateAppUserGrant(ctx context.Context, arg CreateAppUserGrant
 const createAppUserGroup = `-- name: CreateAppUserGroup :one
 INSERT INTO app_user_groups (id, organisation_id, key, name, description)
 VALUES ($1, $2, $3, $4, $5)
-RETURNING id, organisation_id, key, name, description, created_at, updated_at
+RETURNING id, organisation_id, key, name, description, created_at, updated_at, effective_parent_ids
 `
 
 type CreateAppUserGroupParams struct {
@@ -408,6 +423,7 @@ func (q *Queries) CreateAppUserGroup(ctx context.Context, arg CreateAppUserGroup
 		&i.Description,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.EffectiveParentIds,
 	)
 	return i, err
 }
@@ -538,7 +554,7 @@ func (q *Queries) GetAppScopeType(ctx context.Context, id string) (AppScopeType,
 }
 
 const getAppUserGroup = `-- name: GetAppUserGroup :one
-SELECT id, organisation_id, key, name, description, created_at, updated_at FROM app_user_groups WHERE id = $1
+SELECT id, organisation_id, key, name, description, created_at, updated_at, effective_parent_ids FROM app_user_groups WHERE id = $1
 `
 
 func (q *Queries) GetAppUserGroup(ctx context.Context, id string) (AppUserGroup, error) {
@@ -552,6 +568,7 @@ func (q *Queries) GetAppUserGroup(ctx context.Context, id string) (AppUserGroup,
 		&i.Description,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.EffectiveParentIds,
 	)
 	return i, err
 }
@@ -673,13 +690,14 @@ LEFT JOIN app_roles r ON r.id = g.role_id
 WHERE g.app_user_id = $1
   AND (g.expires_at IS NULL OR g.expires_at > now())
 UNION ALL
-SELECT g.id, g.scope_kind, g.scope_id, g.expires_at, g.role_id,
+SELECT DISTINCT g.id, g.scope_kind, g.scope_id, g.expires_at, g.role_id,
        COALESCE(r.key, '')::text AS role_key,
        COALESCE(r.effective_capabilities, '{}')::text[] AS effective_capabilities,
        g.group_id, grp.key AS group_key, 'group'::text AS subject_kind,
        g.all_capabilities, g.except_capabilities, g.except_scopes, g.constraint_kind
 FROM app_user_group_members m
-JOIN app_grants g ON g.group_id = m.group_id
+JOIN app_user_groups direct ON direct.id = m.group_id
+JOIN app_grants g ON g.group_id = ANY (direct.effective_parent_ids)
 LEFT JOIN app_roles r ON r.id = g.role_id
 JOIN app_user_groups grp ON grp.id = g.group_id
 WHERE m.app_user_id = $1
@@ -742,6 +760,9 @@ type ListAppGrantsForUserRow struct {
 //
 // except_app_user_ids is applied here rather than in Go so an excluded customer
 // never has the row assembled for them at all.
+// direct.effective_parent_ids is the group itself plus everything it extends,
+// flattened at write time. Joining through it is what makes a grant on a parent
+// group reach a member of a child, without walking anything on the read path.
 func (q *Queries) ListAppGrantsForUser(ctx context.Context, arg ListAppGrantsForUserParams) ([]ListAppGrantsForUserRow, error) {
 	rows, err := q.db.Query(ctx, listAppGrantsForUser, arg.AppUserID, arg.OrganisationID)
 	if err != nil {
@@ -896,6 +917,37 @@ func (q *Queries) ListAppScopeTypes(ctx context.Context, organisationID string) 
 	return items, nil
 }
 
+const listAppUserGroupExtends = `-- name: ListAppUserGroupExtends :many
+
+SELECT e.group_id, e.parent_id
+FROM app_user_group_extends e
+JOIN app_user_groups g ON g.id = e.group_id
+WHERE g.organisation_id = $1
+`
+
+// Group nesting, mirroring app_role_extends exactly. A role and a group are one
+// mechanism, so they get one shape: the child gains what the parent holds, and
+// what a member of the child effectively belongs to is expanded at write time.
+func (q *Queries) ListAppUserGroupExtends(ctx context.Context, organisationID string) ([]AppUserGroupExtend, error) {
+	rows, err := q.db.Query(ctx, listAppUserGroupExtends, organisationID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []AppUserGroupExtend{}
+	for rows.Next() {
+		var i AppUserGroupExtend
+		if err := rows.Scan(&i.GroupID, &i.ParentID); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listAppUserGroupMembers = `-- name: ListAppUserGroupMembers :many
 SELECT u.id, u.email, u.display_name, u.status
 FROM app_user_group_members m
@@ -936,22 +988,50 @@ func (q *Queries) ListAppUserGroupMembers(ctx context.Context, groupID string) (
 	return items, nil
 }
 
+const listAppUserGroupParents = `-- name: ListAppUserGroupParents :many
+SELECT parent_id FROM app_user_group_extends WHERE group_id = $1 ORDER BY parent_id
+`
+
+func (q *Queries) ListAppUserGroupParents(ctx context.Context, groupID string) ([]string, error) {
+	rows, err := q.db.Query(ctx, listAppUserGroupParents, groupID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []string{}
+	for rows.Next() {
+		var parent_id string
+		if err := rows.Scan(&parent_id); err != nil {
+			return nil, err
+		}
+		items = append(items, parent_id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listAppUserGroups = `-- name: ListAppUserGroups :many
-SELECT g.id, g.organisation_id, g.key, g.name, g.description, g.created_at, g.updated_at, (SELECT COUNT(*) FROM app_user_group_members m WHERE m.group_id = g.id)::bigint AS member_count
+SELECT g.id, g.organisation_id, g.key, g.name, g.description, g.created_at, g.updated_at, g.effective_parent_ids,
+       (SELECT COUNT(*) FROM app_user_group_members m WHERE m.group_id = g.id)::bigint AS member_count,
+       (SELECT COUNT(*) FROM app_user_group_extends e WHERE e.group_id = g.id)::bigint AS parent_count
 FROM app_user_groups g
 WHERE g.organisation_id = $1
 ORDER BY g.key
 `
 
 type ListAppUserGroupsRow struct {
-	ID             string    `json:"id"`
-	OrganisationID string    `json:"organisation_id"`
-	Key            string    `json:"key"`
-	Name           string    `json:"name"`
-	Description    string    `json:"description"`
-	CreatedAt      time.Time `json:"created_at"`
-	UpdatedAt      time.Time `json:"updated_at"`
-	MemberCount    int64     `json:"member_count"`
+	ID                 string    `json:"id"`
+	OrganisationID     string    `json:"organisation_id"`
+	Key                string    `json:"key"`
+	Name               string    `json:"name"`
+	Description        string    `json:"description"`
+	CreatedAt          time.Time `json:"created_at"`
+	UpdatedAt          time.Time `json:"updated_at"`
+	EffectiveParentIds []string  `json:"effective_parent_ids"`
+	MemberCount        int64     `json:"member_count"`
+	ParentCount        int64     `json:"parent_count"`
 }
 
 func (q *Queries) ListAppUserGroups(ctx context.Context, organisationID string) ([]ListAppUserGroupsRow, error) {
@@ -971,7 +1051,9 @@ func (q *Queries) ListAppUserGroups(ctx context.Context, organisationID string) 
 			&i.Description,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.EffectiveParentIds,
 			&i.MemberCount,
+			&i.ParentCount,
 		); err != nil {
 			return nil, err
 		}
@@ -1040,6 +1122,15 @@ func (q *Queries) ReplaceAppRoleExtends(ctx context.Context, roleID string) erro
 	return err
 }
 
+const replaceAppUserGroupExtends = `-- name: ReplaceAppUserGroupExtends :exec
+DELETE FROM app_user_group_extends WHERE group_id = $1
+`
+
+func (q *Queries) ReplaceAppUserGroupExtends(ctx context.Context, groupID string) error {
+	_, err := q.db.Exec(ctx, replaceAppUserGroupExtends, groupID)
+	return err
+}
+
 const setAppRoleEffectiveCapabilities = `-- name: SetAppRoleEffectiveCapabilities :exec
 UPDATE app_roles SET effective_capabilities = $2, updated_at = now() WHERE id = $1
 `
@@ -1051,6 +1142,20 @@ type SetAppRoleEffectiveCapabilitiesParams struct {
 
 func (q *Queries) SetAppRoleEffectiveCapabilities(ctx context.Context, arg SetAppRoleEffectiveCapabilitiesParams) error {
 	_, err := q.db.Exec(ctx, setAppRoleEffectiveCapabilities, arg.ID, arg.EffectiveCapabilities)
+	return err
+}
+
+const setAppUserGroupEffectiveParents = `-- name: SetAppUserGroupEffectiveParents :exec
+UPDATE app_user_groups SET effective_parent_ids = $2, updated_at = now() WHERE id = $1
+`
+
+type SetAppUserGroupEffectiveParentsParams struct {
+	ID                 string   `json:"id"`
+	EffectiveParentIds []string `json:"effective_parent_ids"`
+}
+
+func (q *Queries) SetAppUserGroupEffectiveParents(ctx context.Context, arg SetAppUserGroupEffectiveParentsParams) error {
+	_, err := q.db.Exec(ctx, setAppUserGroupEffectiveParents, arg.ID, arg.EffectiveParentIds)
 	return err
 }
 
@@ -1153,7 +1258,7 @@ SET name = COALESCE($1, name),
     description = COALESCE($2, description),
     updated_at = now()
 WHERE id = $3 AND organisation_id = $4
-RETURNING id, organisation_id, key, name, description, created_at, updated_at
+RETURNING id, organisation_id, key, name, description, created_at, updated_at, effective_parent_ids
 `
 
 type UpdateAppUserGroupParams struct {
@@ -1179,6 +1284,7 @@ func (q *Queries) UpdateAppUserGroup(ctx context.Context, arg UpdateAppUserGroup
 		&i.Description,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.EffectiveParentIds,
 	)
 	return i, err
 }

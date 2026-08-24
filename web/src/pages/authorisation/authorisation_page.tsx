@@ -12,6 +12,7 @@ import {
   type NodeProps,
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
+import { listOperatorRoles, type OperatorRole } from '../../api'
 import { PageHeader } from '../../crud/ui'
 import { resourcePath } from '../../org_nav'
 import { layout, type SchemaGraph, type SchemaNode } from './schema_layout'
@@ -73,6 +74,8 @@ export function AuthorisationPage() {
         shows the model rather than the repetition.
       </p>
 
+      <OperatorRoles orgId={orgId} />
+
       <Shapes graph={graph} />
 
       <h3 className="schema-heading">Reading a rule</h3>
@@ -98,6 +101,68 @@ export function AuthorisationPage() {
         <Link to={resourcePath(orgId, 'members')}>Members</Link>.
       </p>
     </section>
+  )
+}
+
+/**
+ * This organisation's roles, and what each inherits.
+ *
+ * The graph above draws types, relations and rules. owner, admin and member are
+ * none of those, so they cannot appear in it: they are rows in the roles table,
+ * instances of the `role` type. The inheritance between them has been real
+ * since role_extends landed and was visible nowhere, because the operator roles
+ * pages are hidden and a membership shows only its own key.
+ */
+function OperatorRoles({ orgId }: { orgId: string }) {
+  const [roles, setRoles] = useState<OperatorRole[] | null>(null)
+  const [error, setError] = useState(false)
+
+  useEffect(() => {
+    if (!orgId) return
+    let live = true
+    void listOperatorRoles(orgId)
+      .then((r) => live && setRoles(r.items))
+      .catch(() => live && setError(true))
+    return () => {
+      live = false
+    }
+  }, [orgId])
+
+  // A viewer without members:read gets nothing here rather than an error. The
+  // graph above is the page; this is an addition to it.
+  if (error || !roles || roles.length === 0) return null
+
+  return (
+    <>
+      <h3 className="schema-heading">Roles in this organisation</h3>
+      <p className="schema-prose">
+        Instances of the <code>role</code> type above. A role inherits from what
+        it extends, so whoever holds it also holds those, and narrowing a parent
+        narrows every child. Inheritance is resolved by the walk rather than
+        stored, so a deep chain costs nothing when a role is edited.
+      </p>
+      <ul className="schema-roles">
+        {roles.map((role) => (
+          <li key={role.id}>
+            <div className="schema-role-head">
+              <strong>{role.key}</strong>
+              {role.extends.length > 0 ? (
+                <span className="schema-role-extends">
+                  extends {role.extends.join(', ')}
+                </span>
+              ) : (
+                <span className="schema-role-base">base role</span>
+              )}
+            </div>
+            <span className="schema-role-perms">
+              {role.permissions.length === 0
+                ? 'grants nothing directly'
+                : `${role.permissions.length} permission${role.permissions.length === 1 ? '' : 's'}: ${role.permissions.join(', ')}`}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </>
   )
 }
 

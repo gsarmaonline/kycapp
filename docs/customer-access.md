@@ -64,6 +64,12 @@ A named set of the merchant's customers. Granting a role to a group reaches ever
 
 Membership is an **explicit list**, not a query over attributes. A rule that recomputed silently would change who has access without anyone issuing anything, and the reason for the change would be invisible on the day it mattered. Group access and direct access add together.
 
+**Groups nest.** A group may extend other groups, and a member of the child counts as a member of every parent, so a grant written on the parent reaches them. "Enterprise customers are also beta customers" is one declaration rather than two membership lists kept in step by hand.
+
+This is the same relation roles have always had. Groups lacked it only because `app_role_extends` got built and nothing equivalent did, which made grouping mean two different things depending on which object you were looking at. One mechanism now covers both: a named set that confers something through membership, nesting either way.
+
+Nesting adds, it never replaces. A grant on the child does not reach the parent's members, or extending a group would silently widen it. Multiple parents are allowed, because membership only ever adds, so a diamond resolves the same way whatever order it is walked. Cycles are refused when the group is saved.
+
 ### Grants
 
 The only object that actually gives access; everything above is vocabulary. A grant binds one subject to one set of capabilities over one scope, optionally until a date.

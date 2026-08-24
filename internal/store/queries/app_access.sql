@@ -139,13 +139,17 @@ LEFT JOIN app_roles r ON r.id = g.role_id
 WHERE g.app_user_id = sqlc.arg('app_user_id')
   AND (g.expires_at IS NULL OR g.expires_at > now())
 UNION ALL
-SELECT g.id, g.scope_kind, g.scope_id, g.expires_at, g.role_id,
+SELECT DISTINCT g.id, g.scope_kind, g.scope_id, g.expires_at, g.role_id,
        COALESCE(r.key, '')::text AS role_key,
        COALESCE(r.effective_capabilities, '{}')::text[] AS effective_capabilities,
        g.group_id, grp.key AS group_key, 'group'::text AS subject_kind,
        g.all_capabilities, g.except_capabilities, g.except_scopes, g.constraint_kind
+-- direct.effective_parent_ids is the group itself plus everything it extends,
+-- flattened at write time. Joining through it is what makes a grant on a parent
+-- group reach a member of a child, without walking anything on the read path.
 FROM app_user_group_members m
-JOIN app_grants g ON g.group_id = m.group_id
+JOIN app_user_groups direct ON direct.id = m.group_id
+JOIN app_grants g ON g.group_id = ANY (direct.effective_parent_ids)
 LEFT JOIN app_roles r ON r.id = g.role_id
 JOIN app_user_groups grp ON grp.id = g.group_id
 WHERE m.app_user_id = sqlc.arg('app_user_id')
@@ -188,7 +192,9 @@ VALUES ($1, $2, $3, $4, $5)
 RETURNING *;
 
 -- name: ListAppUserGroups :many
-SELECT g.*, (SELECT COUNT(*) FROM app_user_group_members m WHERE m.group_id = g.id)::bigint AS member_count
+SELECT g.*,
+       (SELECT COUNT(*) FROM app_user_group_members m WHERE m.group_id = g.id)::bigint AS member_count,
+       (SELECT COUNT(*) FROM app_user_group_extends e WHERE e.group_id = g.id)::bigint AS parent_count
 FROM app_user_groups g
 WHERE g.organisation_id = $1
 ORDER BY g.key;
@@ -203,6 +209,26 @@ SET name = COALESCE(sqlc.narg('name'), name),
     updated_at = now()
 WHERE id = sqlc.arg('id') AND organisation_id = sqlc.arg('organisation_id')
 RETURNING *;
+
+-- Group nesting, mirroring app_role_extends exactly. A role and a group are one
+-- mechanism, so they get one shape: the child gains what the parent holds, and
+-- what a member of the child effectively belongs to is expanded at write time.
+
+-- name: ListAppUserGroupExtends :many
+SELECT e.group_id, e.parent_id
+FROM app_user_group_extends e
+JOIN app_user_groups g ON g.id = e.group_id
+WHERE g.organisation_id = $1;
+
+-- name: ReplaceAppUserGroupExtends :exec
+DELETE FROM app_user_group_extends WHERE group_id = $1;
+
+-- name: AddAppUserGroupExtends :exec
+INSERT INTO app_user_group_extends (group_id, parent_id) VALUES ($1, $2)
+ON CONFLICT DO NOTHING;
+
+-- name: SetAppUserGroupEffectiveParents :exec
+UPDATE app_user_groups SET effective_parent_ids = $2, updated_at = now() WHERE id = $1;
 
 -- name: DeleteAppUserGroup :exec
 DELETE FROM app_user_groups WHERE id = $1 AND organisation_id = $2;
@@ -264,3 +290,6 @@ RETURNING *;
 -- show what is already selected.
 -- name: ListAppRoleParents :many
 SELECT parent_id FROM app_role_extends WHERE role_id = $1;
+
+-- name: ListAppUserGroupParents :many
+SELECT parent_id FROM app_user_group_extends WHERE group_id = $1 ORDER BY parent_id;

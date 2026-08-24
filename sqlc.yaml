@@ -55,6 +55,7 @@ sql:
       - "internal/store/migrations/000050_reach_edges.up.sql"
       - "internal/store/migrations/000051_reach_edges_live.up.sql"
       - "internal/store/migrations/000052_role_extends.up.sql"
+      - "internal/store/migrations/000053_app_user_group_extends.up.sql"
     gen:
       go:
         package: "sqlc"

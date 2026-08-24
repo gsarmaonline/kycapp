@@ -2486,6 +2486,51 @@ html.dark-mode .docs-swagger {
   color: var(--app-fg);
 }
 
+.schema-roles {
+  list-style: none;
+  margin: 0.75rem 0;
+  padding: 0;
+  display: grid;
+  gap: 0.4rem;
+}
+
+.schema-roles li {
+  background: var(--app-panel);
+  border: 1px solid var(--app-border);
+  border-radius: 4px;
+  padding: 0.55rem 0.75rem;
+  display: grid;
+  gap: 0.2rem;
+}
+
+.schema-role-head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  align-items: baseline;
+}
+
+.schema-role-head strong {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.9rem;
+}
+
+.schema-role-extends {
+  font-size: 0.75rem;
+  color: var(--app-accent);
+}
+
+.schema-role-base {
+  font-size: 0.75rem;
+  color: var(--app-fg-muted);
+}
+
+.schema-role-perms {
+  font-size: 0.8rem;
+  color: var(--app-fg-muted);
+  line-height: 1.45;
+}
+
 .schema-shapes {
   list-style: none;
   margin: 0.75rem 0;
@@ -2542,4 +2587,44 @@ html.dark-mode .docs-swagger {
   font-size: 0.7rem;
   opacity: 0.85;
   width: 100%;
+}
+
+/* --- Group nesting picker --- */
+
+.group-parents {
+  border: 1px solid var(--app-border);
+  border-radius: 4px;
+  padding: 0.75rem 0.9rem;
+  display: grid;
+  gap: 0.35rem;
+  margin: 0;
+}
+
+.group-parents legend {
+  padding: 0 0.35rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.group-parents-hint {
+  margin: 0 0 0.35rem;
+  font-size: 0.82rem;
+  color: var(--app-fg-muted);
+  max-width: 60ch;
+}
+
+.group-parents-option {
+  display: flex;
+  gap: 0.5rem;
+  align-items: baseline;
+  font-size: 0.88rem;
+}
+
+.group-parents-option strong {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.85rem;
+}
+
+.group-parents-name {
+  color: var(--app-fg-muted);
 }

@@ -116,6 +116,52 @@ func (s *Service) explainAccess(ctx context.Context, viewer authn.Principal, org
 	return out, nil
 }
 
+// OperatorRole is one of this organisation's own roles, with what it extends
+// and what it grants.
+//
+// The schema map draws types, relations and rules. owner, admin and member are
+// none of those: they are rows in the roles table, which is why they cannot
+// appear there and why this exists. The model in one place, the instances in
+// another, on the same page.
+type OperatorRole struct {
+	ID   string `json:"id"`
+	Key  string `json:"key"`
+	Name string `json:"name"`
+	// Extends are the keys this role inherits from. Whoever holds this role
+	// also holds those, so narrowing a parent narrows every child.
+	Extends []string `json:"extends"`
+	// Permissions are granted directly on this role. What it reaches in total is
+	// these plus everything its parents hold, resolved by the walk rather than
+	// stored, so a deep chain costs nothing at write time.
+	Permissions []string `json:"permissions"`
+}
+
+// ListOperatorRoles returns the organisation's roles and their inheritance.
+//
+// Gated on members:read, the same permission that shows who holds them. A role
+// list is not sensitive alone, but paired with the member list it says who can
+// do what, so it takes the stricter of the two.
+func (s *Service) ListOperatorRoles(ctx context.Context, orgID string) ([]OperatorRole, error) {
+	if _, err := s.RequireOrgPermission(ctx, orgID, "members:read"); err != nil {
+		return nil, err
+	}
+	rows, err := s.db.Q().ListOperatorRoleHierarchy(ctx, orgID)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]OperatorRole, 0, len(rows))
+	for _, r := range rows {
+		out = append(out, OperatorRole{
+			ID:          r.ID,
+			Key:         r.Key,
+			Name:        r.Name,
+			Extends:     r.ParentKeys,
+			Permissions: r.PermissionKeys,
+		})
+	}
+	return out, nil
+}
+
 // nodeSet is the set of node names a viewer may be shown by name.
 type nodeSet map[string]struct{}
 

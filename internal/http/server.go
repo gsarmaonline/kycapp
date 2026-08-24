@@ -155,6 +155,7 @@ func (s *Server) routeTable() []route {
 		{"POST", "/v1/memberships/{id}/accept", s.handleAcceptMembership, user()},
 		{"GET", "/v1/memberships/{id}", s.handleGetMembership, orgFromResource("members:read")},
 		{"GET", "/v1/memberships/{id}/access", s.handleExplainMembershipAccess, inService()},
+		{"GET", "/v1/organisations/{id}/operator-roles", s.handleListOperatorRoles, inService()},
 		{"PATCH", "/v1/memberships/{id}", s.handlePatchMembership, orgFromResource("members:invite")},
 		{"DELETE", "/v1/memberships/{id}", s.handleRevokeMembership, orgFromResource("members:remove")},
 		{"GET", "/v1/permissions", s.handleListPermissions, principal()},

@@ -329,16 +329,17 @@ func (s *Server) handleListAppUserGroups(w http.ResponseWriter, r *http.Request)
 func (s *Server) handleCreateAppUserGroup(w http.ResponseWriter, r *http.Request) {
 	orgID := r.PathValue("id")
 	var body struct {
-		Key         string `json:"key"`
-		Name        string `json:"name"`
-		Description string `json:"description"`
+		Key         string   `json:"key"`
+		Name        string   `json:"name"`
+		Description string   `json:"description"`
+		Parents     []string `json:"parents"`
 	}
 	if err := decodeJSON(r, &body); err != nil {
 		writeError(w, apperr.Validation("invalid JSON body"))
 		return
 	}
 	row, err := s.svc.CreateAppUserGroup(r.Context(), orgID, service.AppUserGroupInput{
-		Key: body.Key, Name: body.Name, Description: body.Description,
+		Key: body.Key, Name: body.Name, Description: body.Description, Parents: body.Parents,
 	})
 	if err != nil {
 		writeError(w, err)
@@ -470,15 +471,16 @@ func exceptScopesJSON(raw json.RawMessage) []service.AppScopeRef {
 func (s *Server) handlePatchAppUserGroup(w http.ResponseWriter, r *http.Request) {
 	orgID := r.PathValue("id")
 	var body struct {
-		Name        string `json:"name"`
-		Description string `json:"description"`
+		Name        string   `json:"name"`
+		Description string   `json:"description"`
+		Parents     []string `json:"parents"`
 	}
 	if err := decodeJSON(r, &body); err != nil {
 		writeError(w, apperr.Validation("invalid JSON body"))
 		return
 	}
 	row, err := s.svc.UpdateAppUserGroup(r.Context(), orgID, r.PathValue("groupId"), service.AppUserGroupInput{
-		Name: body.Name, Description: body.Description,
+		Name: body.Name, Description: body.Description, Parents: body.Parents,
 	})
 	if err != nil {
 		writeError(w, err)
@@ -584,7 +586,15 @@ func (s *Server) handleGetAppUserGroup(w http.ResponseWriter, r *http.Request) {
 		writeError(w, err)
 		return
 	}
+	// Parents belong to the group now, so an edit form round-tripping the object
+	// without them would silently clear the nesting on every save.
+	parents, err := s.svc.ListAppUserGroupParents(r.Context(), r.PathValue("id"), row.ID)
+	if err != nil {
+		writeError(w, err)
+		return
+	}
 	writeJSON(w, http.StatusOK, map[string]any{
 		"id": row.ID, "key": row.Key, "name": row.Name, "description": row.Description,
+		"parents": parents,
 	})
 }
