@@ -1,0 +1,560 @@
+{
+  "namespace": "kyc",
+  "nodes": [
+    {
+      "id": "t_activity",
+      "kind": "type",
+      "label": "activity",
+      "rules": [
+        {
+          "action": "read",
+          "expr": "can_read"
+        }
+      ]
+    },
+    {
+      "id": "t_api_keys",
+      "kind": "type",
+      "label": "api_keys",
+      "rules": [
+        {
+          "action": "manage",
+          "expr": "can_manage"
+        },
+        {
+          "action": "read",
+          "expr": "can_read"
+        }
+      ]
+    },
+    {
+      "id": "t_app_access",
+      "kind": "type",
+      "label": "app_access",
+      "rules": [
+        {
+          "action": "manage",
+          "expr": "can_manage"
+        },
+        {
+          "action": "read",
+          "expr": "can_read"
+        }
+      ]
+    },
+    {
+      "id": "t_app_users",
+      "kind": "type",
+      "label": "app_users",
+      "rules": [
+        {
+          "action": "read",
+          "expr": "can_read"
+        },
+        {
+          "action": "write",
+          "expr": "can_write"
+        }
+      ]
+    },
+    {
+      "id": "t_attributes",
+      "kind": "type",
+      "label": "attributes",
+      "rules": [
+        {
+          "action": "manage",
+          "expr": "can_manage"
+        },
+        {
+          "action": "read",
+          "expr": "can_read"
+        }
+      ]
+    },
+    {
+      "id": "t_automations",
+      "kind": "type",
+      "label": "automations",
+      "rules": [
+        {
+          "action": "manage",
+          "expr": "can_manage"
+        },
+        {
+          "action": "read",
+          "expr": "can_read"
+        }
+      ]
+    },
+    {
+      "id": "t_billing",
+      "kind": "type",
+      "label": "billing",
+      "rules": [
+        {
+          "action": "manage",
+          "expr": "can_manage"
+        },
+        {
+          "action": "read",
+          "expr": "can_read"
+        }
+      ]
+    },
+    {
+      "id": "t_email_templates",
+      "kind": "type",
+      "label": "email_templates",
+      "rules": [
+        {
+          "action": "manage",
+          "expr": "can_manage"
+        },
+        {
+          "action": "read",
+          "expr": "can_read"
+        }
+      ]
+    },
+    {
+      "id": "t_group",
+      "kind": "type",
+      "label": "group"
+    },
+    {
+      "id": "t_key",
+      "kind": "type",
+      "label": "key"
+    },
+    {
+      "id": "t_members",
+      "kind": "type",
+      "label": "members",
+      "rules": [
+        {
+          "action": "invite",
+          "expr": "can_invite"
+        },
+        {
+          "action": "read",
+          "expr": "can_read"
+        },
+        {
+          "action": "remove",
+          "expr": "can_remove"
+        }
+      ]
+    },
+    {
+      "id": "t_org_roles",
+      "kind": "type",
+      "label": "org_roles",
+      "rules": [
+        {
+          "action": "manage",
+          "expr": "can_manage"
+        },
+        {
+          "action": "read",
+          "expr": "can_read"
+        }
+      ]
+    },
+    {
+      "id": "t_organisation",
+      "kind": "type",
+      "label": "organisation",
+      "rules": [
+        {
+          "action": "member",
+          "expr": "belongs - suspended + oversees"
+        },
+        {
+          "action": "reach",
+          "expr": "belongs + oversees"
+        },
+        {
+          "action": "read",
+          "expr": "can_read"
+        },
+        {
+          "action": "update",
+          "expr": "can_update"
+        }
+      ]
+    },
+    {
+      "id": "t_product_features",
+      "kind": "type",
+      "label": "product_features",
+      "rules": [
+        {
+          "action": "manage",
+          "expr": "can_manage"
+        },
+        {
+          "action": "read",
+          "expr": "can_read"
+        }
+      ]
+    },
+    {
+      "id": "t_recovery",
+      "kind": "type",
+      "label": "recovery"
+    },
+    {
+      "id": "t_role",
+      "kind": "type",
+      "label": "role"
+    },
+    {
+      "id": "t_usage",
+      "kind": "type",
+      "label": "usage",
+      "rules": [
+        {
+          "action": "read",
+          "expr": "can_read"
+        }
+      ]
+    },
+    {
+      "id": "t_user",
+      "kind": "type",
+      "label": "user"
+    },
+    {
+      "id": "s_group_member_of_user",
+      "kind": "set",
+      "label": "group#member_of · user",
+      "members": [
+        "group#member_of",
+        "user"
+      ]
+    },
+    {
+      "id": "s_key_recovery_role_holder_user",
+      "kind": "set",
+      "label": "key · recovery · role#holder · user",
+      "members": [
+        "key",
+        "recovery",
+        "role#holder",
+        "user"
+      ]
+    }
+  ],
+  "edges": [
+    {
+      "id": "t_activity__s_key_recovery_role_holder_user__can_read",
+      "from": "t_activity",
+      "to": "s_key_recovery_role_holder_user",
+      "label": "can_read",
+      "relations": [
+        "can_read"
+      ]
+    },
+    {
+      "id": "t_activity__t_organisation__org",
+      "from": "t_activity",
+      "to": "t_organisation",
+      "label": "org",
+      "relations": [
+        "org"
+      ]
+    },
+    {
+      "id": "t_api_keys__s_key_recovery_role_holder_user__can_manage__can_read",
+      "from": "t_api_keys",
+      "to": "s_key_recovery_role_holder_user",
+      "label": "can_manage, can_read",
+      "relations": [
+        "can_manage",
+        "can_read"
+      ]
+    },
+    {
+      "id": "t_api_keys__t_organisation__org",
+      "from": "t_api_keys",
+      "to": "t_organisation",
+      "label": "org",
+      "relations": [
+        "org"
+      ]
+    },
+    {
+      "id": "t_app_access__s_key_recovery_role_holder_user__can_manage__can_read",
+      "from": "t_app_access",
+      "to": "s_key_recovery_role_holder_user",
+      "label": "can_manage, can_read",
+      "relations": [
+        "can_manage",
+        "can_read"
+      ]
+    },
+    {
+      "id": "t_app_access__t_organisation__org",
+      "from": "t_app_access",
+      "to": "t_organisation",
+      "label": "org",
+      "relations": [
+        "org"
+      ]
+    },
+    {
+      "id": "t_app_users__s_key_recovery_role_holder_user__can_read__can_write",
+      "from": "t_app_users",
+      "to": "s_key_recovery_role_holder_user",
+      "label": "can_read, can_write",
+      "relations": [
+        "can_read",
+        "can_write"
+      ]
+    },
+    {
+      "id": "t_app_users__t_organisation__org",
+      "from": "t_app_users",
+      "to": "t_organisation",
+      "label": "org",
+      "relations": [
+        "org"
+      ]
+    },
+    {
+      "id": "t_attributes__s_key_recovery_role_holder_user__can_manage__can_read",
+      "from": "t_attributes",
+      "to": "s_key_recovery_role_holder_user",
+      "label": "can_manage, can_read",
+      "relations": [
+        "can_manage",
+        "can_read"
+      ]
+    },
+    {
+      "id": "t_attributes__t_organisation__org",
+      "from": "t_attributes",
+      "to": "t_organisation",
+      "label": "org",
+      "relations": [
+        "org"
+      ]
+    },
+    {
+      "id": "t_automations__s_key_recovery_role_holder_user__can_manage__can_read",
+      "from": "t_automations",
+      "to": "s_key_recovery_role_holder_user",
+      "label": "can_manage, can_read",
+      "relations": [
+        "can_manage",
+        "can_read"
+      ]
+    },
+    {
+      "id": "t_automations__t_organisation__org",
+      "from": "t_automations",
+      "to": "t_organisation",
+      "label": "org",
+      "relations": [
+        "org"
+      ]
+    },
+    {
+      "id": "t_billing__s_key_recovery_role_holder_user__can_manage__can_read",
+      "from": "t_billing",
+      "to": "s_key_recovery_role_holder_user",
+      "label": "can_manage, can_read",
+      "relations": [
+        "can_manage",
+        "can_read"
+      ]
+    },
+    {
+      "id": "t_billing__t_organisation__org",
+      "from": "t_billing",
+      "to": "t_organisation",
+      "label": "org",
+      "relations": [
+        "org"
+      ]
+    },
+    {
+      "id": "t_email_templates__s_key_recovery_role_holder_user__can_manage__can_read",
+      "from": "t_email_templates",
+      "to": "s_key_recovery_role_holder_user",
+      "label": "can_manage, can_read",
+      "relations": [
+        "can_manage",
+        "can_read"
+      ]
+    },
+    {
+      "id": "t_email_templates__t_organisation__org",
+      "from": "t_email_templates",
+      "to": "t_organisation",
+      "label": "org",
+      "relations": [
+        "org"
+      ]
+    },
+    {
+      "id": "t_group__s_group_member_of_user__member_of",
+      "from": "t_group",
+      "to": "s_group_member_of_user",
+      "label": "member_of",
+      "relations": [
+        "member_of"
+      ]
+    },
+    {
+      "id": "t_key__t_user__owner",
+      "from": "t_key",
+      "to": "t_user",
+      "label": "owner",
+      "relations": [
+        "owner"
+      ]
+    },
+    {
+      "id": "t_members__s_key_recovery_role_holder_user__can_invite__can_read__can_remove",
+      "from": "t_members",
+      "to": "s_key_recovery_role_holder_user",
+      "label": "can_invite, can_read, can_remove",
+      "relations": [
+        "can_invite",
+        "can_read",
+        "can_remove"
+      ]
+    },
+    {
+      "id": "t_members__t_organisation__org",
+      "from": "t_members",
+      "to": "t_organisation",
+      "label": "org",
+      "relations": [
+        "org"
+      ]
+    },
+    {
+      "id": "t_org_roles__s_key_recovery_role_holder_user__can_manage__can_read",
+      "from": "t_org_roles",
+      "to": "s_key_recovery_role_holder_user",
+      "label": "can_manage, can_read",
+      "relations": [
+        "can_manage",
+        "can_read"
+      ]
+    },
+    {
+      "id": "t_org_roles__t_organisation__org",
+      "from": "t_org_roles",
+      "to": "t_organisation",
+      "label": "org",
+      "relations": [
+        "org"
+      ]
+    },
+    {
+      "id": "t_organisation__s_key_recovery_role_holder_user__belongs__can_read__can_update__oversees__suspended",
+      "from": "t_organisation",
+      "to": "s_key_recovery_role_holder_user",
+      "label": "belongs, can_read, can_update, oversees, suspended",
+      "relations": [
+        "belongs",
+        "can_read",
+        "can_update",
+        "oversees",
+        "suspended"
+      ]
+    },
+    {
+      "id": "t_product_features__s_key_recovery_role_holder_user__can_manage__can_read",
+      "from": "t_product_features",
+      "to": "s_key_recovery_role_holder_user",
+      "label": "can_manage, can_read",
+      "relations": [
+        "can_manage",
+        "can_read"
+      ]
+    },
+    {
+      "id": "t_product_features__t_organisation__org",
+      "from": "t_product_features",
+      "to": "t_organisation",
+      "label": "org",
+      "relations": [
+        "org"
+      ]
+    },
+    {
+      "id": "t_role__s_group_member_of_user__holder",
+      "from": "t_role",
+      "to": "s_group_member_of_user",
+      "label": "holder",
+      "relations": [
+        "holder"
+      ]
+    },
+    {
+      "id": "t_usage__s_key_recovery_role_holder_user__can_read",
+      "from": "t_usage",
+      "to": "s_key_recovery_role_holder_user",
+      "label": "can_read",
+      "relations": [
+        "can_read"
+      ]
+    },
+    {
+      "id": "t_usage__t_organisation__org",
+      "from": "t_usage",
+      "to": "t_organisation",
+      "label": "org",
+      "relations": [
+        "org"
+      ]
+    }
+  ],
+  "summary": {
+    "namespace": "kyc",
+    "actions": 8,
+    "relations": 13,
+    "types": 18,
+    "rules": 27,
+    "wildcards": 8,
+    "transitive": 1
+  },
+  "shapes": [
+    {
+      "types": [
+        "api_keys",
+        "app_access",
+        "attributes",
+        "automations",
+        "billing",
+        "email_templates",
+        "org_roles",
+        "product_features"
+      ],
+      "rules": [
+        "manage = can_manage",
+        "read = can_read"
+      ]
+    },
+    {
+      "types": [
+        "activity",
+        "usage"
+      ],
+      "rules": [
+        "read = can_read"
+      ]
+    },
+    {
+      "types": [
+        "recovery",
+        "user"
+      ]
+    }
+  ]
+}

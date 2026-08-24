@@ -24,31 +24,195 @@ import (
 // the same schema always renders the same bytes and a diagram can be committed
 // and diffed like anything else.
 func (s *Schema) Mermaid() string {
+	g := s.Graph()
+
 	var b strings.Builder
 	b.WriteString("flowchart LR\n")
+	for _, n := range g.Nodes {
+		if n.Kind == GraphKindSet {
+			// A brace shape marks the synthetic nodes, so a reader can tell a
+			// declared type from a collapsed target set at a glance.
+			b.WriteString("  " + n.ID + "{{\"" + escapeMermaid(n.Label) + "\"}}\n")
+			continue
+		}
+		label := escapeMermaid(n.Label)
+		for _, r := range n.Rules {
+			label += "<br/>" + escapeMermaid(r.Action+" = "+r.Expr)
+		}
+		b.WriteString("  " + n.ID + "[\"" + label + "\"]\n")
+	}
+	for _, e := range g.Edges {
+		b.WriteString("  " + e.From + " -->|" + escapeMermaid(e.Label) + "| " + e.To + "\n")
+	}
+	return b.String()
+}
 
+// Graph is a schema as nodes and edges, for a renderer that lays out its own
+// picture rather than consuming one.
+//
+// Mermaid renders from this, so the two can never disagree about which nodes
+// exist or which arrows were merged. Anything that draws a schema should start
+// here; Mermaid is one such renderer that happens to live in the same file.
+type Graph struct {
+	Namespace string      `json:"namespace"`
+	Nodes     []GraphNode `json:"nodes"`
+	Edges     []GraphEdge `json:"edges"`
+	Summary   Summary     `json:"summary"`
+	// Shapes groups types that are indistinguishable except by name.
+	Shapes []Shape `json:"shapes,omitempty"`
+}
+
+// Shape is a set of types that declare the same relations pointing at the same
+// places and answer the same actions the same way.
+//
+// It is computed here rather than by whatever draws the graph, so the answer
+// cannot differ between renderers. The definition has two halves and both
+// matter: types that share a container look identical in a picture while
+// answering entirely different actions, and comparing arrows alone reports a
+// larger, wrong number.
+type Shape struct {
+	Types []string `json:"types"`
+	// Rules is the shared rule set, as "action = expr", already sorted. Empty
+	// for types that answer nothing, which are structural rather than governed.
+	Rules []string `json:"rules,omitempty"`
+}
+
+// GraphKind distinguishes a declared type from a node this package invented.
+type GraphKind string
+
+const (
+	// GraphKindType is a type the schema declares.
+	GraphKindType GraphKind = "type"
+	// GraphKindSet is a synthetic node standing for a target set that several
+	// relations share. It exists in the picture, never in the schema.
+	GraphKindSet GraphKind = "set"
+)
+
+// GraphNode is one drawn node.
+type GraphNode struct {
+	ID    string      `json:"id"`
+	Kind  GraphKind   `json:"kind"`
+	Label string      `json:"label"`
+	Rules []GraphRule `json:"rules,omitempty"`
+	// Members is the target set a synthetic node stands for, already sorted.
+	// Empty for a declared type.
+	Members []string `json:"members,omitempty"`
+}
+
+// GraphRule is one action and the expression that answers it.
+type GraphRule struct {
+	Action string `json:"action"`
+	Expr   string `json:"expr"`
+}
+
+// GraphEdge is one drawn arrow. Relations that agree about where they point
+// share an edge, so Label may name several.
+type GraphEdge struct {
+	ID        string   `json:"id"`
+	From      string   `json:"from"`
+	To        string   `json:"to"`
+	Label     string   `json:"label"`
+	Relations []string `json:"relations"`
+}
+
+// Graph builds the drawable form of the schema.
+//
+// Everything is sorted, so the same schema always produces the same graph and a
+// generated file can be committed and diffed like source.
+func (s *Schema) Graph() Graph {
 	types := sortedKeys(s.Types)
 	shared := s.sharedTargetSets()
 
+	g := Graph{
+		Namespace: s.Namespace,
+		Nodes:     make([]GraphNode, 0, len(types)+len(shared)),
+		Edges:     []GraphEdge{},
+		Summary:   s.Describe(),
+	}
+
 	for _, name := range types {
 		t := s.Types[name]
-		b.WriteString("  " + typeNodeID(name) + "[\"" + typeLabel(t) + "\"]\n")
+		node := GraphNode{ID: typeNodeID(name), Kind: GraphKindType, Label: name}
+		for _, action := range sortedKeys(t.Rules) {
+			node.Rules = append(node.Rules, GraphRule{Action: action, Expr: t.Rules[action].String()})
+		}
+		g.Nodes = append(g.Nodes, node)
 	}
 
-	// Synthetic nodes for target sets that repeat. Without them every grant
-	// relation on every type draws its own edge to each of user, key, recovery
-	// and role, which is a picture of the repetition rather than of the model.
-	setIDs := sortedKeys(shared)
-	for _, key := range setIDs {
-		b.WriteString("  " + setNodeID(key) + "{{\"" + escapeMermaid(shared[key]) + "\"}}\n")
+	for _, key := range sortedKeys(shared) {
+		g.Nodes = append(g.Nodes, GraphNode{
+			ID:      setNodeID(key),
+			Kind:    GraphKindSet,
+			Label:   shared[key],
+			Members: strings.Split(key, "|"),
+		})
 	}
 
 	for _, name := range types {
+		from := typeNodeID(name)
 		for _, e := range s.edgesOf(name, shared) {
-			b.WriteString("  " + typeNodeID(name) + " -->|" + escapeMermaid(e.label) + "| " + e.to + "\n")
+			g.Edges = append(g.Edges, GraphEdge{
+				ID:        from + "__" + e.to + "__" + sanitiseID(e.label),
+				From:      from,
+				To:        e.to,
+				Label:     e.label,
+				Relations: strings.Split(e.label, ", "),
+			})
 		}
 	}
-	return b.String()
+	g.Shapes = g.shapes()
+	return g
+}
+
+// shapes groups types by what makes them indistinguishable.
+//
+// Only groups of more than one are returned: a type that is its own shape is
+// not a repetition, and reporting it as one would bury the finding in noise.
+func (g Graph) shapes() []Shape {
+	arrows := map[string][]string{}
+	for _, e := range g.Edges {
+		arrows[e.From] = append(arrows[e.From], e.Label+" -> "+e.To)
+	}
+
+	byKey := map[string]*Shape{}
+	var keys []string
+	for _, n := range g.Nodes {
+		if n.Kind != GraphKindType {
+			continue
+		}
+		rules := make([]string, 0, len(n.Rules))
+		for _, r := range n.Rules {
+			rules = append(rules, r.Action+" = "+r.Expr)
+		}
+		sort.Strings(rules)
+		out := append([]string(nil), arrows[n.ID]...)
+		sort.Strings(out)
+
+		key := strings.Join(rules, ";") + "|" + strings.Join(out, ";")
+		if existing, ok := byKey[key]; ok {
+			existing.Types = append(existing.Types, n.Label)
+			continue
+		}
+		byKey[key] = &Shape{Types: []string{n.Label}, Rules: rules}
+		keys = append(keys, key)
+	}
+
+	out := make([]Shape, 0, len(keys))
+	for _, key := range keys {
+		if s := byKey[key]; len(s.Types) > 1 {
+			sort.Strings(s.Types)
+			out = append(out, *s)
+		}
+	}
+	// Largest first, then alphabetically, so the ordering does not depend on
+	// which type happened to be visited first.
+	sort.SliceStable(out, func(i, j int) bool {
+		if len(out[i].Types) != len(out[j].Types) {
+			return len(out[i].Types) > len(out[j].Types)
+		}
+		return out[i].Types[0] < out[j].Types[0]
+	})
+	return out
 }
 
 // diagramEdge is one drawn arrow: a merged relation label and a target node id.
@@ -118,17 +282,6 @@ func (s *Schema) sharedTargetSets() map[string]string {
 		}
 	}
 	return out
-}
-
-// typeLabel is the type name above its rules. The rules belong in the node
-// rather than on the arrows: an action is answered at the resource, so drawing
-// it as an edge would put it somewhere it does not happen.
-func typeLabel(t *TypeDef) string {
-	label := escapeMermaid(t.Name)
-	for _, action := range sortedKeys(t.Rules) {
-		label += "<br/>" + escapeMermaid(action+" = "+t.Rules[action].String())
-	}
-	return label
 }
 
 func relationLabel(rel string, target TargetSpec) string {
@@ -207,17 +360,17 @@ func sortedKeys[V any](m map[string]V) []string {
 // Summary counts what a schema declares, for a header above the diagram or a
 // line in an admin page.
 type Summary struct {
-	Namespace string
-	Actions   int
-	Relations int
-	Types     int
-	Rules     int
+	Namespace string `json:"namespace"`
+	Actions   int    `json:"actions"`
+	Relations int    `json:"relations"`
+	Types     int    `json:"types"`
+	Rules     int    `json:"rules"`
 	// Wildcards is how many relations accept a star node at either end. It is
 	// worth its own count: each one is a place where a single edge can confer
 	// reach over everything of a type.
-	Wildcards int
+	Wildcards int `json:"wildcards"`
 	// Transitive is how many relations the walk follows to closure.
-	Transitive int
+	Transitive int `json:"transitive"`
 }
 
 func (s Summary) String() string {

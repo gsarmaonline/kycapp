@@ -238,9 +238,28 @@ that agree about where they point merge onto one arrow. A set used *once* is
 never collapsed, because hiding the one type it names would trade a true
 picture for a tidy one.
 
-Rendering the KYC namespace surfaces something the text hides: thirteen of the
-eighteen types are structurally identical, differing only in name. That is worth
-a decision rather than an accident.
+Rendering the KYC namespace surfaces something the text hides: eight of the
+eighteen types are structurally identical, declaring the same relations and
+answering `read` and `manage` the same way, differing only in their name. That
+is worth a decision rather than an accident.
+
+Thirteen types hang off `organisation`, which is the shape the picture shows
+first, but they are not all the same: they split into four rule sets, and only
+the largest has eight members. `members` answers `invite` and `remove`,
+`app_users` answers `write`, `activity` and `usage` answer `read` alone. Counting
+the arrows rather than the rules overstates the repetition, which is exactly the
+mistake a picture invites and a test prevents. `shapeGroups` in the web app
+compares both, and its test fails if the count moves.
+
+The graph is generated into `web/public/access-schema.json` by `make openapi`,
+and the docs render it from there. It is a build artefact rather than an
+endpoint because the schema is a compile-time constant: serving it would mean
+answering an authorisation question about the authorisation model, and a stale
+file is a wrong diagram rather than a disclosure. `make sdk-check` already diffs
+`web/public`, so a schema edited without regenerating fails CI.
+
+A merchant's own schema cannot work that way. Theirs is tenant data, read at
+request time and gated like anything else.
 
 ### Showing a decision to a person
 

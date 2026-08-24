@@ -78,6 +78,7 @@ import { InboundWebhooksNew } from './pages/inbound_webhooks/inbound_webhooks_ne
 import { InboundWebhooksShow } from './pages/inbound_webhooks/inbound_webhooks_show'
 import { DocsConceptPage, DocsConceptsIndex } from './pages/docs/docs_concepts'
 import { DocsIntegrationApiPage, DocsOperatorApiPage } from './pages/docs/docs_api'
+import { DocsAuthorisationPage } from './pages/docs/docs_authorisation'
 import { DocsLayout } from './pages/docs/docs_layout'
 import { DocsVariablesPage } from './pages/docs/docs_variables'
 import { initTheme } from './theme'
@@ -164,6 +165,7 @@ export default function App() {
         <Route path="api" element={<DocsIntegrationApiPage />} />
         <Route path="api/operator" element={<DocsOperatorApiPage />} />
         <Route path="variables" element={<DocsVariablesPage />} />
+        <Route path="authorisation" element={<DocsAuthorisationPage />} />
         <Route path="operator" element={<Navigate to="api/operator" replace />} />
       </Route>
       <Route
@@ -252,6 +254,7 @@ export default function App() {
           <Route path="api" element={<DocsIntegrationApiPage />} />
           <Route path="api/operator" element={<DocsOperatorApiPage />} />
           <Route path="variables" element={<DocsVariablesPage />} />
+        <Route path="authorisation" element={<DocsAuthorisationPage />} />
           <Route path="operator" element={<Navigate to="api/operator" replace />} />
         </Route>
       </Route>

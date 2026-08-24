@@ -1,6 +1,7 @@
 package reach
 
 import (
+	"reflect"
 	"strings"
 	"testing"
 )
@@ -132,4 +133,109 @@ func TestDescribeCounts(t *testing.T) {
 	if got.Wildcards != 1 {
 		t.Errorf("Wildcards = %d, wanted 1", got.Wildcards)
 	}
+}
+
+func TestGraphIsTheSourceMermaidRendersFrom(t *testing.T) {
+	s, err := Parse(diagramSchema)
+	if err != nil {
+		t.Fatal(err)
+	}
+	g := s.Graph()
+
+	// Every node and edge Mermaid writes must exist in the graph, or the two
+	// renderings could come to disagree about what the schema says.
+	out := s.Mermaid()
+	for _, n := range g.Nodes {
+		if !strings.Contains(out, "  "+n.ID) {
+			t.Errorf("node %q is in the graph but not the diagram", n.ID)
+		}
+	}
+	for _, e := range g.Edges {
+		if !strings.Contains(out, e.From+" -->|"+escapeMermaid(e.Label)+"| "+e.To) {
+			t.Errorf("edge %s -> %s is in the graph but not the diagram", e.From, e.To)
+		}
+	}
+}
+
+func TestGraphIsDeterministic(t *testing.T) {
+	s, err := Parse(diagramSchema)
+	if err != nil {
+		t.Fatal(err)
+	}
+	first := s.Graph()
+	for i := 0; i < 20; i++ {
+		if !reflect.DeepEqual(s.Graph(), first) {
+			t.Fatalf("graph differs on run %d", i)
+		}
+	}
+}
+
+func TestGraphMarksSyntheticNodes(t *testing.T) {
+	s, err := Parse(diagramSchema)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var sets, declared int
+	for _, n := range s.Graph().Nodes {
+		switch n.Kind {
+		case GraphKindSet:
+			sets++
+			if len(n.Members) < 2 {
+				t.Errorf("synthetic node %q stands for %d members", n.ID, len(n.Members))
+			}
+		case GraphKindType:
+			declared++
+			if len(n.Members) != 0 {
+				t.Errorf("declared type %q carries members", n.ID)
+			}
+			if _, ok := s.Types[n.Label]; !ok {
+				t.Errorf("node %q is not a declared type", n.Label)
+			}
+		default:
+			t.Errorf("node %q has kind %q", n.ID, n.Kind)
+		}
+	}
+	if declared != len(s.Types) {
+		t.Errorf("got %d type nodes, wanted %d", declared, len(s.Types))
+	}
+	if sets != 1 {
+		t.Errorf("got %d synthetic nodes, wanted 1", sets)
+	}
+}
+
+func TestGraphEdgeIDsAreUnique(t *testing.T) {
+	// A renderer keys on these. A collision would silently drop an arrow.
+	s, err := Parse(diagramSchema)
+	if err != nil {
+		t.Fatal(err)
+	}
+	seen := map[string]struct{}{}
+	for _, e := range s.Graph().Edges {
+		if _, dup := seen[e.ID]; dup {
+			t.Errorf("duplicate edge id %q", e.ID)
+		}
+		seen[e.ID] = struct{}{}
+	}
+}
+
+func TestGraphCarriesRulesOnTheTypeThatAnswersThem(t *testing.T) {
+	// An action is answered at the resource, so a rule belongs in the node
+	// rather than on an arrow, which would put it somewhere it does not happen.
+	s, err := Parse(diagramSchema)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, n := range s.Graph().Nodes {
+		if n.Label != "document" {
+			continue
+		}
+		if len(n.Rules) != 2 {
+			t.Fatalf("document has %d rules, wanted 2", len(n.Rules))
+		}
+		if n.Rules[0].Action != "read" || n.Rules[0].Expr != "viewer + editor + parent->read" {
+			t.Errorf("first rule = %+v", n.Rules[0])
+		}
+		return
+	}
+	t.Fatal("no document node")
 }
