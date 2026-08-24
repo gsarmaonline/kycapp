@@ -75,6 +75,10 @@ func (s *Service) GetOrganisationOnboarding(ctx context.Context, orgID string) (
 	if err != nil {
 		return OnboardingView{}, err
 	}
+	capabilityCount, err := s.db.Q().CountAppCapabilitiesByOrg(ctx, orgID)
+	if err != nil {
+		return OnboardingView{}, err
+	}
 
 	steps := []OnboardingStep{
 		{
@@ -112,6 +116,21 @@ func (s *Service) GetOrganisationOnboarding(ctx context.Context, orgID string) (
 			Label: "Create your first app user",
 			Done:  appUserCount > 0,
 			Href:  "users",
+		},
+		{
+			// Customer access had five pages and no way in. Nothing is seeded
+			// there, deliberately, because the vocabulary is the merchant's own
+			// and a guessed default is worse than none. That leaves an empty
+			// section nobody is pointed at, which this step fixes.
+			//
+			// Capabilities is the step rather than scope kinds or roles: a scope
+			// kind grants nothing on its own, a role with no capabilities
+			// carries nothing, and a grant needs both. Declaring the first
+			// capability is where the section starts to mean something.
+			Key:   "customer_access",
+			Label: "Declare what your customers may do",
+			Done:  capabilityCount > 0,
+			Href:  "customer-capabilities",
 		},
 	}
 

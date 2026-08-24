@@ -46,6 +46,7 @@ export function CustomerGrantsNew() {
   const [roleId, setRoleId] = useState('')
   const [exceptCapabilities, setExceptCapabilities] = useState<string[]>([])
 
+  const [allScopes, setAllScopes] = useState(false)
   const [scopeKind, setScopeKind] = useState('')
   const [scopeId, setScopeId] = useState('')
   const [exceptScopes, setExceptScopes] = useState<AppScopeRef[]>([])
@@ -85,7 +86,8 @@ export function CustomerGrantsNew() {
         role_id: allCapabilities ? undefined : roleId,
         all_capabilities: allCapabilities,
         except_capabilities: allCapabilities ? exceptCapabilities : [],
-        scope_kind: scopeKind,
+        all_scopes: allScopes,
+        scope_kind: allScopes ? undefined : scopeKind,
         scope_id: scopeId,
         except_scopes: exceptScopes,
         except_app_user_ids: subjectKind === 'app_user' ? [] : exceptUsers,
@@ -235,26 +237,47 @@ export function CustomerGrantsNew() {
           )}
         </fieldset>
 
-        <label>
-          Scope kind
-          <select value={scopeKind} onChange={(e) => setScopeKind(e.target.value)} required>
-            <option value="">Choose…</option>
-            {scopeTypes.map((s) => (
-              <option key={s.id} value={s.kind}>
-                {s.label || s.kind}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label>
-          Scope id
+        {/*
+          The organisation is the ceiling, never a scope kind: a grant already
+          lives in exactly one, so declaring it would be a second way to say
+          what every grant already says.
+        */}
+        <label className="inline-check">
           <input
-            value={scopeId}
-            onChange={(e) => setScopeId(e.target.value)}
-            placeholder="the id of the project, region or account"
-            required
+            type="checkbox"
+            checked={allScopes}
+            onChange={(e) => setAllScopes(e.target.checked)}
           />
+          Everywhere in this organisation
         </label>
+
+        {!allScopes && (
+          <>
+            <label>
+              Scope kind
+              <select value={scopeKind} onChange={(e) => setScopeKind(e.target.value)} required>
+                <option value="">Choose…</option>
+                {scopeTypes.map((s) => (
+                  <option key={s.id} value={s.kind}>
+                    {s.label || s.kind}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              Scope id
+              <input
+                value={scopeId}
+                onChange={(e) => setScopeId(e.target.value)}
+                placeholder="the id of the project, region or account"
+                required
+              />
+              <span className="field-hint">
+                Use <code>*</code> for every {scopeKind || 'one'} you have now or add later.
+              </span>
+            </label>
+          </>
+        )}
 
         <fieldset className="perm-group">
           <legend>Except these scopes</legend>

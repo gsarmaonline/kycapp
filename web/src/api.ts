@@ -1296,7 +1296,46 @@ export function listOrgUsage(orgId: string, opts?: { from?: string; to?: string 
 // permissions, which govern the operators configuring all this.
 
 export type AppScopeType = { id: string; kind: string; label: string }
-export type AppCapability = { id: string; key: string; description: string }
+/**
+ * A starter set a merchant may apply, never a default.
+ *
+ * Nothing is seeded into customer access on signup, because the vocabulary is
+ * theirs and a guessed default is one they work around rather than delete. A
+ * template is the same rows arrived at differently: by an explicit click, with
+ * the full list visible first.
+ */
+export type CapabilityTemplate = {
+  key: string
+  name: string
+  description: string
+  items: { key: string; description: string }[]
+}
+
+export function listCapabilityTemplates(orgId: string) {
+  return request<{ items: CapabilityTemplate[] }>(
+    `/v1/organisations/${orgId}/app-capability-templates`,
+  )
+}
+
+export function applyCapabilityTemplate(orgId: string, template: string) {
+  return request<{ items: AppCapability[] }>(
+    `/v1/organisations/${orgId}/app-capability-templates/apply`,
+    { method: 'POST', body: JSON.stringify({ template }) },
+  )
+}
+
+/**
+ * `source` records where a capability came from: empty when someone wrote it,
+ * `template:<key>` when it arrived from a starter set. Without it a template row
+ * and an authored row are identical, and "why does this exist?" stops being
+ * answerable once the person who applied it has moved on.
+ */
+export type AppCapability = {
+  id: string
+  key: string
+  description: string
+  source?: string
+}
 
 export type AppRole = {
   id: string
@@ -1458,10 +1497,22 @@ export function createAppGrant(
     group_id?: string
     /** Omitted when all_capabilities is set: a wildcard grant carries no role. */
     role_id?: string
-    scope_kind: string
-    scope_id: string
+    /**
+     * Omitted when all_scopes is set. A grant is everywhere or somewhere, never
+     * both, the same way a wildcard capability grant carries no role.
+     *
+     * A scope_id of `*` is the narrower wildcard: every instance of that kind,
+     * including ones created later.
+     */
+    scope_kind?: string
+    scope_id?: string
     expires_at?: string
     all_capabilities?: boolean
+    /**
+     * Every scope of every kind. The widest a grant can be, because an
+     * organisation is where a merchant's world ends.
+     */
+    all_scopes?: boolean
     except_capabilities?: string[]
     except_scopes?: AppScopeRef[]
     except_app_user_ids?: string[]

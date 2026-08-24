@@ -1,0 +1,15 @@
+-- Where a capability came from.
+--
+-- Nothing is seeded into customer access, deliberately: the vocabulary is the
+-- merchant's own, and guessing their domain produces defaults they work around
+-- and we support for ever. But an empty section with five CRUD pages and no way
+-- in is its own failure, so a merchant can now apply a starter template.
+--
+-- A template is not a default. It is applied by an explicit click, never on
+-- signup, and this column is what keeps the difference legible afterwards.
+-- Without it a template row and an authored row are identical, and "why does
+-- this capability exist?" becomes unanswerable the moment the person who
+-- clicked has moved on.
+--
+-- Empty means authored by hand, which is what every existing row is.
+ALTER TABLE app_capabilities ADD COLUMN IF NOT EXISTS source TEXT NOT NULL DEFAULT '';

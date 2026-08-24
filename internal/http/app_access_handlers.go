@@ -67,7 +67,9 @@ func (s *Server) handleListAppCapabilities(w http.ResponseWriter, r *http.Reques
 	}
 	items := make([]map[string]any, 0, len(rows))
 	for _, c := range rows {
-		items = append(items, map[string]any{"id": c.ID, "key": c.Key, "description": c.Description})
+		items = append(items, map[string]any{
+			"id": c.ID, "key": c.Key, "description": c.Description, "source": c.Source,
+		})
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"items": items})
 }
@@ -88,6 +90,36 @@ func (s *Server) handleCreateAppCapability(w http.ResponseWriter, r *http.Reques
 		return
 	}
 	writeJSON(w, http.StatusCreated, map[string]any{"id": row.ID, "key": row.Key, "description": row.Description})
+}
+
+// handleListCapabilityTemplates offers starter sets on an empty vocabulary.
+// Nothing is applied by reading this: the merchant sees exactly what a template
+// would declare before anything is written.
+func (s *Server) handleListCapabilityTemplates(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, http.StatusOK, map[string]any{"items": service.CapabilityTemplates})
+}
+
+func (s *Server) handleApplyCapabilityTemplate(w http.ResponseWriter, r *http.Request) {
+	orgID := r.PathValue("id")
+	var body struct {
+		Template string `json:"template"`
+	}
+	if err := decodeJSON(r, &body); err != nil {
+		writeError(w, apperr.Validation("invalid JSON body"))
+		return
+	}
+	rows, err := s.svc.ApplyCapabilityTemplate(r.Context(), orgID, body.Template)
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	items := make([]map[string]any, 0, len(rows))
+	for _, c := range rows {
+		items = append(items, map[string]any{
+			"id": c.ID, "key": c.Key, "description": c.Description, "source": c.Source,
+		})
+	}
+	writeJSON(w, http.StatusCreated, map[string]any{"items": items})
 }
 
 func (s *Server) handleDeleteAppCapability(w http.ResponseWriter, r *http.Request) {
@@ -204,6 +236,7 @@ func (s *Server) handleCreateAppGrant(w http.ResponseWriter, r *http.Request) {
 		ExpiresAt   string `json:"expires_at"`
 
 		AllCapabilities    bool                  `json:"all_capabilities"`
+		AllScopes          bool                  `json:"all_scopes"`
 		ExceptCapabilities []string              `json:"except_capabilities"`
 		ExceptScopes       []service.AppScopeRef `json:"except_scopes"`
 		ExceptAppUserIDs   []string              `json:"except_app_user_ids"`
@@ -219,6 +252,7 @@ func (s *Server) handleCreateAppGrant(w http.ResponseWriter, r *http.Request) {
 		ScopeKind: body.ScopeKind, ScopeID: body.ScopeID,
 		GrantedBy:          p.ActorLabel(),
 		AllCapabilities:    body.AllCapabilities,
+		AllScopes:          body.AllScopes,
 		ExceptCapabilities: body.ExceptCapabilities,
 		ExceptScopes:       body.ExceptScopes,
 		ExceptAppUserIDs:   body.ExceptAppUserIDs,
@@ -241,7 +275,8 @@ func (s *Server) handleCreateAppGrant(w http.ResponseWriter, r *http.Request) {
 		"id": grant.ID, "app_user_id": grant.AppUserID.String, "group_id": grant.GroupID.String,
 		"subject_kind": grant.SubjectKind, "role_id": grant.RoleID.String,
 		"scope_kind": grant.ScopeKind, "scope_id": grant.ScopeID,
-		"all_capabilities": grant.AllCapabilities, "constraint": grant.ConstraintKind,
+		"all_capabilities": grant.AllCapabilities, "all_scopes": grant.AllScopes,
+		"constraint": grant.ConstraintKind,
 	})
 }
 
@@ -287,6 +322,7 @@ func (s *Server) handleAppUserAccess(w http.ResponseWriter, r *http.Request) {
 		// and allow more than the merchant granted, so these are always
 		// present rather than omitted when empty.
 		item["all_capabilities"] = g.AllCapabilities
+		item["all_scopes"] = g.AllScopes
 		item["except_capabilities"] = nonNil(g.ExceptCapabilities)
 		item["except_scopes"] = scopeRefs(g.Except)
 		item["constraint"] = string(g.Constraint)
@@ -413,6 +449,7 @@ func (s *Server) handleListAppGrants(w http.ResponseWriter, r *http.Request) {
 			"scope_kind": g.ScopeKind, "scope_id": g.ScopeID,
 			"subject_kind": g.SubjectKind, "subject_label": g.AppUserEmail,
 			"all_capabilities":    g.AllCapabilities,
+			"all_scopes":          g.AllScopes,
 			"except_capabilities": stringsOrEmpty(g.ExceptCapabilities),
 			"except_scopes":       exceptScopesJSON(g.ExceptScopes),
 			"except_app_users":    stringsOrEmpty(g.ExceptAppUserIds),

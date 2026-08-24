@@ -30,6 +30,7 @@ type AppCapability struct {
 	Key            string    `json:"key"`
 	Description    string    `json:"description"`
 	CreatedAt      time.Time `json:"created_at"`
+	Source         string    `json:"source"`
 }
 
 type AppGrant struct {
@@ -49,6 +50,7 @@ type AppGrant struct {
 	AllCapabilities    bool               `json:"all_capabilities"`
 	ExceptCapabilities []string           `json:"except_capabilities"`
 	ConstraintKind     string             `json:"constraint_kind"`
+	AllScopes          bool               `json:"all_scopes"`
 }
 
 type AppRole struct {

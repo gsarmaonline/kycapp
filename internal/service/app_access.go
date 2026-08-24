@@ -303,7 +303,13 @@ type AppGrantInput struct {
 
 	// AllCapabilities carries every capability in the organisation's namespace,
 	// including ones declared later. RoleID must be empty when it is set.
-	AllCapabilities    bool
+	AllCapabilities bool
+	// AllScopes carries every scope in the organisation, of every kind,
+	// including kinds declared later. It is the widest a grant can be, because
+	// an organisation is where a merchant's world ends. ScopeKind and ScopeID
+	// must be empty when it is set, the same way RoleID must be empty under
+	// AllCapabilities: a grant cannot be both everywhere and somewhere.
+	AllScopes          bool
 	ExceptCapabilities []string
 	ExceptScopes       []AppScopeRef
 	ExceptAppUserIDs   []string
@@ -326,9 +332,7 @@ const (
 func (s *Service) CreateAppGrant(ctx context.Context, orgID string, in AppGrantInput) (sqlc.AppGrant, error) {
 	kind := strings.ToLower(strings.TrimSpace(in.ScopeKind))
 	scopeID := strings.TrimSpace(in.ScopeID)
-	if kind == "" || scopeID == "" {
-		return sqlc.AppGrant{}, apperr.Validation("scope_kind and scope_id are required")
-	}
+
 	declared, err := s.db.Q().ListAppScopeTypes(ctx, orgID)
 	if err != nil {
 		return sqlc.AppGrant{}, err
@@ -337,10 +341,24 @@ func (s *Service) CreateAppGrant(ctx context.Context, orgID string, in AppGrantI
 	for _, d := range declared {
 		declaredKinds[d.Kind] = struct{}{}
 	}
-	if _, ok := declaredKinds[kind]; !ok {
-		// The kind is checked; the id deliberately is not. An undeclared kind
-		// would silently match nothing, which is the worst way to fail.
-		return sqlc.AppGrant{}, apperr.Validation("scope kind not declared: " + kind)
+
+	switch {
+	case in.AllScopes && (kind != "" || scopeID != ""):
+		// A grant is everywhere or somewhere, never both. Accepting a kind here
+		// would leave a row whose scope columns are ignored, and the next reader
+		// would reasonably believe them.
+		return sqlc.AppGrant{}, apperr.Validation("an organisation-wide grant carries no scope_kind or scope_id")
+	case in.AllScopes:
+		kind, scopeID = "", ""
+	case kind == "" || scopeID == "":
+		return sqlc.AppGrant{}, apperr.Validation("scope_kind and scope_id are required unless all_scopes is set")
+	default:
+		if _, ok := declaredKinds[kind]; !ok {
+			// The kind is checked; the id deliberately is not, beyond the
+			// wildcard. An undeclared kind would silently match nothing, which
+			// is the worst way to fail.
+			return sqlc.AppGrant{}, apperr.Validation("scope kind not declared: " + kind)
+		}
 	}
 
 	// A grant carries a role or the wildcard, never both and never neither.
@@ -400,7 +418,7 @@ func (s *Service) CreateAppGrant(ctx context.Context, orgID string, in AppGrantI
 		return s.db.Q().CreateAppEveryoneGrant(ctx, sqlc.CreateAppEveryoneGrantParams{
 			ID: ids.New(), OrganisationID: orgID, RoleID: roleID,
 			ScopeKind: kind, ScopeID: scopeID, ExpiresAt: expires, GrantedBy: in.GrantedBy,
-			AllCapabilities: in.AllCapabilities, ExceptCapabilities: exceptCaps,
+			AllCapabilities: in.AllCapabilities, AllScopes: in.AllScopes, ExceptCapabilities: exceptCaps,
 			ExceptScopes: exceptScopes, ExceptAppUserIds: excluded, ConstraintKind: constraint,
 		})
 
@@ -422,7 +440,7 @@ func (s *Service) CreateAppGrant(ctx context.Context, orgID string, in AppGrantI
 		return s.db.Q().CreateAppGroupGrant(ctx, sqlc.CreateAppGroupGrantParams{
 			ID: ids.New(), OrganisationID: orgID, GroupID: textArg(in.GroupID), RoleID: roleID,
 			ScopeKind: kind, ScopeID: scopeID, ExpiresAt: expires, GrantedBy: in.GrantedBy,
-			AllCapabilities: in.AllCapabilities, ExceptCapabilities: exceptCaps,
+			AllCapabilities: in.AllCapabilities, AllScopes: in.AllScopes, ExceptCapabilities: exceptCaps,
 			ExceptScopes: exceptScopes, ExceptAppUserIds: excluded, ConstraintKind: constraint,
 		})
 
@@ -438,7 +456,7 @@ func (s *Service) CreateAppGrant(ctx context.Context, orgID string, in AppGrantI
 		return s.db.Q().CreateAppUserGrant(ctx, sqlc.CreateAppUserGrantParams{
 			ID: ids.New(), OrganisationID: orgID, AppUserID: textArg(in.AppUserID), RoleID: roleID,
 			ScopeKind: kind, ScopeID: scopeID, ExpiresAt: expires, GrantedBy: in.GrantedBy,
-			AllCapabilities: in.AllCapabilities, ExceptCapabilities: exceptCaps,
+			AllCapabilities: in.AllCapabilities, AllScopes: in.AllScopes, ExceptCapabilities: exceptCaps,
 			ExceptScopes: exceptScopes, ConstraintKind: constraint,
 		})
 	}
@@ -786,6 +804,7 @@ func (s *Service) AppAccessFor(ctx context.Context, orgID, appUserID string) (Ap
 			Constraint:   AppConstraint(r.ConstraintKind),
 			Source:       grantSource(r.SubjectKind, r.GroupKey, r.RoleKey, r.AllCapabilities),
 		}
+		g.AllScopes = r.AllScopes
 		if r.AllCapabilities {
 			g.AllCapabilities = true
 			g.ExceptCapabilities = append(g.ExceptCapabilities, r.ExceptCapabilities...)
