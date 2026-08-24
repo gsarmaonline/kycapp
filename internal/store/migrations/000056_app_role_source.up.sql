@@ -1,0 +1,21 @@
+-- Where a role came from, matching app_capabilities.source.
+--
+-- A template may now declare roles and the inheritance between them, not only
+-- capabilities. A role is where the shape of an access model actually lives:
+-- almost every product has admin extending member extending viewer, and every
+-- merchant was building that chain by hand because templates stopped at the
+-- vocabulary.
+--
+-- The column exists for the same reason the capability one does. A template row
+-- and an authored row are otherwise identical, and "why does this role exist,
+-- and who decided what it grants?" stops being answerable the moment the person
+-- who applied the template has moved on.
+--
+-- What a template still never creates is a grant. A role confers nothing until
+-- one carries it, so seeding roles is a starting point a merchant can edit,
+-- while seeding a grant would be issuing access nobody authorised. That line is
+-- held in code by ApplyCapabilityTemplate and pinned by
+-- TestTemplatesNeverIssueAGrant.
+--
+-- Empty means authored by hand, which is what every existing row is.
+ALTER TABLE app_roles ADD COLUMN IF NOT EXISTS source TEXT NOT NULL DEFAULT '';

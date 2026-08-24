@@ -58,6 +58,7 @@ sql:
       - "internal/store/migrations/000053_app_user_group_extends.up.sql"
       - "internal/store/migrations/000054_app_grant_scope_wildcard.up.sql"
       - "internal/store/migrations/000055_app_capability_source.up.sql"
+      - "internal/store/migrations/000056_app_role_source.up.sql"
     gen:
       go:
         package: "sqlc"

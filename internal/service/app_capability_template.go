@@ -25,12 +25,38 @@ import (
 // merchant is already looking at, and recorded as template-sourced so the
 // answer to "why does this exist?" survives the person who clicked it.
 
-// CapabilityTemplate is one named starter set.
+// CapabilityTemplate is one named starter set: a vocabulary and the shape that
+// usually goes with it.
+//
+// Roles are the half worth having. Almost every product has admin extending
+// member extending viewer, and a template that stopped at capabilities left
+// every merchant building that chain by hand. The shape is the part that
+// generalises; what each role grants is the part that does not, which is why
+// it is offered rather than seeded.
 type CapabilityTemplate struct {
 	Key         string                   `json:"key"`
 	Name        string                   `json:"name"`
 	Description string                   `json:"description"`
 	Items       []CapabilityTemplateItem `json:"items"`
+	// Roles are created in order, so a role may only extend one named before
+	// it. That keeps the chain resolvable in a single pass and makes a cycle
+	// unwritable rather than merely rejected.
+	Roles []CapabilityTemplateRole `json:"roles,omitempty"`
+}
+
+// CapabilityTemplateRole is one role a template would create.
+//
+// A template never creates a grant. A role confers nothing until one carries
+// it, so this is a starting point a merchant edits, while issuing a grant would
+// be granting access nobody authorised.
+type CapabilityTemplateRole struct {
+	Key         string `json:"key"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	// Capabilities this role adds beyond its parents.
+	Capabilities []string `json:"capabilities"`
+	// Extends names roles earlier in the same template.
+	Extends []string `json:"extends,omitempty"`
 }
 
 // CapabilityTemplateItem is one capability a template would declare.
@@ -60,6 +86,25 @@ var CapabilityTemplates = []CapabilityTemplate{
 			{Key: "billing:read", Description: "See invoices and plan"},
 			{Key: "billing:manage", Description: "Change plan or payment method"},
 		},
+		Roles: []CapabilityTemplateRole{
+			{
+				Key: "viewer", Name: "Viewer",
+				Description:  "Can see the account but change nothing.",
+				Capabilities: []string{"profile:read", "members:read", "billing:read"},
+			},
+			{
+				Key: "member", Name: "Member",
+				Description:  "A viewer who can also edit their own profile.",
+				Capabilities: []string{"profile:write"},
+				Extends:      []string{"viewer"},
+			},
+			{
+				Key: "admin", Name: "Admin",
+				Description:  "A member who can also manage the team and billing.",
+				Capabilities: []string{"members:invite", "members:remove", "billing:manage"},
+				Extends:      []string{"member"},
+			},
+		},
 	},
 	{
 		Key:         "content_workspace",
@@ -72,6 +117,25 @@ var CapabilityTemplates = []CapabilityTemplate{
 			{Key: "document:share", Description: "Share a document with someone else"},
 			{Key: "workspace:read", Description: "See the workspace"},
 			{Key: "workspace:manage", Description: "Rename or configure the workspace"},
+		},
+		Roles: []CapabilityTemplateRole{
+			{
+				Key: "reader", Name: "Reader",
+				Description:  "Can open documents but not change them.",
+				Capabilities: []string{"document:read", "workspace:read"},
+			},
+			{
+				Key: "editor", Name: "Editor",
+				Description:  "A reader who can also write and share.",
+				Capabilities: []string{"document:write", "document:share"},
+				Extends:      []string{"reader"},
+			},
+			{
+				Key: "owner", Name: "Owner",
+				Description:  "An editor who can also delete and configure the workspace.",
+				Capabilities: []string{"document:delete", "workspace:manage"},
+				Extends:      []string{"editor"},
+			},
 		},
 	},
 }
@@ -114,5 +178,76 @@ func (s *Service) ApplyCapabilityTemplate(ctx context.Context, orgID, key string
 			return nil, err
 		}
 	}
+	if err := s.applyTemplateRoles(ctx, orgID, tpl); err != nil {
+		return nil, err
+	}
+	// No grant is created here, and none ever should be. A role confers nothing
+	// until a grant carries it, which is exactly why seeding roles is a
+	// starting point and seeding a grant would be issuing access nobody asked
+	// for. TestTemplatesNeverIssueAGrant holds that line.
 	return s.db.Q().ListAppCapabilities(ctx, orgID)
+}
+
+// applyTemplateRoles creates the template's roles and the inheritance between
+// them.
+//
+// Roles are created in template order, so a parent always exists before the
+// child naming it. That is what makes the chain resolvable in one pass, and it
+// makes a cycle unwritable rather than merely rejected afterwards.
+func (s *Service) applyTemplateRoles(ctx context.Context, orgID string, tpl CapabilityTemplate) error {
+	if len(tpl.Roles) == 0 {
+		return nil
+	}
+	// Key to id, for resolving Extends. Populated as roles are created, and
+	// from the store for a key that already existed, so re-applying converges
+	// on the same chain rather than skipping it.
+	byKey := map[string]string{}
+
+	for _, role := range tpl.Roles {
+		own := role.Capabilities
+		if own == nil {
+			own = []string{}
+		}
+		if err := s.db.Q().CreateAppRoleFromTemplate(ctx, sqlc.CreateAppRoleFromTemplateParams{
+			ID:              ids.New(),
+			OrganisationID:  orgID,
+			Key:             role.Key,
+			Name:            role.Name,
+			Description:     role.Description,
+			OwnCapabilities: own,
+			Source:          tpl.Source(),
+		}); err != nil {
+			return err
+		}
+		row, err := s.db.Q().GetAppRoleByKey(ctx, sqlc.GetAppRoleByKeyParams{
+			OrganisationID: orgID, Key: role.Key,
+		})
+		if err != nil {
+			return err
+		}
+		byKey[role.Key] = row.ID
+	}
+
+	for _, role := range tpl.Roles {
+		if len(role.Extends) == 0 {
+			continue
+		}
+		parents := make([]string, 0, len(role.Extends))
+		for _, key := range role.Extends {
+			id, ok := byKey[key]
+			if !ok {
+				// Only reachable from a malformed template, since Extends may
+				// only name a role earlier in the same one.
+				return apperr.Validation("template " + tpl.Key + " extends unknown role " + key)
+			}
+			parents = append(parents, id)
+		}
+		if err := s.setAppRoleParents(ctx, orgID, byKey[role.Key], parents); err != nil {
+			return err
+		}
+	}
+	// One recompute at the end rather than per role: inheritance is resolved
+	// wholesale, so doing it once the chain is complete is both cheaper and the
+	// only point at which it is correct.
+	return s.recomputeAppRoles(ctx, orgID)
 }

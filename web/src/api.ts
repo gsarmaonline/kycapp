@@ -1309,6 +1309,18 @@ export type CapabilityTemplate = {
   name: string
   description: string
   items: { key: string; description: string }[]
+  /**
+   * The shape that usually goes with the vocabulary: admin extending member
+   * extending viewer. Never a grant, because a role gives nobody anything until
+   * one is issued, and issuing one is a decision a person has to make.
+   */
+  roles?: {
+    key: string
+    name: string
+    description: string
+    capabilities: string[]
+    extends?: string[]
+  }[]
 }
 
 export function listCapabilityTemplates(orgId: string) {

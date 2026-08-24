@@ -55,6 +55,17 @@ SELECT * FROM app_roles WHERE organisation_id = $1 ORDER BY key;
 -- name: GetAppRole :one
 SELECT * FROM app_roles WHERE id = $1;
 
+-- name: GetAppRoleByKey :one
+SELECT * FROM app_roles WHERE organisation_id = $1 AND key = $2;
+
+-- Applying a template twice must converge rather than fail, and must never
+-- relabel a role the merchant has since written by hand. DO NOTHING rather than
+-- an upsert: a key that exists is already declared, whoever declared it.
+-- name: CreateAppRoleFromTemplate :exec
+INSERT INTO app_roles (id, organisation_id, key, name, description, own_capabilities, source)
+VALUES ($1, $2, $3, $4, $5, $6, $7)
+ON CONFLICT (organisation_id, key) DO NOTHING;
+
 -- name: DeleteAppRole :exec
 DELETE FROM app_roles WHERE id = $1 AND organisation_id = $2;
 

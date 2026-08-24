@@ -77,7 +77,9 @@ export function CapabilityTemplates({
                 disabled={applying !== null}
                 onClick={() => void apply(t.key)}
               >
-                {applying === t.key ? 'Applying…' : `Apply ${t.items.length}`}
+                {applying === t.key
+                  ? 'Applying…'
+                  : `Apply ${t.items.length}${t.roles?.length ? ` + ${t.roles.length} roles` : ''}`}
               </button>
             </div>
             <button
@@ -89,14 +91,34 @@ export function CapabilityTemplates({
               {open === t.key ? 'Hide' : 'Show'} what this declares
             </button>
             {open === t.key && (
-              <ul className="cap-template-items">
-                {t.items.map((item) => (
-                  <li key={item.key}>
-                    <code>{item.key}</code>
-                    <span>{item.description}</span>
-                  </li>
-                ))}
-              </ul>
+              <>
+                <ul className="cap-template-items">
+                  {t.items.map((item) => (
+                    <li key={item.key}>
+                      <code>{item.key}</code>
+                      <span>{item.description}</span>
+                    </li>
+                  ))}
+                </ul>
+                {t.roles && t.roles.length > 0 && (
+                  <ul className="cap-template-items">
+                    {t.roles.map((role) => (
+                      <li key={role.key}>
+                        <code>{role.key}</code>
+                        <span>
+                          {role.extends && role.extends.length > 0
+                            ? `extends ${role.extends.join(', ')}, plus `
+                            : ''}
+                          {role.capabilities.join(', ')}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                <p className="cap-template-desc">
+                  No grants. A role gives nobody anything until you issue one.
+                </p>
+              </>
             )}
           </article>
         ))}
