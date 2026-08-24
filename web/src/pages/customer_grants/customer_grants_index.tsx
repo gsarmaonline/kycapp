@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
-import { deleteAppGrant, listAppGrants, type AppGrant } from '../../api'
+import { deleteAppGrant, grantScopeLabel, listAppGrants, type AppGrant } from '../../api'
 import { ConceptDocsLink } from '../../components/ConceptDocsLink'
 import { PageHeader, ResourceTable } from '../../crud/ui'
 import { resourcePath } from '../../org_nav'
@@ -85,7 +85,7 @@ export function CustomerGrantsIndex() {
               g.subject_label,
               subjectLabel(g.subject_kind),
               carries(g),
-              `${g.scope_kind} / ${g.scope_id}`,
+              grantScopeLabel(g),
               // Exclusions belong in the list, not behind a click. A grant that
               // reads as wider than it is invites someone to issue a second one.
               exceptSummary(g) || '—',

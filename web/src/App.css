@@ -2721,3 +2721,102 @@ html.dark-mode .docs-swagger {
   align-items: center;
   gap: 0.5rem;
 }
+
+/* --- Merchant graph: edges and playground --- */
+
+.edge-form {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+  gap: 0.75rem;
+  align-items: end;
+  margin: 0.75rem 0 1.25rem;
+  padding: 1rem;
+  background: var(--app-panel);
+  border: 1px solid var(--app-border);
+  border-radius: 6px;
+}
+
+.edge-form.wide {
+  grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+}
+
+.edge-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  font-size: 0.82rem;
+  min-width: 0;
+}
+
+.edge-form .form-actions {
+  grid-column: 1 / -1;
+  display: flex;
+  gap: 0.6rem;
+  margin: 0;
+}
+
+.edge-result {
+  margin-bottom: 1.5rem;
+}
+
+.reach-list {
+  list-style: none;
+  margin: 0.5rem 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.reach-list li {
+  background: var(--app-code-bg);
+  border: 1px solid var(--app-border);
+  border-radius: 4px;
+  padding: 0.25rem 0.5rem;
+  font-size: 0.82rem;
+}
+
+/* Used across the newer pages for secondary text. It had no rule at all, so
+   every "app-muted" paragraph rendered at full weight. */
+.app-muted {
+  color: var(--app-fg-muted);
+  font-size: 0.9rem;
+  max-width: 68ch;
+}
+
+/* --- What a customer can reach --- */
+
+.reachable-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr));
+  gap: 0.5rem;
+  margin: 0.75rem 0 1.5rem;
+}
+
+.reachable-card {
+  border: 1px solid var(--app-border);
+  border-radius: 5px;
+  padding: 0.6rem 0.75rem;
+  background: var(--app-panel);
+  display: grid;
+  gap: 0.35rem;
+  align-content: start;
+}
+
+.reachable-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 0.5rem;
+}
+
+.reachable-head code {
+  font-size: 0.8rem;
+}
+
+.reachable-count {
+  margin: 0;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--app-accent);
+}
