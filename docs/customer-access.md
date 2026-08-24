@@ -25,7 +25,19 @@ KYC already answers two access questions. Customer access is the third.
 | Did this organisation buy this? | Plans and entitlements | KYC's entitlement checks |
 | **May this customer do this in the merchant's product?** | **Customer access** | **The merchant's backend** |
 
-KYC does not enforce the third one, and cannot: it has no idea what a *project* of the merchant's is. Putting a check on the request path would also make KYC own the merchant's latency. So KYC stores the model and returns an assembled grant set; evaluation happens in the merchant's own process.
+**KYC evaluates the third one now.** A merchant writes the ownership and containment edges of their own product, and asks. That is the point of the tier: a merchant should not be building an authorisation layer for every app they ship.
+
+`POST /v1/organisations/{id}/edges` records what they own. `POST /v1/organisations/{id}/check` answers a question against it, with the route the walk took. The schema those questions resolve against is derived from the vocabulary they already declared, so scope kinds are types, capabilities are actions, and roles and groups are named sets: nothing new to author, and no migration when they add a kind.
+
+One grant on a container reaches everything inside it. `project:apollo #can_read role:editor#holder` plus `document:d1 #parent project:apollo` means Ana reads d1, without any grant naming d1. That is the thing an exported grant set could never do, because KYC had never heard of the document.
+
+The tenancy boundary is the namespace an edge is written in and nothing else. Every edge query filters on it and a resolver carries exactly one, so a walk physically cannot read another merchant's edges. No type name is reserved, because a name was never what kept them apart: a scope kind called `global` inside `org:acme` reaches nothing outside it.
+
+The older model still works and is unchanged. `GET /v1/app-users/{id}/access` returns an assembled grant set for a backend that wants to decide locally, which is now an optimisation rather than the only route.
+
+### What KYC could not do before
+
+It had no idea what a *project* of the merchant's was. Putting a check on the request path would also make KYC own the merchant's latency. So KYC stores the model and returns an assembled grant set; evaluation happens in the merchant's own process.
 
 The subject is **app users only**. A merchant's own KYC operators keep organisation-wide roles. Scoping *them* to projects would mean KYC's gates learning which project every resource belongs to, which is a much larger change and is not done.
 

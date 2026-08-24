@@ -1,10 +1,10 @@
 # Access by reachability
 
-> **Status: cut over. Every KYC gate now evaluates through this engine.**
-> [`core/reach`](../core/reach) is a standalone Go module with no dependencies
-> outside the standard library. The merchant tier is not yet modelled and still
-> uses the previous evaluator; see
-> [Replacing the current system](#replacing-the-current-system).
+> **Status: cut over, both tiers.** Every KYC gate evaluates through this
+> engine, and so does a merchant's own model: same engine, same table, separated
+> by `reach_edges.namespace`. [`core/reach`](../core/reach) is a standalone Go
+> module with no dependencies outside the standard library. See
+> [One engine, two namespaces](#one-engine-two-namespaces).
 
 The published design is [Access by Reachability][artifact]. This document is the
 repository's copy, with pointers into the code.
@@ -266,8 +266,28 @@ answering an authorisation question about the authorisation model, and a stale
 file is a wrong diagram rather than a disclosure. `make sdk-check` already diffs
 `web/public`, so a schema edited without regenerating fails CI.
 
-A merchant's own schema cannot work that way. Theirs is tenant data, read at
-request time and gated like anything else.
+A merchant's own schema cannot work that way. Theirs is derived per request
+from the vocabulary they declared, and served from
+`GET /v1/organisations/{id}/access-schema`.
+
+### One engine, two namespaces
+
+A merchant's model is the same engine over the same table, separated only by
+`reach_edges.namespace`. `MerchantSchema` derives their namespace from their
+scope kinds and capabilities: a scope kind is a type, a capability's resource is
+a type and its action is what that type answers, roles and groups are named sets
+reached through a relation. Containment is an arrow, so one grant at a container
+covers everything inside it.
+
+The isolation is structural. Every edge query filters on namespace and a
+resolver carries exactly one, so a walk cannot read another namespace's edges.
+Names are not addresses across the boundary: a merchant naming a type `global`
+gets `global:x` inside `org:<id>`, reaching nothing of KYC's.
+
+That is worth stating plainly because the alternative keeps suggesting itself. A
+blacklist of reserved names was there for a while, and it prevented nothing
+while implying the name carried power. It is gone, and
+`TestNamespacesCannotSeeEachOther` holds the boundary instead.
 
 ### Showing a decision to a person
 

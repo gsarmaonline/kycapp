@@ -45,11 +45,18 @@ func (s *Service) CreateAppScopeType(ctx context.Context, orgID, kind, label str
 	if !scopeKindPattern.MatchString(kind) {
 		return sqlc.AppScopeType{}, apperr.Validation("kind must be lowercase letters, digits and underscores")
 	}
-	if kind == AppScopeGlobal || kind == AppScopeOrganisation {
-		// These are KYC's own levels. Letting a merchant redefine them would
-		// let a declared scope collide with the tenancy boundary.
-		return sqlc.AppScopeType{}, apperr.Validation("kind is reserved: " + kind)
-	}
+	// No names are reserved here any more.
+	//
+	// global and organisation used to be refused, on the reasoning that a
+	// merchant redefining them could collide with the tenancy boundary. They
+	// cannot. A merchant's edges live in their own namespace and every edge
+	// query filters on it, so a scope kind called global would be global:x
+	// inside org:acme, reaching nothing outside it because no edge crosses.
+	//
+	// The blacklist was a defence in the wrong layer, and worse than redundant:
+	// it implied the name carried power, which is how a graph system grows a
+	// policy language bolted to its side. TestNamespacesCannotSeeEachOther is
+	// what holds the boundary, and it asserts the structure rather than a rule.
 	row, err := s.db.Q().CreateAppScopeType(ctx, sqlc.CreateAppScopeTypeParams{
 		ID: ids.New(), OrganisationID: orgID, Kind: kind, Label: strings.TrimSpace(label),
 	})

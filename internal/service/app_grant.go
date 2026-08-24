@@ -27,12 +27,10 @@ const MaxAppRoleDepth = 5
 // open: a name in one can never collide with, or widen, the other.
 func AppNamespace(orgID string) string { return "org:" + orgID }
 
-// Reserved scope kinds. A merchant declaring either would let one of their own
-// levels collide with the tenancy boundary.
-const (
-	AppScopeGlobal       = "global"
-	AppScopeOrganisation = "organisation"
-)
+// Nothing is reserved. These names were once refused, on the reasoning that a
+// merchant redefining them could collide with the tenancy boundary; they cannot,
+// because that boundary is the namespace an edge is written in and not the name
+// of a type. See the note in CreateAppScopeType.
 
 // AppConstraint narrows a grant using something only the request knows.
 //

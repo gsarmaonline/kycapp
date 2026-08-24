@@ -9,8 +9,23 @@ import (
 )
 
 // Namespace is KYC's own tenancy boundary. A merchant's model lives under
-// org:<id>, which is what keeps their open vocabulary out of this one.
+// MerchantNamespace(orgID), which is what keeps their open vocabulary out of
+// this one.
 const Namespace = "kyc"
+
+// MerchantNamespace is where one merchant's own model lives.
+//
+// The isolation between namespaces is structural, not a rule anyone enforces.
+// Every edge query filters on namespace and a resolver carries exactly one, so
+// a walk physically cannot read another namespace's edges. Nothing needs to
+// forbid a merchant from naming a scope kind "global": inside org:acme it would
+// be global:x, reaching nothing outside, because no edge crosses.
+//
+// That is worth stating because the alternative keeps suggesting itself. A
+// blacklist of reserved names implies the name carries power, and a system that
+// believes that grows a policy language bolted to the side of the graph.
+// TestNamespacesCannotSeeEachOther is what actually holds this.
+func MerchantNamespace(orgID string) string { return "org:" + orgID }
 
 // Querier is the slice of the store the resolver needs. Narrow on purpose: the
 // evaluator reads edges and nothing else, and a resolver that could reach the
@@ -45,21 +60,35 @@ const (
 type Resolver struct {
 	q      Querier
 	source Source
+	// namespace is the only thing separating one tenant's graph from another's.
+	// It is a field rather than a constant because a merchant's model is the
+	// same engine over the same table, and the constant was the single line
+	// pinning all of this to one tenant.
+	namespace string
 }
 
-// NewResolver returns a Resolver reading the live view.
-func NewResolver(q Querier) *Resolver { return &Resolver{q: q, source: SourceLive} }
+// NewResolver returns a Resolver reading the live view of KYC's own namespace.
+func NewResolver(q Querier) *Resolver {
+	return &Resolver{q: q, source: SourceLive, namespace: Namespace}
+}
+
+// NewResolverIn returns a Resolver over one namespace, reading written edges
+// only. A merchant's model has no legacy tables behind a view, so there is
+// nothing for SourceLive to add.
+func NewResolverIn(q Querier, namespace string) *Resolver {
+	return &Resolver{q: q, source: SourceEdges, namespace: namespace}
+}
 
 // NewResolverFrom returns a Resolver reading the named source.
 func NewResolverFrom(q Querier, source Source) *Resolver {
-	return &Resolver{q: q, source: source}
+	return &Resolver{q: q, source: source, namespace: Namespace}
 }
 
 // Edges implements reach.Resolver.
 func (r *Resolver) Edges(ctx context.Context, object reach.NodeRef, relation string) ([]reach.Edge, error) {
 	if r.source == SourceEdges {
 		rows, err := r.q.ListReachEdges(ctx, sqlc.ListReachEdgesParams{
-			Namespace:  Namespace,
+			Namespace:  r.namespace,
 			ObjectType: object.Type,
 			ObjectID:   object.ID,
 			Relation:   relation,
@@ -76,7 +105,7 @@ func (r *Resolver) Edges(ctx context.Context, object reach.NodeRef, relation str
 	}
 
 	rows, err := r.q.ListLiveEdges(ctx, sqlc.ListLiveEdgesParams{
-		Namespace:  Namespace,
+		Namespace:  r.namespace,
 		ObjectType: object.Type,
 		ObjectID:   object.ID,
 		Relation:   relation,
@@ -100,7 +129,7 @@ func (r *Resolver) Edges(ctx context.Context, object reach.NodeRef, relation str
 func (r *Resolver) EdgesForSubject(ctx context.Context, subject reach.NodeRef) ([]reach.Edge, error) {
 	if r.source == SourceEdges {
 		rows, err := r.q.ListReachEdgesForSubject(ctx, sqlc.ListReachEdgesForSubjectParams{
-			Namespace:   Namespace,
+			Namespace:   r.namespace,
 			SubjectType: subject.Type,
 			SubjectID:   subject.ID,
 		})
@@ -115,7 +144,7 @@ func (r *Resolver) EdgesForSubject(ctx context.Context, subject reach.NodeRef) (
 		return out, nil
 	}
 	rows, err := r.q.ListLiveEdgesForSubject(ctx, sqlc.ListLiveEdgesForSubjectParams{
-		Namespace:   Namespace,
+		Namespace:   r.namespace,
 		SubjectType: subject.Type,
 		SubjectID:   subject.ID,
 	})
