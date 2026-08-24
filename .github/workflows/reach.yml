@@ -1,0 +1,47 @@
+name: Reach
+
+# core/reach is the portable authorisation engine. It is a separate module with
+# zero dependencies because the same walk has to run in the API and inside a
+# tenant's own backend against their own resource graph. The dependency check
+# below is the point: if this module ever grows one, it stops being embeddable.
+#
+# This guard used to sit on core/access, which core/reach replaced. The module
+# changed; the property worth protecting did not.
+on:
+  push:
+    branches: [main]
+  pull_request:
+    paths:
+      - "core/reach/**"
+      - ".github/workflows/reach.yml"
+
+jobs:
+  reach:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: core/reach
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: core/reach/go.mod
+
+      - name: Vet
+        run: go vet ./...
+
+      - name: Test with race detector
+        run: go test ./... -count=1 -race -cover
+
+      - name: Assert the module stays dependency-free
+        run: |
+          deps=$(go list -m all | tail -n +2 | wc -l)
+          if [ "$deps" -ne 0 ]; then
+            echo "core/reach must have zero dependencies, found $deps:"
+            go list -m all | tail -n +2
+            exit 1
+          fi
+
+      - name: Check formatting
+        run: test -z "$(gofmt -l .)" || { gofmt -l .; exit 1; }
