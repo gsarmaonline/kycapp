@@ -584,8 +584,19 @@ export function DocsConceptsIndex() {
 
       {groups.map((group) => (
         <section key={group.id} className="docs-concept-group">
-          <h2>{group.label}</h2>
-          <p className="docs-concept-group-hint">{group.hint}</p>
+          {/*
+            The heading and its hint sit in a banded header rather than floating
+            above the list. Spacing alone did not separate one group from the
+            next: every row already carried a rule, so a group boundary looked
+            exactly like a row divider.
+          */}
+          <header className="docs-concept-group-head">
+            <h2>{group.label}</h2>
+            <p className="docs-concept-group-hint">{group.hint}</p>
+            <span className="docs-concept-count">
+              {group.items.length} {group.items.length === 1 ? 'concept' : 'concepts'}
+            </span>
+          </header>
           <ul className="docs-concept-list">
             {group.items.map((item) => (
               <li key={item.slug}>
