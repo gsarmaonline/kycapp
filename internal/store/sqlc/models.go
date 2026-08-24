@@ -377,6 +377,19 @@ type ProductPlanPrice struct {
 	Status              string `json:"status"`
 }
 
+type ReachEdge struct {
+	Namespace       string             `json:"namespace"`
+	ObjectType      string             `json:"object_type"`
+	ObjectID        string             `json:"object_id"`
+	Relation        string             `json:"relation"`
+	SubjectType     string             `json:"subject_type"`
+	SubjectID       string             `json:"subject_id"`
+	SubjectRelation string             `json:"subject_relation"`
+	ExpiresAt       pgtype.Timestamptz `json:"expires_at"`
+	Source          string             `json:"source"`
+	CreatedAt       time.Time          `json:"created_at"`
+}
+
 type RecoveryCredential struct {
 	ID          string             `json:"id"`
 	Name        string             `json:"name"`

@@ -1,7 +1,8 @@
 # Access by reachability
 
-> **Status: the engine and KYC's own domain schema are built and tested;
-> nothing is wired to a request path yet.**
+> **Status: the engine, KYC's domain schema, the edge table, the Postgres
+> resolver and the projection are built and tested against a real database.
+> Nothing is wired to a request path yet.**
 > [`core/reach`](../core/reach) is a standalone Go module with no dependencies
 > outside the standard library. The system it replaces is documented in
 > [authorisation.md](authorisation.md), which stays authoritative until the
@@ -451,7 +452,10 @@ authorisation and nothing to compare against.
 | 2 | `Resolver` interface, in-memory implementation | `core/reach/graph.go` |
 | 3 | The walk: visited set, depth bound, path, reasons | `core/reach/walk.go` |
 | 4 | The delegation check | `core/reach/delegate.go` |
-| 5 | KYC's own domain expressed in the schema | [`internal/accessmodel`](../internal/accessmodel) |
+| 5 | KYC's own domain expressed in the schema | [`internal/accessmodel/schema.go`](../internal/accessmodel/schema.go) |
+| 6 | Edge table and its constraints | [`migrations/000050_reach_edges.up.sql`](../internal/store/migrations/000050_reach_edges.up.sql) |
+| 7 | Postgres resolver | [`internal/accessmodel/resolver.go`](../internal/accessmodel/resolver.go) |
+| 8 | Projection of the current model into edges | [`internal/accessmodel/projection.sql`](../internal/accessmodel/projection.sql) |
 
 All thirteen worked examples from the design run as tests, and
 `TestEveryPermissionKeyMaps` checks the projection table against the registry
@@ -493,21 +497,57 @@ the engine. It was the only feature that made the walk bidirectional; every
 other term runs inward from the resource. The evaluator is now uniformly
 inward, which is simpler to reason about and to index.
 
+### Storage
+
+One table holds the entire data model. There is no capability table, no scope
+table and no grant table, because a group, a role, a container, a tag and an
+action are all nodes, and every fact about them is an edge.
+
+The resolver's only query is an exact prefix of the primary key, so it stays an
+index lookup however large the table grows. Expiry is not filtered in SQL: the
+evaluator is handed the time to decide against, so the query and the walk cannot
+disagree about what "now" means.
+
+Two constraints are enforced by the database rather than by application code:
+`object_type` and `subject_type` may not be `*`, because reach over every type
+at once is the environment-derived root of trust and stays outside the data; and
+a userset may not sit on a star node, because it would name nobody in particular.
+
+### The projection
+
+`accessmodel.Project` applies [`projection.sql`](../internal/accessmodel/projection.sql).
+It is a function rather than a data migration on purpose: a projection buried in
+a schema change can be neither re-run nor tested, and this one has to be both.
+Every statement is `ON CONFLICT DO NOTHING`, so it is idempotent and can run
+again at cutover to pick up whatever was written since.
+
+| Source | Becomes |
+| --- | --- |
+| `role_permissions` | `<area>:<org> #can_<action> role:<id>#holder` |
+| a role, by existing | `organisation:<org> #belongs role:<id>#holder` |
+| a role in the platform organisation | the same edges on the `*` node, plus `organisation:* #oversees` |
+| `memberships` | `role:<id> #holder user:<id>`, carrying its expiry |
+| a non-active organisation | `organisation:<id> #suspended role:<r>#holder` |
+| `api_keys` | the key's own grant edges, plus `key:<id> #owner user:<id>` |
+
+Global reach is derived from membership of the platform organisation, exactly as
+`ListUserGrantSources` derives it, and never stored. The `COALESCE` keeps it
+failing closed: with no `system_state` row the comparison is NULL and nobody
+gets reach.
+
+An API key's scope list is applied **once**, here. What a key can do afterwards
+is readable rather than simulated, and revoking it is deleting rows.
+
 **Not done, in the order it should happen:**
 
-1. **A Postgres `Resolver`**, plus the edge tables and a migration that projects
-   the existing `permissions`, `roles`, `role_permissions`, `memberships`,
-   `app_grants` and `app_role_extends` rows into edges. Existing API keys
-   project once into explicit edges carrying their current effective reach;
-   there is no ongoing recompute.
-2. **Run both engines side by side** on the same requests and log every
+1. **Run both engines side by side** on the same requests and log every
    disagreement. The current suite becomes the differential test.
-3. **Cut the gates over**, one authorisation kind at a time, starting with the
+2. **Cut the gates over**, one authorisation kind at a time, starting with the
    route table's `authOrgPermission` rules because they are enforced from one
    place.
-4. **Model the merchant tier.** The app-user side is not yet expressed, and it
+3. **Model the merchant tier.** The app-user side is not yet expressed, and it
    is the half with open vocabulary, so it will exercise the namespace boundary
    harder than KYC's own tier did.
-5. **Delete the old implementation** and its migrations once nothing calls it.
-6. **The reverse index**, behind an unchanged interface. Not before there is a
+4. **Delete the old implementation** and its migrations once nothing calls it.
+5. **The reverse index**, behind an unchanged interface. Not before there is a
    storage engine to index.
