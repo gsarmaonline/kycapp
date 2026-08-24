@@ -780,3 +780,74 @@ func TestSelfConstraintReachesTheBackend(t *testing.T) {
 		t.Errorf("an unknown constraint must be rejected, got %d", code)
 	}
 }
+
+// The response shape is a published contract: merchant backends read these
+// fields in their own process, and both SDKs are generated against them. This
+// pins every key, so the merchant tier can be re-modelled internally without
+// the wire format moving underneath anyone.
+func TestAccessSetWireFormatIsStable(t *testing.T) {
+	f := newAppAccess(t, "wire")
+	f.declareScope(t, "project")
+	f.declareCapability(t, "deploy:read")
+	roleID := f.createRole(t, "reader", []string{"deploy:read"}, nil)
+	userID := f.createAppUser(t, "wire@customer.com")
+
+	if code, out := f.post(t, "/app-grants", map[string]any{
+		"app_user_id": userID, "role_id": roleID,
+		"scope_kind": "project", "scope_id": "p1",
+		"constraint":    "self_subject",
+		"except_scopes": []map[string]any{{"kind": "project", "id": "secret"}},
+	}); code != http.StatusCreated {
+		t.Fatalf("grant: %d %v", code, out)
+	}
+
+	set := f.accessFor(t, userID)
+	for _, key := range []string{"app_user_id", "namespace", "version", "grants"} {
+		if _, ok := set[key]; !ok {
+			t.Errorf("response is missing %q", key)
+		}
+	}
+
+	grants := set["grants"].([]any)
+	if len(grants) != 1 {
+		t.Fatalf("want one grant, got %d", len(grants))
+	}
+	g := grants[0].(map[string]any)
+
+	// Present on every grant, never omitted when empty: a backend reading only
+	// `capabilities` would treat a narrowed grant as a plain one and allow more
+	// than was granted.
+	for _, key := range []string{
+		"id", "scope_kind", "scope_id", "capabilities", "source",
+		"all_capabilities", "except_capabilities", "except_scopes", "constraint",
+	} {
+		if _, ok := g[key]; !ok {
+			t.Errorf("grant is missing %q: %v", key, g)
+		}
+	}
+
+	if g["constraint"] != "self_subject" {
+		t.Errorf("constraint = %v, wanted self_subject", g["constraint"])
+	}
+	if g["all_capabilities"] != false {
+		t.Errorf("all_capabilities = %v, wanted false", g["all_capabilities"])
+	}
+	if caps, ok := g["capabilities"].([]any); !ok || len(caps) != 1 || caps[0] != "deploy:read" {
+		t.Errorf("capabilities = %v, wanted [deploy:read]", g["capabilities"])
+	}
+	// An absent list serialises as [] rather than null.
+	if ex, ok := g["except_capabilities"].([]any); !ok || len(ex) != 0 {
+		t.Errorf("except_capabilities = %v, wanted []", g["except_capabilities"])
+	}
+	scopes, ok := g["except_scopes"].([]any)
+	if !ok || len(scopes) != 1 {
+		t.Fatalf("except_scopes = %v, wanted one entry", g["except_scopes"])
+	}
+	if sc := scopes[0].(map[string]any); sc["kind"] != "project" || sc["id"] != "secret" {
+		t.Errorf("except_scopes[0] = %v", sc)
+	}
+	// expires_at appears only on a grant that has one.
+	if _, present := g["expires_at"]; present {
+		t.Errorf("expires_at must be omitted on a standing grant")
+	}
+}

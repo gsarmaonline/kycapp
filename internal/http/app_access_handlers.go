@@ -5,8 +5,6 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/gsarmaonline/kyc/core/access"
-
 	"github.com/gsarmaonline/kyc/internal/apperr"
 	"github.com/gsarmaonline/kyc/internal/service"
 	"github.com/gsarmaonline/kyc/internal/store/sqlc"
@@ -279,10 +277,7 @@ func (s *Server) handleAppUserAccess(w http.ResponseWriter, r *http.Request) {
 	}
 	grants := make([]map[string]any, 0, len(set.Grants))
 	for _, g := range set.Grants {
-		caps := make([]string, 0, len(g.Capabilities))
-		for _, c := range g.Capabilities {
-			caps = append(caps, c.Key)
-		}
+		caps := g.Capabilities
 		item := map[string]any{
 			"id": g.ID, "scope_kind": g.Scope.Kind, "scope_id": g.Scope.ID,
 			"capabilities": caps, "source": g.Source,
@@ -291,8 +286,8 @@ func (s *Server) handleAppUserAccess(w http.ResponseWriter, r *http.Request) {
 		// reads only capabilities would treat a narrowed grant as a plain one
 		// and allow more than the merchant granted, so these are always
 		// present rather than omitted when empty.
-		item["all_capabilities"] = g.AllCapabilitiesIn != ""
-		item["except_capabilities"] = capabilityKeys(g.ExceptCapabilities)
+		item["all_capabilities"] = g.AllCapabilities
+		item["except_capabilities"] = nonNil(g.ExceptCapabilities)
 		item["except_scopes"] = scopeRefs(g.Except)
 		item["constraint"] = string(g.Constraint)
 		if g.ExpiresAt != nil {
@@ -436,15 +431,17 @@ func (s *Server) handleListAppGrants(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"items": items})
 }
 
-func capabilityKeys(caps []access.Capability) []string {
-	out := make([]string, 0, len(caps))
-	for _, c := range caps {
-		out = append(out, c.Key)
+// nonNil keeps an absent list serialising as [] rather than null. A backend
+// that treats null as "no exceptions" would be right; one that dereferences it
+// would not, and this costs nothing.
+func nonNil(in []string) []string {
+	if in == nil {
+		return []string{}
 	}
-	return out
+	return in
 }
 
-func scopeRefs(scopes []access.Scope) []service.AppScopeRef {
+func scopeRefs(scopes []service.AppScope) []service.AppScopeRef {
 	out := make([]service.AppScopeRef, 0, len(scopes))
 	for _, sc := range scopes {
 		out = append(out, service.AppScopeRef{Kind: sc.Kind, ID: sc.ID})

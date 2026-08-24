@@ -577,6 +577,8 @@ view now gives a key the organisations its owner reaches.
 2. **Retire the view's legacy branches**, one at a time. Each removal is paired
    with running the projection so those edges become rows in `reach_edges`, and
    with teaching the write path that changes them to write edges directly.
-3. **Delete `core/access`** and the old tables once nothing reads them.
+3. **Delete the old tables** once nothing reads them. `core/access` itself is
+   already gone: the merchant tier now owns its wire format and borrows only
+   `reach.ExpandSets` for role inheritance.
 4. **The reverse index**, behind an unchanged interface. Not before there is a
    storage engine to index.

@@ -56,7 +56,7 @@ The merchant's capabilities live in the namespace `org:<id>`. KYC's own set stay
 
 A capability set with a name. Grants carry roles rather than raw capabilities, so *maintainer* can change in one place and every holder follows.
 
-A role may **build on** others. What it resolves to is materialised at write time, so a check never walks a chain and editing a base role updates everything built on it. Roles never subtract, so the resolved set stays predictable however deep the chain runs. The depth cap is `MaxRoleDepth` in [`core/access`](../core/access).
+A role may **build on** others. What it resolves to is materialised at write time, so a check never walks a chain and editing a base role updates everything built on it. Roles never subtract, so the resolved set stays predictable however deep the chain runs. The depth cap is `MaxAppRoleDepth`.
 
 ### Groups
 
@@ -126,9 +126,8 @@ A grant with `all_capabilities` lists no capabilities and carries the most; one
 with `except_scopes` reaches less than its scope suggests; one with
 `"constraint": "self_subject"` applies only to rows the holder owns. Code that
 reads `capabilities` alone will allow more than was granted, and KYC cannot stop
-it — the evaluation happens in your process. Embed
-[`core/access`](../core/access) if you are in Go; it is a zero-dependency module
-for exactly this reason.
+it — the evaluation happens in your process. Read every field, not just
+`capabilities`.
 
 `expires_at` appears only on a grant that has one. The backend caches the set against `version` and evaluates locally through the SDK.
 
@@ -144,13 +143,14 @@ These are the [invariants](authorisation.md#invariants) as they apply to this na
 2. **No grant subtracts from another.** A grant may narrow itself with exceptions; it can never veto a different grant. That is what keeps grants unordered and evaluation first-match.
 3. **Capabilities are closed per namespace.** Open for the merchant, closed for KYC. The boundary is structural rather than checked: a merchant capability is stored in a table scoped to the organisation and stamped `org:<id>` whenever it is read, so it has no way to name anything in `kyc`. `CreateAppCapability` additionally validates the key through the evaluator's own registry, so a merchant cannot declare a shape KYC would reject.
 4. **Out of scope is indistinguishable from absent.** A customer with no grant for a scope cannot tell it apart from a scope that does not exist.
-5. **No principal grants what it does not hold.** `CanGrantInNamespace` in `core/access` implements this, but nothing calls it yet — the boundary currently rests on point 3 alone. Tracked in [authorisation.md](authorisation.md#merchant-hosted-access-control).
+5. **No principal grants what it does not hold.** Not yet enforced on this tier; the boundary rests on point 3 alone. The KYC tier has it (`CanWrite` in [`core/reach`](../core/reach)), and this tier gets it when it is modelled there.
 
 ## Where it lives
 
 | Piece | Location |
 | --- | --- |
-| Evaluator (`Decide`, `ExpandRoles`, delegation) | [`core/access`](../core/access) — a zero-dependency module, so the SDK can embed it |
+| Role inheritance (`ExpandSets`) | [`core/reach`](../core/reach) — a zero-dependency module |
+| Wire format (`AppGrant`, `AppScope`, `AppConstraint`) | `internal/service/app_grant.go` — inert types, no evaluator |
 | Storage and assembly | `internal/service/app_access.go` |
 | HTTP surface | `internal/http/app_access_handlers.go` |
 | UI | Each organisation's **Customer access** section, one page per object |
