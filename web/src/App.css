@@ -2628,3 +2628,96 @@ html.dark-mode .docs-swagger {
 .group-parents-name {
   color: var(--app-fg-muted);
 }
+
+/* --- Capability starter templates --- */
+
+.cap-templates {
+  border: 1px solid var(--app-border);
+  border-radius: 6px;
+  padding: 1rem 1.1rem;
+  margin: 1rem 0;
+  background: var(--app-panel);
+  display: grid;
+  gap: 0.6rem;
+}
+
+.cap-templates-title {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.cap-templates-hint {
+  margin: 0;
+  font-size: 0.88rem;
+  color: var(--app-fg-muted);
+  max-width: 66ch;
+}
+
+.cap-template-list {
+  display: grid;
+  gap: 0.6rem;
+}
+
+.cap-template {
+  border: 1px solid var(--app-border);
+  border-radius: 5px;
+  padding: 0.75rem 0.9rem;
+  display: grid;
+  gap: 0.45rem;
+}
+
+.cap-template-head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: start;
+  justify-content: space-between;
+}
+
+.cap-template-desc {
+  margin: 0.15rem 0 0;
+  font-size: 0.85rem;
+  color: var(--app-fg-muted);
+  max-width: 52ch;
+}
+
+.cap-template-toggle {
+  justify-self: start;
+  font-size: 0.82rem;
+}
+
+.cap-template-items {
+  list-style: none;
+  margin: 0;
+  padding: 0.5rem 0 0;
+  border-top: 1px solid var(--app-border);
+  display: grid;
+  gap: 0.25rem;
+}
+
+.cap-template-items li {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  align-items: baseline;
+  font-size: 0.85rem;
+}
+
+.cap-template-items span {
+  color: var(--app-fg-muted);
+}
+
+.field-hint {
+  display: block;
+  margin-top: 0.2rem;
+  font-size: 0.78rem;
+  color: var(--app-fg-muted);
+}
+
+.inline-check {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 0.5rem;
+}

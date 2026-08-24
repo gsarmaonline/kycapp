@@ -84,6 +84,14 @@ type AppGrant struct {
 	// AllCapabilities carries every capability in the organisation's namespace,
 	// including ones declared after the grant was written.
 	AllCapabilities bool
+	// AllScopes carries every scope of every kind in the organisation. It is the
+	// widest a grant can be: an organisation is where a merchant's world ends,
+	// so nothing reaches past it. Scope is empty when this is set.
+	//
+	// The narrower wildcard needs no field of its own. Scope.ID of "*" means
+	// every instance of that kind, which is the same star the rest of the system
+	// uses for "everything of this type".
+	AllScopes bool
 	// ExceptCapabilities are carved out of the wildcard. Meaningless without
 	// one, since a concrete list simply omits what it does not grant.
 	ExceptCapabilities []string

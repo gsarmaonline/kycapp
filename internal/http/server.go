@@ -189,6 +189,8 @@ func (s *Server) routeTable() []route {
 		{"GET", "/v1/organisations/{id}/app-capabilities", s.handleListAppCapabilities, orgPermission("app_access:read")},
 		{"POST", "/v1/organisations/{id}/app-capabilities", s.handleCreateAppCapability, orgPermission("app_access:manage")},
 		{"DELETE", "/v1/organisations/{id}/app-capabilities/{capId}", s.handleDeleteAppCapability, orgPermission("app_access:manage")},
+		{"GET", "/v1/organisations/{id}/app-capability-templates", s.handleListCapabilityTemplates, orgPermission("app_access:read")},
+		{"POST", "/v1/organisations/{id}/app-capability-templates/apply", s.handleApplyCapabilityTemplate, orgPermission("app_access:manage")},
 		{"GET", "/v1/organisations/{id}/app-roles", s.handleListAppRoles, orgPermission("app_access:read")},
 		{"POST", "/v1/organisations/{id}/app-roles", s.handleCreateAppRole, orgPermission("app_access:manage")},
 		{"PATCH", "/v1/organisations/{id}/app-roles/{roleId}", s.handlePatchAppRole, orgPermission("app_access:manage")},

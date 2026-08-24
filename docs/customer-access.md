@@ -48,7 +48,9 @@ Kinds are **flat and independent, not a tree**. When a resource belongs to sever
 
 ### Capabilities
 
-One thing a customer may do: `invoices:read`, `docs:write`. The set is **open** — whatever the merchant declares is valid — but a role may use nothing outside it. That is the reason to declare them at all: a mistyped capability is rejected when the role is built, instead of quietly granting nothing at the moment it matters.
+One thing a customer may do: `invoices:read`, `docs:write`.
+
+**Nothing is seeded.** A new organisation starts with an empty vocabulary, deliberately: this set is the merchant's own, so a default shipped by KYC is a guess about a product it has never seen, and a wrong guess is one merchants work around rather than delete. The empty Capabilities page instead offers **starter templates** a merchant applies with one click, after seeing the full list. Every row a template creates records `source`, so "why does this capability exist?" stays answerable once the person who applied it has moved on. An authored capability keeps its authored provenance even when a template later names the same key. The set is **open** — whatever the merchant declares is valid — but a role may use nothing outside it. That is the reason to declare them at all: a mistyped capability is rejected when the role is built, instead of quietly granting nothing at the moment it matters.
 
 The merchant's capabilities live in the namespace `org:<id>`. KYC's own set stays **closed** and code-defined in the `kyc` namespace. A merchant admin can never mint a capability in KYC's namespace.
 
@@ -79,6 +81,12 @@ Grants are **issued and revoked, never edited**. Editing in place would rewrite 
 **Subject** is one customer, one group, or **everyone** — every customer of the organisation, present and future, from a single row. The everyone subject exists so a baseline needs no per-customer bookkeeping: materialising a membership per person costs a row and a queue job each and says exactly the same thing.
 
 **Capabilities** come from a role, or from the wildcard: every capability in your namespace, including ones you declare later.
+
+**Scope** has a wildcard too, at two levels. `project:*` reaches every project you have now or add later. `all_scopes` reaches every scope of every kind: the widest a grant can be.
+
+The organisation is that ceiling, and it is deliberately not a scope kind you declare. A scope is a `(kind, id)` pair, and an organisation has exactly one instance, already carried by the grant itself. Declaring it would be a second way to say what every grant already says.
+
+`global` and `organisation` stay reserved and undeclarable for the same reason from the other side: your world ends at your organisation, so a scope reaching past it would cross into another merchant's.
 
 **A grant may narrow itself.** Three exclusion lists, one per wildcard:
 

@@ -7,6 +7,8 @@ import (
 	"net/http"
 	"strings"
 	"testing"
+
+	"github.com/gsarmaonline/kyc/internal/service"
 )
 
 type appAccessFixture struct {
@@ -27,6 +29,14 @@ func newAppAccess(t *testing.T, slug string) appAccessFixture {
 func (f appAccessFixture) post(t *testing.T, path string, body map[string]any) (int, map[string]any) {
 	t.Helper()
 	res := doJSON(t, f.h, http.MethodPost, "/v1/organisations/"+f.orgID+path, body, userAuth(f.token))
+	var out map[string]any
+	_ = json.Unmarshal(res.Body.Bytes(), &out)
+	return res.Code, out
+}
+
+func (f appAccessFixture) get(t *testing.T, path string) (int, map[string]any) {
+	t.Helper()
+	res := doJSON(t, f.h, http.MethodGet, "/v1/organisations/"+f.orgID+path, nil, userAuth(f.token))
 	var out map[string]any
 	_ = json.Unmarshal(res.Body.Bytes(), &out)
 	return res.Code, out
@@ -835,6 +845,175 @@ func TestScopeExceptionsAreCheckedAndCarried(t *testing.T) {
 	}
 }
 
+// The scope wildcard, at both levels. Without it "every project" could not be
+// written at all: a merchant issued one grant per project and reissued on every
+// new one, which is exactly the bookkeeping the everyone subject and the
+// capability wildcard exist to remove.
+func TestScopeWildcardReachesTheBackend(t *testing.T) {
+	f := newAppAccess(t, "scopewild")
+	f.declareScope(t, "project")
+	f.declareCapability(t, "deploy:read")
+	roleID := f.createRole(t, "reader", []string{"deploy:read"}, nil)
+	perKind := f.createAppUser(t, "perkind@customer.com")
+	orgWide := f.createAppUser(t, "orgwide@customer.com")
+
+	// Every instance of one kind. The kind is still declared and checked; only
+	// the id is the star.
+	if code, out := f.post(t, "/app-grants", map[string]any{
+		"app_user_id": perKind, "role_id": roleID,
+		"scope_kind": "project", "scope_id": "*",
+	}); code != http.StatusCreated {
+		t.Fatalf("per-kind wildcard: %d %v", code, out)
+	}
+	g := f.accessFor(t, perKind)["grants"].([]any)[0].(map[string]any)
+	if g["scope_kind"] != "project" || g["scope_id"] != "*" {
+		t.Errorf("wildcard scope must reach the backend intact, got %v", g)
+	}
+	if g["all_scopes"] != false {
+		t.Errorf("a per-kind wildcard is not organisation-wide, got %v", g["all_scopes"])
+	}
+
+	// Every kind at once. The widest a grant can be, and it names no scope.
+	if code, out := f.post(t, "/app-grants", map[string]any{
+		"app_user_id": orgWide, "role_id": roleID, "all_scopes": true,
+	}); code != http.StatusCreated {
+		t.Fatalf("organisation-wide grant: %d %v", code, out)
+	}
+	wide := f.accessFor(t, orgWide)["grants"].([]any)[0].(map[string]any)
+	if wide["all_scopes"] != true {
+		t.Fatalf("all_scopes must reach the backend, got %v", wide)
+	}
+	if wide["scope_kind"] != "" || wide["scope_id"] != "" {
+		t.Errorf("an organisation-wide grant names no scope, got %v", wide)
+	}
+}
+
+// A grant is everywhere or somewhere, never both. Accepting a scope alongside
+// the wildcard would leave a row whose scope columns are ignored, and the next
+// reader would reasonably believe them.
+func TestOrganisationWideGrantRefusesAScope(t *testing.T) {
+	f := newAppAccess(t, "scopeboth")
+	f.declareScope(t, "project")
+	f.declareCapability(t, "deploy:read")
+	roleID := f.createRole(t, "reader", []string{"deploy:read"}, nil)
+	userID := f.createAppUser(t, "both@customer.com")
+
+	if code, _ := f.post(t, "/app-grants", map[string]any{
+		"app_user_id": userID, "role_id": roleID, "all_scopes": true,
+		"scope_kind": "project", "scope_id": "p1",
+	}); code != http.StatusBadRequest {
+		t.Errorf("a grant cannot be both everywhere and somewhere, got %d", code)
+	}
+	// And a grant that is neither is still refused, as it always was.
+	if code, _ := f.post(t, "/app-grants", map[string]any{
+		"app_user_id": userID, "role_id": roleID,
+	}); code != http.StatusBadRequest {
+		t.Errorf("a grant with no scope at all must be rejected, got %d", code)
+	}
+}
+
+// The organisation is the ceiling, not a name. 'global' and 'organisation' stay
+// undeclarable: a merchant's world ends at their organisation, so a scope
+// reaching past it would cross into another tenant.
+func TestReservedScopeKindsStayReserved(t *testing.T) {
+	f := newAppAccess(t, "reserved")
+	for _, kind := range []string{"global", "organisation"} {
+		code, _ := f.post(t, "/app-scope-types", map[string]any{"kind": kind})
+		if code != http.StatusBadRequest {
+			t.Errorf("%q must stay reserved, got %d", kind, code)
+		}
+	}
+}
+
+// A template is not a default. Nothing is seeded on signup, because the
+// vocabulary is the merchant's own; a template is the same rows arrived at by
+// an explicit click, and the provenance has to survive so "why does this exist?"
+// stays answerable.
+func TestCapabilityTemplateIsAppliedAndMarked(t *testing.T) {
+	f := newAppAccess(t, "template")
+
+	// Nothing exists until it is asked for.
+	if code, out := f.get(t, "/app-capabilities"); code != http.StatusOK ||
+		len(out["items"].([]any)) != 0 {
+		t.Fatalf("a new organisation starts with no capabilities: %d %v", code, out)
+	}
+
+	code, out := f.post(t, "/app-capability-templates/apply", map[string]any{
+		"template": "team_accounts",
+	})
+	if code != http.StatusCreated {
+		t.Fatalf("apply template: %d %v", code, out)
+	}
+	items := out["items"].([]any)
+	if len(items) == 0 {
+		t.Fatal("the template declared nothing")
+	}
+	for _, raw := range items {
+		item := raw.(map[string]any)
+		if item["source"] != "template:team_accounts" {
+			t.Errorf("%v must be marked as template-sourced", item)
+		}
+	}
+
+	// Applying twice is harmless: a key already declared is already declared.
+	if code, _ := f.post(t, "/app-capability-templates/apply", map[string]any{
+		"template": "team_accounts",
+	}); code != http.StatusCreated {
+		t.Errorf("re-applying must not fail, got %d", code)
+	}
+	_, after := f.get(t, "/app-capabilities")
+	if len(after["items"].([]any)) != len(items) {
+		t.Errorf("re-applying duplicated rows: %d then %d", len(items), len(after["items"].([]any)))
+	}
+
+	if code, _ := f.post(t, "/app-capability-templates/apply", map[string]any{
+		"template": "not_a_template",
+	}); code != http.StatusBadRequest {
+		t.Errorf("an unknown template must be refused, got %d", code)
+	}
+}
+
+// An authored capability keeps its authored provenance even when a template
+// later names the same key. Relabelling it would rewrite history about who
+// decided what.
+func TestTemplateNeverRelabelsAnAuthoredCapability(t *testing.T) {
+	f := newAppAccess(t, "authored")
+	f.declareCapability(t, "profile:read")
+
+	if code, _ := f.post(t, "/app-capability-templates/apply", map[string]any{
+		"template": "team_accounts",
+	}); code != http.StatusCreated {
+		t.Fatalf("apply template")
+	}
+
+	_, out := f.get(t, "/app-capabilities")
+	for _, raw := range out["items"].([]any) {
+		item := raw.(map[string]any)
+		if item["key"] == "profile:read" && item["source"] != "" {
+			t.Errorf("an authored capability was relabelled: %v", item)
+		}
+	}
+}
+
+// Every template key goes through the same validation an authored one does. A
+// template able to write a key the registry would reject would be a way around
+// the vocabulary rules rather than a shortcut through them.
+func TestEveryTemplateKeyIsValid(t *testing.T) {
+	for _, tpl := range service.CapabilityTemplates {
+		if len(tpl.Items) == 0 {
+			t.Errorf("template %q declares nothing", tpl.Key)
+		}
+		for _, item := range tpl.Items {
+			if err := service.ValidAppCapabilityKey(item.Key); err != nil {
+				t.Errorf("template %q: %v", tpl.Key, err)
+			}
+			if item.Description == "" {
+				t.Errorf("template %q: %q has no description", tpl.Key, item.Key)
+			}
+		}
+	}
+}
+
 // The self constraint is how "everyone may manage their own things" becomes one
 // row. KYC cannot enforce it, so the only thing that matters here is that it
 // survives to the merchant's backend intact.
@@ -905,7 +1084,7 @@ func TestAccessSetWireFormatIsStable(t *testing.T) {
 	// than was granted.
 	for _, key := range []string{
 		"id", "scope_kind", "scope_id", "capabilities", "source",
-		"all_capabilities", "except_capabilities", "except_scopes", "constraint",
+		"all_capabilities", "all_scopes", "except_capabilities", "except_scopes", "constraint",
 	} {
 		if _, ok := g[key]; !ok {
 			t.Errorf("grant is missing %q: %v", key, g)

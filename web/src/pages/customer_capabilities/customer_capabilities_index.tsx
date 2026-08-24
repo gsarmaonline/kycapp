@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom'
 import { deleteAppCapability, listAppCapabilities, type AppCapability } from '../../api'
 import { ConceptDocsLink } from '../../components/ConceptDocsLink'
 import { PageHeader, ResourceTable, RowActions } from '../../crud/ui'
+import { CapabilityTemplates } from './capability_templates'
 import { resourcePath } from '../../org_nav'
 
 export function CustomerCapabilitiesIndex() {
@@ -50,15 +51,28 @@ export function CustomerCapabilitiesIndex() {
         <ConceptDocsLink slug="customer-capabilities" label="How capabilities are used" />
       </p>
       {error && <p className="error">{error}</p>}
+      {/*
+        Offered only on an empty vocabulary. Once a merchant has one, a starter
+        set is someone else's idea of their product.
+      */}
+      {!loading && items.length === 0 && (
+        <CapabilityTemplates orgId={orgId} onApplied={() => void refresh()} />
+      )}
       {loading ? (
         <p>Loading…</p>
       ) : (
         <ResourceTable
-          columns={['Key', 'Description']}
+          columns={['Key', 'Description', 'Source']}
           empty="No capabilities yet."
           rows={items.map((c) => ({
             key: c.id,
-            cells: [c.key, c.description || '—'],
+            cells: [
+              c.key,
+              c.description || '—',
+              // Provenance, so "why does this exist?" survives the person who
+              // applied the template.
+              c.source ? c.source.replace('template:', 'template ') : 'authored',
+            ],
             actions: (
               <RowActions
                 viewTo={resourcePath(orgId, 'customer-capabilities', c.id)}

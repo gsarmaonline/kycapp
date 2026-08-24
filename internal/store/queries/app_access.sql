@@ -12,9 +12,17 @@ ORDER BY kind;
 DELETE FROM app_scope_types WHERE id = $1 AND organisation_id = $2;
 
 -- name: CreateAppCapability :one
-INSERT INTO app_capabilities (id, organisation_id, key, description)
-VALUES ($1, $2, $3, $4)
+INSERT INTO app_capabilities (id, organisation_id, key, description, source)
+VALUES ($1, $2, $3, $4, $5)
 RETURNING *;
+
+-- Applying a template twice must not fail, and must not relabel a capability
+-- the merchant has since written by hand. DO NOTHING rather than an upsert:
+-- a key that already exists is already declared, whoever declared it.
+-- name: CreateAppCapabilityFromTemplate :exec
+INSERT INTO app_capabilities (id, organisation_id, key, description, source)
+VALUES ($1, $2, $3, $4, $5)
+ON CONFLICT (organisation_id, key) DO NOTHING;
 
 -- name: ListAppCapabilities :many
 SELECT * FROM app_capabilities
@@ -73,8 +81,8 @@ ON CONFLICT DO NOTHING;
 INSERT INTO app_grants (
     id, organisation_id, subject_kind, app_user_id, role_id, scope_kind, scope_id,
     expires_at, granted_by, all_capabilities, except_capabilities, except_scopes,
-    except_app_user_ids, constraint_kind
-) VALUES ($1, $2, 'app_user', $3, $4, $5, $6, $7, $8, $9, $10, $11, '{}', $12)
+    except_app_user_ids, constraint_kind, all_scopes
+) VALUES ($1, $2, 'app_user', $3, $4, $5, $6, $7, $8, $9, $10, $11, '{}', $12, $13)
 ON CONFLICT (app_user_id, COALESCE(role_id, ''), scope_kind, scope_id) WHERE app_user_id IS NOT NULL
 DO UPDATE SET expires_at = EXCLUDED.expires_at, granted_by = EXCLUDED.granted_by,
     except_capabilities = EXCLUDED.except_capabilities, except_scopes = EXCLUDED.except_scopes,
@@ -85,8 +93,8 @@ RETURNING *;
 INSERT INTO app_grants (
     id, organisation_id, subject_kind, group_id, role_id, scope_kind, scope_id,
     expires_at, granted_by, all_capabilities, except_capabilities, except_scopes,
-    except_app_user_ids, constraint_kind
-) VALUES ($1, $2, 'group', $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+    except_app_user_ids, constraint_kind, all_scopes
+) VALUES ($1, $2, 'group', $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
 ON CONFLICT (group_id, COALESCE(role_id, ''), scope_kind, scope_id) WHERE group_id IS NOT NULL
 DO UPDATE SET expires_at = EXCLUDED.expires_at, granted_by = EXCLUDED.granted_by,
     except_capabilities = EXCLUDED.except_capabilities, except_scopes = EXCLUDED.except_scopes,
@@ -99,8 +107,8 @@ RETURNING *;
 INSERT INTO app_grants (
     id, organisation_id, subject_kind, role_id, scope_kind, scope_id,
     expires_at, granted_by, all_capabilities, except_capabilities, except_scopes,
-    except_app_user_ids, constraint_kind
-) VALUES ($1, $2, 'everyone', $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+    except_app_user_ids, constraint_kind, all_scopes
+) VALUES ($1, $2, 'everyone', $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
 ON CONFLICT (organisation_id, COALESCE(role_id, ''), scope_kind, scope_id) WHERE subject_kind = 'everyone'
 DO UPDATE SET expires_at = EXCLUDED.expires_at, granted_by = EXCLUDED.granted_by,
     except_capabilities = EXCLUDED.except_capabilities, except_scopes = EXCLUDED.except_scopes,
@@ -133,7 +141,7 @@ SELECT g.id, g.scope_kind, g.scope_id, g.expires_at, g.role_id,
        COALESCE(r.key, '')::text AS role_key,
        COALESCE(r.effective_capabilities, '{}')::text[] AS effective_capabilities,
        g.group_id, ''::text AS group_key, 'app_user'::text AS subject_kind,
-       g.all_capabilities, g.except_capabilities, g.except_scopes, g.constraint_kind
+       g.all_capabilities, g.except_capabilities, g.except_scopes, g.constraint_kind, g.all_scopes
 FROM app_grants g
 LEFT JOIN app_roles r ON r.id = g.role_id
 WHERE g.app_user_id = sqlc.arg('app_user_id')
@@ -143,7 +151,7 @@ SELECT DISTINCT g.id, g.scope_kind, g.scope_id, g.expires_at, g.role_id,
        COALESCE(r.key, '')::text AS role_key,
        COALESCE(r.effective_capabilities, '{}')::text[] AS effective_capabilities,
        g.group_id, grp.key AS group_key, 'group'::text AS subject_kind,
-       g.all_capabilities, g.except_capabilities, g.except_scopes, g.constraint_kind
+       g.all_capabilities, g.except_capabilities, g.except_scopes, g.constraint_kind, g.all_scopes
 -- direct.effective_parent_ids is the group itself plus everything it extends,
 -- flattened at write time. Joining through it is what makes a grant on a parent
 -- group reach a member of a child, without walking anything on the read path.
@@ -160,7 +168,7 @@ SELECT g.id, g.scope_kind, g.scope_id, g.expires_at, g.role_id,
        COALESCE(r.key, '')::text AS role_key,
        COALESCE(r.effective_capabilities, '{}')::text[] AS effective_capabilities,
        g.group_id, ''::text AS group_key, 'everyone'::text AS subject_kind,
-       g.all_capabilities, g.except_capabilities, g.except_scopes, g.constraint_kind
+       g.all_capabilities, g.except_capabilities, g.except_scopes, g.constraint_kind, g.all_scopes
 FROM app_grants g
 LEFT JOIN app_roles r ON r.id = g.role_id
 WHERE g.organisation_id = sqlc.arg('organisation_id')
@@ -259,7 +267,7 @@ SELECT g.id, g.scope_kind, g.scope_id, g.expires_at, g.app_user_id, g.group_id,
        COALESCE(r.key, '')::text AS role_key, COALESCE(grp.key, '')::text AS group_key,
        COALESCE(u.email, '')::text AS app_user_email, g.subject_kind,
        g.all_capabilities, g.except_capabilities, g.except_scopes,
-       g.except_app_user_ids, g.constraint_kind
+       g.except_app_user_ids, g.constraint_kind, g.all_scopes
 FROM app_grants g
 LEFT JOIN app_roles r ON r.id = g.role_id
 LEFT JOIN app_user_groups grp ON grp.id = g.group_id
@@ -293,3 +301,12 @@ SELECT parent_id FROM app_role_extends WHERE role_id = $1;
 
 -- name: ListAppUserGroupParents :many
 SELECT parent_id FROM app_user_group_extends WHERE group_id = $1 ORDER BY parent_id;
+
+-- CountAppCapabilitiesByOrg backs the customer-access onboarding step.
+--
+-- Capabilities are the right thing to count. A scope kind on its own grants
+-- nothing, a role with no capabilities carries nothing, and a grant cannot be
+-- written until both exist. Declaring the first capability is the point where
+-- the section starts to mean something.
+-- name: CountAppCapabilitiesByOrg :one
+SELECT COUNT(*)::bigint FROM app_capabilities WHERE organisation_id = $1;

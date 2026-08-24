@@ -27,12 +27,24 @@ func TestOrganisationOnboardingDeriveAndDismiss(t *testing.T) {
 	if int(view["completed_count"].(float64)) != 0 {
 		t.Fatalf("new org should have 0 complete: %#v", view)
 	}
-	if int(view["total_count"].(float64)) != 6 {
+	if int(view["total_count"].(float64)) != 7 {
 		t.Fatalf("total_count: %#v", view["total_count"])
 	}
 	steps, _ := view["steps"].([]any)
-	if len(steps) != 6 {
+	if len(steps) != 7 {
 		t.Fatalf("steps: %#v", steps)
+	}
+	// Customer access had five pages and nothing pointing at them. Nothing is
+	// seeded there on purpose, so a step is the only way in from an empty
+	// workspace.
+	var hasCustomerAccess bool
+	for _, raw := range steps {
+		if raw.(map[string]any)["key"] == "customer_access" {
+			hasCustomerAccess = true
+		}
+	}
+	if !hasCustomerAccess {
+		t.Errorf("onboarding must reach customer access: %#v", steps)
 	}
 	for _, raw := range steps {
 		step := raw.(map[string]any)
@@ -80,10 +92,18 @@ func TestOrganisationOnboardingDeriveAndDismiss(t *testing.T) {
 	if user.Code != http.StatusCreated {
 		t.Fatalf("app user: %s", user.Body.String())
 	}
+	// Declaring a capability is what completes customer access. A scope kind
+	// grants nothing on its own and a role with no capabilities carries
+	// nothing, so this is the first point the section means something.
+	capability := doJSON(t, h, http.MethodPost, "/v1/organisations/"+orgID+"/app-capabilities",
+		map[string]any{"key": "profile:read", "description": "See a profile"}, auth)
+	if capability.Code != http.StatusCreated {
+		t.Fatalf("capability: %s", capability.Body.String())
+	}
 
 	done := doJSON(t, h, http.MethodGet, "/v1/organisations/"+orgID+"/onboarding", nil, auth)
 	decodeBody(t, done, &view)
-	if int(view["completed_count"].(float64)) != 6 {
+	if int(view["completed_count"].(float64)) != 7 {
 		t.Fatalf("expected all complete: %#v", view)
 	}
 	if view["visible"] != false {
