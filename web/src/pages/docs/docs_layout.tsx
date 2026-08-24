@@ -61,6 +61,12 @@ export function DocsLayout({
         >
           Variables
         </NavLink>
+        <NavLink
+          to={`${base}/authorisation`}
+          className={({ isActive }) => (isActive ? 'docs-tab active' : 'docs-tab')}
+        >
+          Authorisation
+        </NavLink>
       </nav>
       <form className="docs-search" role="search" onSubmit={(e) => e.preventDefault()}>
         <input

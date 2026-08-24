@@ -2,6 +2,7 @@ package accessmodel_test
 
 import (
 	"context"
+	"reflect"
 	"testing"
 	"time"
 
@@ -93,6 +94,47 @@ func TestEveryProjectionResolvesInTheSchema(t *testing.T) {
 func TestSchemaCarriesNoInertDeclarations(t *testing.T) {
 	if _, err := accessmodel.Load(); err != nil {
 		t.Fatal(err)
+	}
+}
+
+// TestRepeatedShapesStayAtEight pins a finding the diagram surfaced and the
+// schema text hides.
+//
+// Eight types declare the same relations and answer read and manage the same
+// way, differing only in their name. Thirteen hang off organisation and look
+// identical in a picture, but they split into four rule sets, so counting the
+// arrows rather than the rules overstates the repetition.
+//
+// The number is asserted rather than described because it is the kind of claim
+// that goes stale silently. If it moves, either a type gained an action or the
+// repetition was collapsed on purpose, and both are worth a deliberate edit
+// here.
+func TestRepeatedShapesStayAtEight(t *testing.T) {
+	g := accessmodel.MustLoad().Graph()
+	if len(g.Shapes) == 0 {
+		t.Fatal("no repeated shapes found at all")
+	}
+	largest := g.Shapes[0]
+	want := []string{
+		"api_keys", "app_access", "attributes", "automations",
+		"billing", "email_templates", "org_roles", "product_features",
+	}
+	if !reflect.DeepEqual(largest.Types, want) {
+		t.Errorf("largest shape = %v, wanted %v", largest.Types, want)
+	}
+	if got := []string{"manage = can_manage", "read = can_read"}; !reflect.DeepEqual(largest.Rules, got) {
+		t.Errorf("largest shape answers %v, wanted %v", largest.Rules, got)
+	}
+
+	// Each of these answers a different set of actions, so none may be folded
+	// into the group however similar it looks in the drawing.
+	for _, shape := range g.Shapes {
+		for _, name := range shape.Types {
+			switch name {
+			case "organisation", "members", "app_users":
+				t.Errorf("%s was grouped with %v", name, shape.Types)
+			}
+		}
 	}
 }
 

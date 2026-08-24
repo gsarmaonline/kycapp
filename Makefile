@@ -36,9 +36,12 @@ sqlc:
 	$$(go env GOPATH)/bin/sqlc generate
 
 # Sync full OpenAPI to the web app and generate the merchant Integration subset.
+# The authorisation schema is generated here too: it is a compile-time constant,
+# so the docs render it from a file rather than asking the server about it.
 openapi:
 	cp docs/openapi.yaml web/public/openapi.yaml
 	go run ./cmd/openapi-filter -in docs/openapi.yaml -out web/public/openapi-integration.yaml
+	go run ./cmd/access-schema -out web/public/access-schema.json
 
 # Regenerate the merchant SDK transport layers from the Integration spec.
 # Both outputs are committed, so CI can detect drift with sdk-check.

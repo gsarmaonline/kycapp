@@ -2220,3 +2220,164 @@ html.dark-mode .docs-swagger {
   color: var(--app-fg-muted);
   max-width: 60ch;
 }
+
+/* --- Schema map: the authorisation model, drawn --- */
+
+.schema-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin: 1rem 0 1.25rem;
+  padding: 0;
+}
+
+.schema-stat {
+  background: var(--app-panel);
+  border: 1px solid var(--app-border);
+  border-radius: 4px;
+  padding: 0.5rem 0.75rem;
+  min-width: 5.5rem;
+}
+
+.schema-stat dt {
+  margin: 0;
+  font-size: 0.66rem;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--app-fg-muted);
+}
+
+.schema-stat dd {
+  margin: 0.1rem 0 0;
+  font-size: 1.15rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.schema-canvas {
+  height: min(70vh, 640px);
+  border: 1px solid var(--app-border);
+  border-radius: 6px;
+  overflow: hidden;
+  background: var(--app-panel);
+}
+
+.schema-caption {
+  margin-top: 0.6rem;
+  font-size: 0.8rem;
+  max-width: 62ch;
+}
+
+.schema-node {
+  background: var(--app-surface-solid);
+  border: 1px solid var(--app-border);
+  border-radius: 5px;
+  padding: 0.5rem 0.65rem;
+  min-width: 9rem;
+  max-width: 15rem;
+  font-size: 0.75rem;
+}
+
+/* A synthetic node is not something the schema declares, so it must not look
+   like one. The accent border and tint are the whole distinction. */
+.schema-node-set {
+  border-color: var(--app-accent);
+  border-style: dashed;
+  background: var(--app-accent-soft);
+}
+
+.schema-node-name {
+  margin: 0;
+  font-weight: 600;
+  font-size: 0.82rem;
+}
+
+.schema-node-rules {
+  list-style: none;
+  margin: 0.4rem 0 0;
+  padding: 0.35rem 0 0;
+  border-top: 1px solid var(--app-border);
+  display: grid;
+  gap: 0.15rem;
+}
+
+.schema-node-rules li {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  align-items: baseline;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.68rem;
+  line-height: 1.35;
+}
+
+.schema-action {
+  color: var(--app-accent);
+  font-weight: 600;
+}
+
+.schema-eq {
+  color: var(--app-fg-muted);
+}
+
+.schema-expr {
+  color: var(--app-fg);
+}
+
+.schema-shapes {
+  list-style: none;
+  margin: 0.75rem 0;
+  padding: 0;
+  display: grid;
+  gap: 0.4rem;
+}
+
+.schema-shapes li {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  align-items: baseline;
+  background: var(--app-panel);
+  border: 1px solid var(--app-border);
+  border-radius: 4px;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.82rem;
+}
+
+.schema-shapes strong {
+  white-space: nowrap;
+  color: var(--app-accent);
+}
+
+.schema-shapes span {
+  color: var(--app-fg-muted);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.75rem;
+}
+
+/* React Flow paints its own controls in light colours. Match the app instead,
+   or the canvas reads as a foreign element in dark mode. */
+.schema-canvas .react-flow__controls-button {
+  background: var(--app-panel);
+  border-bottom: 1px solid var(--app-border);
+  fill: var(--app-fg);
+}
+
+.schema-canvas .react-flow__minimap {
+  background: var(--app-panel);
+}
+
+.schema-canvas .react-flow__edge-text {
+  font-size: 9px;
+  fill: var(--app-fg-muted);
+}
+
+.schema-canvas .react-flow__edge-textbg {
+  fill: var(--app-panel);
+}
+
+.schema-shape-rules {
+  font-size: 0.7rem;
+  opacity: 0.85;
+  width: 100%;
+}
