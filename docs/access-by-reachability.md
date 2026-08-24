@@ -213,6 +213,35 @@ resolves and how. So the same verb means the same thing to a reader across every
 type, while each type keeps control of what satisfies it. A type that never
 declares `rule delete` is unreachable by any delete question.
 
+### Reading a schema back
+
+`Schema.Mermaid()` renders a namespace as a diagram, and `Schema.Describe()`
+counts what it declares. Both are pure functions of the schema text, which is
+the property that makes them worth having in the portable core rather than in
+one application's admin pages: a tenant who declares their own namespace gets
+their own diagram with no further code.
+
+This draws the schema, never the edges. The distinction is what makes it safe
+to call. A schema is a dozen types whatever the tenant, while the edge set is
+unbounded and a picture of all of it is a grey disc at every zoom level. Bounded
+views of the edges are a separate thing: a decision path, or one subject's
+neighbourhood at fixed depth.
+
+Every collection is sorted before it is written, so the same schema always
+renders the same bytes and a diagram can be committed and diffed like source.
+
+One judgement call is in the output. Drawn naively, every grant relation on
+every type draws its own arrow to each of `user`, `key`, `recovery` and `role`,
+which is a picture of the repetition rather than of the model. So a target set
+used by more than one relation is collapsed into a single node, and relations
+that agree about where they point merge onto one arrow. A set used *once* is
+never collapsed, because hiding the one type it names would trade a true
+picture for a tidy one.
+
+Rendering the KYC namespace surfaces something the text hides: thirteen of the
+eighteen types are structurally identical, differing only in name. That is worth
+a decision rather than an accident.
+
 ---
 
 ## A tag is a node
