@@ -1334,6 +1334,32 @@ paths:
         default:
           $ref: "#/components/responses/Error"
 
+  /v1/memberships/{id}/access:
+    parameters:
+      - $ref: "#/components/parameters/membershipId"
+    get:
+      tags: [Members]
+      summary: Explain a member's access
+      description: >
+        Answers every permission for this member and returns the route the
+        authorisation graph took to each answer. Requires members:read in the
+        member's organisation.
+
+
+        Hops naming anything outside that organisation are withheld unless the
+        caller reaches every organisation. A withheld hop is marked rather than
+        dropped, so the route stays honest about its length without naming what
+        the caller cannot already see.
+      responses:
+        "200":
+          description: Every permission, with its route
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AccessExplanation"
+        default:
+          $ref: "#/components/responses/Error"
+
   /v1/permissions:
     get:
       tags: [Members]
@@ -3050,6 +3076,60 @@ components:
         created_at:
           type: string
           format: date-time
+
+    PathHop:
+      type: object
+      description: One edge the authorisation walk crossed.
+      properties:
+        object:
+          type: string
+          description: The node the edge is written on, as type:id.
+        relation:
+          type: string
+        subject:
+          type: string
+          description: The far end, as type:id or type:id#relation for a userset.
+        redacted:
+          type: boolean
+          description: >
+            A name in this hop sits outside the organisation being viewed and was
+            withheld. Marked rather than dropped, so the route keeps its true
+            length.
+
+    PermissionOutcome:
+      type: object
+      properties:
+        key:
+          type: string
+        allowed:
+          type: boolean
+        reason:
+          type: string
+          enum: [allowed, unreachable, no_rule, excluded]
+          description: >
+            Why the decision went this way. unreachable means no route arrives at
+            all and maps to 404, so it stays indistinguishable from a resource
+            that does not exist. no_rule means a route arrives but no rule grants
+            this action. excluded means a rule matched and a subtraction removed
+            it. Both refusals map to 403.
+        path:
+          type: array
+          description: The route the walk took. Empty for every reason but allowed.
+          items:
+            $ref: "#/components/schemas/PathHop"
+
+    AccessExplanation:
+      type: object
+      properties:
+        organisation_id:
+          type: string
+        subject:
+          type: string
+          description: The principal the questions were asked about, as type:id.
+        outcomes:
+          type: array
+          items:
+            $ref: "#/components/schemas/PermissionOutcome"
 
     AppUser:
       type: object

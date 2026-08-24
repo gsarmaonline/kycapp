@@ -2057,3 +2057,166 @@ html.dark-mode .docs-swagger {
   opacity: 0.6;
 }
 
+
+/* --- Access panel: why a member can or cannot do each thing --- */
+
+.access-panel {
+  margin-top: 1.5rem;
+  border-top: 1px solid var(--app-border);
+  padding-top: 1.25rem;
+  display: grid;
+  gap: 1rem;
+}
+
+.access-panel-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.access-panel-title {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.access-panel-sub {
+  margin: 0.15rem 0 0;
+  font-size: 0.8rem;
+  color: var(--app-fg-muted);
+}
+
+.access-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.8rem;
+  color: var(--app-fg-muted);
+  cursor: pointer;
+}
+
+.access-group {
+  display: grid;
+  gap: 0.4rem;
+}
+
+.access-group-title {
+  margin: 0;
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--app-fg-muted);
+}
+
+.access-rows {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.25rem;
+}
+
+.access-row {
+  width: 100%;
+  display: grid;
+  grid-template-columns: minmax(6rem, 1fr) auto auto;
+  gap: 0.75rem;
+  align-items: center;
+  text-align: left;
+  padding: 0.45rem 0.6rem;
+  background: var(--app-panel);
+  border: 1px solid var(--app-border);
+  border-radius: 4px;
+  font: inherit;
+  font-size: 0.85rem;
+  color: inherit;
+  cursor: pointer;
+}
+
+.access-row:hover {
+  border-color: var(--app-accent);
+}
+
+.access-row:focus-visible {
+  outline: 2px solid var(--app-accent);
+  outline-offset: 1px;
+}
+
+.access-action {
+  font-weight: 500;
+}
+
+.access-hops {
+  font-size: 0.75rem;
+  color: var(--app-fg-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.access-chip {
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  padding: 0.12rem 0.4rem;
+  border-radius: 3px;
+  white-space: nowrap;
+  background: var(--app-code-bg);
+  color: var(--app-fg-muted);
+}
+
+.access-chip-allowed {
+  background: var(--app-accent-soft);
+  color: var(--app-accent);
+}
+
+/* no_rule and excluded are both refusals with a route, so they share a look.
+   unreachable keeps the neutral chip: there is nothing there to report. */
+.access-chip-no_rule,
+.access-chip-excluded {
+  background: color-mix(in srgb, var(--app-danger) 12%, transparent);
+  color: var(--app-danger);
+}
+
+.access-path {
+  list-style: none;
+  margin: 0.35rem 0 0.6rem;
+  padding: 0 0 0 0.6rem;
+  border-left: 2px solid var(--app-accent-soft);
+  display: grid;
+  gap: 0.3rem;
+  overflow-x: auto;
+}
+
+.access-hop {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  align-items: baseline;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.75rem;
+  padding: 0.2rem 0.4rem;
+}
+
+.access-hop-redacted {
+  opacity: 0.72;
+  font-style: italic;
+}
+
+.access-node {
+  color: var(--app-fg);
+}
+
+.access-rel {
+  color: var(--app-accent);
+}
+
+.access-empty {
+  margin: 0.35rem 0 0.6rem;
+  padding-left: 0.7rem;
+  border-left: 2px solid var(--app-border);
+  font-size: 0.8rem;
+  color: var(--app-fg-muted);
+  max-width: 60ch;
+}

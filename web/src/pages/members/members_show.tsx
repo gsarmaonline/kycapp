@@ -3,6 +3,7 @@ import { Link, useParams } from 'react-router-dom'
 import { getMembership, type Membership } from '../../api'
 import { DetailList, PageHeader } from '../../crud/ui'
 import { resourcePath } from '../../org_nav'
+import { AccessPathPanel } from '../../panels/access_path_panel'
 
 export function MembersShow() {
   const { orgId = '', id = '' } = useParams()
@@ -31,6 +32,7 @@ export function MembersShow() {
           { label: 'Membership ID', value: item.id },
         ]}
       />
+      <AccessPathPanel membershipId={item.id} />
       <div className="form-actions">
         <Link className="ghost" to={resourcePath(orgId, 'members')}>
           Back

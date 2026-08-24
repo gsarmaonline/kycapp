@@ -488,6 +488,43 @@ export function getMembership(id: string) {
   return request<Membership>(`/v1/memberships/${id}`)
 }
 
+/**
+ * One edge the authorisation walk crossed.
+ *
+ * `redacted` means a name in this hop sits outside the organisation you are
+ * looking at, so it is withheld rather than dropped: the route stays honest
+ * about its length without naming what you cannot already see.
+ */
+export type PathHop = {
+  object: string
+  relation: string
+  subject: string
+  redacted: boolean
+}
+
+/**
+ * `reason` is the engine's own vocabulary rather than a boolean, because the
+ * distinction is the useful part. `unreachable` means no path arrives at all,
+ * `no_rule` means one arrives but grants something else, and `excluded` means a
+ * rule matched and a subtraction removed it. Each calls for a different fix.
+ */
+export type PermissionOutcome = {
+  key: string
+  allowed: boolean
+  reason: 'allowed' | 'unreachable' | 'no_rule' | 'excluded'
+  path: PathHop[]
+}
+
+export type AccessExplanation = {
+  organisation_id: string
+  subject: string
+  outcomes: PermissionOutcome[]
+}
+
+export function explainMembershipAccess(id: string) {
+  return request<AccessExplanation>(`/v1/memberships/${id}/access`)
+}
+
 export function inviteMember(orgId: string, email: string, roleId: string) {
   return request<Membership>(`/v1/organisations/${orgId}/memberships`, {
     method: 'POST',
