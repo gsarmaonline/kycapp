@@ -523,6 +523,12 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        AccessExplanation: {
+            organisation_id?: string;
+            outcomes?: components["schemas"]["PermissionOutcome"][];
+            /** @description The principal the questions were asked about, as type:id. */
+            subject?: string;
+        };
         AppUser: {
             attributes?: {
                 [key: string]: unknown;
@@ -844,6 +850,16 @@ export interface components {
             /** @description Present when more results exist; pass as ?cursor= on the next request */
             next_cursor?: string;
         };
+        /** @description One edge the authorisation walk crossed. */
+        PathHop: {
+            /** @description The node the edge is written on, as type:id. */
+            object?: string;
+            /** @description A name in this hop sits outside the organisation being viewed and was withheld. Marked rather than dropped, so the route keeps its true length. */
+            redacted?: boolean;
+            relation?: string;
+            /** @description The far end, as type:id or type:id#relation for a userset. */
+            subject?: string;
+        };
         Permission: {
             action?: string;
             category?: string;
@@ -851,6 +867,18 @@ export interface components {
             id?: string;
             key?: string;
             resource?: string;
+        };
+        PermissionOutcome: {
+            allowed?: boolean;
+            key?: string;
+            /** @description The route the walk took. Empty for every reason but allowed. */
+            path?: components["schemas"]["PathHop"][];
+            /**
+             * @description One of allowed, unreachable, no_rule or excluded. unreachable means no route arrives at all and maps to 404, so it stays indistinguishable from a resource that does not exist. no_rule means a route arrives but no rule grants this action. excluded means a rule matched and a subtraction removed it. Both refusals map to 403.
+             *
+             *     Deliberately not declared as an enum. This route is console-only and the SDK filter excludes it, so generated constants would reach no caller, while a value named unreachable collides with OrganisationDatabaseStatus and renames its published constants. The values are closed regardless: the server sends no others.
+             */
+            reason?: string;
         };
         PlanPrice: {
             currency?: string;

@@ -242,6 +242,43 @@ Rendering the KYC namespace surfaces something the text hides: thirteen of the
 eighteen types are structurally identical, differing only in name. That is worth
 a decision rather than an accident.
 
+### Showing a decision to a person
+
+`GET /v1/memberships/{id}/access` answers every permission for one member and
+returns the route the walk took to each answer. It adds no evaluation: the
+engine already records the path, so this asks each permission in turn and
+reshapes the answer for a reader.
+
+It renders as a panel on the member page rather than behind its own nav entry,
+because the question is always asked *about* somebody. A destination would mean
+navigating away from the member in order to ask about that member.
+
+The reason is carried through rather than flattened to a boolean, because the
+distinction is the part worth having. `unreachable` and `no_rule` call for
+entirely different fixes, and `excluded` is the case that most needs showing:
+when a member loses billing access because `organisation:acme #suspended` fired
+inside `member = belongs - suspended + oversees`, no list of their grants
+explains it, since every grant is still there. Only the subtracting edge does.
+
+**A path is a disclosure surface.** "Denied because role `finance-approvers` in
+organisation `acme` holds that grant" names a role, an organisation and a
+structure the asker may have no business knowing. So every hop is filtered
+against what the *viewer* reaches:
+
+- Area nodes are keyed by the organisation id, so `api_keys:acme` is derivable
+  rather than looked up.
+- A role id says nothing about which tenant owns it, so the organisation's own
+  roles are read and anything outside that set is foreign.
+- A star node is always withheld from a restricted viewer. `organisation:*` is
+  the platform's reach over every tenant, and naming it to a tenant admin
+  discloses both that the mechanism exists and that somebody holds it.
+- A viewer who reaches every organisation sees every name, because a redaction
+  would withhold what they are already entitled to.
+
+A withheld hop is marked, never dropped. Dropping it would render a four-hop
+route as three and misdescribe the model, and the length is itself something the
+viewer is entitled to.
+
 ---
 
 ## A tag is a node

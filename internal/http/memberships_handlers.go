@@ -139,3 +139,18 @@ func (s *Server) handleRevokeMembership(w http.ResponseWriter, r *http.Request) 
 	}
 	writeJSON(w, http.StatusOK, membershipJSON(out))
 }
+
+// handleExplainMembershipAccess answers every permission for one member and
+// returns the route the graph took to each answer.
+//
+// The gate lives in the service rather than here, because the organisation is
+// only known after the membership is loaded, and because the same call decides
+// how much of each route this caller may be shown.
+func (s *Server) handleExplainMembershipAccess(w http.ResponseWriter, r *http.Request) {
+	out, err := s.svc.ExplainMembershipAccess(r.Context(), r.PathValue("id"))
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, out)
+}
