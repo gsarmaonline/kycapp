@@ -3105,13 +3105,19 @@ components:
           type: boolean
         reason:
           type: string
-          enum: [allowed, unreachable, no_rule, excluded]
           description: >
-            Why the decision went this way. unreachable means no route arrives at
-            all and maps to 404, so it stays indistinguishable from a resource
-            that does not exist. no_rule means a route arrives but no rule grants
-            this action. excluded means a rule matched and a subtraction removed
-            it. Both refusals map to 403.
+            One of allowed, unreachable, no_rule or excluded. unreachable means
+            no route arrives at all and maps to 404, so it stays
+            indistinguishable from a resource that does not exist. no_rule means
+            a route arrives but no rule grants this action. excluded means a rule
+            matched and a subtraction removed it. Both refusals map to 403.
+
+
+            Deliberately not declared as an enum. This route is console-only and
+            the SDK filter excludes it, so generated constants would reach no
+            caller, while a value named unreachable collides with
+            OrganisationDatabaseStatus and renames its published constants. The
+            values are closed regardless: the server sends no others.
         path:
           type: array
           description: The route the walk took. Empty for every reason but allowed.

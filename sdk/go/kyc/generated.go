@@ -774,6 +774,15 @@ func (e IngestAppUser201JSONResponseBodyStatus) Valid() bool {
 	}
 }
 
+// AccessExplanation defines model for AccessExplanation.
+type AccessExplanation struct {
+	OrganisationId *string              `json:"organisation_id,omitempty"`
+	Outcomes       *[]PermissionOutcome `json:"outcomes,omitempty"`
+
+	// Subject The principal the questions were asked about, as type:id.
+	Subject *string `json:"subject,omitempty"`
+}
+
 // AppUser defines model for AppUser.
 type AppUser struct {
 	Attributes     *map[string]interface{} `json:"attributes,omitempty"`
@@ -1184,6 +1193,19 @@ type PaginatedMeta struct {
 	NextCursor *string `json:"next_cursor,omitempty"`
 }
 
+// PathHop One edge the authorisation walk crossed.
+type PathHop struct {
+	// Object The node the edge is written on, as type:id.
+	Object *string `json:"object,omitempty"`
+
+	// Redacted A name in this hop sits outside the organisation being viewed and was withheld. Marked rather than dropped, so the route keeps its true length.
+	Redacted *bool   `json:"redacted,omitempty"`
+	Relation *string `json:"relation,omitempty"`
+
+	// Subject The far end, as type:id or type:id#relation for a userset.
+	Subject *string `json:"subject,omitempty"`
+}
+
 // Permission defines model for Permission.
 type Permission struct {
 	Action      *string `json:"action,omitempty"`
@@ -1192,6 +1214,20 @@ type Permission struct {
 	Id          *string `json:"id,omitempty"`
 	Key         *string `json:"key,omitempty"`
 	Resource    *string `json:"resource,omitempty"`
+}
+
+// PermissionOutcome defines model for PermissionOutcome.
+type PermissionOutcome struct {
+	Allowed *bool   `json:"allowed,omitempty"`
+	Key     *string `json:"key,omitempty"`
+
+	// Path The route the walk took. Empty for every reason but allowed.
+	Path *[]PathHop `json:"path,omitempty"`
+
+	// Reason One of allowed, unreachable, no_rule or excluded. unreachable means no route arrives at all and maps to 404, so it stays indistinguishable from a resource that does not exist. no_rule means a route arrives but no rule grants this action. excluded means a rule matched and a subtraction removed it. Both refusals map to 403.
+	//
+	// Deliberately not declared as an enum. This route is console-only and the SDK filter excludes it, so generated constants would reach no caller, while a value named unreachable collides with OrganisationDatabaseStatus and renames its published constants. The values are closed regardless: the server sends no others.
+	Reason *string `json:"reason,omitempty"`
 }
 
 // PlanPrice defines model for PlanPrice.
