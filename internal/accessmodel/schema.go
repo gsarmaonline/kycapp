@@ -46,7 +46,7 @@ import (
 const Schema = `
 namespace kyc
 
-action member, read, write, update, manage, invite, remove
+action member, reach, read, write, update, manage, invite, remove
 
 // --- principals ---
 relation member_of : transitive
@@ -69,6 +69,11 @@ relation can_remove : direct, wildcard object
 
 type user
 
+// A recovery credential is a principal, not a short-circuit in code. It reaches
+// everything through edges on the star nodes, so it goes through the same walk
+// a membership does and shows up in Decision.Path like anything else.
+type recovery
+
 type group
   relation member_of -> user | group#member_of
 
@@ -86,95 +91,99 @@ type role
   relation holder -> user | group#member_of
 
 type organisation
-  relation belongs    -> user | key | role#holder
-  relation suspended  -> user | key | role#holder
-  relation oversees   -> user | key | role#holder
-  relation can_read   -> user | key | role#holder
-  relation can_update -> user | key | role#holder
+  relation belongs    -> user | key | recovery | role#holder
+  relation suspended  -> user | key | recovery | role#holder
+  relation oversees   -> user | key | recovery | role#holder
+  relation can_read   -> user | key | recovery | role#holder
+  relation can_update -> user | key | recovery | role#holder
   rule member = belongs - suspended + oversees
+  // reach is member without the lifecycle subtraction. The gates that must work
+  // on a suspended or archived tenant ask for it, so suspending one is not a
+  // one-way door: the route that would restore it stays answerable.
+  rule reach  = belongs + oversees
   rule read   = can_read
   rule update = can_update
 
 type members
   relation org        -> organisation
-  relation can_read   -> user | key | role#holder
-  relation can_invite -> user | key | role#holder
-  relation can_remove -> user | key | role#holder
+  relation can_read   -> user | key | recovery | role#holder
+  relation can_invite -> user | key | recovery | role#holder
+  relation can_remove -> user | key | recovery | role#holder
   rule read   = can_read
   rule invite = can_invite
   rule remove = can_remove
 
 type org_roles
   relation org        -> organisation
-  relation can_read   -> user | key | role#holder
-  relation can_manage -> user | key | role#holder
+  relation can_read   -> user | key | recovery | role#holder
+  relation can_manage -> user | key | recovery | role#holder
   rule read   = can_read
   rule manage = can_manage
 
 type api_keys
   relation org        -> organisation
-  relation can_read   -> user | key | role#holder
-  relation can_manage -> user | key | role#holder
+  relation can_read   -> user | key | recovery | role#holder
+  relation can_manage -> user | key | recovery | role#holder
   rule read   = can_read
   rule manage = can_manage
 
 type app_users
   relation org       -> organisation
-  relation can_read  -> user | key | role#holder
-  relation can_write -> user | key | role#holder
+  relation can_read  -> user | key | recovery | role#holder
+  relation can_write -> user | key | recovery | role#holder
   rule read  = can_read
   rule write = can_write
 
 type app_access
   relation org        -> organisation
-  relation can_read   -> user | key | role#holder
-  relation can_manage -> user | key | role#holder
+  relation can_read   -> user | key | recovery | role#holder
+  relation can_manage -> user | key | recovery | role#holder
   rule read   = can_read
   rule manage = can_manage
 
 type attributes
   relation org        -> organisation
-  relation can_read   -> user | key | role#holder
-  relation can_manage -> user | key | role#holder
+  relation can_read   -> user | key | recovery | role#holder
+  relation can_manage -> user | key | recovery | role#holder
   rule read   = can_read
   rule manage = can_manage
 
 type automations
   relation org        -> organisation
-  relation can_read   -> user | key | role#holder
-  relation can_manage -> user | key | role#holder
+  relation can_read   -> user | key | recovery | role#holder
+  relation can_manage -> user | key | recovery | role#holder
   rule read   = can_read
   rule manage = can_manage
 
 type billing
   relation org        -> organisation
-  relation can_read   -> user | key | role#holder
-  relation can_manage -> user | key | role#holder
+  relation can_read   -> user | key | recovery | role#holder
+  relation can_manage -> user | key | recovery | role#holder
   rule read   = can_read
   rule manage = can_manage
 
 type email_templates
   relation org        -> organisation
-  relation can_read   -> user | key | role#holder
-  relation can_manage -> user | key | role#holder
+  relation can_read   -> user | key | recovery | role#holder
+  relation can_manage -> user | key | recovery | role#holder
   rule read   = can_read
   rule manage = can_manage
 
 type product_features
   relation org        -> organisation
-  relation can_read   -> user | key | role#holder
-  relation can_manage -> user | key | role#holder
+  relation can_read   -> user | key | recovery | role#holder
+  relation can_manage -> user | key | recovery | role#holder
   rule read   = can_read
   rule manage = can_manage
 
 type activity
   relation org      -> organisation
-  relation can_read -> user | key | role#holder
+  relation can_read -> user | key | recovery | role#holder
   rule read = can_read
 
 type usage
   relation org      -> organisation
-  relation can_read -> user | key | role#holder
+  relation can_read -> user | key | recovery | role#holder
   rule read = can_read
 `
 

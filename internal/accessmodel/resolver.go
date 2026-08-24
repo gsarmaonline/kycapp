@@ -5,6 +5,7 @@ import (
 
 	"github.com/gsarmaonline/kyc/core/reach"
 	"github.com/gsarmaonline/kyc/internal/store/sqlc"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 // Namespace is KYC's own tenancy boundary. A merchant's model lives under
@@ -15,9 +16,25 @@ const Namespace = "kyc"
 // evaluator reads edges and nothing else, and a resolver that could reach the
 // rest of the schema would eventually be made to.
 type Querier interface {
+	ListLiveEdges(ctx context.Context, arg sqlc.ListLiveEdgesParams) ([]sqlc.ReachEdgesLive, error)
+	ListLiveEdgesForSubject(ctx context.Context, arg sqlc.ListLiveEdgesForSubjectParams) ([]sqlc.ReachEdgesLive, error)
 	ListReachEdges(ctx context.Context, arg sqlc.ListReachEdgesParams) ([]sqlc.ReachEdge, error)
 	ListReachEdgesForSubject(ctx context.Context, arg sqlc.ListReachEdgesForSubjectParams) ([]sqlc.ReachEdge, error)
 }
+
+// Source says which rows a resolver reads.
+type Source int
+
+const (
+	// SourceLive reads reach_edges_live: the current authorisation tables
+	// presented as edges, unioned with anything written directly. This is what
+	// production uses during the cutover, and it is what makes the cutover safe
+	// -- no write path has to be changed, so none can be missed.
+	SourceLive Source = iota
+	// SourceEdges reads reach_edges alone. Used by the projection's own tests,
+	// which would otherwise pass whether or not the projection did anything.
+	SourceEdges
+)
 
 // Resolver reads edges from Postgres.
 //
@@ -26,15 +43,39 @@ type Querier interface {
 // filtered here: the evaluator is handed the time to decide against, so the
 // query and the walk cannot disagree about what "now" means.
 type Resolver struct {
-	q Querier
+	q      Querier
+	source Source
 }
 
-// NewResolver returns a Resolver over the store.
-func NewResolver(q Querier) *Resolver { return &Resolver{q: q} }
+// NewResolver returns a Resolver reading the live view.
+func NewResolver(q Querier) *Resolver { return &Resolver{q: q, source: SourceLive} }
+
+// NewResolverFrom returns a Resolver reading the named source.
+func NewResolverFrom(q Querier, source Source) *Resolver {
+	return &Resolver{q: q, source: source}
+}
 
 // Edges implements reach.Resolver.
 func (r *Resolver) Edges(ctx context.Context, object reach.NodeRef, relation string) ([]reach.Edge, error) {
-	rows, err := r.q.ListReachEdges(ctx, sqlc.ListReachEdgesParams{
+	if r.source == SourceEdges {
+		rows, err := r.q.ListReachEdges(ctx, sqlc.ListReachEdgesParams{
+			Namespace:  Namespace,
+			ObjectType: object.Type,
+			ObjectID:   object.ID,
+			Relation:   relation,
+		})
+		if err != nil {
+			return nil, err
+		}
+		out := make([]reach.Edge, 0, len(rows))
+		for _, row := range rows {
+			out = append(out, edgeFromRow(row.ObjectType, row.ObjectID, row.Relation,
+				row.SubjectType, row.SubjectID, row.SubjectRelation, row.ExpiresAt))
+		}
+		return out, nil
+	}
+
+	rows, err := r.q.ListLiveEdges(ctx, sqlc.ListLiveEdgesParams{
 		Namespace:  Namespace,
 		ObjectType: object.Type,
 		ObjectID:   object.ID,
@@ -45,7 +86,8 @@ func (r *Resolver) Edges(ctx context.Context, object reach.NodeRef, relation str
 	}
 	out := make([]reach.Edge, 0, len(rows))
 	for _, row := range rows {
-		out = append(out, edgeFromRow(row))
+		out = append(out, edgeFromRow(row.ObjectType, row.ObjectID, row.Relation,
+			row.SubjectType, row.SubjectID, row.SubjectRelation, row.ExpiresAt))
 	}
 	return out, nil
 }
@@ -56,7 +98,23 @@ func (r *Resolver) Edges(ctx context.Context, object reach.NodeRef, relation str
 // it safe for a key's owner edge to confer nothing. It is not on the decision
 // path.
 func (r *Resolver) EdgesForSubject(ctx context.Context, subject reach.NodeRef) ([]reach.Edge, error) {
-	rows, err := r.q.ListReachEdgesForSubject(ctx, sqlc.ListReachEdgesForSubjectParams{
+	if r.source == SourceEdges {
+		rows, err := r.q.ListReachEdgesForSubject(ctx, sqlc.ListReachEdgesForSubjectParams{
+			Namespace:   Namespace,
+			SubjectType: subject.Type,
+			SubjectID:   subject.ID,
+		})
+		if err != nil {
+			return nil, err
+		}
+		out := make([]reach.Edge, 0, len(rows))
+		for _, row := range rows {
+			out = append(out, edgeFromRow(row.ObjectType, row.ObjectID, row.Relation,
+				row.SubjectType, row.SubjectID, row.SubjectRelation, row.ExpiresAt))
+		}
+		return out, nil
+	}
+	rows, err := r.q.ListLiveEdgesForSubject(ctx, sqlc.ListLiveEdgesForSubjectParams{
 		Namespace:   Namespace,
 		SubjectType: subject.Type,
 		SubjectID:   subject.ID,
@@ -66,22 +124,23 @@ func (r *Resolver) EdgesForSubject(ctx context.Context, subject reach.NodeRef) (
 	}
 	out := make([]reach.Edge, 0, len(rows))
 	for _, row := range rows {
-		out = append(out, edgeFromRow(row))
+		out = append(out, edgeFromRow(row.ObjectType, row.ObjectID, row.Relation,
+			row.SubjectType, row.SubjectID, row.SubjectRelation, row.ExpiresAt))
 	}
 	return out, nil
 }
 
-func edgeFromRow(row sqlc.ReachEdge) reach.Edge {
+func edgeFromRow(objectType, objectID, relation, subjectType, subjectID, subjectRelation string, expires pgtype.Timestamptz) reach.Edge {
 	e := reach.Edge{
-		Object:   reach.Node(row.ObjectType, row.ObjectID),
-		Relation: row.Relation,
+		Object:   reach.Node(objectType, objectID),
+		Relation: relation,
 		Subject: reach.SubjectRef{
-			Node:     reach.Node(row.SubjectType, row.SubjectID),
-			Relation: row.SubjectRelation,
+			Node:     reach.Node(subjectType, subjectID),
+			Relation: subjectRelation,
 		},
 	}
-	if row.ExpiresAt.Valid {
-		t := row.ExpiresAt.Time
+	if expires.Valid {
+		t := expires.Time
 		e.ExpiresAt = &t
 	}
 	return e
@@ -110,9 +169,14 @@ func RowFor(e reach.Edge, source string) sqlc.WriteReachEdgeParams {
 
 // NewEvaluator builds an evaluator over the store, with KYC's schema.
 func NewEvaluator(q Querier, opts ...reach.Option) (*reach.Evaluator, error) {
+	return NewEvaluatorFrom(q, SourceLive, opts...)
+}
+
+// NewEvaluatorFrom builds an evaluator reading the named source.
+func NewEvaluatorFrom(q Querier, source Source, opts ...reach.Option) (*reach.Evaluator, error) {
 	schema, err := Load()
 	if err != nil {
 		return nil, err
 	}
-	return reach.New(schema, NewResolver(q), opts...)
+	return reach.New(schema, NewResolverFrom(q, source), opts...)
 }

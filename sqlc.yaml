@@ -53,6 +53,7 @@ sql:
       - "internal/store/migrations/000048_app_user_groups.up.sql"
       - "internal/store/migrations/000049_app_grant_exceptions.up.sql"
       - "internal/store/migrations/000050_reach_edges.up.sql"
+      - "internal/store/migrations/000051_reach_edges_live.up.sql"
     gen:
       go:
         package: "sqlc"

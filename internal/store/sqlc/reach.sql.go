@@ -78,6 +78,103 @@ func (q *Queries) DeleteReachEdge(ctx context.Context, arg DeleteReachEdgeParams
 	return err
 }
 
+const listLiveEdges = `-- name: ListLiveEdges :many
+
+SELECT namespace, object_type, object_id, relation, subject_type, subject_id, subject_relation, expires_at, source FROM reach_edges_live
+WHERE namespace = $1
+  AND object_type = $2
+  AND object_id = $3
+  AND relation = $4
+`
+
+type ListLiveEdgesParams struct {
+	Namespace  string `json:"namespace"`
+	ObjectType string `json:"object_type"`
+	ObjectID   string `json:"object_id"`
+	Relation   string `json:"relation"`
+}
+
+// ListLiveEdges reads the view that presents the current authorisation tables
+// as edges, unioned with any edge written directly. This is the evaluator's
+// source during the cutover: it reads the same rows the previous engine read,
+// so the two cannot disagree about state, only about how state is interpreted.
+func (q *Queries) ListLiveEdges(ctx context.Context, arg ListLiveEdgesParams) ([]ReachEdgesLive, error) {
+	rows, err := q.db.Query(ctx, listLiveEdges,
+		arg.Namespace,
+		arg.ObjectType,
+		arg.ObjectID,
+		arg.Relation,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ReachEdgesLive{}
+	for rows.Next() {
+		var i ReachEdgesLive
+		if err := rows.Scan(
+			&i.Namespace,
+			&i.ObjectType,
+			&i.ObjectID,
+			&i.Relation,
+			&i.SubjectType,
+			&i.SubjectID,
+			&i.SubjectRelation,
+			&i.ExpiresAt,
+			&i.Source,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listLiveEdgesForSubject = `-- name: ListLiveEdgesForSubject :many
+SELECT namespace, object_type, object_id, relation, subject_type, subject_id, subject_relation, expires_at, source FROM reach_edges_live
+WHERE namespace = $1 AND subject_type = $2 AND subject_id = $3
+ORDER BY object_type, object_id, relation
+`
+
+type ListLiveEdgesForSubjectParams struct {
+	Namespace   string `json:"namespace"`
+	SubjectType string `json:"subject_type"`
+	SubjectID   string `json:"subject_id"`
+}
+
+func (q *Queries) ListLiveEdgesForSubject(ctx context.Context, arg ListLiveEdgesForSubjectParams) ([]ReachEdgesLive, error) {
+	rows, err := q.db.Query(ctx, listLiveEdgesForSubject, arg.Namespace, arg.SubjectType, arg.SubjectID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ReachEdgesLive{}
+	for rows.Next() {
+		var i ReachEdgesLive
+		if err := rows.Scan(
+			&i.Namespace,
+			&i.ObjectType,
+			&i.ObjectID,
+			&i.Relation,
+			&i.SubjectType,
+			&i.SubjectID,
+			&i.SubjectRelation,
+			&i.ExpiresAt,
+			&i.Source,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listReachEdges = `-- name: ListReachEdges :many
 
 SELECT namespace, object_type, object_id, relation, subject_type, subject_id, subject_relation, expires_at, source, created_at FROM reach_edges

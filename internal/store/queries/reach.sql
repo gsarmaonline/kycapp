@@ -45,3 +45,20 @@ FROM reach_edges
 WHERE namespace = $1
 GROUP BY source
 ORDER BY source;
+
+-- ListLiveEdges reads the view that presents the current authorisation tables
+-- as edges, unioned with any edge written directly. This is the evaluator's
+-- source during the cutover: it reads the same rows the previous engine read,
+-- so the two cannot disagree about state, only about how state is interpreted.
+
+-- name: ListLiveEdges :many
+SELECT * FROM reach_edges_live
+WHERE namespace = $1
+  AND object_type = $2
+  AND object_id = $3
+  AND relation = $4;
+
+-- name: ListLiveEdgesForSubject :many
+SELECT * FROM reach_edges_live
+WHERE namespace = $1 AND subject_type = $2 AND subject_id = $3
+ORDER BY object_type, object_id, relation;

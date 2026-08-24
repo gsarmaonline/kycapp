@@ -119,7 +119,7 @@ func seedTenant(t *testing.T, pool *pgxpool.Pool, orgID, roleID, userID string, 
 
 func evaluator(t *testing.T, db *store.Store) *reach.Evaluator {
 	t.Helper()
-	e, err := accessmodel.NewEvaluator(db.Q())
+	e, err := accessmodel.NewEvaluatorFrom(db.Q(), accessmodel.SourceEdges)
 	if err != nil {
 		t.Fatalf("evaluator: %v", err)
 	}
@@ -320,7 +320,7 @@ func TestOwnerEdgeIsWrittenButConfersNothing(t *testing.T) {
 	project(t, pool)
 
 	// The sweep can find it, which is the whole reason the edge exists.
-	res := accessmodel.NewResolver(db.Q())
+	res := accessmodel.NewResolverFrom(db.Q(), accessmodel.SourceEdges)
 	edges, err := res.EdgesForSubject(context.Background(), reach.Node("user", "u9"))
 	if err != nil {
 		t.Fatal(err)

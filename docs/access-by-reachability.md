@@ -1,13 +1,10 @@
 # Access by reachability
 
-> **Status: the engine, KYC's domain schema, the edge table, the Postgres
-> resolver and the projection are built and tested against a real database.
-> Nothing is wired to a request path yet.**
+> **Status: cut over. Every KYC gate now evaluates through this engine.**
 > [`core/reach`](../core/reach) is a standalone Go module with no dependencies
-> outside the standard library. The system it replaces is documented in
-> [authorisation.md](authorisation.md), which stays authoritative until the
-> migration in [Replacing the current system](#replacing-the-current-system) is
-> done.
+> outside the standard library. The merchant tier is not yet modelled and still
+> uses the previous evaluator; see
+> [Replacing the current system](#replacing-the-current-system).
 
 The published design is [Access by Reachability][artifact]. This document is the
 repository's copy, with pointers into the code.
@@ -456,6 +453,8 @@ authorisation and nothing to compare against.
 | 6 | Edge table and its constraints | [`migrations/000050_reach_edges.up.sql`](../internal/store/migrations/000050_reach_edges.up.sql) |
 | 7 | Postgres resolver | [`internal/accessmodel/resolver.go`](../internal/accessmodel/resolver.go) |
 | 8 | Projection of the current model into edges | [`internal/accessmodel/projection.sql`](../internal/accessmodel/projection.sql) |
+| 9 | Live view of the current tables, shaped as edges | [`migrations/000051_reach_edges_live.up.sql`](../internal/store/migrations/000051_reach_edges_live.up.sql) |
+| 10 | Every KYC gate evaluating through the walk | [`internal/service/access.go`](../internal/service/access.go) |
 
 All thirteen worked examples from the design run as tests, and
 `TestEveryPermissionKeyMaps` checks the projection table against the registry
@@ -538,16 +537,46 @@ gets reach.
 An API key's scope list is applied **once**, here. What a key can do afterwards
 is readable rather than simulated, and revoking it is deleting rows.
 
+### How the cutover was done
+
+Not by dual-writing. Every path that changes authorisation -- a role edit, an
+invite, a removal, a suspension, a key issued or revoked -- would have needed to
+write edges too, and any one missed is a silent hole.
+
+Instead the resolver reads **`reach_edges_live`**, a view presenting the current
+tables as edges, unioned with anything written directly. State cannot diverge,
+because it is the same rows. What changed is only how those rows are
+interpreted: by a walk that returns the path it took.
+
+So the gates in [`access.go`](../internal/service/access.go) were swapped
+outright, and the existing suite became the differential test. It passes
+unchanged, which is the evidence that the two engines agree.
+
+Three things fell out of the swap:
+
+- **Grant assembly is gone.** `grantsFor`, `keyGrants` and
+  `grantsFromMemberships` are deleted. `grants.go` is now the permission catalog
+  and nothing else.
+- **Recovery credentials stopped being a short-circuit.** They are edges on the
+  star nodes, so they go through the same walk a membership does and appear in
+  `Decision.Path`.
+- **Break-glass is the only principal outside the graph**, and deliberately so:
+  reach that has to survive an empty store cannot be derived from the store.
+
+Writing it caught one real bug before it shipped. A key was given its permission
+edges but no `belongs` edge, so it held permissions in a tenant it could not
+see, and every gate answered 404 before ever asking about the permission. The
+view now gives a key the organisations its owner reaches.
+
 **Not done, in the order it should happen:**
 
-1. **Run both engines side by side** on the same requests and log every
+1. **Model the merchant tier.** `app_access.go` still uses the previous
+   evaluator. It is the half with open vocabulary, so it will exercise the
+   namespace boundary harder than KYC's own tier did. on the same requests and log every
    disagreement. The current suite becomes the differential test.
-2. **Cut the gates over**, one authorisation kind at a time, starting with the
-   route table's `authOrgPermission` rules because they are enforced from one
-   place.
-3. **Model the merchant tier.** The app-user side is not yet expressed, and it
-   is the half with open vocabulary, so it will exercise the namespace boundary
-   harder than KYC's own tier did.
-4. **Delete the old implementation** and its migrations once nothing calls it.
-5. **The reverse index**, behind an unchanged interface. Not before there is a
+2. **Retire the view's legacy branches**, one at a time. Each removal is paired
+   with running the projection so those edges become rows in `reach_edges`, and
+   with teaching the write path that changes them to write edges directly.
+3. **Delete `core/access`** and the old tables once nothing reads them.
+4. **The reverse index**, behind an unchanged interface. Not before there is a
    storage engine to index.

@@ -64,11 +64,11 @@ func (s *Service) CreateRecoveryCredential(ctx context.Context, in CreateRecover
 		return CreatedRecovery{}, apperr.Validation("reason is required: a recovery credential with no stated reason is a back door")
 	}
 
-	gs, err := s.grantsFor(ctx, p, "")
+	global, err := s.ReachesEveryOrganisation(ctx, p)
 	if err != nil {
 		return CreatedRecovery{}, err
 	}
-	if !hasGlobalReach(gs) {
+	if !global {
 		return CreatedRecovery{}, apperr.Forbidden("only a principal that already reaches every organisation may mint a recovery credential")
 	}
 

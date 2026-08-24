@@ -1,4 +1,4 @@
-package accessmodel
+package accessmodel_test
 
 import (
 	"context"
@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/gsarmaonline/kyc/core/reach"
+	"github.com/gsarmaonline/kyc/internal/accessmodel"
 	"github.com/gsarmaonline/kyc/internal/service"
 )
 
@@ -17,7 +18,7 @@ var now = time.Date(2026, 8, 24, 12, 0, 0, 0, time.UTC)
 
 func build(t *testing.T, edges ...reach.Edge) *reach.Evaluator {
 	t.Helper()
-	schema, err := Load()
+	schema, err := accessmodel.Load()
 	if err != nil {
 		t.Fatalf("load schema: %v", err)
 	}
@@ -43,14 +44,14 @@ func until(e reach.Edge, when time.Time) reach.Edge {
 
 func can(t *testing.T, e *reach.Evaluator, subject reach.NodeRef, key, orgID string) bool {
 	t.Helper()
-	p, ok := Permissions[key]
+	p, ok := accessmodel.Permissions[key]
 	if !ok {
 		t.Fatalf("permission %q is not in the projection table", key)
 	}
 	d, err := e.Check(context.Background(), reach.Request{
 		Subject:  subject,
 		Action:   p.Action,
-		Resource: Area(p.Type, orgID),
+		Resource: accessmodel.Area(p.Type, orgID),
 	}, now)
 	if err != nil {
 		t.Fatalf("check %s %s in %s: %v", subject, key, orgID, err)
@@ -80,7 +81,7 @@ func TestEveryPermissionKeyMaps(t *testing.T) {
 	current := service.KYCCapabilities.Keys()
 
 	var projected []string
-	for k := range Permissions {
+	for k := range accessmodel.Permissions {
 		projected = append(projected, k)
 	}
 	sort.Strings(projected)
@@ -90,7 +91,7 @@ func TestEveryPermissionKeyMaps(t *testing.T) {
 		t.Errorf("projection has %d keys, the registry has %d", len(projected), len(current))
 	}
 	for _, key := range current {
-		if _, ok := Permissions[key]; !ok {
+		if _, ok := accessmodel.Permissions[key]; !ok {
 			t.Errorf("permission %q has no projection", key)
 		}
 	}
@@ -102,8 +103,8 @@ func TestEveryPermissionKeyMaps(t *testing.T) {
 }
 
 func TestEveryProjectionResolvesInTheSchema(t *testing.T) {
-	schema := MustLoad()
-	for key, p := range Permissions {
+	schema := accessmodel.MustLoad()
+	for key, p := range accessmodel.Permissions {
 		typ, ok := schema.Type(p.Type)
 		if !ok {
 			t.Errorf("%s: type %q is not declared", key, p.Type)
@@ -119,7 +120,7 @@ func TestEveryProjectionResolvesInTheSchema(t *testing.T) {
 }
 
 func TestSchemaCarriesNoInertDeclarations(t *testing.T) {
-	if _, err := Load(); err != nil {
+	if _, err := accessmodel.Load(); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -130,7 +131,7 @@ func TestRolePermissionsKeepTheirGranularity(t *testing.T) {
 	// A role holding members:invite and not members:remove stays that way.
 	// One relation per action is what preserves that.
 	e := build(t,
-		at(Area("members", "acme"), GrantRelation("invite"), reach.Userset(reach.Node("role", "acme_ops"), "holder")),
+		at(accessmodel.Area("members", "acme"), accessmodel.GrantRelation("invite"), reach.Userset(reach.Node("role", "acme_ops"), "holder")),
 		at(reach.Node("role", "acme_ops"), "holder", reach.Subject(reach.Node("user", "u9"))),
 	)
 	u9 := reach.Node("user", "u9")
@@ -141,7 +142,7 @@ func TestRolePermissionsKeepTheirGranularity(t *testing.T) {
 
 func TestMembershipDoesNotLeakAcrossOrganisations(t *testing.T) {
 	e := build(t,
-		at(Area("api_keys", "acme"), GrantRelation("manage"), reach.Userset(reach.Node("role", "acme_ops"), "holder")),
+		at(accessmodel.Area("api_keys", "acme"), accessmodel.GrantRelation("manage"), reach.Userset(reach.Node("role", "acme_ops"), "holder")),
 		at(reach.Node("role", "acme_ops"), "holder", reach.Subject(reach.Node("user", "u9"))),
 	)
 	u9 := reach.Node("user", "u9")
@@ -151,7 +152,7 @@ func TestMembershipDoesNotLeakAcrossOrganisations(t *testing.T) {
 
 func TestGroupNestingReachesThroughARole(t *testing.T) {
 	e := build(t,
-		at(Area("billing", "acme"), GrantRelation("manage"), reach.Userset(reach.Node("role", "acme_finance"), "holder")),
+		at(accessmodel.Area("billing", "acme"), accessmodel.GrantRelation("manage"), reach.Userset(reach.Node("role", "acme_finance"), "holder")),
 		at(reach.Node("role", "acme_finance"), "holder", reach.Userset(reach.Node("group", "finance"), "member_of")),
 		at(reach.Node("group", "finance"), "member_of", reach.Subject(reach.Node("group", "ap"))),
 		at(reach.Node("group", "ap"), "member_of", reach.Subject(reach.Node("user", "u9"))),
@@ -161,13 +162,13 @@ func TestGroupNestingReachesThroughARole(t *testing.T) {
 
 func TestMembershipExpiryStopsAccessWithNoJobRunning(t *testing.T) {
 	lapsed := build(t,
-		at(Area("billing", "acme"), GrantRelation("manage"), reach.Userset(reach.Node("role", "acme_ops"), "holder")),
+		at(accessmodel.Area("billing", "acme"), accessmodel.GrantRelation("manage"), reach.Userset(reach.Node("role", "acme_ops"), "holder")),
 		until(at(reach.Node("role", "acme_ops"), "holder", reach.Subject(reach.Node("user", "u9"))), now.Add(-time.Second)),
 	)
 	mustNotHold(t, lapsed, reach.Node("user", "u9"), "billing:manage", "acme")
 
 	live := build(t,
-		at(Area("billing", "acme"), GrantRelation("manage"), reach.Userset(reach.Node("role", "acme_ops"), "holder")),
+		at(accessmodel.Area("billing", "acme"), accessmodel.GrantRelation("manage"), reach.Userset(reach.Node("role", "acme_ops"), "holder")),
 		until(at(reach.Node("role", "acme_ops"), "holder", reach.Subject(reach.Node("user", "u9"))), now.Add(time.Hour)),
 	)
 	mustHold(t, live, reach.Node("user", "u9"), "billing:manage", "acme")
@@ -179,7 +180,7 @@ func TestGlobalReachIsAnEdgeOnAStarNode(t *testing.T) {
 	// Platform-org membership becomes the same edge written on the star node.
 	// There is no flag and no privileged role name.
 	e := build(t,
-		at(EveryArea("api_keys"), GrantRelation("manage"), reach.Userset(reach.Node("role", "platform_admin"), "holder")),
+		at(accessmodel.EveryArea("api_keys"), accessmodel.GrantRelation("manage"), reach.Userset(reach.Node("role", "platform_admin"), "holder")),
 		at(reach.Node("role", "platform_admin"), "holder", reach.Subject(reach.Node("user", "staff"))),
 	)
 	staff := reach.Node("user", "staff")
@@ -192,8 +193,8 @@ func TestReadOnlyStaffStayReadOnly(t *testing.T) {
 	// Staff must not short-circuit. A support role carries exactly what it was
 	// granted, everywhere.
 	e := build(t,
-		at(EveryArea("api_keys"), GrantRelation("read"), reach.Userset(reach.Node("role", "platform_support"), "holder")),
-		at(EveryArea("billing"), GrantRelation("read"), reach.Userset(reach.Node("role", "platform_support"), "holder")),
+		at(accessmodel.EveryArea("api_keys"), accessmodel.GrantRelation("read"), reach.Userset(reach.Node("role", "platform_support"), "holder")),
+		at(accessmodel.EveryArea("billing"), accessmodel.GrantRelation("read"), reach.Userset(reach.Node("role", "platform_support"), "holder")),
 		at(reach.Node("role", "platform_support"), "holder", reach.Subject(reach.Node("user", "sup"))),
 	)
 	sup := reach.Node("user", "sup")
@@ -235,7 +236,7 @@ func TestKeyIsAnOrdinaryPrincipal(t *testing.T) {
 	// name it, so "what can this key do?" is answered by reading them rather
 	// than by simulating a derivation.
 	e := build(t,
-		at(Area("billing", "acme"), GrantRelation("read"), reach.Subject(reach.Node("key", "k4"))),
+		at(accessmodel.Area("billing", "acme"), accessmodel.GrantRelation("read"), reach.Subject(reach.Node("key", "k4"))),
 		at(reach.Node("key", "k4"), "owner", reach.Subject(reach.Node("user", "u9"))),
 	)
 	k4 := reach.Node("key", "k4")
@@ -249,7 +250,7 @@ func TestOwningAKeyConfersNothingToIt(t *testing.T) {
 	// The owner edge exists so a departing person's keys can be found and
 	// swept. It is lifecycle, not authority.
 	e := build(t,
-		at(Area("api_keys", "acme"), GrantRelation("manage"), reach.Userset(reach.Node("role", "acme_ops"), "holder")),
+		at(accessmodel.Area("api_keys", "acme"), accessmodel.GrantRelation("manage"), reach.Userset(reach.Node("role", "acme_ops"), "holder")),
 		at(reach.Node("role", "acme_ops"), "holder", reach.Subject(reach.Node("user", "u9"))),
 		at(reach.Node("key", "k4"), "owner", reach.Subject(reach.Node("user", "u9"))),
 	)
@@ -259,9 +260,9 @@ func TestOwningAKeyConfersNothingToIt(t *testing.T) {
 
 func TestRevokingAKeyIsDeletingItsEdges(t *testing.T) {
 	store := reach.NewMemoryStore()
-	grant := at(Area("billing", "acme"), GrantRelation("read"), reach.Subject(reach.Node("key", "k4")))
+	grant := at(accessmodel.Area("billing", "acme"), accessmodel.GrantRelation("read"), reach.Subject(reach.Node("key", "k4")))
 	store.MustWrite(grant)
-	e, err := reach.New(MustLoad(), store)
+	e, err := reach.New(accessmodel.MustLoad(), store)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -274,7 +275,7 @@ func TestRevokingAKeyIsDeletingItsEdges(t *testing.T) {
 
 func TestAKeyExpiresWithItsEdge(t *testing.T) {
 	e := build(t,
-		until(at(Area("billing", "acme"), GrantRelation("read"), reach.Subject(reach.Node("key", "k4"))),
+		until(at(accessmodel.Area("billing", "acme"), accessmodel.GrantRelation("read"), reach.Subject(reach.Node("key", "k4"))),
 			now.Add(-time.Second)),
 	)
 	mustNotHold(t, e, reach.Node("key", "k4"), "billing:read", "acme")
@@ -285,25 +286,25 @@ func TestAKeyCannotBeIssuedBeyondItsCreator(t *testing.T) {
 	// cannot exceed the person who minted it, and the check is the same walk
 	// that answers an ordinary request.
 	e := build(t,
-		at(Area("billing", "acme"), GrantRelation("read"), reach.Userset(reach.Node("role", "acme_finance"), "holder")),
+		at(accessmodel.Area("billing", "acme"), accessmodel.GrantRelation("read"), reach.Userset(reach.Node("role", "acme_finance"), "holder")),
 		at(reach.Node("role", "acme_finance"), "holder", reach.Subject(reach.Node("user", "u9"))),
 	)
 	ctx := context.Background()
 	u9 := reach.Node("user", "u9")
 
-	within := at(Area("billing", "acme"), GrantRelation("read"), reach.Subject(reach.Node("key", "k4")))
+	within := at(accessmodel.Area("billing", "acme"), accessmodel.GrantRelation("read"), reach.Subject(reach.Node("key", "k4")))
 	if err := e.CanWrite(ctx, u9, within, reach.CarveNone, now); err != nil {
 		t.Fatalf("issuing a key inside the creator's reach was refused: %v", err)
 	}
 
 	// u9 holds billing:read, not billing:manage.
-	beyond := at(Area("billing", "acme"), GrantRelation("manage"), reach.Subject(reach.Node("key", "k4")))
+	beyond := at(accessmodel.Area("billing", "acme"), accessmodel.GrantRelation("manage"), reach.Subject(reach.Node("key", "k4")))
 	if err := e.CanWrite(ctx, u9, beyond, reach.CarveNone, now); err == nil {
 		t.Fatal("a key was issued beyond its creator's reach")
 	}
 
 	// And never across tenants.
-	elsewhere := at(Area("billing", "globex"), GrantRelation("read"), reach.Subject(reach.Node("key", "k4")))
+	elsewhere := at(accessmodel.Area("billing", "globex"), accessmodel.GrantRelation("read"), reach.Subject(reach.Node("key", "k4")))
 	if err := e.CanWrite(ctx, u9, elsewhere, reach.CarveNone, now); err == nil {
 		t.Fatal("a key was issued into another tenant")
 	}
@@ -313,25 +314,25 @@ func TestAKeyCannotBeIssuedBeyondItsCreator(t *testing.T) {
 
 func TestAnOrgAdminCannotIssueGlobalReach(t *testing.T) {
 	e := build(t,
-		at(Area("api_keys", "acme"), GrantRelation("manage"), reach.Userset(reach.Node("role", "acme_ops"), "holder")),
+		at(accessmodel.Area("api_keys", "acme"), accessmodel.GrantRelation("manage"), reach.Userset(reach.Node("role", "acme_ops"), "holder")),
 		at(reach.Node("role", "acme_ops"), "holder", reach.Subject(reach.Node("user", "u9"))),
 	)
 	ctx := context.Background()
 
 	// Within their own organisation: allowed.
-	inside := at(Area("api_keys", "acme"), GrantRelation("manage"), reach.Subject(reach.Node("user", "u12")))
+	inside := at(accessmodel.Area("api_keys", "acme"), accessmodel.GrantRelation("manage"), reach.Subject(reach.Node("user", "u12")))
 	if err := e.CanWrite(ctx, reach.Node("user", "u9"), inside, reach.CarveNone, now); err != nil {
 		t.Fatalf("delegation inside the tenant was refused: %v", err)
 	}
 
 	// Another tenant: refused.
-	elsewhere := at(Area("api_keys", "globex"), GrantRelation("manage"), reach.Subject(reach.Node("user", "u12")))
+	elsewhere := at(accessmodel.Area("api_keys", "globex"), accessmodel.GrantRelation("manage"), reach.Subject(reach.Node("user", "u12")))
 	if err := e.CanWrite(ctx, reach.Node("user", "u9"), elsewhere, reach.CarveNone, now); err == nil {
 		t.Fatal("delegation into another tenant was allowed")
 	}
 
 	// Every tenant at once: refused, because u9 does not reach the star node.
-	everywhere := at(EveryArea("api_keys"), GrantRelation("manage"), reach.Subject(reach.Node("user", "u12")))
+	everywhere := at(accessmodel.EveryArea("api_keys"), accessmodel.GrantRelation("manage"), reach.Subject(reach.Node("user", "u12")))
 	if err := e.CanWrite(ctx, reach.Node("user", "u9"), everywhere, reach.CarveNone, now); err == nil {
 		t.Fatal("an org admin issued global reach")
 	}
@@ -341,7 +342,7 @@ func TestRootOfTrustCanSeedAnEmptyStore(t *testing.T) {
 	// The system has to be recoverable when the store is empty or freshly
 	// restored, which is the whole reason the carve-out exists.
 	e := build(t)
-	seed := at(EveryArea("api_keys"), GrantRelation("manage"), reach.Userset(reach.Node("role", "platform_admin"), "holder"))
+	seed := at(accessmodel.EveryArea("api_keys"), accessmodel.GrantRelation("manage"), reach.Userset(reach.Node("role", "platform_admin"), "holder"))
 	if err := e.CanWrite(context.Background(), reach.Node("user", "none"), seed, reach.CarveRootOfTrust, now); err != nil {
 		t.Fatalf("root of trust could not seed an empty store: %v", err)
 	}
