@@ -912,15 +912,18 @@ func TestOrganisationWideGrantRefusesAScope(t *testing.T) {
 	}
 }
 
-// The organisation is the ceiling, not a name. 'global' and 'organisation' stay
-// undeclarable: a merchant's world ends at their organisation, so a scope
-// reaching past it would cross into another tenant.
-func TestReservedScopeKindsStayReserved(t *testing.T) {
+// No scope kind name is reserved, because the name was never what kept tenants
+// apart. A merchant's edges live in their own namespace and every edge query
+// filters on it, so global:x inside org:acme reaches nothing outside it.
+//
+// The structural half of this is TestNamespacesCannotSeeEachOther, which shows
+// the walk cannot cross. This half only shows the blacklist is gone.
+func TestNoScopeKindNameIsReserved(t *testing.T) {
 	f := newAppAccess(t, "reserved")
 	for _, kind := range []string{"global", "organisation"} {
-		code, _ := f.post(t, "/app-scope-types", map[string]any{"kind": kind})
-		if code != http.StatusBadRequest {
-			t.Errorf("%q must stay reserved, got %d", kind, code)
+		code, out := f.post(t, "/app-scope-types", map[string]any{"kind": kind})
+		if code != http.StatusCreated {
+			t.Errorf("%q must be declarable: %d %v", kind, code, out)
 		}
 	}
 }

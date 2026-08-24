@@ -189,6 +189,12 @@ func (s *Server) routeTable() []route {
 		{"GET", "/v1/organisations/{id}/app-capabilities", s.handleListAppCapabilities, orgPermission("app_access:read")},
 		{"POST", "/v1/organisations/{id}/app-capabilities", s.handleCreateAppCapability, orgPermission("app_access:manage")},
 		{"DELETE", "/v1/organisations/{id}/app-capabilities/{capId}", s.handleDeleteAppCapability, orgPermission("app_access:manage")},
+		// The merchant graph. Edges are their product's own facts, so writing
+		// them is app_access:manage, and asking is app_access:read.
+		{"POST", "/v1/organisations/{id}/edges", s.handleWriteMerchantEdges, orgPermission("app_access:manage")},
+		{"DELETE", "/v1/organisations/{id}/edges", s.handleDeleteMerchantEdge, orgPermission("app_access:manage")},
+		{"POST", "/v1/organisations/{id}/check", s.handleCheckMerchant, orgPermission("app_access:read")},
+		{"GET", "/v1/organisations/{id}/access-schema", s.handleMerchantSchema, orgPermission("app_access:read")},
 		{"GET", "/v1/organisations/{id}/app-capability-templates", s.handleListCapabilityTemplates, orgPermission("app_access:read")},
 		{"POST", "/v1/organisations/{id}/app-capability-templates/apply", s.handleApplyCapabilityTemplate, orgPermission("app_access:manage")},
 		{"GET", "/v1/organisations/{id}/app-roles", s.handleListAppRoles, orgPermission("app_access:read")},
