@@ -55,11 +55,7 @@ type RelationDef struct {
 	// inside a folder and an action that covers another are all the same
 	// operation.
 	Transitive bool
-	// Identity is the one kind the walk follows outward from the *subject*, so
-	// a key carries the reach of whoever it acts as. Everything else is
-	// followed inward from the resource.
-	Identity bool
-	Wildcard WildcardPos
+	Wildcard   WildcardPos
 }
 
 // TargetSpec is one legal far end of a relation: a type, optionally with the
@@ -126,19 +122,6 @@ func (s *Schema) HasAction(name string) bool {
 		}
 	}
 	return false
-}
-
-// identityRelations returns the relations the walk follows outward from a
-// subject, sorted so behaviour does not depend on map order.
-func (s *Schema) identityRelations() []string {
-	var out []string
-	for name, d := range s.Relations {
-		if d.Identity {
-			out = append(out, name)
-		}
-	}
-	sort.Strings(out)
-	return out
 }
 
 // --- Expressions ---
@@ -237,11 +220,6 @@ func (s *Schema) Validate() error {
 		}
 		if d.Name != name {
 			return fmt.Errorf("%w: relation %q is keyed as %q", ErrInvalidSchema, d.Name, name)
-		}
-		if d.Identity && d.Wildcard != WildcardNone {
-			// An identity edge says "this principal is also that one". A star
-			// on it would make every principal of a type the same principal.
-			return fmt.Errorf("%w: identity relation %q may not accept a wildcard", ErrInvalidSchema, name)
 		}
 	}
 

@@ -11,8 +11,7 @@ import (
 )
 
 // These tests are the migration's evidence. Each one names a behaviour the
-// current system has today and shows this model reproduces it. Where it cannot,
-// the test says so rather than being quietly omitted.
+// system needs and shows this model expresses it.
 
 var now = time.Date(2026, 8, 24, 12, 0, 0, 0, time.UTC)
 
@@ -190,8 +189,8 @@ func TestGlobalReachIsAnEdgeOnAStarNode(t *testing.T) {
 }
 
 func TestReadOnlyStaffStayReadOnly(t *testing.T) {
-	// The defect the current design calls out: staff must not short-circuit.
-	// A support role carries exactly what it was granted, everywhere.
+	// Staff must not short-circuit. A support role carries exactly what it was
+	// granted, everywhere.
 	e := build(t,
 		at(EveryArea("api_keys"), GrantRelation("read"), reach.Userset(reach.Node("role", "platform_support"), "holder")),
 		at(EveryArea("billing"), GrantRelation("read"), reach.Userset(reach.Node("role", "platform_support"), "holder")),
@@ -231,36 +230,83 @@ func TestActiveOrgIsVisibleToItsMembers(t *testing.T) {
 
 // --- API keys ---
 
-func TestKeyDerivesFromItsOwnerAndDemotesWithThem(t *testing.T) {
-	// A key has no power of its own. This reproduces the current model's
-	// unscoped key: "everything my owner can do", bounded by the owner.
-	store := reach.NewMemoryStore()
-	grant := at(Area("api_keys", "acme"), GrantRelation("manage"), reach.Userset(reach.Node("role", "acme_ops"), "holder"))
-	store.MustWrite(
-		grant,
-		at(reach.Node("role", "acme_ops"), "holder", reach.Subject(reach.Node("user", "u9"))),
-		at(reach.Node("key", "k4"), "actor", reach.Subject(reach.Node("user", "u9"))),
+func TestKeyIsAnOrdinaryPrincipal(t *testing.T) {
+	// A key carries no mechanism of its own. What it reaches is whatever edges
+	// name it, so "what can this key do?" is answered by reading them rather
+	// than by simulating a derivation.
+	e := build(t,
+		at(Area("billing", "acme"), GrantRelation("read"), reach.Subject(reach.Node("key", "k4"))),
+		at(reach.Node("key", "k4"), "owner", reach.Subject(reach.Node("user", "u9"))),
 	)
+	k4 := reach.Node("key", "k4")
+	mustHold(t, e, k4, "billing:read", "acme")
+	mustNotHold(t, e, k4, "billing:manage", "acme")
+	mustNotHold(t, e, k4, "api_keys:manage", "acme")
+	mustNotHold(t, e, k4, "billing:read", "globex")
+}
+
+func TestOwningAKeyConfersNothingToIt(t *testing.T) {
+	// The owner edge exists so a departing person's keys can be found and
+	// swept. It is lifecycle, not authority.
+	e := build(t,
+		at(Area("api_keys", "acme"), GrantRelation("manage"), reach.Userset(reach.Node("role", "acme_ops"), "holder")),
+		at(reach.Node("role", "acme_ops"), "holder", reach.Subject(reach.Node("user", "u9"))),
+		at(reach.Node("key", "k4"), "owner", reach.Subject(reach.Node("user", "u9"))),
+	)
+	mustHold(t, e, reach.Node("user", "u9"), "api_keys:manage", "acme")
+	mustNotHold(t, e, reach.Node("key", "k4"), "api_keys:manage", "acme")
+}
+
+func TestRevokingAKeyIsDeletingItsEdges(t *testing.T) {
+	store := reach.NewMemoryStore()
+	grant := at(Area("billing", "acme"), GrantRelation("read"), reach.Subject(reach.Node("key", "k4")))
+	store.MustWrite(grant)
 	e, err := reach.New(MustLoad(), store)
 	if err != nil {
 		t.Fatal(err)
 	}
-
 	k4 := reach.Node("key", "k4")
-	mustHold(t, e, k4, "api_keys:manage", "acme")
+	mustHold(t, e, k4, "billing:read", "acme")
 
-	// Demote the owner; the key demotes on the next request, with no separate
-	// revocation step.
 	store.Delete(grant)
-	mustNotHold(t, e, k4, "api_keys:manage", "acme")
+	mustNotHold(t, e, k4, "billing:read", "acme")
 }
 
-func TestOwnerlessKeyConfersNothing(t *testing.T) {
+func TestAKeyExpiresWithItsEdge(t *testing.T) {
 	e := build(t,
-		at(Area("api_keys", "acme"), GrantRelation("manage"), reach.Userset(reach.Node("role", "acme_ops"), "holder")),
-		at(reach.Node("role", "acme_ops"), "holder", reach.Subject(reach.Node("user", "u9"))),
+		until(at(Area("billing", "acme"), GrantRelation("read"), reach.Subject(reach.Node("key", "k4"))),
+			now.Add(-time.Second)),
 	)
-	mustNotHold(t, e, reach.Node("key", "orphan"), "api_keys:manage", "acme")
+	mustNotHold(t, e, reach.Node("key", "k4"), "billing:read", "acme")
+}
+
+func TestAKeyCannotBeIssuedBeyondItsCreator(t *testing.T) {
+	// The bound on a machine credential is the subset rule at write time. It
+	// cannot exceed the person who minted it, and the check is the same walk
+	// that answers an ordinary request.
+	e := build(t,
+		at(Area("billing", "acme"), GrantRelation("read"), reach.Userset(reach.Node("role", "acme_finance"), "holder")),
+		at(reach.Node("role", "acme_finance"), "holder", reach.Subject(reach.Node("user", "u9"))),
+	)
+	ctx := context.Background()
+	u9 := reach.Node("user", "u9")
+
+	within := at(Area("billing", "acme"), GrantRelation("read"), reach.Subject(reach.Node("key", "k4")))
+	if err := e.CanWrite(ctx, u9, within, reach.CarveNone, now); err != nil {
+		t.Fatalf("issuing a key inside the creator's reach was refused: %v", err)
+	}
+
+	// u9 holds billing:read, not billing:manage.
+	beyond := at(Area("billing", "acme"), GrantRelation("manage"), reach.Subject(reach.Node("key", "k4")))
+	if err := e.CanWrite(ctx, u9, beyond, reach.CarveNone, now); err == nil {
+		t.Fatal("a key was issued beyond its creator's reach")
+	}
+
+	// And never across tenants.
+	elsewhere := at(Area("billing", "globex"), GrantRelation("read"), reach.Subject(reach.Node("key", "k4")))
+	if err := e.CanWrite(ctx, u9, elsewhere, reach.CarveNone, now); err == nil {
+		t.Fatal("a key was issued into another tenant")
+	}
 }
 
 // --- Delegation ---
@@ -299,55 +345,4 @@ func TestRootOfTrustCanSeedAnEmptyStore(t *testing.T) {
 	if err := e.CanWrite(context.Background(), reach.Node("user", "none"), seed, reach.CarveRootOfTrust, now); err != nil {
 		t.Fatalf("root of trust could not seed an empty store: %v", err)
 	}
-}
-
-// --- What this model does not yet reproduce ---
-
-func TestScopedAPIKeysAreNotYetExpressible(t *testing.T) {
-	// The current system narrows a key to the intersection of its owner's
-	// grants and its own scopes. That is not expressible here, and this test
-	// records why rather than leaving the gap undocumented.
-	//
-	// Identity expansion merges the key into its owner before any rule is
-	// evaluated, so a rule cannot tell that the request arrived through k4
-	// rather than as u9. Intersect operates on the resource side and cannot
-	// reach back to the requesting principal.
-	//
-	// The options, none of which is free:
-	//
-	//   a. Unscoped keys only. What is implemented. Loses scope narrowing.
-	//   b. Materialise owner-reach ∩ scopes as edges when the key is created.
-	//      Loses live derivation: demoting the owner would not demote the key.
-	//   c. Give the walk a subject context, so a rule can name the requesting
-	//      principal's own edges. Preserves both, and is a real engine change.
-	//
-	// (c) is the recommendation. Until then this asserts the current gap, so
-	// the day it is closed this test fails and has to be revisited.
-	e := build(t,
-		at(Area("api_keys", "acme"), GrantRelation("manage"), reach.Userset(reach.Node("role", "acme_ops"), "holder")),
-		at(Area("billing", "acme"), GrantRelation("manage"), reach.Userset(reach.Node("role", "acme_ops"), "holder")),
-		at(reach.Node("role", "acme_ops"), "holder", reach.Subject(reach.Node("user", "u9"))),
-		at(reach.Node("key", "k4"), "actor", reach.Subject(reach.Node("user", "u9"))),
-	)
-	k4 := reach.Node("key", "k4")
-
-	// A key intended to be scoped to billing alone still reaches api_keys,
-	// because it carries its owner's whole reach.
-	mustHold(t, e, k4, "billing:manage", "acme")
-	mustHold(t, e, k4, "api_keys:manage", "acme")
-}
-
-func TestNarrowingAKeyByPointingItAtASmallerRoleWorks(t *testing.T) {
-	// The workaround available today: aim the actor edge at a narrower role
-	// rather than at the person. It gives up owner-derivation, which is the
-	// trade recorded above.
-	e := build(t,
-		at(Area("api_keys", "acme"), GrantRelation("manage"), reach.Userset(reach.Node("role", "acme_ops"), "holder")),
-		at(Area("billing", "acme"), GrantRelation("read"), reach.Userset(reach.Node("role", "acme_readonly"), "holder")),
-		at(reach.Node("role", "acme_ops"), "holder", reach.Subject(reach.Node("user", "u9"))),
-		at(reach.Node("role", "acme_readonly"), "holder", reach.Subject(reach.Node("user", "u9"))),
-		at(reach.Node("key", "k7"), "actor", reach.Userset(reach.Node("role", "acme_readonly"), "holder")),
-	)
-	k7 := reach.Node("key", "k7")
-	mustNotHold(t, e, k7, "api_keys:manage", "acme")
 }

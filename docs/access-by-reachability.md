@@ -56,7 +56,7 @@ See [`graph.go`](../core/reach/graph.go) and [`schema.go`](../core/reach/schema.
 
 Read an edge as *"A's relation is B"*.
 
-That flag is the whole grouping mechanism. Ten familiar concepts collapse into
+That flag is the whole grouping mechanism. Nine familiar concepts collapse into
 it, so none of them can drift from the others:
 
 | What people call it | What it is here |
@@ -69,7 +69,6 @@ it, so none of them can drift from the others:
 | Tag, label, department | a node, plus `tagged` edges |
 | Ownership | an `owner` edge |
 | Everything of a type | the `T:*` node |
-| A key acting as a person | an `actor` edge, declared `identity` |
 | Action cover | `implies` edges between type-action nodes |
 
 ---
@@ -152,7 +151,6 @@ action read, write, delete, share
 relation member  : transitive        # grouping
 relation parent  : transitive
 relation viewer  : direct, wildcard both
-relation actor   : identity          # followed outward from the subject
 relation owner   : direct
 relation banned  : direct
 relation tagged  : direct
@@ -197,7 +195,7 @@ the tests:
   a relation that type actually carries.
 - `parent->read` requires the far type to answer `read`, as a rule or a relation.
 - A rule may not reference itself, directly or through a chain.
-- An `identity` relation may not accept a wildcard.
+- A wildcard may only sit where the relation declares it.
 
 `Schema.Warnings()` reports declarations that are true as written but inert:
 a relation nothing carries, an action no type resolves, and a relation marked
@@ -476,26 +474,32 @@ There is no flag and no privileged role name, so a read-only support role stays
 read-only in every tenant, which is a defect the current system documents but
 cannot fix without this change.
 
-**Scoped API keys are not expressible, and this is the open problem.** The
-current system narrows a key to the intersection of its owner's grants and its
-own scopes. Identity expansion merges the key into its owner before any rule is
-evaluated, so a rule cannot tell the request arrived through the key. Three
-options, none free:
+**A machine credential is just a principal.** The current system derives a
+key's power from its owner and narrows it by a scope list, re-computed on every
+request. That is not ported. A key is a node, it holds whatever edges name it,
+and its bound is the subset rule at write time: `CanWrite` refuses to issue a
+key anything its creator does not already hold.
 
-| Option | Cost |
-| --- | --- |
-| Unscoped keys only | Loses scope narrowing. This is what is implemented. |
-| Materialise owner-reach ∩ scopes at key creation | Loses live derivation: demoting the owner would not demote the key. |
-| Give the walk a **subject context**, so a rule can name the requesting principal's own edges | Preserves both. A real engine change. |
+That is simpler and it is better. "What can this key do?" is answered by reading
+its edges instead of simulating a derivation. Revocation is deleting them.
+Expiry already lives on edges, so a time-boxed key costs nothing extra. And it
+removes the wart the derived model has to document: *a key that has to outlive
+its owner's involvement must be moved to someone else before they are
+offboarded.* An `owner` edge remains, for lifecycle only, so a departing
+person's keys can still be found and swept. It confers nothing.
 
-The third is the recommendation. `TestScopedAPIKeysAreNotYetExpressible` asserts
-the current gap, so the day it closes the test fails and has to be revisited.
+The knock-on is that `identity` had no remaining user and has been removed from
+the engine. It was the only feature that made the walk bidirectional; every
+other term runs inward from the resource. The evaluator is now uniformly
+inward, which is simpler to reason about and to index.
 
 **Not done, in the order it should happen:**
 
 1. **A Postgres `Resolver`**, plus the edge tables and a migration that projects
    the existing `permissions`, `roles`, `role_permissions`, `memberships`,
-   `app_grants` and `app_role_extends` rows into edges.
+   `app_grants` and `app_role_extends` rows into edges. Existing API keys
+   project once into explicit edges carrying their current effective reach;
+   there is no ongoing recompute.
 2. **Run both engines side by side** on the same requests and log every
    disagreement. The current suite becomes the differential test.
 3. **Cut the gates over**, one authorisation kind at a time, starting with the

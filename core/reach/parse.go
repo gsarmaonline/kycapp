@@ -14,7 +14,6 @@ import (
 //	relation member : transitive          // grouping
 //	relation parent : transitive, wildcard none
 //	relation viewer : direct, wildcard both
-//	relation actor  : identity
 //
 //	type folder
 //	  relation parent -> folder
@@ -154,8 +153,6 @@ func (p *parser) namespaceRelation(rest string) error {
 			def.Transitive = false
 		case "transitive":
 			def.Transitive = true
-		case "identity":
-			def.Identity = true
 		case "wildcard":
 			w, err := parseWildcard(strings.TrimSpace(arg))
 			if err != nil {

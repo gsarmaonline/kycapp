@@ -128,13 +128,8 @@ func (e *Evaluator) Check(ctx context.Context, req Request, now time.Time) (Deci
 		return Decision{}, fmt.Errorf("%w: %q", ErrUnknownType, req.Resource.Type)
 	}
 
-	subjects, err := e.expandSubject(ctx, req.Subject, now)
-	if err != nil {
-		return Decision{}, err
-	}
-
 	if expr, ok := t.Rules[req.Action]; ok {
-		r := e.newRun(ctx, subjects, now)
+		r := e.newRun(ctx, req.Subject, now)
 		matched, path, err := r.satisfies(req.Resource, expr, 0)
 		if err != nil {
 			return Decision{}, err
@@ -150,7 +145,7 @@ func (e *Evaluator) Check(ctx context.Context, req Request, now time.Time) (Deci
 	// Reached but not permitted, or not reached at all? The distinction is what
 	// keeps a 404 honest, so it is worth one extra pass over the type's other
 	// rules on the denial path.
-	reached, err := e.reachesAtAll(ctx, subjects, t, req, now)
+	reached, err := e.reachesAtAll(ctx, t, req, now)
 	if err != nil {
 		return Decision{}, err
 	}
@@ -167,7 +162,7 @@ func (e *Evaluator) Allowed(ctx context.Context, req Request, now time.Time) (bo
 	return d.Allowed, err
 }
 
-func (e *Evaluator) reachesAtAll(ctx context.Context, subjects map[NodeRef]bool, t *TypeDef, req Request, now time.Time) (bool, error) {
+func (e *Evaluator) reachesAtAll(ctx context.Context, t *TypeDef, req Request, now time.Time) (bool, error) {
 	actions := make([]string, 0, len(t.Rules))
 	for a := range t.Rules {
 		if a != req.Action {
@@ -177,7 +172,7 @@ func (e *Evaluator) reachesAtAll(ctx context.Context, subjects map[NodeRef]bool,
 	sort.Strings(actions)
 
 	for _, a := range actions {
-		r := e.newRun(ctx, subjects, now)
+		r := e.newRun(ctx, req.Subject, now)
 		matched, _, err := r.satisfies(req.Resource, t.Rules[a], 0)
 		if err != nil {
 			return false, err
@@ -189,45 +184,6 @@ func (e *Evaluator) reachesAtAll(ctx context.Context, subjects map[NodeRef]bool,
 	return false, nil
 }
 
-// expandSubject follows identity relations outward from the caller, so a key
-// carries the reach of whoever it acts as. It is the one direction the walk
-// runs away from the resource.
-func (e *Evaluator) expandSubject(ctx context.Context, subject NodeRef, now time.Time) (map[NodeRef]bool, error) {
-	out := map[NodeRef]bool{subject: true}
-	identity := e.schema.identityRelations()
-	if len(identity) == 0 {
-		return out, nil
-	}
-
-	queue := []NodeRef{subject}
-	for depth := 0; len(queue) > 0; depth++ {
-		if depth > e.maxDepth {
-			return nil, fmt.Errorf("%w: expanding subject %s", ErrDepthExceeded, subject)
-		}
-		var next []NodeRef
-		for _, node := range queue {
-			for _, rel := range identity {
-				edges, err := e.resolver.Edges(ctx, node, rel)
-				if err != nil {
-					return nil, err
-				}
-				for _, ed := range edges {
-					if !ed.Active(now) || ed.Subject.IsUserset() {
-						continue
-					}
-					if out[ed.Subject.Node] {
-						continue
-					}
-					out[ed.Subject.Node] = true
-					next = append(next, ed.Subject.Node)
-				}
-			}
-		}
-		queue = next
-	}
-	return out, nil
-}
-
 // --- one evaluation ---
 
 const (
@@ -236,18 +192,18 @@ const (
 )
 
 type run struct {
-	e        *Evaluator
-	ctx      context.Context
-	subjects map[NodeRef]bool
-	now      time.Time
-	state    map[string]int
+	e       *Evaluator
+	ctx     context.Context
+	subject NodeRef
+	now     time.Time
+	state   map[string]int
 	// excluded records that a subtraction removed a match that would otherwise
 	// have allowed. It changes only the reported reason, never the answer.
 	excluded bool
 }
 
-func (e *Evaluator) newRun(ctx context.Context, subjects map[NodeRef]bool, now time.Time) *run {
-	return &run{e: e, ctx: ctx, subjects: subjects, now: now, state: map[string]int{}}
+func (e *Evaluator) newRun(ctx context.Context, subject NodeRef, now time.Time) *run {
+	return &run{e: e, ctx: ctx, subject: subject, now: now, state: map[string]int{}}
 }
 
 func (r *run) satisfies(obj NodeRef, expr Expr, depth int) (bool, []Step, error) {
@@ -449,17 +405,13 @@ func (r *run) edgesFor(obj NodeRef, rel string, def RelationDef) ([]Edge, error)
 	return append(append(out, own...), star...), nil
 }
 
+// matchesSubject reports whether an edge's plain-node target is the caller.
+//
+// The walk runs inward from the resource and never outward from the subject, so
+// this is the only place the caller appears: a comparison at the leaves.
 func (r *run) matchesSubject(n NodeRef, def RelationDef) bool {
-	if r.subjects[n] {
+	if n == r.subject {
 		return true
 	}
-	if !n.IsWildcard() || !def.Wildcard.allowsSubject() {
-		return false
-	}
-	for s := range r.subjects {
-		if s.Type == n.Type {
-			return true
-		}
-	}
-	return false
+	return n.IsWildcard() && def.Wildcard.allowsSubject() && n.Type == r.subject.Type
 }

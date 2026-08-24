@@ -13,7 +13,8 @@
 //	role_permissions row     an edge: <area>:<org> #can_<action> role:<id>#holder
 //	memberships row          an edge: role:<id> #holder user:<id>, with expiry
 //	platform org membership  the same edges, written on the <area>:* star node
-//	api_keys row             an edge: key:<id> #actor user:<owner>
+//	api_keys row             a key node, plus its own grant edges; the owner
+//	                         edge is lifecycle only and confers nothing
 //
 // Every area type is keyed by the organisation id, so api_keys:acme is "the API
 // keys of acme". That keeps the resource noun in the type where it can be
@@ -50,7 +51,7 @@ action member, read, write, update, manage, invite, remove
 // --- principals ---
 relation member_of : transitive
 relation holder    : direct
-relation actor     : identity
+relation owner     : direct
 
 // --- structure ---
 relation org       : direct
@@ -71,11 +72,12 @@ type user
 type group
   relation member_of -> user | group#member_of
 
-// A key holds nothing of its own. It reaches exactly what its actor reaches,
-// so demoting the owner demotes the key on the next request and deleting the
-// edge stops it.
+// A key is an ordinary principal, named directly by the edges that grant it.
+// Its bound is the subset rule at write time: CanWrite refuses to issue a key
+// anything its creator does not already hold. The owner edge is lifecycle only,
+// so a departing person's keys can be found and swept, and it grants nothing.
 type key
-  relation actor -> user | role#holder
+  relation owner -> user
 
 // A role is a named set of holders. Membership expiry lives on the holder edge,
 // which is what makes time-boxed access the cheap option rather than the
@@ -84,95 +86,95 @@ type role
   relation holder -> user | group#member_of
 
 type organisation
-  relation belongs    -> user | role#holder
-  relation suspended  -> user | role#holder
-  relation oversees   -> user | role#holder
-  relation can_read   -> user | role#holder
-  relation can_update -> user | role#holder
+  relation belongs    -> user | key | role#holder
+  relation suspended  -> user | key | role#holder
+  relation oversees   -> user | key | role#holder
+  relation can_read   -> user | key | role#holder
+  relation can_update -> user | key | role#holder
   rule member = belongs - suspended + oversees
   rule read   = can_read
   rule update = can_update
 
 type members
   relation org        -> organisation
-  relation can_read   -> user | role#holder
-  relation can_invite -> user | role#holder
-  relation can_remove -> user | role#holder
+  relation can_read   -> user | key | role#holder
+  relation can_invite -> user | key | role#holder
+  relation can_remove -> user | key | role#holder
   rule read   = can_read
   rule invite = can_invite
   rule remove = can_remove
 
 type org_roles
   relation org        -> organisation
-  relation can_read   -> user | role#holder
-  relation can_manage -> user | role#holder
+  relation can_read   -> user | key | role#holder
+  relation can_manage -> user | key | role#holder
   rule read   = can_read
   rule manage = can_manage
 
 type api_keys
   relation org        -> organisation
-  relation can_read   -> user | role#holder
-  relation can_manage -> user | role#holder
+  relation can_read   -> user | key | role#holder
+  relation can_manage -> user | key | role#holder
   rule read   = can_read
   rule manage = can_manage
 
 type app_users
   relation org       -> organisation
-  relation can_read  -> user | role#holder
-  relation can_write -> user | role#holder
+  relation can_read  -> user | key | role#holder
+  relation can_write -> user | key | role#holder
   rule read  = can_read
   rule write = can_write
 
 type app_access
   relation org        -> organisation
-  relation can_read   -> user | role#holder
-  relation can_manage -> user | role#holder
+  relation can_read   -> user | key | role#holder
+  relation can_manage -> user | key | role#holder
   rule read   = can_read
   rule manage = can_manage
 
 type attributes
   relation org        -> organisation
-  relation can_read   -> user | role#holder
-  relation can_manage -> user | role#holder
+  relation can_read   -> user | key | role#holder
+  relation can_manage -> user | key | role#holder
   rule read   = can_read
   rule manage = can_manage
 
 type automations
   relation org        -> organisation
-  relation can_read   -> user | role#holder
-  relation can_manage -> user | role#holder
+  relation can_read   -> user | key | role#holder
+  relation can_manage -> user | key | role#holder
   rule read   = can_read
   rule manage = can_manage
 
 type billing
   relation org        -> organisation
-  relation can_read   -> user | role#holder
-  relation can_manage -> user | role#holder
+  relation can_read   -> user | key | role#holder
+  relation can_manage -> user | key | role#holder
   rule read   = can_read
   rule manage = can_manage
 
 type email_templates
   relation org        -> organisation
-  relation can_read   -> user | role#holder
-  relation can_manage -> user | role#holder
+  relation can_read   -> user | key | role#holder
+  relation can_manage -> user | key | role#holder
   rule read   = can_read
   rule manage = can_manage
 
 type product_features
   relation org        -> organisation
-  relation can_read   -> user | role#holder
-  relation can_manage -> user | role#holder
+  relation can_read   -> user | key | role#holder
+  relation can_manage -> user | key | role#holder
   rule read   = can_read
   rule manage = can_manage
 
 type activity
   relation org      -> organisation
-  relation can_read -> user | role#holder
+  relation can_read -> user | key | role#holder
   rule read = can_read
 
 type usage
   relation org      -> organisation
-  relation can_read -> user | role#holder
+  relation can_read -> user | key | role#holder
   rule read = can_read
 `
 

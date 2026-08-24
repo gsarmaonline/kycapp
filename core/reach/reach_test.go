@@ -283,16 +283,6 @@ type doc
   rule read  = write
   rule write = read`,
 
-		"identity relation carrying a wildcard": `
-namespace n
-action read
-relation actor  : identity, wildcard subject
-relation viewer : direct
-type user
-type doc
-  relation viewer -> user
-  rule read = viewer`,
-
 		"arrow to a type that cannot answer it": `
 namespace n
 action read

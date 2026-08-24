@@ -274,36 +274,42 @@ action write
 relation member : transitive
 relation editor : direct
 relation parent : direct
-relation actor  : identity
+relation owner  : direct
 
 type user
 
 type group
   relation member -> user | group#member
 
+// A key is an ordinary principal. It carries no mechanism of its own: what it
+// reaches is whatever edges name it. The owner edge is lifecycle only, so a
+// departing person's keys can be found and swept, and it deliberately confers
+// nothing.
 type key
-  relation actor -> user | group#member
+  relation owner -> user
 
 type folder
   relation parent -> folder
-  relation editor -> user | group#member
+  relation editor -> user | key | group#member
   rule write = editor + parent->write
 `
 
 func TestExample08MachinePrincipal(t *testing.T) {
 	e := evalFor(t, schemaKey,
-		edge(Node("folder", "f1"), "editor", Subject(Node("user", "u9"))),
-		edge(Node("key", "k4"), "actor", Subject(Node("user", "u9"))),
+		edge(Node("folder", "f1"), "editor", Subject(Node("key", "k4"))),
+		edge(Node("key", "k4"), "owner", Subject(Node("user", "u9"))),
+		edge(Node("folder", "f2"), "editor", Subject(Node("user", "u9"))),
 	)
-	// The key holds nothing of its own; it reaches exactly what its actor does.
 	mustAllow(t, e, Node("key", "k4"), "write", Node("folder", "f1"))
+	// Owning a key confers nothing to the key. f2 is the owner's, not k4's.
+	mustDeny(t, e, Node("key", "k4"), "write", Node("folder", "f2"), ReasonUnreachable)
 	mustDeny(t, e, Node("key", "k7"), "write", Node("folder", "f1"), ReasonUnreachable)
 }
 
 func TestMachinePrincipalStopsWhenTheEdgeGoes(t *testing.T) {
 	store := NewMemoryStore()
-	actor := edge(Node("key", "k4"), "actor", Subject(Node("user", "u9")))
-	store.MustWrite(edge(Node("folder", "f1"), "editor", Subject(Node("user", "u9"))), actor)
+	grant := edge(Node("folder", "f1"), "editor", Subject(Node("key", "k4")))
+	store.MustWrite(grant, edge(Node("key", "k4"), "owner", Subject(Node("user", "u9"))))
 
 	e, err := New(MustParse(schemaKey), store)
 	if err != nil {
@@ -311,10 +317,30 @@ func TestMachinePrincipalStopsWhenTheEdgeGoes(t *testing.T) {
 	}
 	mustAllow(t, e, Node("key", "k4"), "write", Node("folder", "f1"))
 
-	if !store.Delete(actor) {
-		t.Fatal("actor edge was not present")
+	// Revocation is deleting the edge that named it. One operation, immediate.
+	if !store.Delete(grant) {
+		t.Fatal("grant edge was not present")
 	}
 	mustDeny(t, e, Node("key", "k4"), "write", Node("folder", "f1"), ReasonUnreachable)
+}
+
+func TestAKeyCannotBeIssuedBeyondItsCreator(t *testing.T) {
+	// The bound on a machine credential is the subset rule at write time, not a
+	// derivation re-run on every read.
+	e := evalFor(t, schemaKey,
+		edge(Node("folder", "f1"), "editor", Subject(Node("user", "u9"))),
+	)
+	ctx := context.Background()
+
+	within := edge(Node("folder", "f1"), "editor", Subject(Node("key", "k4")))
+	if err := e.CanWrite(ctx, Node("user", "u9"), within, CarveNone, at); err != nil {
+		t.Fatalf("issuing a key inside the creator's reach was refused: %v", err)
+	}
+
+	beyond := edge(Node("folder", "f9"), "editor", Subject(Node("key", "k4")))
+	if err := e.CanWrite(ctx, Node("user", "u9"), beyond, CarveNone, at); err == nil {
+		t.Fatal("a key was issued beyond its creator's reach")
+	}
 }
 
 // --- 09. Everyone, and everything ---
