@@ -187,8 +187,13 @@ type usage
   rule read = can_read
 `
 
-// PermissionKey maps a permission key from the current catalog to the (type,
-// action) pair that replaces it.
+// CapOrganisationMember is inherent to reaching an organisation at all: it is
+// what holding any role there means, not something a role hands out. It is
+// therefore deliberately absent from the seeded permissions catalog, and
+// TestCatalogMatchesSeededPermissions checks that it stays absent.
+const CapOrganisationMember = "organisation:member"
+
+// PermissionKey maps a permission key to the (type, action) pair it resolves as.
 //
 // This table is the migration contract. TestEveryPermissionKeyMaps checks it
 // against the registry the current system boots from, so a key added on either
@@ -198,7 +203,13 @@ type PermissionKey struct {
 	Action string
 }
 
-// Permissions is the whole current catalog, projected.
+// Permissions is the authoritative catalog: every permission key the system
+// understands, and what each one means to the evaluator.
+//
+// It is closed, and defined in code, so a typo in a gate cannot reach a
+// decision. TestCatalogMatchesSeededPermissions checks it against the
+// permissions the migrations seed, so a key added on either side without the
+// other fails the build rather than silently losing a gate.
 var Permissions = map[string]PermissionKey{
 	"organisation:member": {"organisation", "member"},
 	"organisation:read":   {"organisation", "read"},

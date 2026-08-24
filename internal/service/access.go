@@ -29,10 +29,6 @@ import (
 //   - Staff do not short-circuit. Their reach is edges on the star nodes, so a
 //     read-only support role stays read-only inside a merchant's organisation.
 
-// capOrganisationMember is inherent to reaching an organisation at all. It is
-// not something a role grants: it is what holding any role there means.
-const capOrganisationMember = CapOrganisationMember
-
 // RequirePrincipal returns the authenticated principal or 401.
 func RequirePrincipal(ctx context.Context) (authn.Principal, error) {
 	p, ok := authn.FromContext(ctx)
@@ -183,14 +179,14 @@ func (s *Service) ReachesEveryOrganisation(ctx context.Context, p authn.Principa
 
 // RequireOrgMember requires reach into an *active* organisation.
 func (s *Service) RequireOrgMember(ctx context.Context, orgID string) (authn.Principal, error) {
-	return s.requireOrgAccess(ctx, orgID, capOrganisationMember, true)
+	return s.requireOrgAccess(ctx, orgID, accessmodel.CapOrganisationMember, true)
 }
 
 // RequireOrgMemberAnyStatus is RequireOrgMember for a lifecycle route: a
 // suspended organisation stays visible to its own members, so the state can be
 // seen and acted on rather than the tenant simply vanishing.
 func (s *Service) RequireOrgMemberAnyStatus(ctx context.Context, orgID string) (authn.Principal, error) {
-	return s.requireOrgAccess(ctx, orgID, capOrganisationMember, false)
+	return s.requireOrgAccess(ctx, orgID, accessmodel.CapOrganisationMember, false)
 }
 
 // RequireOrgPermission requires reach into the organisation plus a named
@@ -249,7 +245,7 @@ func (s *Service) requireOrgAccess(ctx context.Context, orgID, permissionKey str
 		// Out of reach and non-existent are the same answer on purpose.
 		return authn.Principal{}, apperr.NotFound("organisation not found")
 	}
-	if permissionKey == capOrganisationMember {
+	if permissionKey == accessmodel.CapOrganisationMember {
 		return p, nil
 	}
 

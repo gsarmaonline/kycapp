@@ -2,13 +2,11 @@ package accessmodel_test
 
 import (
 	"context"
-	"sort"
 	"testing"
 	"time"
 
 	"github.com/gsarmaonline/kyc/core/reach"
 	"github.com/gsarmaonline/kyc/internal/accessmodel"
-	"github.com/gsarmaonline/kyc/internal/service"
 )
 
 // These tests are the migration's evidence. Each one names a behaviour the
@@ -73,34 +71,7 @@ func mustNotHold(t *testing.T, e *reach.Evaluator, subject reach.NodeRef, key, o
 	}
 }
 
-// --- The migration contract ---
-
-func TestEveryPermissionKeyMaps(t *testing.T) {
-	// The current system boots from this registry. A key added on either side
-	// without the other must fail here rather than silently lose a gate.
-	current := service.KYCCapabilities.Keys()
-
-	var projected []string
-	for k := range accessmodel.Permissions {
-		projected = append(projected, k)
-	}
-	sort.Strings(projected)
-	sort.Strings(current)
-
-	if len(projected) != len(current) {
-		t.Errorf("projection has %d keys, the registry has %d", len(projected), len(current))
-	}
-	for _, key := range current {
-		if _, ok := accessmodel.Permissions[key]; !ok {
-			t.Errorf("permission %q has no projection", key)
-		}
-	}
-	for _, key := range projected {
-		if !service.KYCCapabilities.Has(key) {
-			t.Errorf("projection carries %q, which the registry does not", key)
-		}
-	}
-}
+// --- The catalog ---
 
 func TestEveryProjectionResolvesInTheSchema(t *testing.T) {
 	schema := accessmodel.MustLoad()
