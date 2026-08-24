@@ -4,6 +4,10 @@ FROM golang:1.26-alpine AS build
 WORKDIR /src
 RUN apk add --no-cache git ca-certificates
 COPY go.mod go.sum ./
+# core/reach is a separate module the root go.mod replaces with a local path, so
+# its go.mod must be present before the download resolves. It has no go.sum,
+# because it depends on nothing outside the standard library.
+COPY core/reach/go.mod core/reach/
 RUN go mod download
 COPY . .
 RUN CGO_ENABLED=0 GOOS=linux go build -o /out/api ./cmd/api
