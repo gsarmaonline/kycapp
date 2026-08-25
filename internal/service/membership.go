@@ -45,6 +45,11 @@ func (s *Service) CreateMembership(ctx context.Context, orgID string, in CreateM
 	if role.OrganisationID != orgID {
 		return sqlc.Membership{}, apperr.Validation("role does not belong to organisation")
 	}
+	// members:invite says who may bring people in, not how much power they may
+	// arrive with. Without this, one call handed anybody the owner role.
+	if err := s.requireCanAssignRole(ctx, orgID, in.RoleID); err != nil {
+		return sqlc.Membership{}, err
+	}
 
 	status := strings.TrimSpace(in.Status)
 	if status == "" {
@@ -130,6 +135,12 @@ func (s *Service) UpdateMembership(ctx context.Context, id string, in UpdateMemb
 		}
 		if role.OrganisationID != m.OrganisationID {
 			return sqlc.Membership{}, apperr.Validation("role does not belong to organisation")
+		}
+		// Moving a membership to a role confers that role, so it takes the same
+		// subset rule as issuing one. This is the path that let a holder of
+		// members:invite promote their own membership to owner.
+		if err := s.requireCanAssignRole(ctx, m.OrganisationID, *in.RoleID); err != nil {
+			return sqlc.Membership{}, err
 		}
 		params.RoleID = pgtype.Text{String: *in.RoleID, Valid: true}
 	}

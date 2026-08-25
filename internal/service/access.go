@@ -58,11 +58,22 @@ func RequireUser(ctx context.Context) (authn.Principal, error) {
 // organisation, so without that check it would be mistaken for break-glass and
 // short-circuit past its owner.
 //
+// RecoveryID must be empty for the same reason, and the omission was a real
+// defect: a recovery credential is a service principal with no organisation and
+// no key id, so it matched every clause and skipped the walk entirely. Its edges
+// on the star nodes were then dead rows, and Decision.Path never named it. The
+// tests could not see the difference, because a credential that reaches
+// everything by short-circuit and one that reaches everything by edge answer
+// every request identically.
+//
 // This is the one principal that does not go through the graph, and it is
 // deliberate: reach that has to survive an empty store cannot be derived from
 // the store. Everything else, recovery credentials included, is edges.
 func isBreakGlass(p authn.Principal) bool {
-	return p.Kind == authn.KindService && p.OrganisationID == "" && p.APIKeyID == ""
+	return p.Kind == authn.KindService &&
+		p.OrganisationID == "" &&
+		p.APIKeyID == "" &&
+		p.RecoveryID == ""
 }
 
 // principalNode is the node the walk starts from.

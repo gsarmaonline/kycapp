@@ -190,6 +190,8 @@ The practical consequence: an exclusion is not a lock. If a second grant reaches
 
 Invariant 2 has one structural carve-out: **break-glass**, which holds everything by definition, so the subset rule is satisfied rather than bypassed. A recovery credential is not a carve-out: minting one requires already holding global reach, so it is ordinary delegation. Organisation creation was a second carve-out and is now ordinary delegation when a staff member creates the tenant; self-serve signup still mints a founding owner grant from the system.
 
+Invariant 2 is enforced in `service/delegation.go`, on the four write paths that confer a permission: authoring a role, editing one, issuing a membership and moving one. It was unenforced for longer than this document admitted — see [known defects](#delegation-was-never-enforced--fixed).
+
 `TestCapabilityRegistryMatchesSeededPermissions` enforces invariant 3 against the migrations. It has already caught real drift.
 
 ---
@@ -486,6 +488,48 @@ See [authentication](authentication.md#api-keys-belong-to-a-user--settled) for t
 
 A staff member carries their full role in every request, including while browsing an ordinary screen. `memberships.expires_at` supports time-boxed access, but nothing issues it, so just-in-time access is possible rather than default. That is phase 6, and without one-click issuing people will simply ask for standing access.
 
-### `RequirePlatform` is gone
+### `RequirePlatform` is gone — and so is `IsPlatform` — fixed
 
 All twelve call sites moved to `RequirePlatformCapability`, and the coarse gate was deleted rather than left available, since a bypass nobody calls is a bypass someone eventually calls.
+
+It came back anyway, as a method. `Principal.IsPlatform()` was the same bypass with a different name, and six handlers used it to skip the capability check entirely: the user read, patch and memberships routes, organisation creation and listing, the entitlement check, the authz check, and the onboarding panel. `PlatformAdmin` is true for anybody holding a live membership of the platform organisation, whatever their role carries, so a **read-only support role could change any user's status** — and the "cannot change own status" guard sat inside the branch the bypass skipped. It also disagreed with `isBreakGlass`, which deliberately refuses a stored key: an organisation-less API key counted as staff there and not here.
+
+The method is deleted. The routes that need a capability call `RequirePlatformCapability`; listing asks `ReachesEveryOrganisation`, which is the same walk; the two check endpoints dropped their platform branch entirely, because staff reach every tenant through `oversees` and the ordinary gate already admits them. `PlatformAdmin` survives as a field that `/v1/me` reports so the UI can show staff screens. It is a display fact, never a gate.
+
+`TestSupportRoleCannotWriteToUsers` is what holds this.
+
+### Recovery credentials skipped the graph — fixed
+
+`isBreakGlass` tested for a service principal with no organisation and no key id. A recovery credential is exactly that, so it matched, and every gate returned before the walk ever ran. The `recovery_credentials` branch of `reach_edges_live` was dead rows, and `Decision.Path` never named a recovery step.
+
+Nothing about *reach* was wrong — a credential that reaches everything by short-circuit and one that reaches everything by edge answer every request identically, which is why `TestRecoveryCredentialReachesEveryOrganisation` passed throughout and could not have caught this. What was wrong is that the documented property was false: break-glass is meant to be the one principal outside the graph, and it was two.
+
+`isBreakGlass` now also requires an empty `RecoveryID`. `TestOnlyTheEnvironmentTokenIsBreakGlass` enumerates the whole set, because the only way to see this defect is to look at the classification directly.
+
+### Delegation was never enforced — fixed
+
+Invariant 2 says no principal may grant what it does not hold, and describes it as structural rather than review-dependent. `reach.CanWrite` states the rule for one edge — and had **no call sites outside its own tests**.
+
+It could not have had any. KYC's own write paths do not write edges: they write `roles`, `role_permissions` and `memberships`, which the live view then presents as edges. So the rule had to be restated in the vocabulary those paths speak, and until it was, four escalations were one call each:
+
+| Held | Reachable |
+| --- | --- |
+| `roles:manage` | Author a role carrying `billing:manage`, then hold it |
+| `roles:manage` | Widen your own role to every capability in the catalog |
+| `members:invite` | Invite anybody as `owner` |
+| `members:invite` | `PATCH` your own membership to `owner` |
+
+`requireCanGrant` (`service/delegation.go`) now asks the evaluator, for each permission being conferred, whether the caller already holds it at the same node — the star node when the role belongs to the platform organisation, since that is where staff edges live. `requireCanAssignRole` resolves a role through `role_extends` first, because assigning a role confers its inherited set and not just its direct rows.
+
+Two decisions worth knowing:
+
+- **The resulting set is checked, not the delta.** You may not leave a permission on a role you do not hold, whether you are adding it now or it was already there. Checking the delta would make the rule depend on history.
+- **A role that hands out another must hold what that other confers.** An "inviter" role therefore needs at least the seeded `member` permission set to invite a member. That is the rule working, not a bug, but it is a real authoring constraint and merchant UI should say so rather than returning a bare 403.
+
+Break-glass satisfies the rule rather than bypassing it, exactly as `CarveRootOfTrust` describes: it holds everything by definition, so there is nothing to refuse. Founding-owner memberships are minted by the system inside a transaction and never pass through this path.
+
+`delegation_api_test.go` covers all four escalations plus the cases that must keep working.
+
+### `reach.CanWrite` is still unwired
+
+The subset rule is enforced above, in the vocabulary of the legacy tables. `CanWrite` remains the statement of it for a principal writing an **edge** directly, which today is only the merchant graph, and that path does not call it yet. The two should converge when the write paths move to edges; until then, read `service/delegation.go` as the enforced version and `CanWrite` as the model.
