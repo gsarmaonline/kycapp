@@ -3,14 +3,11 @@ import type { FormEvent } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import {
   createAppGrant,
-  listAppCapabilities,
   listAppRoles,
   listAppScopeTypes,
   listAppUserGroups,
   listAppUsers,
-  type AppCapability,
   type AppRole,
-  type AppScopeRef,
   type AppScopeType,
   type AppUser,
   type AppUserGroup,
@@ -36,22 +33,16 @@ export function CustomerGrantsNew() {
   const [scopeTypes, setScopeTypes] = useState<AppScopeType[]>([])
   const [groups, setGroups] = useState<AppUserGroup[]>([])
   const [customers, setCustomers] = useState<AppUser[]>([])
-  const [capabilities, setCapabilities] = useState<AppCapability[]>([])
 
   const [subjectKind, setSubjectKind] = useState<SubjectKind>('app_user')
   const [subjectId, setSubjectId] = useState('')
-  const [exceptUsers, setExceptUsers] = useState<string[]>([])
 
   const [allCapabilities, setAllCapabilities] = useState(false)
   const [roleId, setRoleId] = useState('')
-  const [exceptCapabilities, setExceptCapabilities] = useState<string[]>([])
 
   const [allScopes, setAllScopes] = useState(false)
   const [scopeKind, setScopeKind] = useState('')
   const [scopeId, setScopeId] = useState('')
-  const [exceptScopes, setExceptScopes] = useState<AppScopeRef[]>([])
-  const [exceptKind, setExceptKind] = useState('')
-  const [exceptId, setExceptId] = useState('')
 
   const [selfOnly, setSelfOnly] = useState(false)
   const [expiresAt, setExpiresAt] = useState('')
@@ -63,14 +54,12 @@ export function CustomerGrantsNew() {
       listAppScopeTypes(orgId),
       listAppUserGroups(orgId),
       listAppUsers(orgId),
-      listAppCapabilities(orgId),
     ])
-      .then(([r, s, g, u, c]) => {
+      .then(([r, s, g, u]) => {
         setRoles(r.items)
         setScopeTypes(s.items)
         setGroups(g.items)
         setCustomers(u.items)
-        setCapabilities(c.items)
       })
       .catch((e) => setError(e instanceof Error ? e.message : 'Failed to load'))
   }, [orgId])
@@ -85,12 +74,9 @@ export function CustomerGrantsNew() {
         group_id: subjectKind === 'group' ? subjectId : undefined,
         role_id: allCapabilities ? undefined : roleId,
         all_capabilities: allCapabilities,
-        except_capabilities: allCapabilities ? exceptCapabilities : [],
         all_scopes: allScopes,
         scope_kind: allScopes ? undefined : scopeKind,
         scope_id: scopeId,
-        except_scopes: exceptScopes,
-        except_app_user_ids: subjectKind === 'app_user' ? [] : exceptUsers,
         constraint: selfOnly ? 'self_subject' : '',
         expires_at: expiresAt ? new Date(expiresAt).toISOString() : undefined,
       })
@@ -98,10 +84,6 @@ export function CustomerGrantsNew() {
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Grant failed')
     }
-  }
-
-  function toggle(list: string[], value: string, on: boolean): string[] {
-    return on ? [...list, value] : list.filter((v) => v !== value)
   }
 
   const missing = scopeTypes.length === 0 || (roles.length === 0 && !allCapabilities)
@@ -125,7 +107,6 @@ export function CustomerGrantsNew() {
             onChange={(e) => {
               setSubjectKind(e.target.value as SubjectKind)
               setSubjectId('')
-              setExceptUsers([])
             }}
           >
             <option value="app_user">One customer</option>
@@ -161,25 +142,6 @@ export function CustomerGrantsNew() {
           </p>
         )}
 
-        {subjectKind !== 'app_user' && customers.length > 0 && (
-          <fieldset className="perm-group">
-            <legend>Except these customers</legend>
-            <p className="muted">
-              Offboard one person without listing everyone else. Only this grant is affected.
-            </p>
-            {customers.map((u) => (
-              <label className="perm" key={u.id}>
-                <input
-                  type="checkbox"
-                  checked={exceptUsers.includes(u.id)}
-                  onChange={(e) => setExceptUsers(toggle(exceptUsers, u.id, e.target.checked))}
-                />
-                <span>{u.email ?? u.display_name ?? u.id}</span>
-              </label>
-            ))}
-          </fieldset>
-        )}
-
         <fieldset className="perm-group">
           <legend>What it carries</legend>
           <label className="perm">
@@ -189,7 +151,6 @@ export function CustomerGrantsNew() {
               onChange={(e) => {
                 setAllCapabilities(e.target.checked)
                 setRoleId('')
-                setExceptCapabilities([])
               }}
             />
             <span>
@@ -215,26 +176,6 @@ export function CustomerGrantsNew() {
             </label>
           )}
 
-          {allCapabilities && capabilities.length > 0 && (
-            <>
-              <p className="muted">Except these capabilities:</p>
-              {capabilities.map((c) => (
-                <label className="perm" key={c.id}>
-                  <input
-                    type="checkbox"
-                    checked={exceptCapabilities.includes(c.key)}
-                    onChange={(e) =>
-                      setExceptCapabilities(toggle(exceptCapabilities, c.key, e.target.checked))
-                    }
-                  />
-                  <span>
-                    {c.key}
-                    {c.description && <em>{c.description}</em>}
-                  </span>
-                </label>
-              ))}
-            </>
-          )}
         </fieldset>
 
         {/*
@@ -279,59 +220,6 @@ export function CustomerGrantsNew() {
           </>
         )}
 
-        <fieldset className="perm-group">
-          <legend>Except these scopes</legend>
-          <p className="muted">
-            For what narrower scoping cannot say: ten thousand projects, one confidential, and no
-            appetite for 9,999 grants. Another grant reaching the same scope still allows it.
-          </p>
-          {exceptScopes.length > 0 && (
-            <ul>
-              {exceptScopes.map((s, i) => (
-                <li key={`${s.kind}/${s.id}`}>
-                  {s.kind} / {s.id}{' '}
-                  <button
-                    type="button"
-                    className="link-btn danger"
-                    onClick={() => setExceptScopes(exceptScopes.filter((_, j) => j !== i))}
-                  >
-                    Remove
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )}
-          <div className="row">
-            <select
-              value={exceptKind}
-              onChange={(e) => setExceptKind(e.target.value)}
-              aria-label="Excluded scope kind"
-            >
-              <option value="">Kind…</option>
-              {scopeTypes.map((s) => (
-                <option key={s.id} value={s.kind}>
-                  {s.label || s.kind}
-                </option>
-              ))}
-            </select>
-            <input
-              value={exceptId}
-              onChange={(e) => setExceptId(e.target.value)}
-              placeholder="id to exclude"
-              aria-label="Excluded scope id"
-            />
-            <button
-              type="button"
-              disabled={!exceptKind || !exceptId}
-              onClick={() => {
-                setExceptScopes([...exceptScopes, { kind: exceptKind, id: exceptId }])
-                setExceptId('')
-              }}
-            >
-              Exclude
-            </button>
-          </div>
-        </fieldset>
 
         <label className="perm">
           <input

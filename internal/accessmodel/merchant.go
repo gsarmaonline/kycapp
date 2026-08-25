@@ -113,6 +113,29 @@ func MerchantSchema(m MerchantModel) (*reach.Schema, error) {
 
 	b.WriteString("relation member_of : transitive\n")
 	b.WriteString("relation holder    : direct\n")
+	if len(resourceTypes) > 0 && len(actions) > 0 {
+		// Ownership, which the grant store carried as a constraint_kind of
+		// self_subject and evaluated by comparing two ids at read time.
+		//
+		// As an edge it is one fact: document:d1 #owner app_user:ana. The walk
+		// then answers "is this thing yours" with the same comparison it uses
+		// for every other principal, at the leaves, with no second mechanism.
+		//
+		// Two consequences, and both are real.
+		//
+		// The merchant now writes an owner edge on every resource create. The
+		// constraint cost no writes at all, so this is the largest thing the
+		// move asks of an integration.
+		//
+		// And ownership confers every action its type answers, where the
+		// constraint conferred only what the role carried. Preserving that would
+		// need "owner AND the grant", and the grammar has no parentheses: terms
+		// associate strictly left to right, so a + b & c is (a + b) & c and the
+		// intersection would swallow the whole union. A merchant who does not
+		// want owners deleting their own rows declares delete on a type owners
+		// do not hold, rather than trimming a role.
+		b.WriteString("relation owner     : direct\n")
+	}
 	if nests {
 		// direct, not transitive, and the validator is what taught this. A
 		// container chain already recurses through the rules: document's
@@ -126,6 +149,26 @@ func MerchantSchema(m MerchantModel) (*reach.Schema, error) {
 		// Wildcard on both ends: the object star is scope_id '*', every instance
 		// of a kind, and the subject star is the everyone grant.
 		fmt.Fprintf(&b, "relation can_%s : direct, wildcard both\n", action)
+	}
+	if len(actions) > 0 {
+		// The third wildcard axis.
+		//
+		// A grant could always say "every customer" and "every scope of a kind",
+		// because both are node ids and the star lives in an id. It could not say
+		// "every capability", because a capability is a relation, and relations
+		// are matched by exact name. can_* would have meant a pattern query
+		// instead of an exact prefix of the edge primary key, and a matching
+		// operator in a grammar whose whole rule is that nobody adds operators.
+		//
+		// So the wildcard is an ordinary relation instead, unioned into every
+		// rule. One edge, and it stays standing: declare an action next quarter
+		// and every holder gains it without a grant being rewritten. That is the
+		// point of a wildcard, and expanding it to a concrete list at write time
+		// would quietly stop covering the admin it was issued to.
+		//
+		// ActionsFed reports every action for it, so CanWrite already refuses to
+		// let anyone issue one who does not hold everything.
+		b.WriteString("relation can_all : direct, wildcard both\n")
 	}
 
 	b.WriteString("\ntype app_user\n")
@@ -147,11 +190,14 @@ func MerchantSchema(m MerchantModel) (*reach.Schema, error) {
 		for _, action := range sortedSet(actions) {
 			fmt.Fprintf(&b, "  relation can_%s -> %s\n", action, grantees)
 		}
+		if len(actions) > 0 {
+			fmt.Fprintf(&b, "  relation can_all -> %s\n", grantees)
+		}
 		for _, action := range sortedSet(actions) {
 			if len(scopeKinds) > 1 {
-				fmt.Fprintf(&b, "  rule %s = can_%s + parent->%s\n", action, action, action)
+				fmt.Fprintf(&b, "  rule %s = can_%s + can_all + parent->%s\n", action, action, action)
 			} else {
-				fmt.Fprintf(&b, "  rule %s = can_%s\n", action, action)
+				fmt.Fprintf(&b, "  rule %s = can_%s + can_all\n", action, action)
 			}
 		}
 	}
@@ -167,11 +213,19 @@ func MerchantSchema(m MerchantModel) (*reach.Schema, error) {
 		for _, action := range sortedSet(resources[resource]) {
 			fmt.Fprintf(&b, "  relation can_%s -> %s\n", action, grantees)
 		}
+		// can_all on a resource type covers the actions *that type* answers, not
+		// every action in the namespace. A wildcard is a claim about a set, and
+		// the set here is what this resource can have done to it.
+		fmt.Fprintf(&b, "  relation can_all -> %s\n", grantees)
+		// owner takes an app_user only. A group or a role owning a row is a
+		// different idea from "this is mine", and conflating them would make
+		// ownership a second way to write a grant.
+		b.WriteString("  relation owner -> app_user\n")
 		for _, action := range sortedSet(resources[resource]) {
 			if len(scopeKinds) > 0 {
-				fmt.Fprintf(&b, "  rule %s = can_%s + parent->%s\n", action, action, action)
+				fmt.Fprintf(&b, "  rule %s = can_%s + can_all + owner + parent->%s\n", action, action, action)
 			} else {
-				fmt.Fprintf(&b, "  rule %s = can_%s\n", action, action)
+				fmt.Fprintf(&b, "  rule %s = can_%s + can_all + owner\n", action, action)
 			}
 		}
 	}

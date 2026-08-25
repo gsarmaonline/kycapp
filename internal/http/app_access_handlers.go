@@ -1,7 +1,6 @@
 package httpserver
 
 import (
-	"encoding/json"
 	"net/http"
 	"time"
 
@@ -238,12 +237,9 @@ func (s *Server) handleCreateAppGrant(w http.ResponseWriter, r *http.Request) {
 		ScopeID     string `json:"scope_id"`
 		ExpiresAt   string `json:"expires_at"`
 
-		AllCapabilities    bool                  `json:"all_capabilities"`
-		AllScopes          bool                  `json:"all_scopes"`
-		ExceptCapabilities []string              `json:"except_capabilities"`
-		ExceptScopes       []service.AppScopeRef `json:"except_scopes"`
-		ExceptAppUserIDs   []string              `json:"except_app_user_ids"`
-		Constraint         string                `json:"constraint"`
+		AllCapabilities bool   `json:"all_capabilities"`
+		AllScopes       bool   `json:"all_scopes"`
+		Constraint      string `json:"constraint"`
 	}
 	if err := decodeJSON(r, &body); err != nil {
 		writeError(w, apperr.Validation("invalid JSON body"))
@@ -253,13 +249,10 @@ func (s *Server) handleCreateAppGrant(w http.ResponseWriter, r *http.Request) {
 		SubjectKind: body.SubjectKind,
 		AppUserID:   body.AppUserID, GroupID: body.GroupID, RoleID: body.RoleID,
 		ScopeKind: body.ScopeKind, ScopeID: body.ScopeID,
-		GrantedBy:          p.ActorLabel(),
-		AllCapabilities:    body.AllCapabilities,
-		AllScopes:          body.AllScopes,
-		ExceptCapabilities: body.ExceptCapabilities,
-		ExceptScopes:       body.ExceptScopes,
-		ExceptAppUserIDs:   body.ExceptAppUserIDs,
-		Constraint:         body.Constraint,
+		GrantedBy:       p.ActorLabel(),
+		AllCapabilities: body.AllCapabilities,
+		AllScopes:       body.AllScopes,
+		Constraint:      body.Constraint,
 	}
 	if body.ExpiresAt != "" {
 		at, parseErr := time.Parse(time.RFC3339, body.ExpiresAt)
@@ -326,8 +319,6 @@ func (s *Server) handleAppUserAccess(w http.ResponseWriter, r *http.Request) {
 		// present rather than omitted when empty.
 		item["all_capabilities"] = g.AllCapabilities
 		item["all_scopes"] = g.AllScopes
-		item["except_capabilities"] = nonNil(g.ExceptCapabilities)
-		item["except_scopes"] = scopeRefs(g.Except)
 		item["constraint"] = string(g.Constraint)
 		if g.ExpiresAt != nil {
 			item["expires_at"] = g.ExpiresAt.UTC().Format(time.RFC3339Nano)
@@ -451,12 +442,9 @@ func (s *Server) handleListAppGrants(w http.ResponseWriter, r *http.Request) {
 			"id": g.ID, "role_key": g.RoleKey,
 			"scope_kind": g.ScopeKind, "scope_id": g.ScopeID,
 			"subject_kind": g.SubjectKind, "subject_label": g.AppUserEmail,
-			"all_capabilities":    g.AllCapabilities,
-			"all_scopes":          g.AllScopes,
-			"except_capabilities": stringsOrEmpty(g.ExceptCapabilities),
-			"except_scopes":       exceptScopesJSON(g.ExceptScopes),
-			"except_app_users":    stringsOrEmpty(g.ExceptAppUserIds),
-			"constraint":          g.ConstraintKind,
+			"all_capabilities": g.AllCapabilities,
+			"all_scopes":       g.AllScopes,
+			"constraint":       g.ConstraintKind,
 		}
 		switch g.SubjectKind {
 		case "group":
@@ -470,42 +458,6 @@ func (s *Server) handleListAppGrants(w http.ResponseWriter, r *http.Request) {
 		items = append(items, item)
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"items": items})
-}
-
-// nonNil keeps an absent list serialising as [] rather than null. A backend
-// that treats null as "no exceptions" would be right; one that dereferences it
-// would not, and this costs nothing.
-func nonNil(in []string) []string {
-	if in == nil {
-		return []string{}
-	}
-	return in
-}
-
-func scopeRefs(scopes []service.AppScope) []service.AppScopeRef {
-	out := make([]service.AppScopeRef, 0, len(scopes))
-	for _, sc := range scopes {
-		out = append(out, service.AppScopeRef{Kind: sc.Kind, ID: sc.ID})
-	}
-	return out
-}
-
-// stringsOrEmpty keeps a null out of the JSON: the client renders a list, and a
-// missing array and an empty one should not read differently.
-func stringsOrEmpty(in []string) []string {
-	if in == nil {
-		return []string{}
-	}
-	return in
-}
-
-func exceptScopesJSON(raw json.RawMessage) []service.AppScopeRef {
-	out := []service.AppScopeRef{}
-	if len(raw) == 0 {
-		return out
-	}
-	_ = json.Unmarshal(raw, &out)
-	return out
 }
 
 func (s *Server) handlePatchAppUserGroup(w http.ResponseWriter, r *http.Request) {

@@ -27,30 +27,29 @@ type ApiKey struct {
 type AppCapability struct {
 	ID             string    `json:"id"`
 	OrganisationID string    `json:"organisation_id"`
-	Key            string    `json:"key"`
 	Description    string    `json:"description"`
 	CreatedAt      time.Time `json:"created_at"`
 	Source         string    `json:"source"`
+	Resource       string    `json:"resource"`
+	Action         string    `json:"action"`
+	Key            string    `json:"key"`
 }
 
 type AppGrant struct {
-	ID                 string             `json:"id"`
-	OrganisationID     string             `json:"organisation_id"`
-	AppUserID          pgtype.Text        `json:"app_user_id"`
-	RoleID             pgtype.Text        `json:"role_id"`
-	ScopeKind          string             `json:"scope_kind"`
-	ScopeID            string             `json:"scope_id"`
-	ExpiresAt          pgtype.Timestamptz `json:"expires_at"`
-	GrantedBy          string             `json:"granted_by"`
-	CreatedAt          time.Time          `json:"created_at"`
-	GroupID            pgtype.Text        `json:"group_id"`
-	SubjectKind        string             `json:"subject_kind"`
-	ExceptAppUserIds   []string           `json:"except_app_user_ids"`
-	ExceptScopes       json.RawMessage    `json:"except_scopes"`
-	AllCapabilities    bool               `json:"all_capabilities"`
-	ExceptCapabilities []string           `json:"except_capabilities"`
-	ConstraintKind     string             `json:"constraint_kind"`
-	AllScopes          bool               `json:"all_scopes"`
+	ID              string             `json:"id"`
+	OrganisationID  string             `json:"organisation_id"`
+	AppUserID       pgtype.Text        `json:"app_user_id"`
+	RoleID          pgtype.Text        `json:"role_id"`
+	ScopeKind       string             `json:"scope_kind"`
+	ScopeID         string             `json:"scope_id"`
+	ExpiresAt       pgtype.Timestamptz `json:"expires_at"`
+	GrantedBy       string             `json:"granted_by"`
+	CreatedAt       time.Time          `json:"created_at"`
+	GroupID         pgtype.Text        `json:"group_id"`
+	SubjectKind     string             `json:"subject_kind"`
+	AllCapabilities bool               `json:"all_capabilities"`
+	ConstraintKind  string             `json:"constraint_kind"`
+	AllScopes       bool               `json:"all_scopes"`
 }
 
 type AppRole struct {
@@ -409,6 +408,12 @@ type ReachEdgesLive struct {
 	SubjectRelation string             `json:"subject_relation"`
 	ExpiresAt       pgtype.Timestamptz `json:"expires_at"`
 	Source          string             `json:"source"`
+}
+
+type ReachNamespaceVersion struct {
+	Namespace string    `json:"namespace"`
+	Version   int64     `json:"version"`
+	UpdatedAt time.Time `json:"updated_at"`
 }
 
 type RecoveryCredential struct {

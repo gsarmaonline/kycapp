@@ -11,18 +11,20 @@ ORDER BY kind;
 -- name: DeleteAppScopeType :exec
 DELETE FROM app_scope_types WHERE id = $1 AND organisation_id = $2;
 
+-- The two halves are written, and key derives from them, so a capability's name
+-- and its pair cannot disagree.
 -- name: CreateAppCapability :one
-INSERT INTO app_capabilities (id, organisation_id, key, description, source)
-VALUES ($1, $2, $3, $4, $5)
+INSERT INTO app_capabilities (id, organisation_id, resource, action, description, source)
+VALUES ($1, $2, $3, $4, $5, $6)
 RETURNING *;
 
 -- Applying a template twice must not fail, and must not relabel a capability
 -- the merchant has since written by hand. DO NOTHING rather than an upsert:
 -- a key that already exists is already declared, whoever declared it.
 -- name: CreateAppCapabilityFromTemplate :exec
-INSERT INTO app_capabilities (id, organisation_id, key, description, source)
-VALUES ($1, $2, $3, $4, $5)
-ON CONFLICT (organisation_id, key) DO NOTHING;
+INSERT INTO app_capabilities (id, organisation_id, resource, action, description, source)
+VALUES ($1, $2, $3, $4, $5, $6)
+ON CONFLICT (organisation_id, resource, action) DO NOTHING;
 
 -- name: ListAppCapabilities :many
 SELECT * FROM app_capabilities
@@ -86,30 +88,26 @@ ON CONFLICT DO NOTHING;
 -- different partial index and a statement may name only one.
 --
 -- The upsert keeps re-granting idempotent: issuing the same role at the same
--- scope refreshes the expiry and the exceptions rather than failing.
+-- scope refreshes the expiry rather than failing.
 
 -- name: CreateAppUserGrant :one
 INSERT INTO app_grants (
     id, organisation_id, subject_kind, app_user_id, role_id, scope_kind, scope_id,
-    expires_at, granted_by, all_capabilities, except_capabilities, except_scopes,
-    except_app_user_ids, constraint_kind, all_scopes
-) VALUES ($1, $2, 'app_user', $3, $4, $5, $6, $7, $8, $9, $10, $11, '{}', $12, $13)
+    expires_at, granted_by, all_capabilities, constraint_kind, all_scopes
+) VALUES ($1, $2, 'app_user', $3, $4, $5, $6, $7, $8, $9, $10, $11)
 ON CONFLICT (app_user_id, COALESCE(role_id, ''), scope_kind, scope_id) WHERE app_user_id IS NOT NULL
 DO UPDATE SET expires_at = EXCLUDED.expires_at, granted_by = EXCLUDED.granted_by,
-    except_capabilities = EXCLUDED.except_capabilities, except_scopes = EXCLUDED.except_scopes,
     constraint_kind = EXCLUDED.constraint_kind
 RETURNING *;
 
 -- name: CreateAppGroupGrant :one
 INSERT INTO app_grants (
     id, organisation_id, subject_kind, group_id, role_id, scope_kind, scope_id,
-    expires_at, granted_by, all_capabilities, except_capabilities, except_scopes,
-    except_app_user_ids, constraint_kind, all_scopes
-) VALUES ($1, $2, 'group', $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+    expires_at, granted_by, all_capabilities, constraint_kind, all_scopes
+) VALUES ($1, $2, 'group', $3, $4, $5, $6, $7, $8, $9, $10, $11)
 ON CONFLICT (group_id, COALESCE(role_id, ''), scope_kind, scope_id) WHERE group_id IS NOT NULL
 DO UPDATE SET expires_at = EXCLUDED.expires_at, granted_by = EXCLUDED.granted_by,
-    except_capabilities = EXCLUDED.except_capabilities, except_scopes = EXCLUDED.except_scopes,
-    except_app_user_ids = EXCLUDED.except_app_user_ids, constraint_kind = EXCLUDED.constraint_kind
+    constraint_kind = EXCLUDED.constraint_kind
 RETURNING *;
 
 -- CreateAppEveryoneGrant covers every customer of the organisation, present and
@@ -117,13 +115,11 @@ RETURNING *;
 -- name: CreateAppEveryoneGrant :one
 INSERT INTO app_grants (
     id, organisation_id, subject_kind, role_id, scope_kind, scope_id,
-    expires_at, granted_by, all_capabilities, except_capabilities, except_scopes,
-    except_app_user_ids, constraint_kind, all_scopes
-) VALUES ($1, $2, 'everyone', $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+    expires_at, granted_by, all_capabilities, constraint_kind, all_scopes
+) VALUES ($1, $2, 'everyone', $3, $4, $5, $6, $7, $8, $9, $10)
 ON CONFLICT (organisation_id, COALESCE(role_id, ''), scope_kind, scope_id) WHERE subject_kind = 'everyone'
 DO UPDATE SET expires_at = EXCLUDED.expires_at, granted_by = EXCLUDED.granted_by,
-    except_capabilities = EXCLUDED.except_capabilities, except_scopes = EXCLUDED.except_scopes,
-    except_app_user_ids = EXCLUDED.except_app_user_ids, constraint_kind = EXCLUDED.constraint_kind
+    constraint_kind = EXCLUDED.constraint_kind
 RETURNING *;
 
 -- ListAppGrantsForUser returns a customer's live grants with the role's
@@ -145,14 +141,18 @@ RETURNING *;
 -- LEFT JOIN on app_roles rather than JOIN: a wildcard grant carries no role,
 -- and an inner join would silently drop exactly the grants that grant the most.
 --
--- except_app_user_ids is applied here rather than in Go so an excluded customer
--- never has the row assembled for them at all.
+-- There is no exclusion filter here any more. except_app_user_ids used to be
+-- applied as a NOT ... = ANY on this path, and it has no edge equivalent: an
+-- exception would have to become a subtraction in a rule, and a rule belongs to
+-- a type rather than to one grant, so it would veto every other grant reaching
+-- that type. A merchant carving customers out of an everyone-grant now carves
+-- them out of the group the grant names instead.
 -- name: ListAppGrantsForUser :many
 SELECT g.id, g.scope_kind, g.scope_id, g.expires_at, g.role_id,
        COALESCE(r.key, '')::text AS role_key,
        COALESCE(r.effective_capabilities, '{}')::text[] AS effective_capabilities,
        g.group_id, ''::text AS group_key, 'app_user'::text AS subject_kind,
-       g.all_capabilities, g.except_capabilities, g.except_scopes, g.constraint_kind, g.all_scopes
+       g.all_capabilities, g.constraint_kind, g.all_scopes
 FROM app_grants g
 LEFT JOIN app_roles r ON r.id = g.role_id
 WHERE g.app_user_id = sqlc.arg('app_user_id')
@@ -162,7 +162,7 @@ SELECT DISTINCT g.id, g.scope_kind, g.scope_id, g.expires_at, g.role_id,
        COALESCE(r.key, '')::text AS role_key,
        COALESCE(r.effective_capabilities, '{}')::text[] AS effective_capabilities,
        g.group_id, grp.key AS group_key, 'group'::text AS subject_kind,
-       g.all_capabilities, g.except_capabilities, g.except_scopes, g.constraint_kind, g.all_scopes
+       g.all_capabilities, g.constraint_kind, g.all_scopes
 -- direct.effective_parent_ids is the group itself plus everything it extends,
 -- flattened at write time. Joining through it is what makes a grant on a parent
 -- group reach a member of a child, without walking anything on the read path.
@@ -173,19 +173,17 @@ LEFT JOIN app_roles r ON r.id = g.role_id
 JOIN app_user_groups grp ON grp.id = g.group_id
 WHERE m.app_user_id = sqlc.arg('app_user_id')
   AND (g.expires_at IS NULL OR g.expires_at > now())
-  AND NOT (sqlc.arg('app_user_id')::text = ANY (g.except_app_user_ids))
 UNION ALL
 SELECT g.id, g.scope_kind, g.scope_id, g.expires_at, g.role_id,
        COALESCE(r.key, '')::text AS role_key,
        COALESCE(r.effective_capabilities, '{}')::text[] AS effective_capabilities,
        g.group_id, ''::text AS group_key, 'everyone'::text AS subject_kind,
-       g.all_capabilities, g.except_capabilities, g.except_scopes, g.constraint_kind, g.all_scopes
+       g.all_capabilities, g.constraint_kind, g.all_scopes
 FROM app_grants g
 LEFT JOIN app_roles r ON r.id = g.role_id
 WHERE g.organisation_id = sqlc.arg('organisation_id')
   AND g.subject_kind = 'everyone'
-  AND (g.expires_at IS NULL OR g.expires_at > now())
-  AND NOT (sqlc.arg('app_user_id')::text = ANY (g.except_app_user_ids));
+  AND (g.expires_at IS NULL OR g.expires_at > now());
 
 -- name: DeleteAppGrant :exec
 DELETE FROM app_grants WHERE id = $1 AND organisation_id = $2;
@@ -277,8 +275,7 @@ ORDER BY g.key;
 SELECT g.id, g.scope_kind, g.scope_id, g.expires_at, g.app_user_id, g.group_id,
        COALESCE(r.key, '')::text AS role_key, COALESCE(grp.key, '')::text AS group_key,
        COALESCE(u.email, '')::text AS app_user_email, g.subject_kind,
-       g.all_capabilities, g.except_capabilities, g.except_scopes,
-       g.except_app_user_ids, g.constraint_kind, g.all_scopes
+       g.all_capabilities, g.constraint_kind, g.all_scopes
 FROM app_grants g
 LEFT JOIN app_roles r ON r.id = g.role_id
 LEFT JOIN app_user_groups grp ON grp.id = g.group_id

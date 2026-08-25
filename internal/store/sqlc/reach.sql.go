@@ -11,6 +11,28 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const bumpReachNamespaceVersion = `-- name: BumpReachNamespaceVersion :one
+
+INSERT INTO reach_namespace_versions (namespace, version, updated_at)
+VALUES ($1, 1, now())
+ON CONFLICT (namespace) DO UPDATE
+SET version = reach_namespace_versions.version + 1, updated_at = now()
+RETURNING version
+`
+
+// The graph's version, so a cache can be invalidated by a revocation.
+//
+// BumpReachNamespaceVersion runs in the same transaction as the write or delete
+// it accompanies. A delete is the case the whole thing exists for: it moves no
+// timestamp on any surviving row, so without this a revocation is invisible and
+// a cache keeps serving the wider permission.
+func (q *Queries) BumpReachNamespaceVersion(ctx context.Context, namespace string) (int64, error) {
+	row := q.db.QueryRow(ctx, bumpReachNamespaceVersion, namespace)
+	var version int64
+	err := row.Scan(&version)
+	return version, err
+}
+
 const countReachEdgesBySource = `-- name: CountReachEdgesBySource :many
 SELECT source, count(*)::bigint AS total
 FROM reach_edges
@@ -76,6 +98,23 @@ func (q *Queries) DeleteReachEdge(ctx context.Context, arg DeleteReachEdgeParams
 		arg.SubjectRelation,
 	)
 	return err
+}
+
+const getReachNamespaceVersion = `-- name: GetReachNamespaceVersion :one
+SELECT COALESCE(
+    (SELECT version FROM reach_namespace_versions WHERE namespace = $1),
+    0
+)::bigint AS version
+`
+
+// GetReachNamespaceVersion returns 0 for a namespace nothing has ever written,
+// which is the correct answer rather than a missing row: there is nothing to
+// have gone stale.
+func (q *Queries) GetReachNamespaceVersion(ctx context.Context, namespace string) (int64, error) {
+	row := q.db.QueryRow(ctx, getReachNamespaceVersion, namespace)
+	var version int64
+	err := row.Scan(&version)
+	return version, err
 }
 
 const listLiveEdges = `-- name: ListLiveEdges :many

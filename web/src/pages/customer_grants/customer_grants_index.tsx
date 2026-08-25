@@ -16,16 +16,6 @@ function carries(g: AppGrant): string {
   return g.constraint === 'self_subject' ? `${base}, own rows only` : base
 }
 
-function exceptSummary(g: AppGrant): string {
-  const parts: string[] = []
-  if (g.except_capabilities.length) parts.push(g.except_capabilities.join(', '))
-  if (g.except_scopes.length) parts.push(g.except_scopes.map((s) => `${s.kind}/${s.id}`).join(', '))
-  if (g.except_app_users.length) {
-    parts.push(`${g.except_app_users.length} customer${g.except_app_users.length > 1 ? 's' : ''}`)
-  }
-  return parts.join('; ')
-}
-
 export function CustomerGrantsIndex() {
   const { orgId = '' } = useParams()
   const [items, setItems] = useState<AppGrant[]>([])
@@ -68,8 +58,8 @@ export function CustomerGrantsIndex() {
       />
       <p className="muted">
         Each row gives one subject one set of capabilities over one scope. Grants are never edited in place: revoke
-        and issue a new one, so the history stays readable. Exceptions narrow the grant they sit on
-        and nothing else, so no grant ever cancels another.{' '}
+        and issue a new one, so the history stays readable. Grants only ever add, so no grant cancels
+        another: to keep somebody out of something, grant nothing that reaches it.{' '}
         <ConceptDocsLink slug="customer-grants" label="How grants are evaluated" />
       </p>
       {error && <p className="error">{error}</p>}
@@ -77,7 +67,7 @@ export function CustomerGrantsIndex() {
         <p>Loading…</p>
       ) : (
         <ResourceTable
-          columns={['Subject', 'Type', 'Carries', 'Scope', 'Except', 'Expires']}
+          columns={['Subject', 'Type', 'Carries', 'Scope', 'Expires']}
           empty="No grants yet."
           rows={items.map((g) => ({
             key: g.id,
@@ -86,9 +76,6 @@ export function CustomerGrantsIndex() {
               subjectLabel(g.subject_kind),
               carries(g),
               grantScopeLabel(g),
-              // Exclusions belong in the list, not behind a click. A grant that
-              // reads as wider than it is invites someone to issue a second one.
-              exceptSummary(g) || '—',
               g.expires_at ? new Date(g.expires_at).toLocaleDateString() : 'never',
             ],
             actions: (

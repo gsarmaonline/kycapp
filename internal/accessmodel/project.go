@@ -13,6 +13,31 @@ import (
 //go:embed projection.sql
 var projectionSQL string
 
+//go:embed merchant_projection.sql
+var merchantProjectionSQL string
+
+// ProjectMerchant writes one merchant's access model into the edge table.
+//
+// The same bridge Project builds for KYC's own tier, in the merchant's
+// namespace. It existed for one side and not the other, which is why POST
+// /check could not see a merchant's roles, groups or memberships at all: the
+// vocabulary crossed over because MerchantSchema reads it, and none of the data
+// did.
+//
+// Idempotent for the same reason and by the same means, so a merchant re-running
+// it converges rather than duplicating.
+func ProjectMerchant(ctx context.Context, tx pgx.Tx, orgID string) error {
+	if strings.TrimSpace(orgID) == "" {
+		return fmt.Errorf("accessmodel: merchant projection needs an organisation")
+	}
+	for i, stmt := range splitStatements(merchantProjectionSQL) {
+		if _, err := tx.Exec(ctx, stmt, orgID); err != nil {
+			return fmt.Errorf("accessmodel: merchant projection statement %d: %w", i+1, err)
+		}
+	}
+	return nil
+}
+
 // Project writes the current authorisation model into the edge table.
 //
 // It is idempotent: every statement is ON CONFLICT DO NOTHING, so running it
@@ -46,9 +71,11 @@ func Project(ctx context.Context, tx pgx.Tx) error {
 // Each statement takes the same one parameter, so they cannot simply be sent as
 // one string: pgx would treat the batch as a single unnamed statement and
 // refuse the repeated placeholder.
-func projectionStatements() []string {
+func projectionStatements() []string { return splitStatements(projectionSQL) }
+
+func splitStatements(src string) []string {
 	var out []string
-	for _, raw := range strings.Split(projectionSQL, ";") {
+	for _, raw := range strings.Split(src, ";") {
 		if strings.TrimSpace(stripSQLComments(raw)) == "" {
 			continue
 		}

@@ -59,6 +59,9 @@ sql:
       - "internal/store/migrations/000054_app_grant_scope_wildcard.up.sql"
       - "internal/store/migrations/000055_app_capability_source.up.sql"
       - "internal/store/migrations/000056_app_role_source.up.sql"
+      - "internal/store/migrations/000057_reach_namespace_version.up.sql"
+      - "internal/store/migrations/000058_drop_grant_exceptions.up.sql"
+      - "internal/store/migrations/000059_app_capability_pair.up.sql"
     gen:
       go:
         package: "sqlc"

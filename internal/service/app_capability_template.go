@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"strings"
 
 	"github.com/gsarmaonline/kyc/internal/apperr"
 	"github.com/gsarmaonline/kyc/internal/ids"
@@ -168,10 +169,12 @@ func (s *Service) ApplyCapabilityTemplate(ctx context.Context, orgID, key string
 		if err := ValidAppCapabilityKey(item.Key); err != nil {
 			return nil, apperr.Validation(err.Error())
 		}
+		resource, action, _ := strings.Cut(item.Key, ":")
 		if err := s.db.Q().CreateAppCapabilityFromTemplate(ctx, sqlc.CreateAppCapabilityFromTemplateParams{
 			ID:             ids.New(),
 			OrganisationID: orgID,
-			Key:            item.Key,
+			Resource:       resource,
+			Action:         action,
 			Description:    item.Description,
 			Source:         tpl.Source(),
 		}); err != nil {

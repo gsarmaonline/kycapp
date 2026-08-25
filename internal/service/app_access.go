@@ -2,13 +2,13 @@ package service
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"regexp"
 	"strings"
 	"time"
 
 	"github.com/gsarmaonline/kyc/core/reach"
+	"github.com/gsarmaonline/kyc/internal/accessmodel"
 	"github.com/gsarmaonline/kyc/internal/apperr"
 	"github.com/gsarmaonline/kyc/internal/ids"
 	"github.com/gsarmaonline/kyc/internal/store"
@@ -63,7 +63,10 @@ func (s *Service) CreateAppScopeType(ctx context.Context, orgID, kind, label str
 	if store.IsUniqueViolation(err) {
 		return sqlc.AppScopeType{}, apperr.Conflict("scope kind already declared")
 	}
-	return row, err
+	if err != nil {
+		return sqlc.AppScopeType{}, err
+	}
+	return row, s.touchAppAccess(ctx, orgID)
 }
 
 func (s *Service) ListAppScopeTypes(ctx context.Context, orgID string) ([]sqlc.AppScopeType, error) {
@@ -71,7 +74,10 @@ func (s *Service) ListAppScopeTypes(ctx context.Context, orgID string) ([]sqlc.A
 }
 
 func (s *Service) DeleteAppScopeType(ctx context.Context, orgID, id string) error {
-	return s.db.Q().DeleteAppScopeType(ctx, sqlc.DeleteAppScopeTypeParams{ID: id, OrganisationID: orgID})
+	if err := s.db.Q().DeleteAppScopeType(ctx, sqlc.DeleteAppScopeTypeParams{ID: id, OrganisationID: orgID}); err != nil {
+		return err
+	}
+	return s.touchAppAccess(ctx, orgID)
 }
 
 // --- Capabilities ---
@@ -86,13 +92,24 @@ func (s *Service) CreateAppCapability(ctx context.Context, orgID, key, descripti
 	if err := ValidAppCapabilityKey(key); err != nil {
 		return sqlc.AppCapability{}, apperr.Validation(err.Error())
 	}
+	// Split once, here, rather than in every reader. The pair is what the table
+	// stores and the key derives from it, so the name and its halves cannot
+	// disagree. appKeyPattern has already refused anything without both.
+	resource, action, _ := strings.Cut(key, ":")
 	row, err := s.db.Q().CreateAppCapability(ctx, sqlc.CreateAppCapabilityParams{
-		ID: ids.New(), OrganisationID: orgID, Key: key, Description: strings.TrimSpace(description),
+		ID: ids.New(), OrganisationID: orgID,
+		Resource: resource, Action: action,
+		Description: strings.TrimSpace(description),
 	})
 	if store.IsUniqueViolation(err) {
 		return sqlc.AppCapability{}, apperr.Conflict("capability already declared")
 	}
-	return row, err
+	if err != nil {
+		return sqlc.AppCapability{}, err
+	}
+	// A new capability widens every wildcard grant that already exists, which is
+	// the point of a wildcard and exactly why it has to move the version.
+	return row, s.touchAppAccess(ctx, orgID)
 }
 
 func (s *Service) ListAppCapabilities(ctx context.Context, orgID string) ([]sqlc.AppCapability, error) {
@@ -100,7 +117,10 @@ func (s *Service) ListAppCapabilities(ctx context.Context, orgID string) ([]sqlc
 }
 
 func (s *Service) DeleteAppCapability(ctx context.Context, orgID, id string) error {
-	return s.db.Q().DeleteAppCapability(ctx, sqlc.DeleteAppCapabilityParams{ID: id, OrganisationID: orgID})
+	if err := s.db.Q().DeleteAppCapability(ctx, sqlc.DeleteAppCapabilityParams{ID: id, OrganisationID: orgID}); err != nil {
+		return err
+	}
+	return s.touchAppAccess(ctx, orgID)
 }
 
 // --- Roles ---
@@ -263,7 +283,10 @@ func (s *Service) recomputeAppRoles(ctx context.Context, orgID string) error {
 			return err
 		}
 	}
-	return nil
+	// Every role write ends here, create, update and delete alike, so this is
+	// the one place the version has to move for a role change. Narrowing a role
+	// revokes for everyone holding it without touching a single grant row.
+	return s.touchAppAccess(ctx, orgID)
 }
 
 func (s *Service) assertDeclaredCapabilities(ctx context.Context, orgID string, keys []string) error {
@@ -316,11 +339,8 @@ type AppGrantInput struct {
 	// an organisation is where a merchant's world ends. ScopeKind and ScopeID
 	// must be empty when it is set, the same way RoleID must be empty under
 	// AllCapabilities: a grant cannot be both everywhere and somewhere.
-	AllScopes          bool
-	ExceptCapabilities []string
-	ExceptScopes       []AppScopeRef
-	ExceptAppUserIDs   []string
-	Constraint         string // "" | self_subject
+	AllScopes  bool
+	Constraint string // "" | self_subject
 }
 
 // AppScopeRef is one excluded scope. Kind and id stay paired, which is why the
@@ -336,7 +356,22 @@ const (
 	subjectEveryone = "everyone"
 )
 
+// CreateAppGrant issues a grant and moves the version a merchant caches
+// against. The write has three shapes -- one customer, one group, everyone --
+// and each returns from its own branch, so the bump lives in a wrapper rather
+// than being repeated three times and forgotten on the fourth.
 func (s *Service) CreateAppGrant(ctx context.Context, orgID string, in AppGrantInput) (sqlc.AppGrant, error) {
+	row, err := s.createAppGrant(ctx, orgID, in)
+	if err != nil {
+		return sqlc.AppGrant{}, err
+	}
+	if err := s.touchAppAccess(ctx, orgID); err != nil {
+		return sqlc.AppGrant{}, err
+	}
+	return row, nil
+}
+
+func (s *Service) createAppGrant(ctx context.Context, orgID string, in AppGrantInput) (sqlc.AppGrant, error) {
 	kind := strings.ToLower(strings.TrimSpace(in.ScopeKind))
 	scopeID := strings.TrimSpace(in.ScopeID)
 
@@ -386,11 +421,9 @@ func (s *Service) CreateAppGrant(ctx context.Context, orgID string, in AppGrantI
 		roleID = textArg(in.RoleID)
 	}
 
-	exceptCaps, err := s.validateExceptCapabilities(ctx, orgID, in)
 	if err != nil {
 		return sqlc.AppGrant{}, err
 	}
-	exceptScopes, err := validateExceptScopes(in.ExceptScopes, declaredKinds)
 	if err != nil {
 		return sqlc.AppGrant{}, err
 	}
@@ -418,15 +451,10 @@ func (s *Service) CreateAppGrant(ctx context.Context, orgID string, in AppGrantI
 		if in.AppUserID != "" || in.GroupID != "" {
 			return sqlc.AppGrant{}, apperr.Validation("an everyone grant names no subject")
 		}
-		excluded, err := s.validateExcludedUsers(ctx, orgID, in.ExceptAppUserIDs)
-		if err != nil {
-			return sqlc.AppGrant{}, err
-		}
 		return s.db.Q().CreateAppEveryoneGrant(ctx, sqlc.CreateAppEveryoneGrantParams{
 			ID: ids.New(), OrganisationID: orgID, RoleID: roleID,
 			ScopeKind: kind, ScopeID: scopeID, ExpiresAt: expires, GrantedBy: in.GrantedBy,
-			AllCapabilities: in.AllCapabilities, AllScopes: in.AllScopes, ExceptCapabilities: exceptCaps,
-			ExceptScopes: exceptScopes, ExceptAppUserIds: excluded, ConstraintKind: constraint,
+			AllCapabilities: in.AllCapabilities, AllScopes: in.AllScopes, ConstraintKind: constraint,
 		})
 
 	case subjectGroup:
@@ -440,105 +468,23 @@ func (s *Service) CreateAppGrant(ctx context.Context, orgID string, in AppGrantI
 		if err != nil {
 			return sqlc.AppGrant{}, err
 		}
-		excluded, err := s.validateExcludedUsers(ctx, orgID, in.ExceptAppUserIDs)
-		if err != nil {
-			return sqlc.AppGrant{}, err
-		}
 		return s.db.Q().CreateAppGroupGrant(ctx, sqlc.CreateAppGroupGrantParams{
 			ID: ids.New(), OrganisationID: orgID, GroupID: textArg(in.GroupID), RoleID: roleID,
 			ScopeKind: kind, ScopeID: scopeID, ExpiresAt: expires, GrantedBy: in.GrantedBy,
-			AllCapabilities: in.AllCapabilities, AllScopes: in.AllScopes, ExceptCapabilities: exceptCaps,
-			ExceptScopes: exceptScopes, ExceptAppUserIds: excluded, ConstraintKind: constraint,
+			AllCapabilities: in.AllCapabilities, AllScopes: in.AllScopes, ConstraintKind: constraint,
 		})
 
 	case subjectAppUser:
 		if in.AppUserID == "" || in.GroupID != "" {
 			return sqlc.AppGrant{}, apperr.Validation("a customer grant needs exactly an app_user_id")
 		}
-		if len(in.ExceptAppUserIDs) > 0 {
-			// Excluding people from a grant that names one person is either a
-			// mistake or a way to write a grant that reaches nobody.
-			return sqlc.AppGrant{}, apperr.Validation("except_app_user_ids applies only to group and everyone grants")
-		}
 		return s.db.Q().CreateAppUserGrant(ctx, sqlc.CreateAppUserGrantParams{
 			ID: ids.New(), OrganisationID: orgID, AppUserID: textArg(in.AppUserID), RoleID: roleID,
 			ScopeKind: kind, ScopeID: scopeID, ExpiresAt: expires, GrantedBy: in.GrantedBy,
-			AllCapabilities: in.AllCapabilities, AllScopes: in.AllScopes, ExceptCapabilities: exceptCaps,
-			ExceptScopes: exceptScopes, ConstraintKind: constraint,
+			AllCapabilities: in.AllCapabilities, AllScopes: in.AllScopes, ConstraintKind: constraint,
 		})
 	}
 	return sqlc.AppGrant{}, apperr.Validation("unknown subject_kind: " + subject)
-}
-
-// validateExceptCapabilities refuses carve-outs that would mislead: one without
-// a wildcard does nothing, and one naming an undeclared capability protects
-// against nothing while reading as though it does.
-func (s *Service) validateExceptCapabilities(ctx context.Context, orgID string, in AppGrantInput) ([]string, error) {
-	out := make([]string, 0, len(in.ExceptCapabilities))
-	if len(in.ExceptCapabilities) == 0 {
-		return out, nil
-	}
-	if !in.AllCapabilities {
-		return nil, apperr.Validation("except_capabilities needs all_capabilities; a role already lists what it grants")
-	}
-	declared, err := s.db.Q().ListAppCapabilities(ctx, orgID)
-	if err != nil {
-		return nil, err
-	}
-	known := make(map[string]struct{}, len(declared))
-	for _, d := range declared {
-		known[d.Key] = struct{}{}
-	}
-	for _, raw := range in.ExceptCapabilities {
-		key := strings.ToLower(strings.TrimSpace(raw))
-		if key == "" {
-			continue
-		}
-		if _, ok := known[key]; !ok {
-			return nil, apperr.Validation("capability not declared: " + key)
-		}
-		out = append(out, key)
-	}
-	return out, nil
-}
-
-// validateExceptScopes keeps an excluded scope to a declared kind, for the same
-// reason a granted one is checked: an undeclared kind excludes nothing.
-func validateExceptScopes(refs []AppScopeRef, declaredKinds map[string]struct{}) (json.RawMessage, error) {
-	out := make([]AppScopeRef, 0, len(refs))
-	for _, r := range refs {
-		kind := strings.ToLower(strings.TrimSpace(r.Kind))
-		id := strings.TrimSpace(r.ID)
-		if kind == "" || id == "" {
-			return nil, apperr.Validation("an excluded scope needs a kind and an id")
-		}
-		if _, ok := declaredKinds[kind]; !ok {
-			return nil, apperr.Validation("scope kind not declared: " + kind)
-		}
-		out = append(out, AppScopeRef{Kind: kind, ID: id})
-	}
-	return json.Marshal(out)
-}
-
-// validateExcludedUsers checks every excluded customer belongs to the
-// organisation, so a typo cannot silently exclude nobody.
-func (s *Service) validateExcludedUsers(ctx context.Context, orgID string, ids []string) ([]string, error) {
-	out := make([]string, 0, len(ids))
-	for _, id := range ids {
-		id = strings.TrimSpace(id)
-		if id == "" {
-			continue
-		}
-		u, err := s.db.Q().GetAppUser(ctx, id)
-		if errors.Is(err, pgx.ErrNoRows) || (err == nil && u.OrganisationID != orgID) {
-			return nil, apperr.Validation("unknown customer in except_app_user_ids")
-		}
-		if err != nil {
-			return nil, err
-		}
-		out = append(out, id)
-	}
-	return out, nil
 }
 
 // --- Groups ---
@@ -663,7 +609,10 @@ func (s *Service) recomputeAppUserGroups(ctx context.Context, orgID string) erro
 			return err
 		}
 	}
-	return nil
+	// Every group write ends here, so this is the one place the version has to
+	// move for a nesting change. Re-parenting a group revokes and grants for
+	// everyone inside it without touching a membership row.
+	return s.touchAppAccess(ctx, orgID)
 }
 
 func (s *Service) ListAppUserGroups(ctx context.Context, orgID string) ([]sqlc.ListAppUserGroupsRow, error) {
@@ -725,9 +674,18 @@ func (s *Service) SetAppUserGroupMember(ctx context.Context, orgID, groupID, app
 		return apperr.NotFound("app user not found")
 	}
 	if member {
-		return s.db.Q().AddAppUserToGroup(ctx, sqlc.AddAppUserToGroupParams{GroupID: groupID, AppUserID: appUserID})
+		if err := s.db.Q().AddAppUserToGroup(ctx, sqlc.AddAppUserToGroupParams{GroupID: groupID, AppUserID: appUserID}); err != nil {
+			return err
+		}
+		return s.touchAppAccess(ctx, orgID)
 	}
-	return s.db.Q().RemoveAppUserFromGroup(ctx, sqlc.RemoveAppUserFromGroupParams{GroupID: groupID, AppUserID: appUserID})
+	// Removing somebody revokes everything the group carried for them, and a
+	// removal deletes a row rather than writing one, so nothing derived from
+	// the surviving rows could ever have seen it.
+	if err := s.db.Q().RemoveAppUserFromGroup(ctx, sqlc.RemoveAppUserFromGroupParams{GroupID: groupID, AppUserID: appUserID}); err != nil {
+		return err
+	}
+	return s.touchAppAccess(ctx, orgID)
 }
 
 // ListAppUserGroupParents returns the ids a group extends, after checking the
@@ -763,7 +721,33 @@ func (s *Service) ListAppGrantsForOrg(ctx context.Context, orgID string, limit i
 }
 
 func (s *Service) DeleteAppGrant(ctx context.Context, orgID, id string) error {
-	return s.db.Q().DeleteAppGrant(ctx, sqlc.DeleteAppGrantParams{ID: id, OrganisationID: orgID})
+	if err := s.db.Q().DeleteAppGrant(ctx, sqlc.DeleteAppGrantParams{ID: id, OrganisationID: orgID}); err != nil {
+		return err
+	}
+	return s.touchAppAccess(ctx, orgID)
+}
+
+// touchAppAccess moves the version a merchant caches against.
+//
+// It has to be called by hand after every write, which is the honest cost of
+// deriving the version from a counter rather than from the rows. The
+// alternative was the bug this replaced: AppAccessVersion took
+// MAX(created_at) over app_grants and over group members, so a delete moved
+// nothing at all, and deleting the *newest* grant moved the number backwards.
+// A cache holding the higher value read that as "still current", and the
+// permission it kept serving was the one that had just been revoked.
+//
+// Over-invalidating is the safe direction, so this is organisation-wide rather
+// than per customer. A grant made to a group changes what its members hold
+// without touching their rows, and no per-user counter can see that.
+//
+// It shares reach_namespace_versions with the edge graph deliberately. The two
+// stores answer the same question today and are meant to become one, so a
+// single counter means the version does not have to be re-derived when they
+// merge.
+func (s *Service) touchAppAccess(ctx context.Context, orgID string) error {
+	_, err := s.db.Q().BumpReachNamespaceVersion(ctx, accessmodel.MerchantNamespace(orgID))
+	return err
 }
 
 // AppAccessSet is what a merchant's backend caches and evaluates against.
@@ -787,9 +771,10 @@ func (s *Service) AppAccessFor(ctx context.Context, orgID, appUserID string) (Ap
 	if err != nil {
 		return AppAccessSet{}, err
 	}
-	version, err := s.db.Q().AppAccessVersion(ctx, sqlc.AppAccessVersionParams{
-		AppUserID: appUserID, OrganisationID: orgID,
-	})
+	// The version is a counter, not a MAX() over the rows. A revocation removes
+	// rows, so anything derived from the surviving ones cannot see it, and that
+	// is precisely the change a cache must not miss.
+	version, err := s.db.Q().GetReachNamespaceVersion(ctx, accessmodel.MerchantNamespace(orgID))
 	if err != nil {
 		return AppAccessSet{}, err
 	}
@@ -806,7 +791,6 @@ func (s *Service) AppAccessFor(ctx context.Context, orgID, appUserID string) (Ap
 		g := AppGrant{
 			ID:           r.ID,
 			Scope:        AppScope{Kind: r.ScopeKind, ID: r.ScopeID},
-			Except:       decodeExceptScopes(r.ExceptScopes),
 			Capabilities: caps,
 			Constraint:   AppConstraint(r.ConstraintKind),
 			Source:       grantSource(r.SubjectKind, r.GroupKey, r.RoleKey, r.AllCapabilities),
@@ -814,7 +798,6 @@ func (s *Service) AppAccessFor(ctx context.Context, orgID, appUserID string) (Ap
 		g.AllScopes = r.AllScopes
 		if r.AllCapabilities {
 			g.AllCapabilities = true
-			g.ExceptCapabilities = append(g.ExceptCapabilities, r.ExceptCapabilities...)
 		}
 		if r.ExpiresAt.Valid {
 			t := r.ExpiresAt.Time
@@ -842,24 +825,6 @@ func grantSource(subjectKind, groupKey, roleKey string, wildcard bool) string {
 	default:
 		return what
 	}
-}
-
-// decodeExceptScopes turns the stored JSON into scopes. A row that will not
-// parse is treated as having no exclusions, which widens the grant, so it is
-// stored as JSONB and validated on the way in rather than trusted here.
-func decodeExceptScopes(raw json.RawMessage) []AppScope {
-	if len(raw) == 0 {
-		return nil
-	}
-	var refs []AppScopeRef
-	if err := json.Unmarshal(raw, &refs); err != nil {
-		return nil
-	}
-	out := make([]AppScope, 0, len(refs))
-	for _, r := range refs {
-		out = append(out, AppScope{Kind: r.Kind, ID: r.ID})
-	}
-	return out
 }
 
 // --- Single-object reads and edits ---

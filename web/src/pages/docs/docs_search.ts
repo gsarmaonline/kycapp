@@ -11,8 +11,8 @@ export type DocSearchHit = {
 /**
  * Everything about a concept that is worth matching against, flattened once.
  *
- * Body text and examples are included deliberately: someone searching "except"
- * or "expires" is describing a problem, not naming a page, and the page titles
+ * Body text and examples are included deliberately: someone searching "expires"
+ * or "wildcard" is describing a problem, not naming a page, and the page titles
  * alone would never answer them.
  */
 function haystack(c: DocConcept): string[] {
@@ -22,14 +22,14 @@ function haystack(c: DocConcept): string[] {
     lines.push(`${e.title}. ${e.problem}`)
     if (e.note) lines.push(e.note)
     // The grant blocks carry the concrete syntax, so someone searching
-    // "except_scopes" or "expires" is searching for exactly these. Split by
+    // "expires" or "every capability" is searching for exactly these. Split by
     // line so an excerpt is one readable line rather than a whole block.
     lines.push(...e.grant.split('\n').filter(Boolean))
   }
   if (c.sample) {
-    // The sample's code carries the API field names — except_scopes,
-    // all_capabilities, constraint — which is precisely what someone reading
-    // the API reference will type into this box.
+    // The sample's code carries the API field names — all_capabilities,
+    // constraint, scope_kind — which is precisely what someone reading the API
+    // reference will type into this box.
     lines.push(c.sample.label, ...c.sample.code.split('\n').filter(Boolean))
   }
   return lines
