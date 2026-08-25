@@ -199,6 +199,7 @@ func (s *Server) routeTable() []route {
 		{"POST", "/v1/organisations/{id}/list-objects", s.handleListMerchantObjects, orgPermission("app_access:read")},
 		{"POST", "/v1/organisations/{id}/list-subjects", s.handleListMerchantSubjects, orgPermission("app_access:read")},
 		{"GET", "/v1/organisations/{id}/access-schema", s.handleMerchantSchema, orgPermission("app_access:read")},
+		{"GET", "/v1/organisations/{id}/access-instances", s.handleMerchantInstances, orgPermission("app_access:read")},
 		{"GET", "/v1/organisations/{id}/app-capability-templates", s.handleListCapabilityTemplates, orgPermission("app_access:read")},
 		{"POST", "/v1/organisations/{id}/app-capability-templates/apply", s.handleApplyCapabilityTemplate, orgPermission("app_access:manage")},
 		{"GET", "/v1/organisations/{id}/app-roles", s.handleListAppRoles, orgPermission("app_access:read")},

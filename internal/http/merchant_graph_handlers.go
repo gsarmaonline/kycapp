@@ -181,3 +181,19 @@ func (s *Server) handleMerchantSchema(w http.ResponseWriter, r *http.Request) {
 	}
 	writeJSON(w, http.StatusOK, schema.Graph())
 }
+
+// handleMerchantInstances returns what exists in a merchant's namespace, per
+// type, capped.
+//
+// A separate route from the schema on purpose. Schema.Graph() lives in
+// core/reach and draws a schema by design, and folding rows into it would make
+// the portable renderer depend on one application's tables. The map fetches
+// both and overlays them, which keeps the boundary where diagram.go put it.
+func (s *Server) handleMerchantInstances(w http.ResponseWriter, r *http.Request) {
+	out, err := s.svc.MerchantInstances(r.Context(), r.PathValue("id"))
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, out)
+}

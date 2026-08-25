@@ -2951,3 +2951,59 @@ html.dark-mode .docs-swagger {
   border-top: none;
   padding-top: 0;
 }
+
+/* Instances on the map.
+ *
+ * An instance must not look like a type. A type node is a panel with a rule
+ * list; these are one word each, so they are chips: smaller, lighter, and
+ * plainly a different order of thing. Somebody scanning the canvas has to be
+ * able to tell "what may exist" from "what does" without reading either. */
+.schema-instance {
+  background: var(--app-surface);
+  border: 1px solid var(--app-border);
+  border-radius: 999px;
+  padding: 0.2rem 0.6rem;
+  font-size: 0.7rem;
+  max-width: 8.5rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.schema-instance-label {
+  color: var(--app-text);
+}
+
+.schema-instance-group {
+  background: transparent;
+  border: 0;
+  padding: 0 0 0.2rem;
+  font-size: 0.72rem;
+  white-space: nowrap;
+}
+
+.schema-instance-group-name {
+  margin: 0;
+  font-weight: 600;
+  font-size: 0.78rem;
+}
+
+.schema-instance-group-count {
+  color: var(--app-muted);
+  font-size: 0.68rem;
+}
+
+/* A hundred arrows converging on one type node. Each says the same thing, so
+   individually they must recede; together the fan is what carries the meaning. */
+.schema-edge-instance path {
+  stroke: var(--app-border);
+  stroke-width: 1;
+  opacity: 0.45;
+}
+
+.schema-cap-notice {
+  margin-top: 0.6rem;
+  font-size: 0.8rem;
+  max-width: 62ch;
+  color: var(--app-muted);
+}
