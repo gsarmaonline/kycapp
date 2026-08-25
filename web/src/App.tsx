@@ -75,7 +75,6 @@ import { InboundWebhooksIndex } from './pages/inbound_webhooks/inbound_webhooks_
 import { InboundWebhooksNew } from './pages/inbound_webhooks/inbound_webhooks_new'
 import { InboundWebhooksShow } from './pages/inbound_webhooks/inbound_webhooks_show'
 import { DocsConceptPage, DocsConceptsIndex } from './pages/docs/docs_concepts'
-import { AuthorisationPage } from './pages/authorisation/authorisation_page'
 import { CustomerPlaygroundPage } from './pages/customer_playground/customer_playground_page'
 import { DocsIntegrationApiPage, DocsOperatorApiPage } from './pages/docs/docs_api'
 import { DocsLayout } from './pages/docs/docs_layout'
@@ -166,9 +165,10 @@ export default function App() {
         <Route path="variables" element={<DocsVariablesPage />} />
         <Route path="operator" element={<Navigate to="api/operator" replace />} />
         {/*
-          The schema map moved into the app, where it sits beside the other
-          platform pages. The public docs have no organisation in scope, so
-          there is nowhere to send this but the index.
+          The schema map is gone. It drew KYC's own authorisation model, which is
+          not a merchant's business: what they need is their own model, which the
+          customer access pages draw. The path stays as a redirect so an old link
+          lands somewhere rather than nowhere.
         */}
         <Route path="authorisation" element={<Navigate to="/docs" replace />} />
       </Route>
@@ -260,7 +260,6 @@ export default function App() {
         <Route path="api-keys" element={<APIKeysIndex />} />
         <Route path="api-keys/new" element={<APIKeysNew />} />
         <Route path="activity" element={<ActivityPage />} />
-        <Route path="authorisation" element={<AuthorisationPage />} />
         <Route path="customer-map" element={<Navigate to="../customer-model" replace />} />
         <Route path="customer-edges" element={<Navigate to="../customer-access" replace />} />
         <Route path="customer-playground" element={<CustomerPlaygroundPage />} />
@@ -271,7 +270,6 @@ export default function App() {
           <Route path="api/operator" element={<DocsOperatorApiPage />} />
           <Route path="variables" element={<DocsVariablesPage />} />
           <Route path="operator" element={<Navigate to="api/operator" replace />} />
-          <Route path="authorisation" element={<Navigate to="../../authorisation" replace />} />
         </Route>
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />

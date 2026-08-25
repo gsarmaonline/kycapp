@@ -203,48 +203,49 @@ export const DOC_CONCEPTS: DocConcept[] = [
     slug: 'customer-access',
     title: 'Customer access',
     summary:
-      'Authorisation you run for your own customers. You declare the vocabulary, KYC stores the grants, your backend decides.',
+      'Authorisation you run for your own customers. You declare the vocabulary, KYC holds who has what, and a question is answered by walking the facts.',
     body: [
-      'Members and permissions govern who may operate KYC. Customer access is the other side: which of your customers may do what inside your product — the project a person can edit, the region an account may read.',
-      'KYC does not enforce this. It has no idea what a project of yours is, and asking it on every request would put a network hop inside your app and make KYC own your latency. Instead you declare the vocabulary here, grant roles over your own scopes, and read back an assembled grant set that your backend evaluates locally.',
-      'Because the vocabulary is yours, the capability set is open: anything you declare is valid, and it stays inside your organisation.',
-      'Because your backend decides, every field of a grant matters to it. A grant may carry a wildcard, and code that reads only the capability list will allow more than you granted. KYC cannot catch that, because the check runs in your process.',
+      'Members and permissions govern who may operate KYC. Customer access is the other side: which of your customers may do what inside your product, such as the project a person can edit or the region an account may read.',
+      'The work is split because the knowledge is split. KYC holds your customers, your roles, your groups and your grants. It does not know what a project of yours is, which documents exist, which project a document sits in, or who owns one. A scope id is a string it stores and never resolves. So neither side can answer a real question alone: you supply the facts about your resources, KYC supplies the facts about who holds what, and the answer comes from both.',
+      'Everything on both sides is the same kind of fact, written as "A’s relation is B". A grant is project:apollo #can_read app_user:ana. Containment is document:d1 #parent project:apollo. Membership is group:eng #member_of app_user:ana. There is no second mechanism hiding behind any of them, which is why one walk can answer every question.',
+      'Facts only ever add. Nothing subtracts, so the order you write them in cannot change an answer, and there is no precedence to reason about. The cost of that is real and worth knowing early: there is no exception list, and no way to narrow a grant after the fact. To keep somebody out of something, grant nothing that reaches it.',
+      'You can consume this two ways, and both answer from the same facts. Cache a customer’s assembled grant set and decide locally, which is the default because it keeps KYC out of your request path. Or ask a question directly with check, which is the only way to ask about a specific resource, because a grant set knows nothing about your documents.',
     ],
     steps: [
       {
         title: 'Declare your scope kinds',
         detail:
-          'The levels your product has, such as project or region. You register the kind; the ids stay in your system.',
+          'The levels your product has, such as project or region. You register the kind; the ids stay in your system and KYC never resolves them.',
       },
       {
         title: 'Declare your capabilities',
         detail:
-          'The verbs your backend checks, written resource:action. A role can only use capabilities declared here, so a typo is caught rather than silently granting nothing.',
+          'The verbs your backend checks, written resource:action. A role can only use capabilities declared here, so a typo is refused when you write it rather than silently granting nothing when it matters.',
       },
       {
         title: 'Compose roles',
         detail:
-          'Name a set of capabilities. A role may build on other roles, and what it resolves to is recomputed when you change it, so every holder follows.',
+          'Name a set of capabilities. A role may build on other roles. A grant points at the role rather than copying what it contains, so changing the role changes what every holder can do without rewriting a single grant.',
       },
       {
         title: 'Group customers, if it helps',
         detail:
-          'A group is a set of customers you grant to once instead of one at a time. Membership is an explicit list you manage on the group.',
+          'A group is a set of customers you grant to once instead of one at a time. Groups nest, and a member of a child counts as a member of every parent, so a grant on the parent reaches them.',
       },
       {
         title: 'Issue grants',
         detail:
-          'A grant gives one subject — a customer, a group, or everyone — one set of capabilities over one scope, optionally with an expiry.',
+          'A grant gives one subject, being a customer, a group, or everyone, one set of capabilities over one scope, optionally with an expiry. An expired grant becomes invisible on its own, with no job needing to run.',
       },
       {
-        title: 'Write your own facts',
+        title: 'Write the facts only you have',
         detail:
-          'Containment, and ownership where you need it: document:d1 #parent project:apollo. KYC stores your scope ids without resolving them, so it cannot know which of your documents lives in which project. Until you say, no walk can reach one.',
+          'Containment, and ownership where you need it: document:d1 #parent project:apollo. Do this as resources are created. Until a document says where it lives, nothing can reach it, because there is no path to walk.',
       },
       {
-        title: 'Read the grant set back, or just ask',
+        title: 'Ask',
         detail:
-          'Your backend fetches a customer’s assembled access, caches it against the version, and decides locally. Or call check directly, which answers from the same facts. The version moves whenever anything changes what a customer holds, revocations included.',
+          'Fetch the grant set and cache it against the version, or call check for a specific resource. The version moves whenever anything changes what a customer holds, revocations included, so a cache that watches it cannot serve access that was taken away.',
       },
     ],
     sample: {
@@ -266,6 +267,146 @@ export const DOC_CONCEPTS: DocConcept[] = [
   ]
 }`,
     },
+    examples: [
+      {
+        title: 'Two kinds of people',
+        problem:
+          'Almost every confusion here comes from one word doing two jobs. A "user" can mean somebody on your team who signs into KYC, or somebody who uses the product you sell. They are different objects with different lifecycles, and they never mix.',
+        grant: `MEMBERS                        APP USERS
+your team                      your customers
+
+sign into KYC                  never see KYC
+belong to your organisation    belong to your organisation
+hold a KYC role                hold an app role
+  owner, admin, member           whatever you name
+
+"may Priya invite a           "may Ana edit
+ teammate?"                     document d1?"
+
+governed by Members            governed by Customer access
+enforced by KYC                enforced by your backend`,
+        note:
+          'App users are records, not logins. They may come from your own database, or from Clerk or Auth0 by ingest, and KYC stores a profile and an id for each. Nothing you do in customer access can affect who may operate KYC, and nothing you do in Members can affect what your customers may do.',
+      },
+      {
+        title: 'Two kinds of capability',
+        problem:
+          'The same split runs through what may be done, and the word "capability" is similarly overloaded. One set is fixed and belongs to KYC. The other is yours and starts empty.',
+        grant: `PLATFORM                       APP
+what your organisation         what your customers
+may use inside KYC             may do inside your product
+
+fixed, defined by KYC          open, declared by you
+app_users:write                document:read
+billing:read                   invoice:refund
+members:invite                 project:archive
+
+comes with your KYC plan       you declare it, nothing seeded
+checked by KYC's gates         checked by your backend`,
+        note:
+          'A new organisation starts with an empty app vocabulary on purpose. A default shipped by KYC would be a guess about a product it has never seen, and a wrong guess is something people work around rather than delete. Templates offer a starting point you can read first and then edit.',
+      },
+      {
+        title: 'And a third thing that is not access at all',
+        problem:
+          'Entitlements are often mistaken for permissions because both end in a yes or no. They answer a different question, and the difference shows up in what you tell the person who was refused.',
+        grant: `PERMISSION            may this SUBJECT do this?
+                      no  ->  "ask your admin"
+
+ENTITLEMENT           did this ORGANISATION buy this?
+                      no  ->  "upgrade your plan"`,
+        note:
+          'Product features and plans are entitlements: what you have unlocked for a customer commercially. Customer access is permission: what a customer is allowed to do with what they have. A customer can be entitled to a feature and not permitted to use it, and both checks have to pass.',
+      },
+      {
+        title: 'Your first hour, end to end',
+        problem:
+          'A document product. Projects hold documents, editors can write, viewers can read, and everyone in a workspace can read. Here is the whole setup, in the order the pieces depend on each other, ending with a question that returns a real answer.',
+        grant: `1  vocabulary          the nouns and verbs of your product
+   POST /app-scope-types      { "kind": "project" }
+   POST /app-capabilities     { "key": "document:read" }
+   POST /app-capabilities     { "key": "document:write" }
+
+2  roles               names for sets of capabilities
+   POST /app-roles  { "key": "viewer",
+                      "capabilities": ["document:read"] }
+   POST /app-roles  { "key": "editor",
+                      "capabilities": ["document:write"],
+                      "extends": ["<viewer id>"] }
+
+3  grants              who holds what, and where
+   POST /app-grants { "app_user_id": "<ana>",
+                      "role_id": "<editor id>",
+                      "scope_kind": "project",
+                      "scope_id": "apollo" }
+
+4  your facts          run this from your own create path
+   POST /edges { "edges": [{
+     "object_type": "document", "object_id": "d1",
+     "relation": "parent",
+     "subject_type": "project", "subject_id": "apollo" }] }
+
+5  ask
+   POST /check { "subject_id": "ana", "action": "write",
+                 "resource_type": "document", "resource_id": "d1" }
+   -> { "allowed": true, "path": [ ... ] }`,
+        note:
+          'Steps 1 to 3 are things a person does once, in the UI or by API. Step 4 is the one that becomes code: it belongs wherever you create a document, next to the insert. Skip it and step 5 answers false no matter how many grants exist, because there is no path from the document to anything. If a check surprises you, read the path it returns: it shows the route it took, or the absence of one.',
+      },
+      {
+        title: 'How a check actually resolves',
+        problem:
+          'Ana is in the engineering group, that group holds the editor role on project apollo, and document d1 lives in apollo. Nothing anywhere names Ana and d1 together. She can still edit it, and this is the walk that finds out.',
+        grant: `ask:  may app_user:ana  write  document:d1 ?
+
+document:d1  #parent     project:apollo     you wrote this
+project:apollo #can_write role:editor#holder a grant
+role:editor  #holder     group:eng#member_of a grant to a group
+group:eng    #member_of  app_user:ana        membership
+
+1  does d1 name ana directly?            no
+2  d1 sits inside apollo, so ask apollo
+3  apollo grants write to editor holders
+4  editor is held by whoever is in eng
+5  eng contains ana                       allowed`,
+        note:
+          'Four facts written by four different people at four different times, and no single one of them says Ana may edit d1. The answer is the path between them. This is also why containment is your job: remove step 1 and there is nowhere for the walk to go, however many grants exist.',
+      },
+      {
+        title: 'Why editing a role reaches everyone at once',
+        problem:
+          'You add docs:delete to the editor role. Nobody rewrites any grants, and every holder gains it immediately, including customers who were granted the role months ago.',
+        grant: `project:apollo #can_delete role:editor#holder
+
+the grant names the ROLE, not what the role contains
+so the walk resolves the role when the question is asked`,
+        note:
+          'A grant is a pointer, not a copy. The same is true of groups: adding somebody to eng gives them everything eng has been granted, without touching a grant. It cuts the other way too, so narrowing a role removes access from every holder at once, which is usually what you want and occasionally a surprise.',
+      },
+      {
+        title: 'Three wildcards, and they compose',
+        problem:
+          'Wildcards exist because some sets cannot be listed: every customer includes the ones who sign up tomorrow, and every capability includes the ones you declare next quarter.',
+        grant: `app_user:*   every customer, present and future
+project:*    every project of that kind
+can_all      every capability, now and later
+
+project:*  #can_all  app_user:*
+   every customer, every project, every capability`,
+        note:
+          'The capability wildcard is the one that keeps working as your vocabulary grows: declare a new capability and existing wildcard grants already carry it. That is the point of it, and the reason to be deliberate about issuing one. If a verb should never ride along, declare it on a type those grants do not reach.',
+      },
+      {
+        title: 'Their own rows',
+        problem:
+          'Every customer may edit their own profile and nobody else’s. This is the most common rule in any product, and it cannot be a grant: KYC does not know your profiles exist, let alone whose is whose.',
+        grant: `profile:p_ana  #owner  app_user:ana
+
+written when the profile is created`,
+        note:
+          'One fact per resource, rather than one grant for everybody. Two things to know. You write it in the same place you write containment, as part of creating the resource. And owning a row confers every action its type answers, so if owners should not delete, declare delete on a type owners do not reach rather than trying to trim it here.',
+      },
+    ],
     related: [
       { label: 'Access recipes', slug: 'customer-access-examples' },
       { label: 'Scope kinds', slug: 'customer-scope-kinds' },
