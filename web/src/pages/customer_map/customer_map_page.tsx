@@ -8,11 +8,20 @@ import {
   Position,
   ReactFlow,
   ReactFlowProvider,
+  useEdgesState,
+  useNodesState,
+  useReactFlow,
   type Edge,
   type NodeProps,
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
-import { getMerchantInstances, getMerchantSchema, type MerchantInstances } from '../../api'
+import {
+  getMerchantInstances,
+  getMerchantSchema,
+  type MerchantInstanceEdge,
+  type MerchantInstances,
+  type MerchantInstanceType,
+} from '../../api'
 import { PageHeader } from '../../crud/ui'
 import { orgPath, resourcePath } from '../../org_nav'
 import {
@@ -24,6 +33,18 @@ import {
   type SchemaInstanceType,
   type SchemaNode,
 } from '../authorisation/schema_layout'
+
+/**
+ * Stable empties, so "no instances yet" is the same array every render.
+ *
+ * `?? []` looks harmless and is not once the canvas holds state: a fresh array
+ * each render changes the prop identity, which misses the layout memo, which
+ * resyncs the nodes, which throws away the drag the reader just made. The bug
+ * would present as "dragging does nothing", which is exactly the bug being
+ * fixed here, so it is worth a name.
+ */
+const NO_INSTANCE_TYPES: MerchantInstanceType[] = []
+const NO_INSTANCE_EDGES: MerchantInstanceEdge[] = []
 
 /**
  * The organisation's own access model, drawn.
@@ -98,8 +119,8 @@ export function CustomerMapPage() {
             <ReactFlowProvider>
               <MapFlow
                 graph={graph}
-                instances={instances?.types ?? []}
-                instanceEdges={instances?.edges ?? []}
+                instances={instances?.types ?? NO_INSTANCE_TYPES}
+                instanceEdges={instances?.edges ?? NO_INSTANCE_EDGES}
               />
             </ReactFlowProvider>
           </div>
@@ -170,8 +191,11 @@ function MapFlow({
     () => layoutInstances(graph, instances, instanceEdges),
     [graph, instances, instanceEdges],
   )
-  const nodes = useMemo(() => [...layout(graph), ...placed.nodes], [graph, placed])
-  const edges: Edge[] = useMemo(
+  const computedNodes = useMemo(
+    () => [...layout(graph), ...placed.nodes],
+    [graph, placed],
+  )
+  const computedEdges: Edge[] = useMemo(
     () => [
       ...graph.edges.map((e) => ({
         id: e.id,
@@ -201,10 +225,35 @@ function MapFlow({
     ],
     [graph, placed],
   )
+
+  // React Flow's `nodes` prop is controlled: it reports a drag as a change and
+  // expects the owner to apply it. Passing a memo and no handler, which is what
+  // this did since the page shipped, means every drag is computed and then
+  // discarded, so a node springs back the instant it is released. The caption
+  // underneath has been promising "drag a node to rearrange" the whole time.
+  const [nodes, setNodes, onNodesChange] = useNodesState(computedNodes)
+  const [edges, setEdges, onEdgesChange] = useEdgesState(computedEdges)
+
+  // Resync when the layout genuinely changes, which is the schema arriving and
+  // then the instances arriving after it. Both memos are stable across renders
+  // that change neither, so a drag survives until the data itself moves.
+  const { fitView } = useReactFlow()
+  useEffect(() => {
+    setNodes(computedNodes)
+    // fitView is an initial-render prop, and the instance layer lands on a
+    // second request after that render. Without this the view stays framed on
+    // the schema alone and the instances sit somewhere off the right edge,
+    // which reads as them not being drawn at all.
+    void fitView({ padding: 0.15 })
+  }, [computedNodes, setNodes, fitView])
+  useEffect(() => setEdges(computedEdges), [computedEdges, setEdges])
+
   return (
     <ReactFlow
       nodes={nodes}
       edges={edges}
+      onNodesChange={onNodesChange}
+      onEdgesChange={onEdgesChange}
       nodeTypes={mapNodeTypes}
       fitView
       fitViewOptions={{ padding: 0.15 }}
