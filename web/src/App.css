@@ -2820,3 +2820,34 @@ html.dark-mode .docs-swagger {
   font-weight: 600;
   color: var(--app-accent);
 }
+
+/* Customer access: four pages, each composing what used to be its own sidebar
+   item. The sections need a visible boundary, or a page reads as one long form
+   and the reader cannot tell where the vocabulary ends and the facts begin. */
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+}
+
+.page-intro h1 {
+  margin: 0 0 0.35rem;
+  font-size: 1.5rem;
+  font-weight: 600;
+}
+
+.page-intro p {
+  margin: 0;
+  max-width: 68ch;
+}
+
+.model-section {
+  border-top: 1px solid var(--app-border);
+  padding-top: 1.25rem;
+}
+
+/* The first section sits directly under the intro, which is boundary enough. */
+.model-section:first-of-type {
+  border-top: none;
+  padding-top: 0;
+}

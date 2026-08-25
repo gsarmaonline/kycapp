@@ -49,21 +49,19 @@ import { ProductPlansShow } from './pages/product_plans/product_plans_show'
 import { UsersEdit } from './pages/users/users_edit'
 import { UsersIndex } from './pages/users/users_index'
 import { CustomerCapabilitiesEdit } from './pages/customer_capabilities/customer_capabilities_edit'
-import { CustomerCapabilitiesIndex } from './pages/customer_capabilities/customer_capabilities_index'
 import { CustomerCapabilitiesNew } from './pages/customer_capabilities/customer_capabilities_new'
 import { CustomerCapabilitiesShow } from './pages/customer_capabilities/customer_capabilities_show'
-import { CustomerGrantsIndex } from './pages/customer_grants/customer_grants_index'
 import { CustomerGrantsNew } from './pages/customer_grants/customer_grants_new'
 import { CustomerGroupsEdit } from './pages/customer_groups/customer_groups_edit'
-import { CustomerGroupsIndex } from './pages/customer_groups/customer_groups_index'
 import { CustomerGroupsNew } from './pages/customer_groups/customer_groups_new'
 import { CustomerGroupsShow } from './pages/customer_groups/customer_groups_show'
 import { CustomerRolesEdit } from './pages/customer_roles/customer_roles_edit'
-import { CustomerRolesIndex } from './pages/customer_roles/customer_roles_index'
 import { CustomerRolesNew } from './pages/customer_roles/customer_roles_new'
 import { CustomerRolesShow } from './pages/customer_roles/customer_roles_show'
 import { CustomerScopeKindsEdit } from './pages/customer_scope_kinds/customer_scope_kinds_edit'
-import { CustomerScopeKindsIndex } from './pages/customer_scope_kinds/customer_scope_kinds_index'
+import { CustomerModelPage } from './pages/customer_access/model_page'
+import { CustomerRolesGroupsPage } from './pages/customer_access/roles_groups_page'
+import { CustomerAccessPage } from './pages/customer_access/access_page'
 import { CustomerScopeKindsNew } from './pages/customer_scope_kinds/customer_scope_kinds_new'
 import { CustomerScopeKindsShow } from './pages/customer_scope_kinds/customer_scope_kinds_show'
 import { UsersNew } from './pages/users/users_new'
@@ -78,8 +76,6 @@ import { InboundWebhooksNew } from './pages/inbound_webhooks/inbound_webhooks_ne
 import { InboundWebhooksShow } from './pages/inbound_webhooks/inbound_webhooks_show'
 import { DocsConceptPage, DocsConceptsIndex } from './pages/docs/docs_concepts'
 import { AuthorisationPage } from './pages/authorisation/authorisation_page'
-import { CustomerEdgesPage } from './pages/customer_edges/customer_edges_page'
-import { CustomerMapPage } from './pages/customer_map/customer_map_page'
 import { CustomerPlaygroundPage } from './pages/customer_playground/customer_playground_page'
 import { DocsIntegrationApiPage, DocsOperatorApiPage } from './pages/docs/docs_api'
 import { DocsLayout } from './pages/docs/docs_layout'
@@ -196,24 +192,32 @@ export default function App() {
         {/* Operator roles UI hidden; seeded roles still used when inviting members. */}
         <Route path="roles/*" element={<Navigate to="../members" replace />} />
         <Route path="users" element={<UsersIndex />} />
-        <Route path="customer-scope-kinds" element={<CustomerScopeKindsIndex />} />
+        {/* Four pages, in the order you do them in: define, build, grant, check.
+            Each composes the index screens that used to be sidebar items of
+            their own. */}
+        <Route path="customer-model" element={<CustomerModelPage />} />
+        <Route path="customer-roles-groups" element={<CustomerRolesGroupsPage />} />
+        <Route path="customer-access" element={<CustomerAccessPage />} />
+        {/* The old index paths still resolve. A merchant with one bookmarked
+            should land on the page that absorbed it, not on a blank route. */}
+        <Route path="customer-scope-kinds" element={<Navigate to="../customer-model" replace />} />
         <Route path="customer-scope-kinds/new" element={<CustomerScopeKindsNew />} />
         <Route path="customer-scope-kinds/:id" element={<CustomerScopeKindsShow />} />
         <Route path="customer-scope-kinds/:id/edit" element={<CustomerScopeKindsEdit />} />
-        <Route path="customer-capabilities" element={<CustomerCapabilitiesIndex />} />
+        <Route path="customer-capabilities" element={<Navigate to="../customer-model" replace />} />
         <Route path="customer-capabilities/new" element={<CustomerCapabilitiesNew />} />
         <Route path="customer-capabilities/:id" element={<CustomerCapabilitiesShow />} />
         <Route path="customer-capabilities/:id/edit" element={<CustomerCapabilitiesEdit />} />
-        <Route path="customer-roles" element={<CustomerRolesIndex />} />
+        <Route path="customer-roles" element={<Navigate to="../customer-roles-groups" replace />} />
         <Route path="customer-roles/new" element={<CustomerRolesNew />} />
         <Route path="customer-roles/:id" element={<CustomerRolesShow />} />
         <Route path="customer-roles/:id/edit" element={<CustomerRolesEdit />} />
-        <Route path="customer-groups" element={<CustomerGroupsIndex />} />
+        <Route path="customer-groups" element={<Navigate to="../customer-roles-groups" replace />} />
         <Route path="customer-groups/new" element={<CustomerGroupsNew />} />
         <Route path="customer-groups/:id" element={<CustomerGroupsShow />} />
         <Route path="customer-groups/:id/edit" element={<CustomerGroupsEdit />} />
         {/* Grants are issued and revoked, never edited, so there is no show or edit. */}
-        <Route path="customer-grants" element={<CustomerGrantsIndex />} />
+        <Route path="customer-grants" element={<Navigate to="../customer-access" replace />} />
         <Route path="customer-grants/new" element={<CustomerGrantsNew />} />
         <Route path="users/new" element={<UsersNew />} />
         <Route path="users/:id" element={<UsersShow />} />
@@ -257,8 +261,8 @@ export default function App() {
         <Route path="api-keys/new" element={<APIKeysNew />} />
         <Route path="activity" element={<ActivityPage />} />
         <Route path="authorisation" element={<AuthorisationPage />} />
-        <Route path="customer-map" element={<CustomerMapPage />} />
-        <Route path="customer-edges" element={<CustomerEdgesPage />} />
+        <Route path="customer-map" element={<Navigate to="../customer-model" replace />} />
+        <Route path="customer-edges" element={<Navigate to="../customer-access" replace />} />
         <Route path="customer-playground" element={<CustomerPlaygroundPage />} />
         <Route path="docs" element={<DocsLayout />}>
           <Route index element={<DocsConceptsIndex />} />
