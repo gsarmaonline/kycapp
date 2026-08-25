@@ -208,7 +208,7 @@ export const DOC_CONCEPTS: DocConcept[] = [
       'Members and permissions govern who may operate KYC. Customer access is the other side: which of your customers may do what inside your product — the project a person can edit, the region an account may read.',
       'KYC does not enforce this. It has no idea what a project of yours is, and asking it on every request would put a network hop inside your app and make KYC own your latency. Instead you declare the vocabulary here, grant roles over your own scopes, and read back an assembled grant set that your backend evaluates locally.',
       'Because the vocabulary is yours, the capability set is open: anything you declare is valid. KYC keeps it inside your organisation and can never be used to grant power inside KYC itself. The two namespaces never mix.',
-      'Because your backend decides, every field of a grant matters to it. A grant may carry a wildcard or a self constraint, and code that reads only the capability list will allow more than you granted. KYC cannot catch that, because the check runs in your process.',
+      'Because your backend decides, every field of a grant matters to it. A grant may carry a wildcard, and code that reads only the capability list will allow more than you granted. KYC cannot catch that, because the check runs in your process.',
     ],
     steps: [
       {
@@ -237,9 +237,14 @@ export const DOC_CONCEPTS: DocConcept[] = [
           'A grant gives one subject — a customer, a group, or everyone — one set of capabilities over one scope, optionally with an expiry.',
       },
       {
-        title: 'Read the grant set back',
+        title: 'Write your own facts',
         detail:
-          'Your backend fetches a customer’s assembled access, caches it against the version, and decides locally.',
+          'Containment, and ownership where you need it: document:d1 #parent project:apollo. KYC stores your scope ids without resolving them, so it cannot know which of your documents lives in which project. Until you say, no walk can reach one.',
+      },
+      {
+        title: 'Read the grant set back, or just ask',
+        detail:
+          'Your backend fetches a customer’s assembled access, caches it against the version, and decides locally. Or call check directly, which answers from the same facts. The version moves whenever anything changes what a customer holds, revocations included.',
       },
     ],
     sample: {
@@ -354,7 +359,7 @@ export const DOC_CONCEPTS: DocConcept[] = [
       {
         title: 'Only their own resources',
         detail:
-          'The self constraint applies a grant to rows belonging to the holder. Together with the everyone subject, that is "customers may manage their own things" in one grant. It says nothing about which verbs are allowed — leave account:delete out of the role for that.',
+          'Write an owner edge when you create the resource: document:d1 #owner app_user:ana. The walk answers "is this thing yours?" with the comparison it already makes for every other principal. Note that owning a row confers every action its type answers, so withhold a verb by declaring it on a type owners do not reach.',
       },
       {
         title: 'Every capability',
@@ -402,11 +407,10 @@ maintainer  builds on editor    + docs:publish`,
         title: 'Their own things',
         problem:
           'Every customer may read and edit their own profile, and nobody else’s. This is the most common rule in any product, and the one people reach for a special case to express.',
-        grant: `subject:    every customer
-role:       self_manager     (profile:read, profile:write)
-scope:      tenant / acme
-constraint: only their own resources`,
-        note: 'The constraint answers "is this thing yours?" and nothing else. It has no opinion on which verbs are allowed: account deletion is prevented by leaving it out of the role.',
+        grant: `profile:p_ana  #owner  app_user:ana
+
+written when the profile is created`,
+        note: 'One fact per resource rather than one grant for everybody. KYC cannot derive it — a scope id is an opaque string it never resolves, so it has no idea which rows exist, let alone who owns them. Owning a row confers every action its type answers; to withhold one, declare it on a type owners do not reach.',
       },
       {
         title: 'A baseline for everyone, including tomorrow',

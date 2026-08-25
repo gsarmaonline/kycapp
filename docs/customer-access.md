@@ -10,8 +10,9 @@ Related: [authorisation](authorisation.md) · [authentication](authentication.md
 2. [The flow](#the-flow)
 3. [The objects](#the-objects)
 4. [Reading access back](#reading-access-back)
-5. [Rules that hold](#rules-that-hold)
-6. [Where it lives](#where-it-lives)
+5. [Asking the graph](#asking-the-graph)
+6. [Rules that hold](#rules-that-hold)
+7. [Where it lives](#where-it-lives)
 
 ---
 
@@ -63,7 +64,8 @@ The subject is **app users only**. A merchant's own KYC operators keep organisat
 3. **Compose roles** — named capability sets, which may build on other roles.
 4. **Group customers** *(optional)* — grant to a set once instead of one at a time.
 5. **Issue grants** — one subject, one set of capabilities, one scope, optionally with an expiry.
-6. **Read the grant set back** — cache it against `version`, decide locally.
+6. **Write your own facts** — containment, and ownership where you need it. KYC cannot know which of your documents lives in which project, so a walk cannot reach one until you say.
+7. **Read the grant set back** — cache it against `version`, decide locally. Or ask directly with `POST /check`, which answers from the same facts.
 
 ## The objects
 
@@ -82,6 +84,8 @@ One thing a customer may do: `invoices:read`, `docs:write`.
 **A template never issues a grant.** A role confers nothing until one carries it, so seeding roles is a starting point you edit and seeding a grant would be granting access nobody authorised. The line is held in code and pinned by a test. The rule the whole thing follows: ship structure, offer content, never issue access. Every row a template creates records `source`, so "why does this capability exist?" stays answerable once the person who applied it has moved on. An authored capability keeps its authored provenance even when a template later names the same key. The set is **open** — whatever the merchant declares is valid — but a role may use nothing outside it. That is the reason to declare them at all: a mistyped capability is rejected when the role is built, instead of quietly granting nothing at the moment it matters.
 
 The merchant's capabilities live in the namespace `org:<id>`. KYC's own set stays **closed** and code-defined in the `kyc` namespace. A merchant admin can never mint a capability in KYC's namespace.
+
+**Stored as a pair.** `resource:action` is the name you write and read, but the two halves are the columns and the name derives from them, so they cannot drift apart. That is not bookkeeping: a key with a missing half used to pass this form and fail later when the schema was generated, which is a different request on a different page, so you saw the mistake nowhere near the thing that caused it. It is refused here now.
 
 ### Roles
 
@@ -129,13 +133,23 @@ So grants only ever add, which is what keeps them unordered and evaluation first
 
 The rule underneath is the one the model always had: for a hard "nobody reaches this", issue nothing that reaches it. That was already the only kind of lock that held, because an exclusion never stopped a second grant from allowing.
 
-**Constraint** narrows a grant with something only the request knows. There is one: `self_subject`, which applies the grant only to resources belonging to the holder. Combined with the everyone subject it is the whole "customers may manage their own things" rule, in one row:
+**Ownership is an edge now, not a constraint.** "Customers may manage their own things" used to be a `self_subject` constraint on a grant, answered by comparing two ids on the read path. It has no edge form that KYC can derive: it said *your own rows*, and KYC never learned which rows exist, let alone who owns them. A `scope_id` is an opaque string it never resolves.
+
+So the merchant writes the fact instead, when the resource is created:
 
 ```
-subject: everyone   role: self_manager   scope: tenant:acme   constraint: self_subject
+document:d1  #owner  app_user:ana
 ```
 
-Note what the constraint does **not** do. It has no opinion on which verbs are allowed. Account deletion is prevented by leaving `account:delete` out of the role, never by the constraint, which only ever answers "is this thing yours?".
+One edge, and the walk answers "is this thing yours?" with the comparison it already makes at the leaves for every other principal. No second mechanism.
+
+Two consequences, and both are real.
+
+**You now write an owner edge on every resource create.** The constraint cost no writes at all, so this is the largest thing the move asks of an integration. It is the same dual write containment already needs — a document has to say which project it is in before any walk can reach it — so it belongs in the same place in your create path.
+
+**Ownership confers every action its type answers.** The constraint had no opinion on which verbs were allowed: `account:delete` was withheld by leaving it out of the role. An owner edge cannot do that. Preserving it would need *owner AND the grant*, and the grammar has no parentheses — terms associate strictly left to right, so `can_write + owner & self_write` parses as `(can_write + owner) & self_write` and the intersection swallows the union. If owners should not delete their own rows, declare `delete` on a type owners do not reach, rather than trimming a role.
+
+Existing `self_subject` grants are **skipped** by the projection rather than translated. Translating one as an ordinary everyone-grant would have handed every customer every row in the scope, which is the opposite of what it said.
 
 ## Reading access back
 
@@ -164,16 +178,64 @@ GET /v1/app-users/{id}/access
 
 **Every field here is load-bearing, and your backend must honour all of them.**
 A grant with `all_capabilities` lists no capabilities and carries the most; one
-with `"constraint": "self_subject"` applies only to rows the holder owns. Code that
+with `"constraint": "self_subject"` applies only to rows the holder owns — see
+the caveat below. Code that
 reads `capabilities` alone will allow more than was granted, and KYC cannot stop
 it — the evaluation happens in your process. Read every field, not just
 `capabilities`.
 
 `expires_at` appears only on a grant that has one. The backend caches the set against `version` and evaluates locally through the SDK.
 
-This is the whole read surface: there is **no per-request check endpoint**, built or planned as the default. One would put a network hop inside every request of the merchant's app and make KYC own their latency. [authorisation.md](authorisation.md#ship-the-grant-set-not-a-per-request-check) leaves the door open to `POST /v1/access/check` for simple integrations; nothing implements it today.
+**`version` is a counter, and it moves on revocation.** It used to be the newest timestamp across your grants, roles and group memberships, which meant a *delete* moved nothing — revoking a grant, or removing somebody from a group, left the number where it was and your cache went on serving the permission that had just been taken away. Deleting the newest grant could even move it backwards, which a cache holding the higher value reads as current. Anything that changes what a customer holds now moves it, including declaring a capability, because a new capability widens every wildcard grant that already exists.
 
 `source` records provenance — which role, and which group it arrived through. The customer's page in KYC renders the same thing as a sentence, which is what makes *why does this person have this?* answerable.
+
+> **Known inconsistency: `self_subject` answers differently on the two paths.**
+> The field is still in the wire format and the grant set still returns it, so a
+> backend caching `GET /access` goes on honouring it. The projection **skips**
+> those grants, so `POST /check` does not see them at all. That is the seam this
+> tier just closed, reopened for one field: the two paths disagree, and a
+> merchant using both gets different answers for the same customer.
+>
+> It is narrow — it affects only grants written with the constraint — but it is
+> real, and it is the reason ownership should move to `owner` edges rather than
+> being left in both models. Until it does, do not rely on `self_subject` if you
+> use the check endpoints.
+
+## Asking the graph
+
+The cached grant set is still the **default** integration, for the reason it always was: a per-request check puts a network hop inside every request of your app and makes KYC own your latency.
+
+But it is no longer the only surface, and it is no longer a separate world. Your roles, their inheritance, your groups, who is in them and every grant are projected into edges in your own namespace, so these three answer from the same facts the grant set is assembled from:
+
+| Endpoint | Answers |
+| --- | --- |
+| `POST /v1/organisations/{id}/check` | May this subject do this to this resource? |
+| `POST /v1/organisations/{id}/list-objects` | What can this subject reach? |
+| `POST /v1/organisations/{id}/list-subjects` | Who can reach this? |
+
+That was not true before. The Grants page wrote `app_grants` and the check read `reach_edges`, and nothing joined them: a grant you issued did not affect `POST /check`, and an edge you wrote never appeared in `GET /access`. There was no way to tell from the UI, and using one made the other lie.
+
+**The check needs facts only you have.** KYC stores an opaque `scope_id` and never resolves it, so a walk cannot arrive at one of your documents unless you have said where it lives:
+
+```
+document:d1  #parent  project:apollo      containment
+document:d1  #owner   app_user:ana        ownership
+```
+
+Write those as your resources are created. Everything else — roles, groups, grants — KYC already holds.
+
+### The capability wildcard
+
+A grant carrying *every capability* becomes one edge rather than a list:
+
+```
+project:apollo  #can_all  app_user:ana
+```
+
+It stays **standing**: declare a capability next quarter and this grant carries it, with nothing rewritten. That is the point of a wildcard, and it is why it is not expanded into a concrete list at projection time — a list would quietly stop covering the administrator it was issued to the moment your vocabulary grew.
+
+The other two wildcards need no translation, because the star already lives in a node id: `app_user:*` is the everyone grant and `project:*` is every scope of a kind.
 
 ## Rules that hold
 
@@ -183,17 +245,20 @@ These are the [invariants](authorisation.md#invariants) as they apply to this na
 2. **No grant subtracts from another.** A grant cannot narrow itself and cannot veto a different one. That is what keeps grants unordered and evaluation first-match, and it is why the exclusion lists were removed rather than carried onto the graph.
 3. **Capabilities are closed per namespace.** Open for the merchant, closed for KYC. The boundary is structural rather than checked: a merchant capability is stored in a table scoped to the organisation and stamped `org:<id>` whenever it is read, so it has no way to name anything in `kyc`. `CreateAppCapability` additionally validates the key through the evaluator's own registry, so a merchant cannot declare a shape KYC would reject.
 4. **Out of scope is indistinguishable from absent.** A customer with no grant for a scope cannot tell it apart from a scope that does not exist.
-5. **No principal grants what it does not hold.** Not yet enforced on this tier; the boundary rests on point 3 alone. The KYC tier has it (`CanWrite` in [`core/reach`](../core/reach)), and this tier gets it when it is modelled there.
+5. **No principal grants what it does not hold.** Still not enforced on this tier, and the reason has changed. It used to be *waiting for the tier to be modelled on the graph*; the tier is modelled now and the rule is still not wired, so the boundary rests on point 3 alone. KYC's own write paths have it — `requireCanGrant` in `service/delegation.go`, stated for one edge as `CanWrite` in [`core/reach`](../core/reach) — and an operator issuing an app grant is bounded by the namespace rather than by what they hold. Tracked as phase 9 in [authorisation.md](authorisation.md#status-and-remaining-work).
 
 ## Where it lives
 
 | Piece | Location |
 | --- | --- |
-| Role inheritance (`ExpandSets`) | [`core/reach`](../core/reach) — a zero-dependency module |
+| The engine | [`core/reach`](../core/reach) — a zero-dependency module, no database and no clock |
+| Your schema, derived from your vocabulary | `internal/accessmodel/merchant.go` (`MerchantSchema`) |
+| Your model, as edges | `internal/accessmodel/merchant_projection.sql` |
 | Wire format (`AppGrant`, `AppScope`, `AppConstraint`) | `internal/service/app_grant.go` — inert types, no evaluator |
 | Storage and assembly | `internal/service/app_access.go` |
-| HTTP surface | `internal/http/app_access_handlers.go` |
-| UI | Each organisation's **Customer access** section, one page per object |
+| Check, list-objects, list-subjects | `internal/service/merchant_graph.go` |
+| HTTP surface | `internal/http/app_access_handlers.go`, `internal/http/merchant_graph_handlers.go` |
+| UI | Each organisation's **Customer access** section: Model, Roles & groups, Access, Playground |
 | In-app docs | **Documentation → Concepts → Customer access** |
 
 Design rationale, and how this fits KYC's own authorisation, are in [authorisation.md](authorisation.md#merchant-hosted-access-control).
