@@ -44,7 +44,6 @@ export function CustomerGrantsNew() {
   const [scopeKind, setScopeKind] = useState('')
   const [scopeId, setScopeId] = useState('')
 
-  const [selfOnly, setSelfOnly] = useState(false)
   const [expiresAt, setExpiresAt] = useState('')
   const [error, setError] = useState<string | null>(null)
 
@@ -77,7 +76,6 @@ export function CustomerGrantsNew() {
         all_scopes: allScopes,
         scope_kind: allScopes ? undefined : scopeKind,
         scope_id: scopeId,
-        constraint: selfOnly ? 'self_subject' : '',
         expires_at: expiresAt ? new Date(expiresAt).toISOString() : undefined,
       })
       navigate(resourcePath(orgId, 'customer-grants'))
@@ -221,21 +219,12 @@ export function CustomerGrantsNew() {
         )}
 
 
-        <label className="perm">
-          <input
-            type="checkbox"
-            checked={selfOnly}
-            onChange={(e) => setSelfOnly(e.target.checked)}
-          />
-          <span>
-            Only their own resources
-            <em>
-              Applies the grant to rows belonging to the holder. Your backend enforces this: it
-              must set the subject on the grant set and on the resource, or the restriction is
-              lost.
-            </em>
-          </span>
-        </label>
+        <p className="muted">
+          For <strong>only their own resources</strong>, write an owner edge when you create the
+          resource rather than narrowing a grant here: <code>profile:p_ana #owner app_user:ana</code>
+          . A grant cannot express it, because we never learn which of your rows exist or who owns
+          them.
+        </p>
 
         <label>
           Expires (optional)

@@ -207,7 +207,7 @@ export const DOC_CONCEPTS: DocConcept[] = [
     body: [
       'Members and permissions govern who may operate KYC. Customer access is the other side: which of your customers may do what inside your product — the project a person can edit, the region an account may read.',
       'KYC does not enforce this. It has no idea what a project of yours is, and asking it on every request would put a network hop inside your app and make KYC own your latency. Instead you declare the vocabulary here, grant roles over your own scopes, and read back an assembled grant set that your backend evaluates locally.',
-      'Because the vocabulary is yours, the capability set is open: anything you declare is valid. KYC keeps it inside your organisation and can never be used to grant power inside KYC itself. The two namespaces never mix.',
+      'Because the vocabulary is yours, the capability set is open: anything you declare is valid, and it stays inside your organisation.',
       'Because your backend decides, every field of a grant matters to it. A grant may carry a wildcard, and code that reads only the capability list will allow more than you granted. KYC cannot catch that, because the check runs in your process.',
     ],
     steps: [
@@ -261,8 +261,7 @@ export const DOC_CONCEPTS: DocConcept[] = [
       "scope_id": "apollo",
       "capabilities": ["docs:read", "docs:write"],
       "source": "group:au_customers app-role:editor",
-      "all_capabilities": false,
-      "constraint": ""
+      "all_capabilities": false
     }
   ]
 }`,
@@ -382,7 +381,7 @@ export const DOC_CONCEPTS: DocConcept[] = [
       'The common access rules, each written as the grant that expresses it — and the ones this model deliberately will not.',
     body: [
       'One model, many shapes. Role-based access, ownership, per-project access, time-boxed access and a customer-wide baseline are not different systems here. Each is a particular way of filling in a grant.',
-      'Every recipe below is a subject, a set of capabilities, a scope, and sometimes a constraint. Read them as a menu: find the sentence you are trying to say, and copy the grant beside it.',
+      'Every recipe below is a subject, a set of capabilities and a scope. Read them as a menu: find the sentence you are trying to say, and copy the grant beside it.',
     ],
     examples: [
       {

@@ -1022,35 +1022,42 @@ func TestEveryTemplateKeyIsValid(t *testing.T) {
 	}
 }
 
-// The self constraint is how "everyone may manage their own things" becomes one
-// row. KYC cannot enforce it, so the only thing that matters here is that it
-// survives to the merchant's backend intact.
-func TestSelfConstraintReachesTheBackend(t *testing.T) {
-	f := newAppAccess(t, "selfconstraint")
+// "Your own rows" is an owner edge, not a constraint on a grant.
+//
+// The constraint said it and KYC could not make it true on the graph: it never
+// learns which of a merchant's rows exist, let alone who owns them. So it
+// answered on one surface and an owner edge answered on the other, and the same
+// customer got two answers depending which you asked. The constraint went.
+func TestOwnershipIsAnEdgeAndTheConstraintIsGone(t *testing.T) {
+	f := newAppAccess(t, "selfowner")
 	f.declareScope(t, "tenant")
 	f.declareCapability(t, "profile:write")
 	roleID := f.createRole(t, "self_manager", []string{"profile:write"}, nil)
 	userID := f.createAppUser(t, "self@customer.com")
 
-	if code, out := f.post(t, "/app-grants", map[string]any{
+	// The field is refused rather than accepted and ignored. Accepting it would
+	// read as a restriction that is not applied, which is the worse failure.
+	if code, _ := f.post(t, "/app-grants", map[string]any{
 		"subject_kind": "everyone", "role_id": roleID,
 		"scope_kind": "tenant", "scope_id": "acme",
 		"constraint": "self_subject",
-	}); code != http.StatusCreated {
-		t.Fatalf("self grant: %d %v", code, out)
-	}
-	g := f.accessFor(t, userID)["grants"].([]any)[0].(map[string]any)
-	if g["constraint"] != "self_subject" {
-		t.Errorf("the constraint must be on the wire, got %v", g["constraint"])
+	}); code != http.StatusBadRequest {
+		t.Errorf("constraint is no longer part of the request: want 400, got %d", code)
 	}
 
-	// An unrecognised constraint must be refused rather than stored and
-	// ignored, or it reads as a restriction that is not applied.
-	if code, _ := f.post(t, "/app-grants", map[string]any{
-		"subject_kind": "everyone", "role_id": roleID,
-		"scope_kind": "tenant", "scope_id": "b", "constraint": "invented",
-	}); code != http.StatusBadRequest {
-		t.Errorf("an unknown constraint must be rejected, got %d", code)
+	// Ownership is written as a fact about the resource, and the walk answers
+	// from it.
+	f.writeEdges(t, map[string]any{
+		"object_type": "profile", "object_id": "p_self", "relation": "owner",
+		"subject_type": "app_user", "subject_id": userID,
+	})
+	if d := f.check(t, userID, "write", "profile", "p_self"); d["allowed"] != true {
+		t.Fatalf("an owner must reach their own row: %v", d)
+	}
+
+	other := f.createAppUser(t, "other@customer.com")
+	if d := f.check(t, other, "write", "profile", "p_self"); d["allowed"] != false {
+		t.Errorf("an owner edge must reach nobody else: %v", d)
 	}
 }
 
@@ -1068,7 +1075,6 @@ func TestAccessSetWireFormatIsStable(t *testing.T) {
 	if code, out := f.post(t, "/app-grants", map[string]any{
 		"app_user_id": userID, "role_id": roleID,
 		"scope_kind": "project", "scope_id": "p1",
-		"constraint": "self_subject",
 	}); code != http.StatusCreated {
 		t.Fatalf("grant: %d %v", code, out)
 	}
@@ -1091,15 +1097,17 @@ func TestAccessSetWireFormatIsStable(t *testing.T) {
 	// than was granted.
 	for _, key := range []string{
 		"id", "scope_kind", "scope_id", "capabilities", "source",
-		"all_capabilities", "all_scopes", "constraint",
+		"all_capabilities", "all_scopes",
 	} {
 		if _, ok := g[key]; !ok {
 			t.Errorf("grant is missing %q: %v", key, g)
 		}
 	}
 
-	if g["constraint"] != "self_subject" {
-		t.Errorf("constraint = %v, wanted self_subject", g["constraint"])
+	// constraint left the wire format with self_subject. Ownership is an owner
+	// edge, which is a fact about a resource rather than a field on a grant.
+	if _, present := g["constraint"]; present {
+		t.Errorf("constraint must not be in the wire format any more: %v", g)
 	}
 	if g["all_capabilities"] != false {
 		t.Errorf("all_capabilities = %v, wanted false", g["all_capabilities"])

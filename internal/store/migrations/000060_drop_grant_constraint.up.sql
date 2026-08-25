@@ -1,0 +1,30 @@
+-- One mechanism for "your own rows", not two.
+--
+-- self_subject was a constraint on a grant, answered by comparing the holder
+-- against the resource's subject on the read path. Ownership on the graph is an
+-- edge: document:d1 #owner app_user:ana, unioned into every rule on the type.
+--
+-- Both existed after the merchant tier moved onto the graph, and neither
+-- crossed over:
+--
+--   self_subject   returned by GET /access, skipped by the projection
+--   owner edge     read by POST /check, invisible to GET /access
+--
+-- So the same customer got two different answers depending on which surface you
+-- asked, and both surfaces looked authoritative. That is the seam this tier just
+-- closed, reopened for one field. Documenting it was not enough: a merchant
+-- using both had no way to see the disagreement until it mattered.
+--
+-- The constraint is the half that goes, because it is the half KYC cannot make
+-- true on the graph. It said "your own rows", and KYC never learns which rows
+-- exist, let alone who owns them, so there is nothing to derive an edge from.
+-- The edge is a fact the merchant already has at resource-create time.
+--
+-- What this costs a merchant: a write per resource, where the constraint cost
+-- none. And ownership confers every action its type answers, where the
+-- constraint conferred only what the role carried -- keeping that bound needs
+-- "owner AND the grant", and the grammar has no parentheses, so terms associate
+-- left to right and the intersection would swallow the union. Withhold a verb by
+-- declaring it on a type owners do not reach.
+
+ALTER TABLE app_grants DROP COLUMN IF EXISTS constraint_kind;

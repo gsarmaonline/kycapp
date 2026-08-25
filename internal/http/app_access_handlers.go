@@ -237,9 +237,8 @@ func (s *Server) handleCreateAppGrant(w http.ResponseWriter, r *http.Request) {
 		ScopeID     string `json:"scope_id"`
 		ExpiresAt   string `json:"expires_at"`
 
-		AllCapabilities bool   `json:"all_capabilities"`
-		AllScopes       bool   `json:"all_scopes"`
-		Constraint      string `json:"constraint"`
+		AllCapabilities bool `json:"all_capabilities"`
+		AllScopes       bool `json:"all_scopes"`
 	}
 	if err := decodeJSON(r, &body); err != nil {
 		writeError(w, apperr.Validation("invalid JSON body"))
@@ -252,7 +251,6 @@ func (s *Server) handleCreateAppGrant(w http.ResponseWriter, r *http.Request) {
 		GrantedBy:       p.ActorLabel(),
 		AllCapabilities: body.AllCapabilities,
 		AllScopes:       body.AllScopes,
-		Constraint:      body.Constraint,
 	}
 	if body.ExpiresAt != "" {
 		at, parseErr := time.Parse(time.RFC3339, body.ExpiresAt)
@@ -272,7 +270,6 @@ func (s *Server) handleCreateAppGrant(w http.ResponseWriter, r *http.Request) {
 		"subject_kind": grant.SubjectKind, "role_id": grant.RoleID.String,
 		"scope_kind": grant.ScopeKind, "scope_id": grant.ScopeID,
 		"all_capabilities": grant.AllCapabilities, "all_scopes": grant.AllScopes,
-		"constraint": grant.ConstraintKind,
 	})
 }
 
@@ -319,7 +316,6 @@ func (s *Server) handleAppUserAccess(w http.ResponseWriter, r *http.Request) {
 		// present rather than omitted when empty.
 		item["all_capabilities"] = g.AllCapabilities
 		item["all_scopes"] = g.AllScopes
-		item["constraint"] = string(g.Constraint)
 		if g.ExpiresAt != nil {
 			item["expires_at"] = g.ExpiresAt.UTC().Format(time.RFC3339Nano)
 		}
@@ -444,7 +440,6 @@ func (s *Server) handleListAppGrants(w http.ResponseWriter, r *http.Request) {
 			"subject_kind": g.SubjectKind, "subject_label": g.AppUserEmail,
 			"all_capabilities": g.AllCapabilities,
 			"all_scopes":       g.AllScopes,
-			"constraint":       g.ConstraintKind,
 		}
 		switch g.SubjectKind {
 		case "group":

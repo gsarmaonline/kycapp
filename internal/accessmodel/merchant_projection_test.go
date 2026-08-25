@@ -261,35 +261,33 @@ func TestAllScopesCrossesAsTheObjectStar(t *testing.T) {
 	}
 }
 
-// A self_subject grant has no edge form that can be derived. It said "your own
-// rows", and KYC never learned which rows exist, let alone who owns them. It is
-// skipped rather than mistranslated, and ownership becomes an owner edge the
-// merchant writes when it creates the resource.
-func TestSelfSubjectGrantsAreSkippedRatherThanMistranslated(t *testing.T) {
+// Ownership is a fact about a resource, written by the merchant.
+//
+// It used to be a constraint on a grant, and the projection skipped those
+// because "your own rows" has no edge form KYC can derive: it never learns which
+// rows exist, let alone who owns them. That left the constraint answering on
+// GET /access and an owner edge answering on POST /check, so the same customer
+// got two answers depending which surface you asked. The constraint is gone.
+func TestOwnershipReachesOnlyTheOwner(t *testing.T) {
 	db := openDB(t)
 	pool := db.Pool()
 
 	seedMerchant(t, pool)
-	seedMerchantRole(t, pool, "self", []string{"document:read"}, []string{"document:read"})
-	exec(t, pool, `INSERT INTO app_grants
-		(id, organisation_id, role_id, scope_kind, scope_id, subject_kind, constraint_kind)
-		VALUES ('g_self', $1, 'self', 'project', 'apollo', 'everyone', 'self_subject') ON CONFLICT DO NOTHING`, mOrg)
 	containment(t, pool, "d1", "apollo")
 	projectMerchant(t, pool)
 
 	e := merchantEvaluator(t, db)
-	// Translating it as an ordinary everyone grant would have handed every
-	// customer every document in the project. That is the mistranslation this
-	// guards against.
-	if mAllows(t, e, "bo", "read", "document", "d1") {
-		t.Fatal("a self_subject grant must not project as a blanket everyone grant")
+	// Nobody holds anything yet: no grant reaches the document, and no owner
+	// edge names anyone.
+	if mAllows(t, e, "ana", "read", "document", "d1") {
+		t.Fatal("no grant and no owner edge must reach nothing")
 	}
 
-	// Ownership is available, as a fact the merchant writes.
 	exec(t, pool, `INSERT INTO reach_edges
 		(namespace, object_type, object_id, relation, subject_type, subject_id, subject_relation, source)
 		VALUES ($1, 'document', 'd1', 'owner', 'app_user', 'ana', '', 'merchant') ON CONFLICT DO NOTHING`,
 		accessmodel.MerchantNamespace(mOrg))
+
 	if !mAllows(t, e, "ana", "read", "document", "d1") {
 		t.Fatal("an owner edge must reach the owner's own row")
 	}

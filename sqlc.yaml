@@ -62,6 +62,7 @@ sql:
       - "internal/store/migrations/000057_reach_namespace_version.up.sql"
       - "internal/store/migrations/000058_drop_grant_exceptions.up.sql"
       - "internal/store/migrations/000059_app_capability_pair.up.sql"
+      - "internal/store/migrations/000060_drop_grant_constraint.up.sql"
     gen:
       go:
         package: "sqlc"

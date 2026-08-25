@@ -12,13 +12,16 @@
 -- graph could not read, and a merchant had no way to know which of the two to
 -- use, or that using one made the other lie.
 --
+-- There is nothing this skips any more. self_subject grants used to be dropped
+-- here, because "your own rows" has no edge form KYC can derive, and that left
+-- the constraint answering on one surface and an owner edge on the other. The
+-- constraint is gone, and ownership is an owner edge the merchant writes. Every
+-- grant crosses.
+--
 -- Every statement is ON CONFLICT DO NOTHING, so this is idempotent and safe to
 -- re-run. The parameter is the organisation id, and the namespace is
 -- 'org:' || $1, which is what keeps one merchant's open vocabulary out of every
 -- other's.
---
--- Note for anyone editing: statements are split on the semicolon, so a comment
--- may not contain one.
 
 -- Role inheritance. role_id extends parent_id, so whoever holds the child also
 -- holds the parent. Stored as a userset rather than expanded, so the walk
@@ -98,12 +101,6 @@ CROSS JOIN LATERAL (
 ) sc
 WHERE g.organisation_id = $1
   AND NOT g.all_capabilities
-  -- A self_subject grant has no edge form that can be derived here. It said
-  -- "your own rows", and KYC never learned which rows exist, let alone who owns
-  -- them. Ownership is now an owner edge the merchant writes when it creates
-  -- the resource, so these are skipped rather than mistranslated. Translating
-  -- one as an ordinary grant would hand every customer every row in the scope.
-  AND COALESCE(g.constraint_kind, '') <> 'self_subject'
   AND split_part(cap, ':', 2) <> ''
 ON CONFLICT DO NOTHING;
 
@@ -139,5 +136,4 @@ CROSS JOIN LATERAL (
 ) sc
 WHERE g.organisation_id = $1
   AND g.all_capabilities
-  AND COALESCE(g.constraint_kind, '') <> 'self_subject'
 ON CONFLICT DO NOTHING;

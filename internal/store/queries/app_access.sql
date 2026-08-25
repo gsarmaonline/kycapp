@@ -93,21 +93,19 @@ ON CONFLICT DO NOTHING;
 -- name: CreateAppUserGrant :one
 INSERT INTO app_grants (
     id, organisation_id, subject_kind, app_user_id, role_id, scope_kind, scope_id,
-    expires_at, granted_by, all_capabilities, constraint_kind, all_scopes
-) VALUES ($1, $2, 'app_user', $3, $4, $5, $6, $7, $8, $9, $10, $11)
+    expires_at, granted_by, all_capabilities, all_scopes
+) VALUES ($1, $2, 'app_user', $3, $4, $5, $6, $7, $8, $9, $10)
 ON CONFLICT (app_user_id, COALESCE(role_id, ''), scope_kind, scope_id) WHERE app_user_id IS NOT NULL
-DO UPDATE SET expires_at = EXCLUDED.expires_at, granted_by = EXCLUDED.granted_by,
-    constraint_kind = EXCLUDED.constraint_kind
+DO UPDATE SET expires_at = EXCLUDED.expires_at, granted_by = EXCLUDED.granted_by
 RETURNING *;
 
 -- name: CreateAppGroupGrant :one
 INSERT INTO app_grants (
     id, organisation_id, subject_kind, group_id, role_id, scope_kind, scope_id,
-    expires_at, granted_by, all_capabilities, constraint_kind, all_scopes
-) VALUES ($1, $2, 'group', $3, $4, $5, $6, $7, $8, $9, $10, $11)
+    expires_at, granted_by, all_capabilities, all_scopes
+) VALUES ($1, $2, 'group', $3, $4, $5, $6, $7, $8, $9, $10)
 ON CONFLICT (group_id, COALESCE(role_id, ''), scope_kind, scope_id) WHERE group_id IS NOT NULL
-DO UPDATE SET expires_at = EXCLUDED.expires_at, granted_by = EXCLUDED.granted_by,
-    constraint_kind = EXCLUDED.constraint_kind
+DO UPDATE SET expires_at = EXCLUDED.expires_at, granted_by = EXCLUDED.granted_by
 RETURNING *;
 
 -- CreateAppEveryoneGrant covers every customer of the organisation, present and
@@ -115,11 +113,10 @@ RETURNING *;
 -- name: CreateAppEveryoneGrant :one
 INSERT INTO app_grants (
     id, organisation_id, subject_kind, role_id, scope_kind, scope_id,
-    expires_at, granted_by, all_capabilities, constraint_kind, all_scopes
-) VALUES ($1, $2, 'everyone', $3, $4, $5, $6, $7, $8, $9, $10)
+    expires_at, granted_by, all_capabilities, all_scopes
+) VALUES ($1, $2, 'everyone', $3, $4, $5, $6, $7, $8, $9)
 ON CONFLICT (organisation_id, COALESCE(role_id, ''), scope_kind, scope_id) WHERE subject_kind = 'everyone'
-DO UPDATE SET expires_at = EXCLUDED.expires_at, granted_by = EXCLUDED.granted_by,
-    constraint_kind = EXCLUDED.constraint_kind
+DO UPDATE SET expires_at = EXCLUDED.expires_at, granted_by = EXCLUDED.granted_by
 RETURNING *;
 
 -- ListAppGrantsForUser returns a customer's live grants with the role's
@@ -152,7 +149,7 @@ SELECT g.id, g.scope_kind, g.scope_id, g.expires_at, g.role_id,
        COALESCE(r.key, '')::text AS role_key,
        COALESCE(r.effective_capabilities, '{}')::text[] AS effective_capabilities,
        g.group_id, ''::text AS group_key, 'app_user'::text AS subject_kind,
-       g.all_capabilities, g.constraint_kind, g.all_scopes
+       g.all_capabilities, g.all_scopes
 FROM app_grants g
 LEFT JOIN app_roles r ON r.id = g.role_id
 WHERE g.app_user_id = sqlc.arg('app_user_id')
@@ -162,7 +159,7 @@ SELECT DISTINCT g.id, g.scope_kind, g.scope_id, g.expires_at, g.role_id,
        COALESCE(r.key, '')::text AS role_key,
        COALESCE(r.effective_capabilities, '{}')::text[] AS effective_capabilities,
        g.group_id, grp.key AS group_key, 'group'::text AS subject_kind,
-       g.all_capabilities, g.constraint_kind, g.all_scopes
+       g.all_capabilities, g.all_scopes
 -- direct.effective_parent_ids is the group itself plus everything it extends,
 -- flattened at write time. Joining through it is what makes a grant on a parent
 -- group reach a member of a child, without walking anything on the read path.
@@ -178,7 +175,7 @@ SELECT g.id, g.scope_kind, g.scope_id, g.expires_at, g.role_id,
        COALESCE(r.key, '')::text AS role_key,
        COALESCE(r.effective_capabilities, '{}')::text[] AS effective_capabilities,
        g.group_id, ''::text AS group_key, 'everyone'::text AS subject_kind,
-       g.all_capabilities, g.constraint_kind, g.all_scopes
+       g.all_capabilities, g.all_scopes
 FROM app_grants g
 LEFT JOIN app_roles r ON r.id = g.role_id
 WHERE g.organisation_id = sqlc.arg('organisation_id')
@@ -275,7 +272,7 @@ ORDER BY g.key;
 SELECT g.id, g.scope_kind, g.scope_id, g.expires_at, g.app_user_id, g.group_id,
        COALESCE(r.key, '')::text AS role_key, COALESCE(grp.key, '')::text AS group_key,
        COALESCE(u.email, '')::text AS app_user_email, g.subject_kind,
-       g.all_capabilities, g.constraint_kind, g.all_scopes
+       g.all_capabilities, g.all_scopes
 FROM app_grants g
 LEFT JOIN app_roles r ON r.id = g.role_id
 LEFT JOIN app_user_groups grp ON grp.id = g.group_id
