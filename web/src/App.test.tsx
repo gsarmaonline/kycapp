@@ -131,7 +131,11 @@ describe('App', () => {
     // Individual concepts are in the sidebar rather than only on the index, so
     // reading one no longer costs a trip through a list.
     expect(nav.querySelector('a[href="/docs/concepts/organisation"]')).toBeTruthy()
-    expect(await screen.findByRole('heading', { name: 'Core ideas' })).toBeInTheDocument()
+    // The first group orients rather than categorising: members against app
+    // users, and platform against app, run through every section and used to be
+    // explained inside customer access.
+    expect(await screen.findByRole('heading', { name: 'Getting started' })).toBeInTheDocument()
+    expect(nav.querySelector('a[href="/docs/concepts/getting-started"]')).toBeTruthy()
     expect(
       document.querySelector('a[href="/docs/concepts/organisation"]'),
     ).toBeTruthy()
