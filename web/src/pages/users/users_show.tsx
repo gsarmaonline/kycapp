@@ -43,7 +43,6 @@ type AccessGrant = AppAccessSet['grants'][number]
 function describeCapabilities(g: AccessGrant): string {
   const base = g.all_capabilities ? 'every capability' : g.capabilities.join(', ') || 'none'
   const parts = [base]
-  if (g.constraint === 'self_subject') parts.push('on their own rows only')
   return parts.join(', ')
 }
 

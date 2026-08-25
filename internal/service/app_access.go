@@ -339,8 +339,7 @@ type AppGrantInput struct {
 	// an organisation is where a merchant's world ends. ScopeKind and ScopeID
 	// must be empty when it is set, the same way RoleID must be empty under
 	// AllCapabilities: a grant cannot be both everywhere and somewhere.
-	AllScopes  bool
-	Constraint string // "" | self_subject
+	AllScopes bool
 }
 
 // AppScopeRef is one excluded scope. Kind and id stay paired, which is why the
@@ -427,10 +426,6 @@ func (s *Service) createAppGrant(ctx context.Context, orgID string, in AppGrantI
 	if err != nil {
 		return sqlc.AppGrant{}, err
 	}
-	constraint := strings.TrimSpace(in.Constraint)
-	if constraint != "" && constraint != string(AppSelfSubject) {
-		return sqlc.AppGrant{}, apperr.Validation("unknown constraint: " + constraint)
-	}
 
 	var expires pgtype.Timestamptz
 	if in.ExpiresAt != nil {
@@ -454,7 +449,7 @@ func (s *Service) createAppGrant(ctx context.Context, orgID string, in AppGrantI
 		return s.db.Q().CreateAppEveryoneGrant(ctx, sqlc.CreateAppEveryoneGrantParams{
 			ID: ids.New(), OrganisationID: orgID, RoleID: roleID,
 			ScopeKind: kind, ScopeID: scopeID, ExpiresAt: expires, GrantedBy: in.GrantedBy,
-			AllCapabilities: in.AllCapabilities, AllScopes: in.AllScopes, ConstraintKind: constraint,
+			AllCapabilities: in.AllCapabilities, AllScopes: in.AllScopes,
 		})
 
 	case subjectGroup:
@@ -471,7 +466,7 @@ func (s *Service) createAppGrant(ctx context.Context, orgID string, in AppGrantI
 		return s.db.Q().CreateAppGroupGrant(ctx, sqlc.CreateAppGroupGrantParams{
 			ID: ids.New(), OrganisationID: orgID, GroupID: textArg(in.GroupID), RoleID: roleID,
 			ScopeKind: kind, ScopeID: scopeID, ExpiresAt: expires, GrantedBy: in.GrantedBy,
-			AllCapabilities: in.AllCapabilities, AllScopes: in.AllScopes, ConstraintKind: constraint,
+			AllCapabilities: in.AllCapabilities, AllScopes: in.AllScopes,
 		})
 
 	case subjectAppUser:
@@ -481,7 +476,7 @@ func (s *Service) createAppGrant(ctx context.Context, orgID string, in AppGrantI
 		return s.db.Q().CreateAppUserGrant(ctx, sqlc.CreateAppUserGrantParams{
 			ID: ids.New(), OrganisationID: orgID, AppUserID: textArg(in.AppUserID), RoleID: roleID,
 			ScopeKind: kind, ScopeID: scopeID, ExpiresAt: expires, GrantedBy: in.GrantedBy,
-			AllCapabilities: in.AllCapabilities, AllScopes: in.AllScopes, ConstraintKind: constraint,
+			AllCapabilities: in.AllCapabilities, AllScopes: in.AllScopes,
 		})
 	}
 	return sqlc.AppGrant{}, apperr.Validation("unknown subject_kind: " + subject)
@@ -792,7 +787,6 @@ func (s *Service) AppAccessFor(ctx context.Context, orgID, appUserID string) (Ap
 			ID:           r.ID,
 			Scope:        AppScope{Kind: r.ScopeKind, ID: r.ScopeID},
 			Capabilities: caps,
-			Constraint:   AppConstraint(r.ConstraintKind),
 			Source:       grantSource(r.SubjectKind, r.GroupKey, r.RoleKey, r.AllCapabilities),
 		}
 		g.AllScopes = r.AllScopes

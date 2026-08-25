@@ -73,10 +73,21 @@ func Project(ctx context.Context, tx pgx.Tx) error {
 // refuse the repeated placeholder.
 func projectionStatements() []string { return splitStatements(projectionSQL) }
 
+// splitStatements strips comments before splitting, which is the whole point.
+//
+// It used to split the raw file, so a semicolon inside a `--` comment cut a
+// statement in half and Postgres reported a syntax error on whatever word
+// followed it. The file carried a warning not to write one. That warning was
+// violated twice, once by the person who wrote it, because prose is where
+// semicolons naturally go and nothing enforced it.
+//
+// Stripping first removes the trap rather than documenting it. The comments are
+// for whoever reads the file, not for Postgres, so dropping them from what is
+// executed costs nothing.
 func splitStatements(src string) []string {
 	var out []string
-	for _, raw := range strings.Split(src, ";") {
-		if strings.TrimSpace(stripSQLComments(raw)) == "" {
+	for _, raw := range strings.Split(stripSQLComments(src), ";") {
+		if strings.TrimSpace(raw) == "" {
 			continue
 		}
 		out = append(out, raw+";")

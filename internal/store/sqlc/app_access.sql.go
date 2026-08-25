@@ -175,12 +175,11 @@ func (q *Queries) CreateAppCapabilityFromTemplate(ctx context.Context, arg Creat
 const createAppEveryoneGrant = `-- name: CreateAppEveryoneGrant :one
 INSERT INTO app_grants (
     id, organisation_id, subject_kind, role_id, scope_kind, scope_id,
-    expires_at, granted_by, all_capabilities, constraint_kind, all_scopes
-) VALUES ($1, $2, 'everyone', $3, $4, $5, $6, $7, $8, $9, $10)
+    expires_at, granted_by, all_capabilities, all_scopes
+) VALUES ($1, $2, 'everyone', $3, $4, $5, $6, $7, $8, $9)
 ON CONFLICT (organisation_id, COALESCE(role_id, ''), scope_kind, scope_id) WHERE subject_kind = 'everyone'
-DO UPDATE SET expires_at = EXCLUDED.expires_at, granted_by = EXCLUDED.granted_by,
-    constraint_kind = EXCLUDED.constraint_kind
-RETURNING id, organisation_id, app_user_id, role_id, scope_kind, scope_id, expires_at, granted_by, created_at, group_id, subject_kind, all_capabilities, constraint_kind, all_scopes
+DO UPDATE SET expires_at = EXCLUDED.expires_at, granted_by = EXCLUDED.granted_by
+RETURNING id, organisation_id, app_user_id, role_id, scope_kind, scope_id, expires_at, granted_by, created_at, group_id, subject_kind, all_capabilities, all_scopes
 `
 
 type CreateAppEveryoneGrantParams struct {
@@ -192,7 +191,6 @@ type CreateAppEveryoneGrantParams struct {
 	ExpiresAt       pgtype.Timestamptz `json:"expires_at"`
 	GrantedBy       string             `json:"granted_by"`
 	AllCapabilities bool               `json:"all_capabilities"`
-	ConstraintKind  string             `json:"constraint_kind"`
 	AllScopes       bool               `json:"all_scopes"`
 }
 
@@ -208,7 +206,6 @@ func (q *Queries) CreateAppEveryoneGrant(ctx context.Context, arg CreateAppEvery
 		arg.ExpiresAt,
 		arg.GrantedBy,
 		arg.AllCapabilities,
-		arg.ConstraintKind,
 		arg.AllScopes,
 	)
 	var i AppGrant
@@ -225,7 +222,6 @@ func (q *Queries) CreateAppEveryoneGrant(ctx context.Context, arg CreateAppEvery
 		&i.GroupID,
 		&i.SubjectKind,
 		&i.AllCapabilities,
-		&i.ConstraintKind,
 		&i.AllScopes,
 	)
 	return i, err
@@ -234,12 +230,11 @@ func (q *Queries) CreateAppEveryoneGrant(ctx context.Context, arg CreateAppEvery
 const createAppGroupGrant = `-- name: CreateAppGroupGrant :one
 INSERT INTO app_grants (
     id, organisation_id, subject_kind, group_id, role_id, scope_kind, scope_id,
-    expires_at, granted_by, all_capabilities, constraint_kind, all_scopes
-) VALUES ($1, $2, 'group', $3, $4, $5, $6, $7, $8, $9, $10, $11)
+    expires_at, granted_by, all_capabilities, all_scopes
+) VALUES ($1, $2, 'group', $3, $4, $5, $6, $7, $8, $9, $10)
 ON CONFLICT (group_id, COALESCE(role_id, ''), scope_kind, scope_id) WHERE group_id IS NOT NULL
-DO UPDATE SET expires_at = EXCLUDED.expires_at, granted_by = EXCLUDED.granted_by,
-    constraint_kind = EXCLUDED.constraint_kind
-RETURNING id, organisation_id, app_user_id, role_id, scope_kind, scope_id, expires_at, granted_by, created_at, group_id, subject_kind, all_capabilities, constraint_kind, all_scopes
+DO UPDATE SET expires_at = EXCLUDED.expires_at, granted_by = EXCLUDED.granted_by
+RETURNING id, organisation_id, app_user_id, role_id, scope_kind, scope_id, expires_at, granted_by, created_at, group_id, subject_kind, all_capabilities, all_scopes
 `
 
 type CreateAppGroupGrantParams struct {
@@ -252,7 +247,6 @@ type CreateAppGroupGrantParams struct {
 	ExpiresAt       pgtype.Timestamptz `json:"expires_at"`
 	GrantedBy       string             `json:"granted_by"`
 	AllCapabilities bool               `json:"all_capabilities"`
-	ConstraintKind  string             `json:"constraint_kind"`
 	AllScopes       bool               `json:"all_scopes"`
 }
 
@@ -267,7 +261,6 @@ func (q *Queries) CreateAppGroupGrant(ctx context.Context, arg CreateAppGroupGra
 		arg.ExpiresAt,
 		arg.GrantedBy,
 		arg.AllCapabilities,
-		arg.ConstraintKind,
 		arg.AllScopes,
 	)
 	var i AppGrant
@@ -284,7 +277,6 @@ func (q *Queries) CreateAppGroupGrant(ctx context.Context, arg CreateAppGroupGra
 		&i.GroupID,
 		&i.SubjectKind,
 		&i.AllCapabilities,
-		&i.ConstraintKind,
 		&i.AllScopes,
 	)
 	return i, err
@@ -397,12 +389,11 @@ const createAppUserGrant = `-- name: CreateAppUserGrant :one
 
 INSERT INTO app_grants (
     id, organisation_id, subject_kind, app_user_id, role_id, scope_kind, scope_id,
-    expires_at, granted_by, all_capabilities, constraint_kind, all_scopes
-) VALUES ($1, $2, 'app_user', $3, $4, $5, $6, $7, $8, $9, $10, $11)
+    expires_at, granted_by, all_capabilities, all_scopes
+) VALUES ($1, $2, 'app_user', $3, $4, $5, $6, $7, $8, $9, $10)
 ON CONFLICT (app_user_id, COALESCE(role_id, ''), scope_kind, scope_id) WHERE app_user_id IS NOT NULL
-DO UPDATE SET expires_at = EXCLUDED.expires_at, granted_by = EXCLUDED.granted_by,
-    constraint_kind = EXCLUDED.constraint_kind
-RETURNING id, organisation_id, app_user_id, role_id, scope_kind, scope_id, expires_at, granted_by, created_at, group_id, subject_kind, all_capabilities, constraint_kind, all_scopes
+DO UPDATE SET expires_at = EXCLUDED.expires_at, granted_by = EXCLUDED.granted_by
+RETURNING id, organisation_id, app_user_id, role_id, scope_kind, scope_id, expires_at, granted_by, created_at, group_id, subject_kind, all_capabilities, all_scopes
 `
 
 type CreateAppUserGrantParams struct {
@@ -415,7 +406,6 @@ type CreateAppUserGrantParams struct {
 	ExpiresAt       pgtype.Timestamptz `json:"expires_at"`
 	GrantedBy       string             `json:"granted_by"`
 	AllCapabilities bool               `json:"all_capabilities"`
-	ConstraintKind  string             `json:"constraint_kind"`
 	AllScopes       bool               `json:"all_scopes"`
 }
 
@@ -435,7 +425,6 @@ func (q *Queries) CreateAppUserGrant(ctx context.Context, arg CreateAppUserGrant
 		arg.ExpiresAt,
 		arg.GrantedBy,
 		arg.AllCapabilities,
-		arg.ConstraintKind,
 		arg.AllScopes,
 	)
 	var i AppGrant
@@ -452,7 +441,6 @@ func (q *Queries) CreateAppUserGrant(ctx context.Context, arg CreateAppUserGrant
 		&i.GroupID,
 		&i.SubjectKind,
 		&i.AllCapabilities,
-		&i.ConstraintKind,
 		&i.AllScopes,
 	)
 	return i, err
@@ -709,7 +697,7 @@ const listAppGrantsForOrg = `-- name: ListAppGrantsForOrg :many
 SELECT g.id, g.scope_kind, g.scope_id, g.expires_at, g.app_user_id, g.group_id,
        COALESCE(r.key, '')::text AS role_key, COALESCE(grp.key, '')::text AS group_key,
        COALESCE(u.email, '')::text AS app_user_email, g.subject_kind,
-       g.all_capabilities, g.constraint_kind, g.all_scopes
+       g.all_capabilities, g.all_scopes
 FROM app_grants g
 LEFT JOIN app_roles r ON r.id = g.role_id
 LEFT JOIN app_user_groups grp ON grp.id = g.group_id
@@ -736,7 +724,6 @@ type ListAppGrantsForOrgRow struct {
 	AppUserEmail    string             `json:"app_user_email"`
 	SubjectKind     string             `json:"subject_kind"`
 	AllCapabilities bool               `json:"all_capabilities"`
-	ConstraintKind  string             `json:"constraint_kind"`
 	AllScopes       bool               `json:"all_scopes"`
 }
 
@@ -761,7 +748,6 @@ func (q *Queries) ListAppGrantsForOrg(ctx context.Context, arg ListAppGrantsForO
 			&i.AppUserEmail,
 			&i.SubjectKind,
 			&i.AllCapabilities,
-			&i.ConstraintKind,
 			&i.AllScopes,
 		); err != nil {
 			return nil, err
@@ -779,7 +765,7 @@ SELECT g.id, g.scope_kind, g.scope_id, g.expires_at, g.role_id,
        COALESCE(r.key, '')::text AS role_key,
        COALESCE(r.effective_capabilities, '{}')::text[] AS effective_capabilities,
        g.group_id, ''::text AS group_key, 'app_user'::text AS subject_kind,
-       g.all_capabilities, g.constraint_kind, g.all_scopes
+       g.all_capabilities, g.all_scopes
 FROM app_grants g
 LEFT JOIN app_roles r ON r.id = g.role_id
 WHERE g.app_user_id = $1
@@ -789,7 +775,7 @@ SELECT DISTINCT g.id, g.scope_kind, g.scope_id, g.expires_at, g.role_id,
        COALESCE(r.key, '')::text AS role_key,
        COALESCE(r.effective_capabilities, '{}')::text[] AS effective_capabilities,
        g.group_id, grp.key AS group_key, 'group'::text AS subject_kind,
-       g.all_capabilities, g.constraint_kind, g.all_scopes
+       g.all_capabilities, g.all_scopes
 FROM app_user_group_members m
 JOIN app_user_groups direct ON direct.id = m.group_id
 JOIN app_grants g ON g.group_id = ANY (direct.effective_parent_ids)
@@ -802,7 +788,7 @@ SELECT g.id, g.scope_kind, g.scope_id, g.expires_at, g.role_id,
        COALESCE(r.key, '')::text AS role_key,
        COALESCE(r.effective_capabilities, '{}')::text[] AS effective_capabilities,
        g.group_id, ''::text AS group_key, 'everyone'::text AS subject_kind,
-       g.all_capabilities, g.constraint_kind, g.all_scopes
+       g.all_capabilities, g.all_scopes
 FROM app_grants g
 LEFT JOIN app_roles r ON r.id = g.role_id
 WHERE g.organisation_id = $2
@@ -827,7 +813,6 @@ type ListAppGrantsForUserRow struct {
 	GroupKey              string             `json:"group_key"`
 	SubjectKind           string             `json:"subject_kind"`
 	AllCapabilities       bool               `json:"all_capabilities"`
-	ConstraintKind        string             `json:"constraint_kind"`
 	AllScopes             bool               `json:"all_scopes"`
 }
 
@@ -880,7 +865,6 @@ func (q *Queries) ListAppGrantsForUser(ctx context.Context, arg ListAppGrantsFor
 			&i.GroupKey,
 			&i.SubjectKind,
 			&i.AllCapabilities,
-			&i.ConstraintKind,
 			&i.AllScopes,
 		); err != nil {
 			return nil, err

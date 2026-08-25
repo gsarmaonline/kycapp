@@ -48,7 +48,6 @@ type AppGrant struct {
 	GroupID         pgtype.Text        `json:"group_id"`
 	SubjectKind     string             `json:"subject_kind"`
 	AllCapabilities bool               `json:"all_capabilities"`
-	ConstraintKind  string             `json:"constraint_kind"`
 	AllScopes       bool               `json:"all_scopes"`
 }
 

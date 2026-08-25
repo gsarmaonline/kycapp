@@ -32,28 +32,20 @@ func AppNamespace(orgID string) string { return "org:" + orgID }
 // because that boundary is the namespace an edge is written in and not the name
 // of a type. See the note in CreateAppScopeType.
 
-// AppConstraint narrows a grant using something only the request knows.
+// There is no constraint type here any more.
 //
-// Deliberately tiny. "Read only" is not here, because that is a capability set
-// containing no write verbs. Every addition moves this closer to being a policy
-// language, which is the thing to avoid.
-type AppConstraint string
-
-const (
-	// AppNoConstraint applies no narrowing.
-	AppNoConstraint AppConstraint = ""
-	// AppSelfSubject allows the grant only where the resource belongs to the
-	// holder, which is what lets a customer edit their own profile without a
-	// role over every profile in the organisation.
-	AppSelfSubject AppConstraint = "self_subject"
-)
-
-// Valid reports whether the constraint is one this package understands. An
-// unrecognised constraint must be refused rather than ignored, so a newer
-// writer cannot quietly widen an older reader.
-func (c AppConstraint) Valid() bool {
-	return c == AppNoConstraint || c == AppSelfSubject
-}
+// self_subject was the only one, and it said "your own rows" -- answered by
+// comparing the holder against the resource's subject on the read path.
+// Ownership is an edge now: document:d1 #owner app_user:ana, unioned into every
+// rule on the type.
+//
+// Both existed briefly and neither crossed over. The constraint was returned by
+// GET /access and skipped by the projection; the owner edge was read by
+// POST /check and invisible to GET /access. Same customer, two answers,
+// depending which surface you asked. The constraint is the half that went,
+// because it is the half KYC cannot make true on the graph: it never learns
+// which of a merchant's rows exist, let alone who owns them, so there is nothing
+// to derive an edge from.
 
 // AppScope is one of a merchant's own levels: a declared kind plus an id that
 // KYC never resolves.
@@ -85,8 +77,7 @@ type AppGrant struct {
 	// The narrower wildcard needs no field of its own. Scope.ID of "*" means
 	// every instance of that kind, which is the same star the rest of the system
 	// uses for "everything of this type".
-	AllScopes  bool
-	Constraint AppConstraint
+	AllScopes bool
 	// ExpiresAt is nil for a standing grant.
 	ExpiresAt *time.Time
 	// Source records how the holder came to have this: a role, a group, the

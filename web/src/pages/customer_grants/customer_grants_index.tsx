@@ -13,7 +13,7 @@ function subjectLabel(kind: AppGrant['subject_kind']): string {
 
 function carries(g: AppGrant): string {
   const base = g.all_capabilities ? 'every capability' : g.role_key
-  return g.constraint === 'self_subject' ? `${base}, own rows only` : base
+  return base
 }
 
 export function CustomerGrantsIndex() {

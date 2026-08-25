@@ -149,7 +149,7 @@ Two consequences, and both are real.
 
 **Ownership confers every action its type answers.** The constraint had no opinion on which verbs were allowed: `account:delete` was withheld by leaving it out of the role. An owner edge cannot do that. Preserving it would need *owner AND the grant*, and the grammar has no parentheses — terms associate strictly left to right, so `can_write + owner & self_write` parses as `(can_write + owner) & self_write` and the intersection swallows the union. If owners should not delete their own rows, declare `delete` on a type owners do not reach, rather than trimming a role.
 
-Existing `self_subject` grants are **skipped** by the projection rather than translated. Translating one as an ordinary everyone-grant would have handed every customer every row in the scope, which is the opposite of what it said.
+The `self_subject` constraint is **gone**, not deprecated. It coexisted with the owner edge briefly and the two did not agree: the constraint was returned by `GET /access` and skipped by the projection, the owner edge was read by `POST /check` and invisible to `GET /access`. Same customer, two answers, depending which surface you asked, and both looked authoritative. A grant carrying `constraint` is now refused.
 
 ## Reading access back
 
@@ -177,11 +177,10 @@ GET /v1/app-users/{id}/access
 ```
 
 **Every field here is load-bearing, and your backend must honour all of them.**
-A grant with `all_capabilities` lists no capabilities and carries the most; one
-with `"constraint": "self_subject"` applies only to rows the holder owns — see
-the caveat below. Code that
+A grant with `all_capabilities` lists no capabilities and carries the most, and
+`all_scopes` reaches further than any `scope_kind` it might have named. Code that
 reads `capabilities` alone will allow more than was granted, and KYC cannot stop
-it — the evaluation happens in your process. Read every field, not just
+it: the evaluation happens in your process. Read every field, not just
 `capabilities`.
 
 `expires_at` appears only on a grant that has one. The backend caches the set against `version` and evaluates locally through the SDK.
@@ -189,18 +188,6 @@ it — the evaluation happens in your process. Read every field, not just
 **`version` is a counter, and it moves on revocation.** It used to be the newest timestamp across your grants, roles and group memberships, which meant a *delete* moved nothing — revoking a grant, or removing somebody from a group, left the number where it was and your cache went on serving the permission that had just been taken away. Deleting the newest grant could even move it backwards, which a cache holding the higher value reads as current. Anything that changes what a customer holds now moves it, including declaring a capability, because a new capability widens every wildcard grant that already exists.
 
 `source` records provenance — which role, and which group it arrived through. The customer's page in KYC renders the same thing as a sentence, which is what makes *why does this person have this?* answerable.
-
-> **Known inconsistency: `self_subject` answers differently on the two paths.**
-> The field is still in the wire format and the grant set still returns it, so a
-> backend caching `GET /access` goes on honouring it. The projection **skips**
-> those grants, so `POST /check` does not see them at all. That is the seam this
-> tier just closed, reopened for one field: the two paths disagree, and a
-> merchant using both gets different answers for the same customer.
->
-> It is narrow — it affects only grants written with the constraint — but it is
-> real, and it is the reason ownership should move to `owner` edges rather than
-> being left in both models. Until it does, do not rely on `self_subject` if you
-> use the check endpoints.
 
 ## Asking the graph
 
