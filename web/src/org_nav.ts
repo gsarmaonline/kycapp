@@ -4,6 +4,14 @@ export type OrgSection =
   | 'roles'
   | 'users'
   | 'attributes'
+  // The four pages the sidebar shows.
+  | 'customer-model'
+  | 'customer-roles-groups'
+  | 'customer-access'
+  | 'customer-playground'
+  // Still addressable, because every create, show and edit screen lives under
+  // one of these. They are no longer nav items: each is a section of one of the
+  // four above.
   | 'customer-scope-kinds'
   | 'customer-capabilities'
   | 'customer-roles'
@@ -11,7 +19,6 @@ export type OrgSection =
   | 'customer-grants'
   | 'customer-map'
   | 'customer-edges'
-  | 'customer-playground'
   | 'email-templates'
   | 'databases'
   | 'webhooks'
@@ -53,13 +60,9 @@ export const ORG_SECTIONS: OrgNavItem[] = [
   { id: 'members', label: 'Members', path: 'members' },
   { id: 'users', label: 'Users', path: 'users' },
   { id: 'attributes', label: 'User Attributes', path: 'attributes' },
-  { id: 'customer-scope-kinds', label: 'Scope kinds', path: 'customer-scope-kinds' },
-  { id: 'customer-capabilities', label: 'Capabilities', path: 'customer-capabilities' },
-  { id: 'customer-roles', label: 'Roles', path: 'customer-roles' },
-  { id: 'customer-groups', label: 'Groups', path: 'customer-groups' },
-  { id: 'customer-grants', label: 'Grants', path: 'customer-grants' },
-  { id: 'customer-map', label: 'Map', path: 'customer-map' },
-  { id: 'customer-edges', label: 'Edges', path: 'customer-edges' },
+  { id: 'customer-model', label: 'Model', path: 'customer-model' },
+  { id: 'customer-roles-groups', label: 'Roles & groups', path: 'customer-roles-groups' },
+  { id: 'customer-access', label: 'Access', path: 'customer-access' },
   { id: 'customer-playground', label: 'Playground', path: 'customer-playground' },
   { id: 'email-templates', label: 'Emails', path: 'email-templates' },
   { id: 'databases', label: 'Databases', path: 'databases' },
@@ -100,17 +103,18 @@ export const ORG_NAV_GROUPS: OrgNavGroup[] = [
     id: 'customer-access',
     label: 'Customer access',
     hint: "What this organisation's own customers may do inside its product",
+    // Four concepts, not eight tables.
+    //
+    // The eight were presented as peers and were nothing like peers: a
+    // vocabulary declared once, two names for one mechanism, facts a backend
+    // writes constantly, and two views that are not objects at all. The order
+    // followed nothing — not what you do first, not what depends on what.
+    //
+    // These four are in the order you do them in: define, build, grant, check.
     items: [
-      { id: 'customer-scope-kinds', label: 'Scope kinds', path: 'customer-scope-kinds' },
-      { id: 'customer-capabilities', label: 'Capabilities', path: 'customer-capabilities' },
-      { id: 'customer-roles', label: 'Roles', path: 'customer-roles' },
-      { id: 'customer-groups', label: 'Groups', path: 'customer-groups' },
-      { id: 'customer-grants', label: 'Grants', path: 'customer-grants' },
-      // The five above declare a vocabulary. These three are the graph that
-      // vocabulary adds up to, and the questions it answers, which had no page
-      // at all while KYC only stored a description of authority.
-      { id: 'customer-map', label: 'Map', path: 'customer-map' },
-      { id: 'customer-edges', label: 'Edges', path: 'customer-edges' },
+      { id: 'customer-model', label: 'Model', path: 'customer-model' },
+      { id: 'customer-roles-groups', label: 'Roles & groups', path: 'customer-roles-groups' },
+      { id: 'customer-access', label: 'Access', path: 'customer-access' },
       { id: 'customer-playground', label: 'Playground', path: 'customer-playground' },
     ],
   },
@@ -156,13 +160,9 @@ export function sectionFromPathname(pathname: string, orgId: string): OrgSection
     case 'roles':
     case 'users':
     case 'attributes':
-    case 'customer-scope-kinds':
-    case 'customer-capabilities':
-    case 'customer-roles':
-    case 'customer-groups':
-    case 'customer-grants':
-    case 'customer-map':
-    case 'customer-edges':
+    case 'customer-model':
+    case 'customer-roles-groups':
+    case 'customer-access':
     case 'customer-playground':
     case 'email-templates':
     case 'databases':
@@ -179,6 +179,19 @@ export function sectionFromPathname(pathname: string, orgId: string): OrgSection
     case 'authorisation':
     case 'docs':
       return head
+    // A create, show or edit screen keeps its own path and highlights the page
+    // it belongs to. Without this you would be editing a role while the sidebar
+    // showed nothing selected, which reads as having navigated out of the app.
+    case 'customer-scope-kinds':
+    case 'customer-capabilities':
+    case 'customer-map':
+      return 'customer-model'
+    case 'customer-roles':
+    case 'customer-groups':
+      return 'customer-roles-groups'
+    case 'customer-grants':
+    case 'customer-edges':
+      return 'customer-access'
     case 'schema':
       return 'attributes'
     default:
