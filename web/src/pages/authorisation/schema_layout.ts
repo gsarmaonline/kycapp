@@ -121,11 +121,17 @@ export function layout(graph: SchemaGraph) {
   })
 }
 
+
 /**
  * An instance of a declared type: `editor` is one of `role`, `apollo` one of
  * `project`.
+ *
+ * `detail` is what the instance carries, where carrying something is what
+ * separates one from the next. A role's own capabilities are the case that
+ * matters: three roles with no detail and no edges are three identical chips,
+ * and the picture then asserts they are interchangeable.
  */
-export type SchemaInstance = { id: string; label: string }
+export type SchemaInstance = { id: string; label: string; detail?: string[] }
 
 export type SchemaInstanceType = {
   type: string
@@ -134,33 +140,57 @@ export type SchemaInstanceType = {
   truncated: boolean
 }
 
-const INSTANCE_COLS = 4
-const INSTANCE_COL = 148
-const INSTANCE_ROW = 40
+/** One fact relating two drawn instances: `admin extends member`. */
+export type SchemaInstanceEdge = {
+  from_type: string
+  from_id: string
+  label: string
+  to_type: string
+  to_id: string
+}
+
+const INSTANCE_COL = 168
+const INSTANCE_ROW = 46
+/** How far a run stacks before it starts a further column. */
+const INSTANCE_ROWS_PER_COL = 10
 /** The gap between the last type column and the instance region. */
-const INSTANCE_GUTTER = 120
+const INSTANCE_GUTTER = 140
+
+export function instanceNodeID(type: string, id: string) {
+  return `instance__${type}__${id}`
+}
+
+export function instanceGroupID(type: string) {
+  return `instances__${type}`
+}
 
 /**
  * Instances go in their own region, to the right of every type.
  *
- * Placing them beside the type they belong to was the first attempt and it does
- * not survive a cap of a hundred: a block that tall pushes the type columns
- * apart until the model itself stops fitting on a screen, and the model is what
- * the page is for. A region of its own keeps the schema layout byte-identical to
- * what it was, so adding this could not change a picture anybody had already
- * learnt to read.
+ * Placing them beside the type they belong to does not survive a cap of a
+ * hundred: a block that tall pushes the type columns apart until the model
+ * itself stops fitting on a screen, and the model is what the page is for. A
+ * region of its own keeps the schema layout byte-identical, so this could not
+ * change a picture somebody had already learnt to read.
  *
- * Membership is carried by an edge to the type node rather than by adjacency.
- * A hundred thin arrows converging on `role` draw a fan, and a fan is the
- * correct picture: these are all the same kind of thing.
+ * Only one arrow crosses between the two regions, from the type node to the run
+ * header. The first version drew one per instance, and that was the bug: a
+ * hundred arrows saying "is a role" carry no information the header does not
+ * already carry, and worse, they chained every instance into the schema's own
+ * nodes so the picture read as though roles flowed into the model. What
+ * separates member from admin is an edge between *them*, and those are the
+ * edges this now draws.
  *
- * Within a type the instances fill a grid rather than a column, because a
- * hundred nodes stacked vertically is nine screens and the same hundred in four
- * columns is two.
+ * Within a run, position is by depth in the instance graph rather than by name.
+ * A base role sits to the right of the role that extends it, matching the rest
+ * of the canvas, where an arrow always leaves a right handle and arrives at a
+ * left one. That is the entire reason to draw the relations at all: the shape
+ * of the run is the shape of the inheritance.
  */
 export function layoutInstances(
   graph: SchemaGraph,
   types: SchemaInstanceType[],
+  instanceEdges: SchemaInstanceEdge[] = [],
 ): { nodes: ReturnType<typeof layout>; edges: SchemaEdge[] } {
   const depth = depths(graph.nodes, graph.edges)
   const maxDepth = Math.max(0, ...graph.nodes.map((n) => depth.get(n.id) ?? 0))
@@ -175,56 +205,101 @@ export function layoutInstances(
   // under — delete a capability and its resource type leaves the schema while
   // its edges stay — and a type absent from this map is absent from the canvas,
   // so its instances are skipped rather than pointed into nothing.
-  const drawn = new Map(
+  const typeNodeOf = new Map(
     graph.nodes.filter((n) => n.kind === 'type').map((n) => [n.label, n.id] as const),
   )
 
-  const nodes: ReturnType<typeof layout> = []
+  const drawnTypes = types.filter(
+    (t) => typeNodeOf.has(t.type) && t.instances.length > 0,
+  )
+
+  const present = new Set<string>()
+  for (const t of drawnTypes) {
+    for (const inst of t.instances) present.add(instanceNodeID(t.type, inst.id))
+  }
+
+  // Relations first, because the layout is derived from them. An edge naming a
+  // node the cap left out is dropped rather than drawn at a node that is not
+  // there.
   const edges: SchemaEdge[] = []
+  for (const e of instanceEdges) {
+    const from = instanceNodeID(e.from_type, e.from_id)
+    const to = instanceNodeID(e.to_type, e.to_id)
+    if (!present.has(from) || !present.has(to)) continue
+    edges.push({
+      id: `${from}__${e.label}__${to}`,
+      from,
+      to,
+      label: e.label,
+      relations: [e.label],
+    })
+  }
+
+  const instanceDepth = depths(
+    [...present].map((id) => ({ id, kind: 'type' as const, label: id })),
+    edges,
+  )
+
+  const nodes: ReturnType<typeof layout> = []
   let y = 0
 
-  for (const t of types) {
-    const typeNode = drawn.get(t.type)
-    if (!typeNode || t.instances.length === 0) continue
-
-    // A header per run, so a reader can tell which fan is which without
-    // following an arrow to its far end, and so the cap has somewhere to be
-    // stated at the place it applies.
+  for (const t of drawnTypes) {
+    const groupID = instanceGroupID(t.type)
     nodes.push({
-      id: `instances__${t.type}`,
+      id: groupID,
       type: 'instanceGroup',
       position: { x: originX, y: y * INSTANCE_ROW },
       data: { group: t },
       draggable: true,
     } as never)
+
+    // The single arrow between the two regions. It anchors the run to the type
+    // it belongs to without asserting anything about the instances inside it.
+    edges.push({
+      id: `${groupID}__of`,
+      from: typeNodeOf.get(t.type) as string,
+      to: groupID,
+      label: 'has',
+      relations: ['instance'],
+    })
     y += 1
 
-    t.instances.forEach((inst, i) => {
-      const col = i % INSTANCE_COLS
-      const row = Math.floor(i / INSTANCE_COLS)
-      const id = `instance__${t.type}__${inst.id}`
-      nodes.push({
-        id,
-        type: 'instance',
-        position: { x: originX + col * INSTANCE_COL, y: (y + row) * INSTANCE_ROW },
-        data: { instance: inst, type: t.type },
-        draggable: true,
-      } as never)
-      // Type to instance, not the other way round. "editor is a role" is the
-      // truer sentence, but the whole canvas flows left to right and the
-      // instance region is on the right, so an arrow pointing back at the type
-      // would leave its node on the wrong side and loop around it. Every other
-      // edge here leaves a right handle and arrives at a left one.
-      edges.push({
-        id: `${id}__of`,
-        from: typeNode,
-        to: id,
-        label: 'has',
-        relations: ['instance'],
-      })
-    })
+    // Bucket by depth, deepest first, so the most derived instance is leftmost
+    // and every arrow runs left to right like the rest of the canvas.
+    const buckets = new Map<number, SchemaInstance[]>()
+    for (const inst of t.instances) {
+      const d = instanceDepth.get(instanceNodeID(t.type, inst.id)) ?? 0
+      const bucket = buckets.get(d)
+      if (bucket) bucket.push(inst)
+      else buckets.set(d, [inst])
+    }
 
-    y += Math.ceil(t.instances.length / INSTANCE_COLS) + 1
+    let col = 0
+    let tallest = 0
+    for (const d of [...buckets.keys()].sort((a, b) => b - a)) {
+      const bucket = buckets.get(d) as SchemaInstance[]
+      // A bucket taller than the run allows spills into further columns of its
+      // own. Without this a type with no relations at all — every instance at
+      // depth zero — would be one column a hundred rows tall.
+      bucket.forEach((inst, i) => {
+        const sub = Math.floor(i / INSTANCE_ROWS_PER_COL)
+        const row = i % INSTANCE_ROWS_PER_COL
+        nodes.push({
+          id: instanceNodeID(t.type, inst.id),
+          type: 'instance',
+          position: {
+            x: originX + (col + sub) * INSTANCE_COL,
+            y: (y + row) * INSTANCE_ROW,
+          },
+          data: { instance: inst, type: t.type },
+          draggable: true,
+        } as never)
+      })
+      col += Math.ceil(bucket.length / INSTANCE_ROWS_PER_COL)
+      tallest = Math.max(tallest, Math.min(bucket.length, INSTANCE_ROWS_PER_COL))
+    }
+
+    y += tallest + 1
   }
   return { nodes, edges }
 }

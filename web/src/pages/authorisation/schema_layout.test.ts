@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
+  instanceGroupID,
+  instanceNodeID,
   layout,
   layoutInstances,
   type SchemaGraph,
@@ -129,21 +131,63 @@ describe('layoutInstances', () => {
     truncated: false,
   }
 
-  it('anchors every instance edge on the id its type node really has', () => {
+  it('crosses into the model exactly once per type', () => {
+    // The first version drew one arrow per instance, all of them saying "is a
+    // role". A hundred repetitions of what the run header already states, and
+    // they chained every instance into the schema's own nodes.
     const { edges } = layoutInstances(withInstances, [roles])
-    expect(edges).toHaveLength(2)
-    for (const e of edges) {
-      expect(withInstances.nodes.map((n) => n.id)).toContain(e.from)
-    }
+    const modelIDs = new Set(withInstances.nodes.map((n) => n.id))
+    const crossing = edges.filter((e) => modelIDs.has(e.from) || modelIDs.has(e.to))
+    expect(crossing).toHaveLength(1)
+    expect(crossing[0].from).toBe('t_role')
+    expect(crossing[0].to).toBe(instanceGroupID('role'))
   })
 
-  it('runs the instance edge the way the rest of the canvas flows', () => {
-    // Left to right: out of the type node, into the instance on its right.
-    const { nodes, edges } = layoutInstances(withInstances, [roles])
-    const byId = new Map(nodes.map((n) => [n.id, n.position.x]))
-    for (const e of edges) {
-      expect(byId.get(e.to)).toBeDefined()
-    }
+  it('draws the relation that tells two instances apart', () => {
+    const { edges } = layoutInstances(withInstances, [roles], [
+      {
+        from_type: 'role',
+        from_id: 'app_role_1',
+        label: 'extends',
+        to_type: 'role',
+        to_id: 'app_role_2',
+      },
+    ])
+    const relation = edges.find((e) => e.label === 'extends')
+    expect(relation).toBeDefined()
+    expect(relation?.from).toBe(instanceNodeID('role', 'app_role_1'))
+    expect(relation?.to).toBe(instanceNodeID('role', 'app_role_2'))
+  })
+
+  it('drops a relation whose far end the cap left out', () => {
+    // An arrow to a node that is not on the canvas points at empty space.
+    const { edges } = layoutInstances(withInstances, [roles], [
+      {
+        from_type: 'role',
+        from_id: 'app_role_1',
+        label: 'extends',
+        to_type: 'role',
+        to_id: 'app_role_999',
+      },
+    ])
+    expect(edges.some((e) => e.label === 'extends')).toBe(false)
+  })
+
+  it('puts the role that extends another to its left', () => {
+    // The run's shape is the shape of the inheritance, and every arrow on this
+    // canvas leaves a right handle and arrives at a left one.
+    const { nodes } = layoutInstances(withInstances, [roles], [
+      {
+        from_type: 'role',
+        from_id: 'app_role_1',
+        label: 'extends',
+        to_type: 'role',
+        to_id: 'app_role_2',
+      },
+    ])
+    const x = (id: string) =>
+      nodes.find((n) => n.id === instanceNodeID('role', id))?.position.x as number
+    expect(x('app_role_1')).toBeLessThan(x('app_role_2'))
   })
 
   it('skips a type the schema no longer draws', () => {

@@ -2972,6 +2972,23 @@ html.dark-mode .docs-swagger {
 
 .schema-instance-label {
   color: var(--app-text);
+  display: block;
+}
+
+/* What a role declares. Smaller and quieter than the name, because the name is
+   what a reader scans for and this is what they read once they have found it. */
+.schema-instance-detail {
+  display: block;
+  margin-top: 0.1rem;
+  color: var(--app-muted);
+  font-size: 0.62rem;
+}
+
+/* A chip carrying detail is two lines, so the pill shape stops fitting. */
+.schema-instance-detailed {
+  border-radius: 5px;
+  max-width: 10.5rem;
+  white-space: normal;
 }
 
 .schema-instance-group {
@@ -2993,12 +3010,19 @@ html.dark-mode .docs-swagger {
   font-size: 0.68rem;
 }
 
-/* A hundred arrows converging on one type node. Each says the same thing, so
-   individually they must recede; together the fan is what carries the meaning. */
+/* The single arrow anchoring a run to the type it belongs to. It says nothing
+   the run header does not, so it recedes. */
 .schema-edge-instance path {
   stroke: var(--app-border);
   stroke-width: 1;
   opacity: 0.45;
+}
+
+/* An arrow between two instances says extends, or parent, or owner. That word
+   is the reason the arrow exists, so these read at full strength. */
+.schema-edge-relation path {
+  stroke: var(--app-accent);
+  stroke-width: 1.5;
 }
 
 .schema-cap-notice {

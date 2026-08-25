@@ -248,3 +248,131 @@ func TestInstancesCapPerTypeAndSayThatTheyDid(t *testing.T) {
 		}
 	}
 }
+
+// edgeLabels reduces the relation set to something a test can assert on
+// without depending on ids.
+func edgeLabels(t *testing.T, out map[string]any) map[string]bool {
+	t.Helper()
+	got := map[string]bool{}
+	raw, ok := out["edges"].([]any)
+	if !ok {
+		t.Fatalf("no edges in %v", out)
+	}
+	for _, r := range raw {
+		m := r.(map[string]any)
+		got[m["from_type"].(string)+" "+m["label"].(string)+" "+m["to_type"].(string)] = true
+	}
+	return got
+}
+
+// What separates one role from another.
+//
+// Instances alone draw three identical chips, which asserts the merchant did
+// not need three. admin extends member has been true since app_role_extends
+// landed and was drawn nowhere, and the role's own capabilities are the other
+// half of the answer.
+func TestInstanceEdgesCarryRoleInheritance(t *testing.T) {
+	f := newAppAccess(t, "mrel")
+	f.declareScope(t, "project")
+	f.declareCapability(t, "deploy:read")
+	f.declareCapability(t, "deploy:write")
+
+	baseID := f.createRole(t, "member", []string{"deploy:read"}, nil)
+	f.createRole(t, "admin", []string{"deploy:write"}, []string{baseID})
+
+	out := mustGet(t, f, "/access-instances")
+	if !edgeLabels(t, out)["role extends role"] {
+		t.Errorf("role inheritance is not on the map: %v", out["edges"])
+	}
+
+	// The capabilities a role declares itself, so a reader can tell two roles
+	// apart without following an arrow.
+	var sawAdminDetail bool
+	for _, inst := range instancesByType(t, out)["role"]["instances"].([]any) {
+		m := inst.(map[string]any)
+		if m["label"] != "admin" {
+			continue
+		}
+		detail, _ := m["detail"].([]any)
+		if len(detail) != 1 || detail[0] != "deploy:write" {
+			t.Errorf("admin carries %v, want only what it declares itself", m["detail"])
+		}
+		sawAdminDetail = true
+	}
+	if !sawAdminDetail {
+		t.Error("no admin role on the map")
+	}
+}
+
+// Containment, ownership and a grant, from the two stores that hold them.
+func TestInstanceEdgesCarryTheRestOfTheModel(t *testing.T) {
+	f := newAppAccess(t, "mrel2")
+	f.declareScope(t, "project")
+	f.declareCapability(t, "document:read")
+
+	roleID := f.createRole(t, "reader", []string{"document:read"}, nil)
+	userID := f.createAppUser(t, "ana@customer.com")
+	if code, out := f.post(t, "/app-grants", map[string]any{
+		"app_user_id": userID, "role_id": roleID,
+		"scope_kind": "project", "scope_id": "apollo",
+	}); code != http.StatusCreated {
+		t.Fatalf("grant: %d %v", code, out)
+	}
+	f.writeEdges(t,
+		map[string]any{
+			"object_type": "document", "object_id": "d1", "relation": "parent",
+			"subject_type": "project", "subject_id": "apollo",
+		},
+		map[string]any{
+			"object_type": "document", "object_id": "d1", "relation": "owner",
+			"subject_type": "app_user", "subject_id": userID,
+		},
+	)
+
+	got := edgeLabels(t, mustGet(t, f, "/access-instances"))
+	for _, want := range []string{
+		"document parent project",
+		"document owner app_user",
+		"project grants role",
+	} {
+		if !got[want] {
+			t.Errorf("missing relation %q: %v", want, got)
+		}
+	}
+}
+
+// An edge is drawn only when both ends are. The cap already removed nodes, and
+// an arrow to one of them would point at empty canvas.
+func TestInstanceEdgesNeedBothEndsDrawn(t *testing.T) {
+	f := newAppAccess(t, "mrel3")
+	f.declareScope(t, "project")
+	f.declareCapability(t, "document:read")
+
+	// More projects than the cap, each holding one document. Whichever projects
+	// fall outside the cap must take their containment edges with them.
+	const projects = service.MerchantInstanceCap + 5
+	edges := make([]map[string]any, 0, projects)
+	for i := 0; i < projects; i++ {
+		edges = append(edges, map[string]any{
+			"object_type": "document", "object_id": fmt.Sprintf("d%03d", i),
+			"relation": "parent", "subject_type": "project", "subject_id": fmt.Sprintf("p%03d", i),
+		})
+	}
+	f.writeEdges(t, edges...)
+
+	out := mustGet(t, f, "/access-instances")
+	drawn := map[string]bool{}
+	for _, t2 := range instancesByType(t, out) {
+		for _, inst := range t2["instances"].([]any) {
+			drawn[t2["type"].(string)+"/"+inst.(map[string]any)["id"].(string)] = true
+		}
+	}
+	for _, r := range out["edges"].([]any) {
+		m := r.(map[string]any)
+		from := m["from_type"].(string) + "/" + m["from_id"].(string)
+		to := m["to_type"].(string) + "/" + m["to_id"].(string)
+		if !drawn[from] || !drawn[to] {
+			t.Fatalf("edge %s -> %s names a node the cap left out", from, to)
+		}
+	}
+}
