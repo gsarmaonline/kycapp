@@ -117,6 +117,54 @@ func (q *Queries) GetReachNamespaceVersion(ctx context.Context, namespace string
 	return version, err
 }
 
+const listAppUserLabels = `-- name: ListAppUserLabels :many
+SELECT id, display_name, email, external_id
+FROM app_users
+WHERE organisation_id = $1 AND id = ANY($2::text[])
+`
+
+type ListAppUserLabelsParams struct {
+	OrganisationID string   `json:"organisation_id"`
+	Ids            []string `json:"ids"`
+}
+
+type ListAppUserLabelsRow struct {
+	ID          string      `json:"id"`
+	DisplayName string      `json:"display_name"`
+	Email       pgtype.Text `json:"email"`
+	ExternalID  pgtype.Text `json:"external_id"`
+}
+
+// Labels for the opaque ids the projection writes.
+//
+// app_users is the one instance table with no ceiling, so this takes the ids
+// the cap already selected rather than listing the organisation. At most
+// per_type rows come back however many customers exist.
+func (q *Queries) ListAppUserLabels(ctx context.Context, arg ListAppUserLabelsParams) ([]ListAppUserLabelsRow, error) {
+	rows, err := q.db.Query(ctx, listAppUserLabels, arg.OrganisationID, arg.Ids)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListAppUserLabelsRow{}
+	for rows.Next() {
+		var i ListAppUserLabelsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.DisplayName,
+			&i.Email,
+			&i.ExternalID,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listLiveEdges = `-- name: ListLiveEdges :many
 
 SELECT namespace, object_type, object_id, relation, subject_type, subject_id, subject_relation, expires_at, source FROM reach_edges_live
@@ -204,6 +252,116 @@ func (q *Queries) ListLiveEdgesForSubject(ctx context.Context, arg ListLiveEdges
 			&i.ExpiresAt,
 			&i.Source,
 		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listMerchantInstances = `-- name: ListMerchantInstances :many
+
+WITH nodes AS (
+    SELECT object_type AS node_type, object_id AS node_id
+    FROM reach_edges
+    WHERE reach_edges.namespace = $2::text AND reach_edges.object_id <> '*'
+    UNION
+    SELECT subject_type, subject_id
+    FROM reach_edges
+    WHERE reach_edges.namespace = $2::text AND reach_edges.subject_id <> '*'
+    UNION
+    -- Scopes a grant is written at. A merchant who only uses the admin pages
+    -- has never written an edge, and this is the only place project:apollo is
+    -- recorded for them.
+    SELECT app_grants.scope_kind, app_grants.scope_id
+    FROM app_grants
+    WHERE app_grants.organisation_id = $3::text
+      AND NOT app_grants.all_scopes
+      AND app_grants.scope_id <> '*'
+    UNION
+    SELECT 'role'::text, app_roles.id
+    FROM app_roles WHERE app_roles.organisation_id = $3::text
+    UNION
+    SELECT 'group'::text, app_user_groups.id
+    FROM app_user_groups WHERE app_user_groups.organisation_id = $3::text
+    UNION
+    -- Archived customers are left out. They are still rows, so a walk can still
+    -- name one, but they are not part of the model a merchant is looking at and
+    -- they would crowd the cap out with people who have left.
+    SELECT 'app_user'::text, app_users.id
+    FROM app_users
+    WHERE app_users.organisation_id = $3::text AND app_users.status <> 'archived'
+),
+ranked AS (
+    SELECT node_type, node_id,
+           row_number() OVER (PARTITION BY node_type ORDER BY node_id) AS rn,
+           count(*)     OVER (PARTITION BY node_type)                  AS total
+    FROM nodes
+)
+SELECT node_type, node_id, total::bigint AS total
+FROM ranked
+WHERE rn <= $1::int
+ORDER BY node_type, node_id
+`
+
+type ListMerchantInstancesParams struct {
+	PerType   int32  `json:"per_type"`
+	Namespace string `json:"namespace"`
+	OrgID     string `json:"org_id"`
+}
+
+type ListMerchantInstancesRow struct {
+	NodeType string `json:"node_type"`
+	NodeID   string `json:"node_id"`
+	Total    int64  `json:"total"`
+}
+
+// Instances, for the map to draw beside the model it belongs to.
+//
+// The schema map answers "what can exist here". It cannot answer "what does
+// exist", because editor and apollo are rows, not types, and core/reach draws
+// the schema on purpose: the edge set is unbounded and drawing it whole
+// produces a hairball. This is the bounded middle. It reports the distinct
+// nodes per type, capped, so the picture gains the instances without gaining
+// the edges between them.
+//
+// Six sources, because a merchant's model is still kept in two stores.
+// reach_edges is what the evaluator walks, and ProjectMerchant is what fills it
+// from the grant store -- but nothing in the running system calls that yet, so
+// a role created through the admin pages exists only in app_roles. Reading the
+// edge table alone would have drawn a map with no roles on it, which is the
+// exact complaint this feature answers. Each type is therefore read from every
+// place it can live.
+//
+// UNION rather than UNION ALL throughout, and that is load-bearing rather than
+// tidy. A project named by a grant and by a containment edge is one project,
+// and ALL would report it twice and inflate the count the cap notice quotes.
+//
+// Every branch is an index prefix or an organisation-scoped table scan on a
+// table a person authors by hand. The two large ones are the edge halves, and
+// those are the primary key and reach_edges_subject_idx.
+//
+// The star node is excluded. object_id '*' is not an instance, it is the
+// wildcard standing for every instance of a kind, and counting it would report
+// one more project than the merchant has. Summary.wildcards already says the
+// schema has them.
+//
+// total is the exact count per type, computed over the same materialised set
+// the ranking uses, so the caller can say "100 of 3,204" rather than "at least
+// 100" and a cap is visible as a cap.
+func (q *Queries) ListMerchantInstances(ctx context.Context, arg ListMerchantInstancesParams) ([]ListMerchantInstancesRow, error) {
+	rows, err := q.db.Query(ctx, listMerchantInstances, arg.PerType, arg.Namespace, arg.OrgID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListMerchantInstancesRow{}
+	for rows.Next() {
+		var i ListMerchantInstancesRow
+		if err := rows.Scan(&i.NodeType, &i.NodeID, &i.Total); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
