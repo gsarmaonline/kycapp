@@ -1563,8 +1563,24 @@ export function getMerchantSchema(orgId: string) {
   return request<Record<string, unknown>>(`/v1/organisations/${orgId}/access-schema`)
 }
 
-/** One node that exists, named the way its owner named it. */
-export type MerchantInstance = { id: string; label: string }
+/**
+ * One node that exists, named the way its owner named it.
+ *
+ * `detail` is what it carries, where carrying something is what tells one
+ * instance from the next. Roles are the case that matters: their own
+ * capabilities, not their effective set, so inheritance is drawn once as an
+ * edge rather than twice.
+ */
+export type MerchantInstance = { id: string; label: string; detail?: string[] }
+
+/** One fact relating two drawn instances: `admin extends member`. */
+export type MerchantInstanceEdge = {
+  from_type: string
+  from_id: string
+  label: string
+  to_type: string
+  to_id: string
+}
 
 /**
  * Every drawn instance of one type, and how many were not drawn.
@@ -1580,7 +1596,17 @@ export type MerchantInstanceType = {
   truncated: boolean
 }
 
-export type MerchantInstances = { cap: number; types: MerchantInstanceType[] }
+export type MerchantInstances = {
+  cap: number
+  types: MerchantInstanceType[]
+  /**
+   * What relates one instance to another. Without these the layer is a fan of
+   * interchangeable chips, which is a worse answer than drawing nothing: it
+   * asserts that three roles are the same role.
+   */
+  edges: MerchantInstanceEdge[]
+  edges_truncated: boolean
+}
 
 /**
  * What exists, to draw beside the model that says what may exist.

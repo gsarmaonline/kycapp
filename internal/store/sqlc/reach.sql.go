@@ -262,6 +262,163 @@ func (q *Queries) ListLiveEdgesForSubject(ctx context.Context, arg ListLiveEdges
 	return items, nil
 }
 
+const listMerchantInstanceEdges = `-- name: ListMerchantInstanceEdges :many
+
+WITH nodes AS (
+    SELECT object_type AS node_type, object_id AS node_id
+    FROM reach_edges
+    WHERE reach_edges.namespace = $2::text AND reach_edges.object_id <> '*'
+    UNION
+    SELECT subject_type, subject_id
+    FROM reach_edges
+    WHERE reach_edges.namespace = $2::text AND reach_edges.subject_id <> '*'
+    UNION
+    -- Scopes a grant is written at. A merchant who only uses the admin pages
+    -- has never written an edge, and this is the only place project:apollo is
+    -- recorded for them.
+    SELECT app_grants.scope_kind, app_grants.scope_id
+    FROM app_grants
+    WHERE app_grants.organisation_id = $3::text
+      AND NOT app_grants.all_scopes
+      AND app_grants.scope_id <> '*'
+    UNION
+    SELECT 'role'::text, app_roles.id
+    FROM app_roles WHERE app_roles.organisation_id = $3::text
+    UNION
+    SELECT 'group'::text, app_user_groups.id
+    FROM app_user_groups WHERE app_user_groups.organisation_id = $3::text
+    UNION
+    -- Archived customers are left out. They are still rows, so a walk can still
+    -- name one, but they are not part of the model a merchant is looking at and
+    -- they would crowd the cap out with people who have left.
+    SELECT 'app_user'::text, app_users.id
+    FROM app_users
+    WHERE app_users.organisation_id = $3::text AND app_users.status <> 'archived'
+),
+ranked AS (
+    SELECT node_type, node_id,
+           row_number() OVER (PARTITION BY node_type ORDER BY node_id) AS rn
+    FROM nodes
+),
+drawn AS (
+    SELECT node_type, node_id FROM ranked WHERE rn <= $4::int
+),
+rel AS (
+    -- The graph's own edges: containment, ownership, and any grant a merchant
+    -- wrote directly. relation is kept verbatim, because can_read and parent
+    -- mean different things and collapsing them would lose the distinction this
+    -- query exists to restore.
+    SELECT reach_edges.object_type AS from_type, reach_edges.object_id AS from_id,
+           reach_edges.relation    AS label,
+           reach_edges.subject_type AS to_type, reach_edges.subject_id AS to_id
+    FROM reach_edges
+    WHERE reach_edges.namespace = $2::text
+      AND reach_edges.object_id <> '*'
+      AND reach_edges.subject_id <> '*'
+    UNION
+    -- Role inheritance. The one relation a merchant can see the effect of and
+    -- not the cause, because a role page shows its own capabilities and says
+    -- nothing about the parent it draws the rest from.
+    SELECT 'role'::text, e.role_id, 'extends'::text, 'role'::text, e.parent_id
+    FROM app_role_extends e
+    JOIN app_roles r ON r.id = e.role_id
+    WHERE r.organisation_id = $3::text
+    UNION
+    SELECT 'group'::text, x.group_id, 'inside'::text, 'group'::text, x.parent_id
+    FROM app_user_group_extends x
+    JOIN app_user_groups g ON g.id = x.group_id
+    WHERE g.organisation_id = $3::text
+    UNION
+    SELECT 'group'::text, m.group_id, 'member'::text, 'app_user'::text, m.app_user_id
+    FROM app_user_group_members m
+    JOIN app_user_groups mg ON mg.id = m.group_id
+    WHERE mg.organisation_id = $3::text
+    UNION
+    -- A grant, as the one arrow it is rather than the fan of can_* edges the
+    -- projection expands it into. A merchant wrote "maintainer, on apollo", and
+    -- that is the sentence to draw.
+    SELECT ag.scope_kind, ag.scope_id, 'grants'::text, 'role'::text, ag.role_id
+    FROM app_grants ag
+    WHERE ag.organisation_id = $3::text
+      AND NOT ag.all_scopes
+      AND ag.scope_id <> '*'
+)
+SELECT rel.from_type, rel.from_id, rel.label, rel.to_type, rel.to_id
+FROM rel
+JOIN drawn a ON a.node_type = rel.from_type AND a.node_id = rel.from_id
+JOIN drawn b ON b.node_type = rel.to_type   AND b.node_id = rel.to_id
+ORDER BY rel.from_type, rel.from_id, rel.label, rel.to_type, rel.to_id
+LIMIT $1::int
+`
+
+type ListMerchantInstanceEdgesParams struct {
+	MaxEdges  int32  `json:"max_edges"`
+	Namespace string `json:"namespace"`
+	OrgID     string `json:"org_id"`
+	PerType   int32  `json:"per_type"`
+}
+
+type ListMerchantInstanceEdgesRow struct {
+	FromType string `json:"from_type"`
+	FromID   string `json:"from_id"`
+	Label    string `json:"label"`
+	ToType   string `json:"to_type"`
+	ToID     string `json:"to_id"`
+}
+
+// What relates one instance to another.
+//
+// Instances alone are a fan of identical chips. Three roles hanging off the
+// role type node say only "three roles exist", which a reader could already
+// have guessed, and the picture actively misleads: it draws member, admin and
+// viewer as interchangeable when the whole point of having three is that they
+// are not.
+//
+// What separates them is here. admin extends member is an edge between two
+// rows, and it has been true since app_role_extends landed and drawn nowhere.
+// The same holds for a group inside a group, a document inside a project, and a
+// grant tying a scope to a role.
+//
+// Both ends must be in the drawn set, which is what keeps this bounded. The cap
+// has already reduced each type to at most per_type nodes, so the edges among
+// them cannot run away even when the underlying table holds millions. An edge
+// to a node the cap excluded is dropped rather than drawn into empty space.
+//
+// max_edges is the second bound, for the pathological case the first one misses:
+// a hundred documents in a hundred projects is ten thousand containment edges,
+// all of them within the cap. Ordered before it is applied, so the sample is
+// the same one every time rather than whatever the planner returned first.
+func (q *Queries) ListMerchantInstanceEdges(ctx context.Context, arg ListMerchantInstanceEdgesParams) ([]ListMerchantInstanceEdgesRow, error) {
+	rows, err := q.db.Query(ctx, listMerchantInstanceEdges,
+		arg.MaxEdges,
+		arg.Namespace,
+		arg.OrgID,
+		arg.PerType,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListMerchantInstanceEdgesRow{}
+	for rows.Next() {
+		var i ListMerchantInstanceEdgesRow
+		if err := rows.Scan(
+			&i.FromType,
+			&i.FromID,
+			&i.Label,
+			&i.ToType,
+			&i.ToID,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listMerchantInstances = `-- name: ListMerchantInstances :many
 
 WITH nodes AS (

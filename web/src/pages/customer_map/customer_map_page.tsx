@@ -20,6 +20,7 @@ import {
   layoutInstances,
   type SchemaGraph,
   type SchemaInstance,
+  type SchemaInstanceEdge,
   type SchemaInstanceType,
   type SchemaNode,
 } from '../authorisation/schema_layout'
@@ -95,15 +96,22 @@ export function CustomerMapPage() {
           <SchemaSummary graph={graph} />
           <div className="schema-canvas">
             <ReactFlowProvider>
-              <MapFlow graph={graph} instances={instances?.types ?? []} />
+              <MapFlow
+                graph={graph}
+                instances={instances?.types ?? []}
+                instanceEdges={instances?.edges ?? []}
+              />
             </ReactFlowProvider>
           </div>
           <p className="app-muted schema-caption">
             Drag a node to rearrange. Diamonds are not types you declared: they
             stand for a set of targets several relations share, drawn once so the
             picture shows the model rather than the repetition. To the right of
-            the model sits what you actually have: <code>editor</code> is one{' '}
-            <code>role</code>, <code>apollo</code> one <code>project</code>.
+            the model sits what you actually have, and the arrows between those
+            are what tells them apart: <code>admin</code> extends{' '}
+            <code>member</code>, <code>d1</code> sits in <code>apollo</code>. A
+            role prints the capabilities it declares itself; what it inherits
+            arrives along its <code>extends</code> arrow.
           </p>
           <CapNotice instances={instances} orgId={orgId} />
         </>
@@ -152,11 +160,16 @@ function Stat({ label, value }: { label: string; value: string | number }) {
 function MapFlow({
   graph,
   instances,
+  instanceEdges,
 }: {
   graph: SchemaGraph
   instances: SchemaInstanceType[]
+  instanceEdges: SchemaInstanceEdge[]
 }) {
-  const placed = useMemo(() => layoutInstances(graph, instances), [graph, instances])
+  const placed = useMemo(
+    () => layoutInstances(graph, instances, instanceEdges),
+    [graph, instances, instanceEdges],
+  )
   const nodes = useMemo(() => [...layout(graph), ...placed.nodes], [graph, placed])
   const edges: Edge[] = useMemo(
     () => [
@@ -167,15 +180,23 @@ function MapFlow({
         label: e.label,
         type: 'bezier',
       })),
-      // Instance arrows carry no label. There are up to a hundred per type and
-      // they all say the same thing, so the label would be the only text on the
-      // canvas repeated a hundred times, and the fan already says it once.
+      // These carry their label, unlike the first version, where every instance
+      // arrow said "is a" and repeating that a hundred times was the only text
+      // on the canvas. An arrow here says extends, or parent, or owner, and
+      // that word is the whole reason the arrow is worth drawing.
+      //
+      // The one exception is the arrow anchoring a run to its type, which says
+      // nothing an adjacent header does not.
       ...placed.edges.map((e) => ({
         id: e.id,
         source: e.from,
         target: e.to,
         type: 'bezier',
-        className: 'schema-edge-instance',
+        label: e.relations[0] === 'instance' ? undefined : e.label,
+        className:
+          e.relations[0] === 'instance'
+            ? 'schema-edge-instance'
+            : 'schema-edge-relation',
       })),
     ],
     [graph, placed],
@@ -247,12 +268,31 @@ function InstanceGroupNode({ data }: NodeProps) {
 }
 
 /** One thing that exists: a role, a group, a customer, a project, a document. */
+/**
+ * One thing that exists: a role, a group, a customer, a project, a document.
+ *
+ * A role prints what it declares. Two roles with the same name-shaped chip and
+ * no other mark on them are indistinguishable in a picture, and three
+ * indistinguishable chips assert that the merchant did not need three.
+ *
+ * What is printed is the role's *own* capabilities, not its effective set. The
+ * effective set already contains everything its parents hold, so printing that
+ * would draw the inheritance twice: once here and once as the extends arrow
+ * leaving the node.
+ */
 function InstanceNode({ data }: NodeProps) {
   const { instance } = data as { instance: SchemaInstance; type: string }
+  const detail = instance.detail ?? []
   return (
-    <div className="schema-instance" title={instance.id}>
+    <div
+      className={detail.length > 0 ? 'schema-instance schema-instance-detailed' : 'schema-instance'}
+      title={instance.id}
+    >
       <Handle type="target" position={Position.Left} />
       <span className="schema-instance-label">{instance.label}</span>
+      {detail.length > 0 && (
+        <span className="schema-instance-detail">{detail.join(', ')}</span>
+      )}
       <Handle type="source" position={Position.Right} />
     </div>
   )

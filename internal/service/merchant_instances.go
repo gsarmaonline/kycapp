@@ -38,6 +38,24 @@ type MerchantInstance struct {
 	// does. A merchant writes document:d1 and reads back d1; the projection
 	// writes role:<opaque id> and they would not recognise it.
 	Label string `json:"label"`
+	// Detail is what this instance carries, for the types where carrying
+	// something is the whole difference between one instance and the next.
+	//
+	// Only roles have one today, and it is their own capabilities rather than
+	// their effective set. The effective set already includes everything the
+	// parents hold, so printing it on both ends of an extends edge would draw
+	// the inheritance twice and make a child look like it declares what it only
+	// inherits.
+	Detail []string `json:"detail,omitempty"`
+}
+
+// MerchantInstanceEdge is one fact relating two drawn instances.
+type MerchantInstanceEdge struct {
+	FromType string `json:"from_type"`
+	FromID   string `json:"from_id"`
+	Label    string `json:"label"`
+	ToType   string `json:"to_type"`
+	ToID     string `json:"to_id"`
 }
 
 // MerchantInstanceType is every drawn instance of one type, and how many were
@@ -58,7 +76,20 @@ type MerchantInstanceType struct {
 type MerchantInstances struct {
 	Cap   int                    `json:"cap"`
 	Types []MerchantInstanceType `json:"types"`
+	// Edges relate one drawn instance to another. Without them the layer is a
+	// fan of interchangeable chips, which is a worse answer than drawing
+	// nothing: it asserts that three roles are the same.
+	Edges []MerchantInstanceEdge `json:"edges"`
+	// EdgesTruncated says max_edges was reached, so the relations are a sample.
+	EdgesTruncated bool `json:"edges_truncated"`
 }
+
+// MaxMerchantInstanceEdges bounds the relations one map draws.
+//
+// The per-type cap does not bound these on its own: a hundred documents each
+// sitting in one of a hundred projects is ten thousand containment edges, every
+// one of them between two drawn nodes.
+const MaxMerchantInstanceEdges = 600
 
 // MerchantInstances returns what exists in a merchant's namespace, per type,
 // capped.
@@ -94,7 +125,7 @@ func (s *Service) MerchantInstances(ctx context.Context, orgID string) (Merchant
 		rows = kept
 	}
 
-	labels, err := s.instanceLabels(ctx, orgID, rows)
+	labels, detail, err := s.instanceLabels(ctx, orgID, rows)
 	if err != nil {
 		return MerchantInstances{}, err
 	}
@@ -113,11 +144,14 @@ func (s *Service) MerchantInstances(ctx context.Context, orgID string) (Merchant
 			t = &out.Types[len(out.Types)-1]
 			byType[r.NodeType] = t
 		}
+		key := r.NodeType + "\x00" + r.NodeID
 		label := r.NodeID
-		if got, ok := labels[r.NodeType+"\x00"+r.NodeID]; ok && got != "" {
+		if got, ok := labels[key]; ok && got != "" {
 			label = got
 		}
-		t.Instances = append(t.Instances, MerchantInstance{ID: r.NodeID, Label: label})
+		t.Instances = append(t.Instances, MerchantInstance{
+			ID: r.NodeID, Label: label, Detail: detail[key],
+		})
 	}
 
 	// The query orders by id, which for an opaque id is not the order the label
@@ -128,16 +162,56 @@ func (s *Service) MerchantInstances(ctx context.Context, orgID string) (Merchant
 			return out.Types[i].Instances[a].Label < out.Types[i].Instances[b].Label
 		})
 	}
+
+	edges, err := s.db.Q().ListMerchantInstanceEdges(ctx, sqlc.ListMerchantInstanceEdgesParams{
+		Namespace: accessmodel.MerchantNamespace(orgID),
+		OrgID:     orgID,
+		PerType:   MerchantInstanceCap,
+		MaxEdges:  MaxMerchantInstanceEdges + 1,
+	})
+	if err != nil {
+		return MerchantInstances{}, err
+	}
+	// One over the bound, so reaching it is distinguishable from landing on it
+	// exactly. Asking for the true count instead would mean counting a join the
+	// cap exists to avoid materialising.
+	if len(edges) > MaxMerchantInstanceEdges {
+		edges = edges[:MaxMerchantInstanceEdges]
+		out.EdgesTruncated = true
+	}
+
+	drawn := map[string]struct{}{}
+	for _, t := range out.Types {
+		for _, inst := range t.Instances {
+			drawn[t.Type+"\x00"+inst.ID] = struct{}{}
+		}
+	}
+	out.Edges = []MerchantInstanceEdge{}
+	for _, e := range edges {
+		// The SQL joins against the same cap, so this agrees with it already.
+		// It is here because app_user instances are dropped after that query
+		// runs, for a viewer without app_users:read, and an edge to a customer
+		// who is no longer on the canvas would point at nothing.
+		if _, ok := drawn[e.FromType+"\x00"+e.FromID]; !ok {
+			continue
+		}
+		if _, ok := drawn[e.ToType+"\x00"+e.ToID]; !ok {
+			continue
+		}
+		out.Edges = append(out.Edges, MerchantInstanceEdge(e))
+	}
 	return out, nil
 }
 
-// instanceLabels resolves the ids KYC stores into the names their author chose.
+// instanceLabels resolves the ids KYC stores into the names their author chose,
+// and collects what an instance carries where that is what distinguishes it.
 //
 // Three tables and no more. A scope instance and a resource are the merchant's
 // own ids, written by their product and meaningful to them already, so there is
 // nothing to look up and nothing KYC could look it up in.
-func (s *Service) instanceLabels(ctx context.Context, orgID string, rows []sqlc.ListMerchantInstancesRow) (map[string]string, error) {
+func (s *Service) instanceLabels(ctx context.Context, orgID string, rows []sqlc.ListMerchantInstancesRow) (map[string]string, map[string][]string, error) {
 	out := map[string]string{}
+	detail := map[string][]string{}
 
 	var userIDs []string
 	wantRoles, wantGroups := false, false
@@ -158,16 +232,17 @@ func (s *Service) instanceLabels(ctx context.Context, orgID string, rows []sqlc.
 	if wantRoles {
 		roles, err := s.db.Q().ListAppRoles(ctx, orgID)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		for _, role := range roles {
 			out["role\x00"+role.ID] = role.Key
+			detail["role\x00"+role.ID] = role.OwnCapabilities
 		}
 	}
 	if wantGroups {
 		groups, err := s.db.Q().ListAppUserGroups(ctx, orgID)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		for _, g := range groups {
 			out["group\x00"+g.ID] = g.Key
@@ -179,13 +254,13 @@ func (s *Service) instanceLabels(ctx context.Context, orgID string, rows []sqlc.
 			Ids:            userIDs,
 		})
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		for _, u := range users {
 			out["app_user\x00"+u.ID] = appUserLabel(u)
 		}
 	}
-	return out, nil
+	return out, detail, nil
 }
 
 // appUserLabel picks the name a merchant would recognise.
