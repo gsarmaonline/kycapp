@@ -10,6 +10,7 @@ import {
   type AppUser,
 } from '../../api'
 import { DetailList, PageHeader, ResourceTable } from '../../crud/ui'
+import { orgPath, resourcePath } from '../../org_nav'
 
 /** Membership is managed here, on the group, rather than from a grants screen. */
 export function CustomerGroupsShow() {
@@ -55,6 +56,8 @@ export function CustomerGroupsShow() {
           { label: 'Description', value: group.description || '—' },
           { label: 'Members', value: String(members.length) },
         ]}
+        editTo={resourcePath(orgId, 'customer-groups', id, 'edit')}
+        backTo={orgPath(orgId, 'customer-roles-groups')}
       />
 
       <h3 className="section-title">Members</h3>

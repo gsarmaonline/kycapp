@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { useParams } from 'react-router-dom'
 import {
   flattenAutomationConditions,
   getAutomation,
@@ -9,7 +9,7 @@ import {
   type AutomationCatalog,
   type AutomationRun,
 } from '../../api'
-import { PageHeader } from '../../crud/ui'
+import { PageHeader, ShowActions } from '../../crud/ui'
 import { resourcePath } from '../../org_nav'
 import { AutomationDag } from './dag/AutomationDag'
 import { normalizeGraph } from './dag/build_graph'
@@ -66,6 +66,10 @@ export function AutomationsShow() {
           </>
         ) : null}
       </p>
+      <ShowActions
+        editTo={resourcePath(orgId, 'automations', item.id, 'edit')}
+        backTo={resourcePath(orgId, 'automations')}
+      />
       <AutomationDag
         readOnly
         catalog={catalog}
@@ -88,14 +92,6 @@ export function AutomationsShow() {
           ))}
         </ul>
       )}
-      <div className="form-actions">
-        <Link className="ghost" to={resourcePath(orgId, 'automations')}>
-          Back
-        </Link>
-        <Link className="button" to={resourcePath(orgId, 'automations', item.id, 'edit')}>
-          Edit
-        </Link>
-      </div>
     </section>
   )
 }

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { useParams } from 'react-router-dom'
 import {
   getProductFeature,
   setProductFeatureOverrides,
@@ -60,14 +60,6 @@ export function ProductFeaturesShow() {
   return (
     <section>
       <PageHeader title={item.key} />
-      <div className="form-actions" style={{ marginTop: 0 }}>
-        <Link className="button ghost" to={resourcePath(orgId, 'product-features', item.id, 'edit')}>
-          Edit
-        </Link>
-        <Link className="button ghost" to={resourcePath(orgId, 'product-features')}>
-          Back
-        </Link>
-      </div>
       {error && <p className="error">{error}</p>}
       <DetailList
         items={[
@@ -77,6 +69,8 @@ export function ProductFeaturesShow() {
           { label: 'Enabled', value: item.enabled ? 'On' : 'Off' },
           { label: 'Rollout', value: `${item.rollout_percentage}%` },
         ]}
+        editTo={resourcePath(orgId, 'product-features', item.id, 'edit')}
+        backTo={resourcePath(orgId, 'product-features')}
       />
 
       <h3 style={{ marginTop: '1.5rem' }}>Subject overrides</h3>

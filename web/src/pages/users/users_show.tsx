@@ -94,6 +94,8 @@ export function UsersShow() {
                     .join(', '),
           },
         ]}
+        editTo={resourcePath(orgId, 'users', item.id, 'edit')}
+        backTo={resourcePath(orgId, 'users')}
       />
       <h3 className="section-title">Groups</h3>
       {groups.length === 0 ? (
@@ -130,15 +132,6 @@ export function UsersShow() {
       />
 
       <ReachablePanel appUserId={item.id} />
-
-      <div className="form-actions">
-        <Link className="ghost" to={resourcePath(orgId, 'users')}>
-          Back
-        </Link>
-        <Link className="button" to={resourcePath(orgId, 'users', item.id, 'edit')}>
-          Edit
-        </Link>
-      </div>
     </section>
   )
 }

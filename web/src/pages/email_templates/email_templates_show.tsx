@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { useParams } from 'react-router-dom'
 import {
   getEmailTemplate,
   getOrganisation,
@@ -103,6 +103,8 @@ export function EmailTemplatesShow() {
           { label: 'Body sections', value: String(item.body_sections?.length || 1) },
           { label: 'Body (text)', value: <pre className="preview-text">{item.body_text || '—'}</pre> },
         ]}
+        editTo={resourcePath(orgId, 'email-templates', item.id, 'edit')}
+        backTo={resourcePath(orgId, 'email-templates')}
       />
       <fieldset className="perm-group email-preview">
         <legend>Preview (with branding)</legend>
@@ -114,14 +116,6 @@ export function EmailTemplatesShow() {
         <pre className="preview-text">{renderEmailTemplate(item.body_text, vars)}</pre>
         <iframe title="HTML preview" className="preview-html" sandbox="" srcDoc={previewHtml} />
       </fieldset>
-      <div className="form-actions">
-        <Link className="ghost" to={resourcePath(orgId, 'email-templates')}>
-          Back
-        </Link>
-        <Link className="button" to={resourcePath(orgId, 'email-templates', item.id, 'edit')}>
-          Edit
-        </Link>
-      </div>
     </section>
   )
 }

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { getAppCapability, type AppCapability } from '../../api'
 import { DetailList, PageHeader } from '../../crud/ui'
+import { orgPath, resourcePath } from '../../org_nav'
 
 export function CustomerCapabilitiesShow() {
   const { orgId = '', id = '' } = useParams()
@@ -25,6 +26,8 @@ export function CustomerCapabilitiesShow() {
           { label: 'Key', value: item.key },
           { label: 'Description', value: item.description || '—' },
         ]}
+        editTo={resourcePath(orgId, 'customer-capabilities', item.id, 'edit')}
+        backTo={orgPath(orgId, 'customer-model')}
       />
     </section>
   )

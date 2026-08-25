@@ -1316,10 +1316,26 @@ button.link-btn.danger:hover {
   text-decoration: none;
 }
 
+/* A show page reads as one object, so it gets one panel — the same border,
+   radius and surface a table gets, rather than text loose on the page. */
+.detail-panel {
+  border: 1px solid var(--app-border);
+  border-radius: 6px;
+  background: var(--app-panel);
+  color: var(--app-fg);
+  margin: 0 0 1rem;
+  overflow: hidden;
+}
+
 .detail-list {
   margin: 0 0 1rem;
   display: grid;
   gap: 0.75rem;
+}
+
+.detail-panel .detail-list {
+  margin: 0;
+  padding: 0.9rem 1rem;
 }
 
 .detail-row {
@@ -1336,6 +1352,84 @@ button.link-btn.danger:hover {
 
 .detail-row dd {
   margin: 0;
+  /* Inside a box a long id or URL has to wrap, or it would run under the border. */
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+/* Every show page ends on the same bar, so Edit and Back sit where the last
+   page left them. Page-specific actions follow them, never before. */
+.show-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.7rem 1rem;
+  background: var(--app-code-bg);
+  border-top: 1px solid var(--app-border);
+}
+
+/* Standalone, on a page whose body is not a detail panel, it needs the box. */
+.show-actions:only-child,
+section > .show-actions {
+  border: 1px solid var(--app-border);
+  border-radius: 6px;
+  margin: 0 0 1rem;
+}
+
+.button-ghost,
+a.button-ghost {
+  background: transparent;
+  color: var(--app-accent);
+  border: 1px solid var(--app-border);
+}
+
+.button-ghost:hover,
+a.button-ghost:hover {
+  background: var(--app-accent-soft);
+}
+
+.cap-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  margin: 0.1rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.cap-chip {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.3rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.78rem;
+  padding: 0.15rem 0.45rem;
+  border-radius: 3px;
+  border: 1px solid transparent;
+  white-space: nowrap;
+  background: var(--app-accent-soft);
+  color: var(--app-accent);
+}
+
+/* Inherited chips step back and say so in words: colour alone would leave the
+   distinction invisible to anyone who cannot see it. */
+.cap-chip-inherited {
+  background: transparent;
+  border-color: var(--app-border);
+  color: var(--app-fg-muted);
+}
+
+.cap-chip-inherited em {
+  font-family: inherit;
+  font-style: normal;
+  font-size: 0.68rem;
+  letter-spacing: 0.03em;
+  opacity: 0.85;
+}
+
+.cap-empty {
+  color: var(--app-fg-muted);
 }
 
 .row {

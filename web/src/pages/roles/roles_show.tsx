@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { useParams } from 'react-router-dom'
 import { getRole, type Role } from '../../api'
 import { DetailList, PageHeader } from '../../crud/ui'
 import { resourcePath } from '../../org_nav'
@@ -32,15 +32,9 @@ export function RolesShow() {
             value: item.permission_keys?.length ? item.permission_keys.join(', ') : '—',
           },
         ]}
+        editTo={resourcePath(orgId, 'roles', item.id, 'edit')}
+        backTo={resourcePath(orgId, 'roles')}
       />
-      <div className="form-actions">
-        <Link className="ghost" to={resourcePath(orgId, 'roles')}>
-          Back
-        </Link>
-        <Link className="button" to={resourcePath(orgId, 'roles', item.id, 'edit')}>
-          Edit
-        </Link>
-      </div>
     </section>
   )
 }

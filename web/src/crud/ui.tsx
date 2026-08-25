@@ -105,20 +105,65 @@ export function RowActions({
   )
 }
 
-export function DetailList({
-  items,
+/**
+ * The two things every show page offers, in one order and one place.
+ * `children` carries the actions only that page has — they follow Edit and
+ * Back, so the pair never moves from one page to the next.
+ */
+export function ShowActions({
+  editTo,
+  backTo,
+  children,
 }: {
-  items: { label: string; value: ReactNode }[]
+  editTo?: string
+  backTo: string
+  children?: ReactNode
 }) {
   return (
-    <dl className="detail-list">
-      {items.map((item) => (
-        <div key={item.label} className="detail-row">
-          <dt>{item.label}</dt>
-          <dd>{item.value}</dd>
-        </div>
-      ))}
-    </dl>
+    <div className="show-actions">
+      {editTo && (
+        <Link className="button" to={editTo}>
+          Edit
+        </Link>
+      )}
+      <Link className="button button-ghost" to={backTo}>
+        Back
+      </Link>
+      {children}
+    </div>
+  )
+}
+
+export function DetailList({
+  items,
+  editTo,
+  backTo,
+  actions,
+}: {
+  items: { label: string; value: ReactNode }[]
+  /** Omit on a record with no edit screen; Back is always offered. */
+  editTo?: string
+  /** Given, the panel ends on the standard action bar. */
+  backTo?: string
+  /** Extra buttons for this page, shown after Edit and Back. */
+  actions?: ReactNode
+}) {
+  return (
+    <div className="detail-panel">
+      <dl className="detail-list">
+        {items.map((item) => (
+          <div key={item.label} className="detail-row">
+            <dt>{item.label}</dt>
+            <dd>{item.value}</dd>
+          </div>
+        ))}
+      </dl>
+      {backTo && (
+        <ShowActions editTo={editTo} backTo={backTo}>
+          {actions}
+        </ShowActions>
+      )}
+    </div>
   )
 }
 

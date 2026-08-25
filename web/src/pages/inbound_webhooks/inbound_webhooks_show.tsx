@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { useParams } from 'react-router-dom'
 import { getInboundWebhook, updateInboundWebhook, type InboundWebhook } from '../../api'
 import { DetailList, PageHeader } from '../../crud/ui'
 import { resourcePath } from '../../org_nav'
@@ -72,6 +72,18 @@ export function InboundWebhooksShow() {
           },
           { label: 'Status', value: item.status },
         ]}
+        editTo={resourcePath(orgId, 'inbound-webhooks', item.id, 'edit')}
+        backTo={resourcePath(orgId, 'inbound-webhooks')}
+        actions={
+          <>
+            <button type="button" className="ghost" onClick={() => void onRotate()}>
+              Rotate secret
+            </button>
+            <button type="button" className="ghost" onClick={() => void onToggle()}>
+              {item.status === 'connected' ? 'Disconnect' : 'Connect'}
+            </button>
+          </>
+        }
       />
       {revealed && mode === 'header' && (
         <p className="notice">
@@ -89,20 +101,6 @@ export function InboundWebhooksShow() {
         <code>inbound_webhook_name</code> and <code>body</code> (JSON if possible, otherwise raw
         text).
       </p>
-      <div className="form-actions">
-        <Link className="ghost" to={resourcePath(orgId, 'inbound-webhooks')}>
-          Back
-        </Link>
-        <button type="button" className="ghost" onClick={() => void onRotate()}>
-          Rotate secret
-        </button>
-        <button type="button" className="ghost" onClick={() => void onToggle()}>
-          {item.status === 'connected' ? 'Disconnect' : 'Connect'}
-        </button>
-        <Link className="button" to={resourcePath(orgId, 'inbound-webhooks', item.id, 'edit')}>
-          Edit
-        </Link>
-      </div>
     </section>
   )
 }
