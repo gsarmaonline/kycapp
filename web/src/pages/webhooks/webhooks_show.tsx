@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { useParams } from 'react-router-dom'
 import { getOrgWebhook, type OrgWebhook } from '../../api'
 import { DetailList, PageHeader } from '../../crud/ui'
 import { resourcePath } from '../../org_nav'
@@ -39,19 +39,13 @@ export function WebhooksShow() {
             value: <pre className="code-block">{body}</pre>,
           },
         ]}
+        editTo={resourcePath(orgId, 'webhooks', item.id, 'edit')}
+        backTo={resourcePath(orgId, 'webhooks')}
       />
       <p className="muted">
         When set, the shared secret is sent as <code>X-KYC-Webhook-Secret</code>. Placeholders use{' '}
         <code>{'{{path}}'}</code> from the trigger payload.
       </p>
-      <div className="form-actions">
-        <Link className="ghost" to={resourcePath(orgId, 'webhooks')}>
-          Back
-        </Link>
-        <Link className="button" to={resourcePath(orgId, 'webhooks', item.id, 'edit')}>
-          Edit
-        </Link>
-      </div>
     </section>
   )
 }

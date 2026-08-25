@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Link, useLocation, useParams } from 'react-router-dom'
+import { useLocation, useParams } from 'react-router-dom'
 import {
   checkOrgDatabase,
   disconnectOrgDatabase,
@@ -91,23 +91,26 @@ export function DatabasesShow() {
           },
           { label: 'Last error', value: item.last_error || '—' },
         ]}
+        editTo={resourcePath(orgId, 'databases', item.id, 'edit')}
+        backTo={resourcePath(orgId, 'databases')}
+        actions={
+          <>
+            <button type="button" className="ghost" disabled={busy} onClick={() => void onCheck()}>
+              Test connection
+            </button>
+            {item.status !== 'disconnected' && (
+              <button
+                type="button"
+                className="ghost"
+                disabled={busy}
+                onClick={() => void onDisconnect()}
+              >
+                Disconnect
+              </button>
+            )}
+          </>
+        }
       />
-      <div className="form-actions">
-        <Link className="ghost" to={resourcePath(orgId, 'databases')}>
-          Back
-        </Link>
-        <button type="button" className="ghost" disabled={busy} onClick={() => void onCheck()}>
-          Test connection
-        </button>
-        {item.status !== 'disconnected' && (
-          <button type="button" className="ghost" disabled={busy} onClick={() => void onDisconnect()}>
-            Disconnect
-          </button>
-        )}
-        <Link className="button" to={resourcePath(orgId, 'databases', item.id, 'edit')}>
-          Edit
-        </Link>
-      </div>
     </section>
   )
 }

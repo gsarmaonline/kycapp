@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { getAppScopeType, type AppScopeType } from '../../api'
 import { DetailList, PageHeader } from '../../crud/ui'
+import { orgPath, resourcePath } from '../../org_nav'
 
 export function CustomerScopeKindsShow() {
   const { orgId = '', id = '' } = useParams()
@@ -25,6 +26,8 @@ export function CustomerScopeKindsShow() {
           { label: 'Kind', value: item.kind },
           { label: 'Label', value: item.label || '—' },
         ]}
+        editTo={resourcePath(orgId, 'customer-scope-kinds', item.id, 'edit')}
+        backTo={orgPath(orgId, 'customer-model')}
       />
     </section>
   )

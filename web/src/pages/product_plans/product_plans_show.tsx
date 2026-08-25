@@ -51,20 +51,6 @@ export function ProductPlansShow() {
     <section>
       <PageHeader title={item.name} />
       {error && <p className="error">{error}</p>}
-      <div className="form-actions" style={{ marginTop: 0 }}>
-        <Link className="button ghost" to={resourcePath(orgId, 'product-plans', item.id, 'edit')}>
-          Edit
-        </Link>
-        <button type="button" disabled={busy || isActive || item.status !== 'active'} onClick={() => void onActivate()}>
-          {isActive ? 'Active for product users' : 'Activate for product users'}
-        </button>
-        <Link className="button ghost" to={orgPath(orgId, 'billing')}>
-          Billing
-        </Link>
-        <Link className="button ghost" to={resourcePath(orgId, 'product-plans')}>
-          Back
-        </Link>
-      </div>
       <DetailList
         items={[
           { label: 'Key', value: item.key },
@@ -88,6 +74,22 @@ export function ProductPlansShow() {
             value: item.feature_keys.length ? item.feature_keys.join(', ') : 'none',
           },
         ]}
+        editTo={resourcePath(orgId, 'product-plans', item.id, 'edit')}
+        backTo={resourcePath(orgId, 'product-plans')}
+        actions={
+          <>
+            <button
+              type="button"
+              disabled={busy || isActive || item.status !== 'active'}
+              onClick={() => void onActivate()}
+            >
+              {isActive ? 'Active for product users' : 'Activate for product users'}
+            </button>
+            <Link className="button button-ghost" to={orgPath(orgId, 'billing')}>
+              Billing
+            </Link>
+          </>
+        }
       />
     </section>
   )

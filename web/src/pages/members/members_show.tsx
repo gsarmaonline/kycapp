@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { useParams } from 'react-router-dom'
 import { getMembership, type Membership } from '../../api'
 import { DetailList, PageHeader } from '../../crud/ui'
 import { resourcePath } from '../../org_nav'
@@ -31,16 +31,10 @@ export function MembersShow() {
           { label: 'User ID', value: item.user_id },
           { label: 'Membership ID', value: item.id },
         ]}
+        editTo={resourcePath(orgId, 'members', item.id, 'edit')}
+        backTo={resourcePath(orgId, 'members')}
       />
       <AccessPathPanel membershipId={item.id} />
-      <div className="form-actions">
-        <Link className="ghost" to={resourcePath(orgId, 'members')}>
-          Back
-        </Link>
-        <Link className="button" to={resourcePath(orgId, 'members', item.id, 'edit')}>
-          Edit
-        </Link>
-      </div>
     </section>
   )
 }

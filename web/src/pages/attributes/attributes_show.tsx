@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { useParams } from 'react-router-dom'
 import { getAttributeDefinition, type AttributeDefinition } from '../../api'
 import { DetailList, PageHeader } from '../../crud/ui'
 import { resourcePath } from '../../org_nav'
@@ -36,15 +36,9 @@ export function AttributesShow() {
             value: item.enum_values?.length ? item.enum_values.join(', ') : '—',
           },
         ]}
+        editTo={resourcePath(orgId, 'attributes', item.id, 'edit')}
+        backTo={resourcePath(orgId, 'attributes')}
       />
-      <div className="form-actions">
-        <Link className="ghost" to={resourcePath(orgId, 'attributes')}>
-          Back
-        </Link>
-        <Link className="button" to={resourcePath(orgId, 'attributes', item.id, 'edit')}>
-          Edit
-        </Link>
-      </div>
     </section>
   )
 }
