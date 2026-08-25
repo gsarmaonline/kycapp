@@ -2728,7 +2728,7 @@ html.dark-mode .docs-swagger {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
   gap: 0.75rem;
-  align-items: end;
+  align-items: start;
   margin: 0.75rem 0 1.25rem;
   padding: 1rem;
   background: var(--app-panel);
@@ -2740,10 +2740,16 @@ html.dark-mode .docs-swagger {
   grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
 }
 
+/*
+ * One label carries a hint below its control, and bottom alignment used to
+ * lift that control a hint's height above the others. Subgrid gives the caption,
+ * the control and the hint a shared row each, so the controls stay on one line.
+ */
 .edge-form label {
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
+  display: grid;
+  grid-template-rows: subgrid;
+  grid-row: span 3;
+  row-gap: 0.25rem;
   font-size: 0.82rem;
   min-width: 0;
 }
