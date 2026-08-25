@@ -3,11 +3,9 @@ package service
 import (
 	"context"
 	"errors"
-	"slices"
 	"strings"
 
 	"github.com/gsarmaonline/kyc/internal/apperr"
-	"github.com/gsarmaonline/kyc/internal/authn"
 	"github.com/gsarmaonline/kyc/internal/store/sqlc"
 	"github.com/jackc/pgx/v5"
 )
@@ -38,11 +36,10 @@ type DismissOnboardingInput struct {
 // GetOrganisationOnboarding derives setup progress for the org dashboard.
 // Members without organisation:update get visible=false and no steps.
 func (s *Service) GetOrganisationOnboarding(ctx context.Context, orgID string) (OnboardingView, error) {
-	p, err := s.RequireOrgMember(ctx, orgID)
-	if err != nil {
+	if _, err := s.RequireOrgMember(ctx, orgID); err != nil {
 		return OnboardingView{}, err
 	}
-	canManage, err := s.canManageOnboarding(ctx, p, orgID)
+	canManage, err := s.canManageOnboarding(ctx, orgID)
 	if err != nil {
 		return OnboardingView{}, err
 	}
@@ -172,21 +169,24 @@ func (s *Service) DismissOrganisationOnboarding(ctx context.Context, orgID strin
 	return s.GetOrganisationOnboarding(ctx, orgID)
 }
 
-func (s *Service) canManageOnboarding(ctx context.Context, p authn.Principal, orgID string) (bool, error) {
-	if p.IsPlatform() {
-		return true, nil
+// canManageOnboarding reports whether the caller may see the setup panel.
+//
+// It used to re-derive the answer three ways: a platform flag that skipped every
+// check, a hand-rolled scope test for API keys, and CheckAuthz for users. All
+// three now collapse into the gate itself, so the panel is shown to exactly the
+// principals that may act on it, and there is one implementation of
+// "may this caller update this organisation?" rather than four.
+//
+// A denial is not an error here. The panel is hidden, not refused, so the caller
+// gets a dashboard without setup steps rather than a 403 on their own org.
+func (s *Service) canManageOnboarding(ctx context.Context, orgID string) (bool, error) {
+	if _, err := s.RequireOrgPermission(ctx, orgID, "organisation:update"); err != nil {
+		if errors.Is(err, apperr.ErrForbidden) || errors.Is(err, apperr.ErrNotFound) {
+			return false, nil
+		}
+		return false, err
 	}
-	if p.Kind == authn.KindService && p.OrganisationID == orgID {
-		return len(p.Scopes) == 0 || slices.Contains(p.Scopes, "organisation:update"), nil
-	}
-	if p.Kind != authn.KindUser || p.UserID == "" {
-		return false, nil
-	}
-	return s.CheckAuthz(ctx, AuthzCheckInput{
-		OrganisationID: orgID,
-		UserID:         p.UserID,
-		Permission:     "organisation:update",
-	})
+	return true, nil
 }
 
 func brandingConfigured(org sqlc.Organisation) bool {

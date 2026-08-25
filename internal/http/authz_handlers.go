@@ -134,8 +134,7 @@ func (s *Server) handleDeleteRole(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleAuthzCheck(w http.ResponseWriter, r *http.Request) {
-	p, err := service.RequirePrincipal(r.Context())
-	if err != nil {
+	if _, err := service.RequirePrincipal(r.Context()); err != nil {
 		writeError(w, err)
 		return
 	}
@@ -150,11 +149,12 @@ func (s *Server) handleAuthzCheck(w http.ResponseWriter, r *http.Request) {
 		writeError(w, apperr.Validation("invalid JSON body"))
 		return
 	}
-	if !p.IsPlatform() {
-		if _, err := s.svc.RequireOrgMember(r.Context(), body.OrganisationID); err != nil {
-			writeError(w, err)
-			return
-		}
+	// No platform branch, for the same reason as the entitlement check: staff
+	// reach every tenant through an oversees edge, so the ordinary gate admits
+	// them without a second path that could drift from it.
+	if _, err := s.svc.RequireOrgMember(r.Context(), body.OrganisationID); err != nil {
+		writeError(w, err)
+		return
 	}
 	allowed, err := s.svc.CheckAuthz(r.Context(), service.AuthzCheckInput{
 		OrganisationID: body.OrganisationID,

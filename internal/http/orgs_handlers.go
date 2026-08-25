@@ -29,9 +29,13 @@ func (s *Server) handleCreateOrganisation(w http.ResponseWriter, r *http.Request
 		Slug:              body.Slug,
 		AttachDefaultPlan: true,
 	}
+	// A person creating their own tenant is self-serve signup and mints a
+	// founding owner. A machine creating one for somebody else is a platform
+	// action, so it takes a platform capability rather than a flag that every
+	// unscoped token carried.
 	if p.Kind == authn.KindUser {
 		in.OwnerUserID = p.UserID
-	} else if !p.IsPlatform() {
+	} else if _, err := s.svc.RequirePlatformCapability(r.Context(), "organisation:update"); err != nil {
 		writeError(w, apperr.Forbidden("cannot create organisation"))
 		return
 	}
@@ -51,7 +55,16 @@ func (s *Server) handleListOrganisations(w http.ResponseWriter, r *http.Request)
 	}
 	q := r.URL.Query()
 	var list []map[string]any
-	if p.IsPlatform() {
+	// Whether the caller sees every tenant is the same question the evaluator
+	// answers everywhere else: does a grant reach the organisation star node?
+	// Asking the graph rather than a flag means a read-only support role lists
+	// tenants because it was granted reach, not because it is staff.
+	everyOrg, err := s.svc.ReachesEveryOrganisation(r.Context(), p)
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	if everyOrg {
 		rows, err := s.svc.ListOrganisations(r.Context(), q.Get("status"), q.Get("q"), queryLimit(r), q.Get("cursor"))
 		if err != nil {
 			writeError(w, err)

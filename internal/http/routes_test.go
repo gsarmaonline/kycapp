@@ -72,7 +72,7 @@ func TestNoRouteHasAnEmptyAuthKind(t *testing.T) {
 func TestPermissionKindsCarryAPermission(t *testing.T) {
 	for _, rt := range tableForTest(t) {
 		switch rt.Auth.Kind {
-		case authPlatform, authOrgPermission, authOrgFromResource:
+		case authPlatform, authSelfOrPlatform, authOrgPermission, authOrgFromResource:
 			if rt.Auth.Permission == "" {
 				t.Errorf("%s %s declares %q with no permission", rt.Method, rt.Pattern, rt.Auth.Kind)
 			}

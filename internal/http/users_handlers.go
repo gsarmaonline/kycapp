@@ -5,8 +5,18 @@ import (
 	"time"
 
 	"github.com/gsarmaonline/kyc/internal/apperr"
+	"github.com/gsarmaonline/kyc/internal/authn"
 	"github.com/gsarmaonline/kyc/internal/service"
 )
+
+// isSelf reports whether the caller is the user named in the path.
+//
+// A machine principal is never self, whoever owns it. An API key acts with its
+// owner's reach, but "this is my own profile" is a statement about a session,
+// and a key has none.
+func isSelf(p authn.Principal, userID string) bool {
+	return p.Kind == authn.KindUser && p.UserID != "" && p.UserID == userID
+}
 
 func (s *Server) handleCreateUser(w http.ResponseWriter, r *http.Request) {
 	if _, err := s.svc.RequirePlatformCapability(r.Context(), "members:invite"); err != nil {
@@ -56,9 +66,11 @@ func (s *Server) handleGetUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	id := r.PathValue("id")
-	if !p.IsPlatform() && p.UserID != id {
-		writeError(w, apperr.Forbidden("cannot view other users"))
-		return
+	if !isSelf(p, id) {
+		if _, err := s.svc.RequirePlatformCapability(r.Context(), "members:read"); err != nil {
+			writeError(w, apperr.Forbidden("cannot view other users"))
+			return
+		}
 	}
 	user, err := s.svc.GetUser(r.Context(), id)
 	if err != nil {
@@ -83,14 +95,24 @@ func (s *Server) handlePatchUser(w http.ResponseWriter, r *http.Request) {
 		writeError(w, apperr.Validation("invalid JSON body"))
 		return
 	}
-	if !p.IsPlatform() {
-		if p.UserID != id {
+	// Editing your own profile needs no capability. Editing somebody else's is a
+	// platform action, and disabling an account is a stricter one than renaming
+	// it: members:remove is the verb that takes a person out.
+	if isSelf(p, id) {
+		if body.Status != nil {
+			writeError(w, apperr.Forbidden("cannot change own status"))
+			return
+		}
+	} else {
+		if _, err := s.svc.RequirePlatformCapability(r.Context(), "members:invite"); err != nil {
 			writeError(w, apperr.Forbidden("cannot update other users"))
 			return
 		}
 		if body.Status != nil {
-			writeError(w, apperr.Forbidden("cannot change own status"))
-			return
+			if _, err := s.svc.RequirePlatformCapability(r.Context(), "members:remove"); err != nil {
+				writeError(w, apperr.Forbidden("cannot change user status"))
+				return
+			}
 		}
 	}
 	user, err := s.svc.UpdateUser(r.Context(), id, service.UpdateUserInput{
@@ -110,9 +132,11 @@ func (s *Server) handleListUserMemberships(w http.ResponseWriter, r *http.Reques
 		return
 	}
 	id := r.PathValue("id")
-	if !p.IsPlatform() && p.UserID != id {
-		writeError(w, apperr.Forbidden("cannot view other users' memberships"))
-		return
+	if !isSelf(p, id) {
+		if _, err := s.svc.RequirePlatformCapability(r.Context(), "members:read"); err != nil {
+			writeError(w, apperr.Forbidden("cannot view other users' memberships"))
+			return
+		}
 	}
 	rows, err := s.svc.ListUserMemberships(r.Context(), id)
 	if err != nil {

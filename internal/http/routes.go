@@ -38,6 +38,15 @@ const (
 	authUser authKind = "user"
 	// authPlatform requires a named capability at global scope.
 	authPlatform authKind = "platform"
+	// authSelfOrPlatform admits the user named in the path, and otherwise
+	// requires the named capability at global scope.
+	//
+	// These routes used to declare authPrincipal and gate on a staff flag, which
+	// meant any member of the platform organisation reached them whatever their
+	// role held. The subject is a user rather than an organisation, so the gate
+	// cannot apply this from the table; the handler still checks, and the
+	// permission is recorded here for the reader.
+	authSelfOrPlatform authKind = "self_or_platform"
 	// authOrgMember requires reach into the organisation named in the path.
 	authOrgMember authKind = "org_member"
 	// authOrgMemberAnyStatus is authOrgMember for a lifecycle route: a
@@ -87,6 +96,10 @@ func orgFromBody() authRule { return authRule{Kind: authOrgFromBody} }
 
 func platform(perm string) authRule {
 	return authRule{Kind: authPlatform, Permission: perm}
+}
+
+func selfOrPlatform(perm string) authRule {
+	return authRule{Kind: authSelfOrPlatform, Permission: perm}
 }
 
 func orgMember() authRule          { return authRule{Kind: authOrgMember} }

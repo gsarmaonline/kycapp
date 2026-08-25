@@ -42,14 +42,22 @@ func FromContext(ctx context.Context) (Principal, bool) {
 	return p, ok
 }
 
-// IsPlatform returns true for platform-admin users and unscoped service tokens.
-// Org-scoped API keys are not platform privilege.
-func (p Principal) IsPlatform() bool {
-	if p.PlatformAdmin {
-		return true
-	}
-	return p.Kind == KindService && p.OrganisationID == ""
-}
+// IsPlatform is gone.
+//
+// It was the coarse staff bypass that RequirePlatform was deleted to remove,
+// living on as a method. Six handlers used it to skip the capability check
+// entirely, so any member of the platform organisation — a read-only support
+// role included — could edit any user's status, and any API key with no
+// organisation counted as staff whatever its owner held. It also disagreed with
+// isBreakGlass, which deliberately refuses a stored key.
+//
+// Ask the graph instead. Service.RequirePlatformCapability for a named
+// capability at global scope, and Service.ReachesEveryOrganisation for the
+// listing question. Both go through the same walk as everything else, so a
+// read-only role stays read-only.
+//
+// PlatformAdmin survives as a field: /v1/me reports it so the UI can show staff
+// screens. It is a display fact, never a gate.
 
 // ActorLabel is a stable string for audit logs.
 func (p Principal) ActorLabel() string {

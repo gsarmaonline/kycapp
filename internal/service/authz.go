@@ -105,6 +105,12 @@ func (s *Service) CreateRole(ctx context.Context, orgID string, in CreateRoleInp
 	if len(permRows) != len(keys) {
 		return RoleView{}, apperr.Validation("one or more permission_keys are unknown")
 	}
+	// roles:manage says who may author roles, not what those roles may contain.
+	// Without this, it was the only permission anyone needed: mint a role with
+	// every capability, then hold it.
+	if err := s.requireCanGrant(ctx, orgID, keys); err != nil {
+		return RoleView{}, err
+	}
 
 	var role sqlc.Role
 	err = s.db.WithTx(ctx, func(q *sqlc.Queries) error {
@@ -162,6 +168,12 @@ func (s *Service) UpdateRole(ctx context.Context, roleID string, in UpdateRoleIn
 		}
 		if len(permRows) != len(keys) {
 			return RoleView{}, apperr.Validation("one or more permission_keys are unknown")
+		}
+		// The resulting set is what is checked, not the delta. Leaving a
+		// permission on a role you do not hold is the same claim as adding it,
+		// and treating them differently would make the rule depend on history.
+		if err := s.requireCanGrant(ctx, role.OrganisationID, keys); err != nil {
+			return RoleView{}, err
 		}
 	}
 

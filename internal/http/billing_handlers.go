@@ -208,8 +208,7 @@ func (s *Server) handleGetOrgEntitlements(w http.ResponseWriter, r *http.Request
 }
 
 func (s *Server) handleEntitlementsCheck(w http.ResponseWriter, r *http.Request) {
-	p, err := service.RequirePrincipal(r.Context())
-	if err != nil {
+	if _, err := service.RequirePrincipal(r.Context()); err != nil {
 		writeError(w, err)
 		return
 	}
@@ -222,11 +221,12 @@ func (s *Server) handleEntitlementsCheck(w http.ResponseWriter, r *http.Request)
 		writeError(w, apperr.Validation("invalid JSON body"))
 		return
 	}
-	if !p.IsPlatform() {
-		if _, err := s.svc.RequireOrgMember(r.Context(), body.OrganisationID); err != nil {
-			writeError(w, err)
-			return
-		}
+	// No platform branch. Staff reach every tenant through an oversees edge, so
+	// the ordinary gate already admits them, and break-glass short-circuits
+	// inside it. A second path here only made the two able to disagree.
+	if _, err := s.svc.RequireOrgMember(r.Context(), body.OrganisationID); err != nil {
+		writeError(w, err)
+		return
 	}
 	result, err := s.svc.CheckEntitlementWithSubject(r.Context(), body.OrganisationID, body.Entitlement, body.SubjectID)
 	if err != nil {
