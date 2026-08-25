@@ -24,6 +24,98 @@ export type DocConcept = {
 /** Conceptual docs for workspace elements and core platform ideas. */
 export const DOC_CONCEPTS: DocConcept[] = [
   {
+    slug: 'getting-started',
+    title: 'Getting started',
+    summary:
+      'The words this product uses, and which of them mean two different things. Read this before anything else.',
+    body: [
+      'Almost every confusion in KYC comes from one word doing two jobs. A "user" can mean somebody on your team or somebody who buys from you. A "capability" can mean something your organisation may do inside KYC or something your customers may do inside your product. The two halves never mix, and telling them apart makes the rest of these docs read straightforwardly.',
+      'The shape underneath is simple. You have an organisation. Your team are members of it and sign in. Your customers are records on it and never do. Everything else hangs off one of those two.',
+      'One more distinction is worth having early, because it catches people who have the first two straight: whether somebody is allowed to do a thing is a different question from whether you sold it to them. Both end in a yes or a no, and confusing them produces an error message that sends the reader to the wrong place.',
+    ],
+    examples: [
+      {
+        title: 'Two kinds of people',
+        problem:
+          'Members are your team. App users are your customers. They are different objects with different lifecycles, and nothing you do to one affects the other.',
+        grant: `MEMBERS                        APP USERS
+your team                      your customers
+
+sign into KYC                  never see KYC
+belong to your organisation    belong to your organisation
+hold a KYC role                hold an app role
+  owner, admin, member           whatever you name
+
+"may Priya invite a           "may Ana edit
+ teammate?"                     document d1?"
+
+governed by Members            governed by Customer access
+enforced by KYC                enforced by your backend`,
+        note:
+          'App users are records, not logins. They may come from your own database, or arrive from Clerk or Auth0 by ingest, and KYC stores a profile and an id for each. Nothing in customer access can affect who may operate KYC, and nothing in Members can affect what your customers may do.',
+      },
+      {
+        title: 'Two kinds of capability',
+        problem:
+          'The same split runs through what may be done. One set is fixed and belongs to KYC. The other is yours and starts empty.',
+        grant: `PLATFORM                       APP
+what your organisation         what your customers
+may use inside KYC             may do inside your product
+
+fixed, defined by KYC          open, declared by you
+app_users:write                document:read
+billing:read                   invoice:refund
+members:invite                 project:archive
+
+comes with your KYC plan       you declare it, nothing seeded
+checked by KYC's gates         checked by your backend`,
+        note:
+          'A new organisation starts with an empty app vocabulary on purpose. A default shipped by KYC would be a guess about a product it has never seen, and a wrong guess is something people work around rather than delete. Templates offer a starting point you can read first and then edit.',
+      },
+      {
+        title: 'Allowed to, versus paid for',
+        problem:
+          'Entitlements are often mistaken for permissions because both end in a yes or no. They answer different questions, and the difference shows up in what you tell the person who was refused.',
+        grant: `PERMISSION            may this SUBJECT do this?
+                      no  ->  "ask your admin"
+
+ENTITLEMENT           did this ORGANISATION buy this?
+                      no  ->  "upgrade your plan"`,
+        note:
+          'Product features and plans are entitlements: what you have unlocked commercially. Customer access is permission: what a customer may do with what they have. Both checks have to pass, and a customer can be entitled to something they are not permitted to use.',
+      },
+    ],
+    steps: [
+      {
+        title: 'Set up your team',
+        detail:
+          'Invite the people who will operate KYC and give each a role. This is Members, and it governs KYC itself rather than your product.',
+      },
+      {
+        title: 'Bring in your customers',
+        detail:
+          'Create app users, or ingest them from wherever they already live. These are records of your customers, not accounts that can sign in here.',
+      },
+      {
+        title: 'Decide what you are selling',
+        detail:
+          'Features and plans are the commercial layer: what a customer has bought. Your backend asks whether a feature is entitled.',
+      },
+      {
+        title: 'Decide who may do what',
+        detail:
+          'Customer access is the permission layer: which customers may do what to which of your resources. It is the part that needs facts only you have, so it is the one worth reading properly.',
+      },
+    ],
+    related: [
+      { label: 'Organisation', slug: 'organisation' },
+      { label: 'Members', slug: 'members' },
+      { label: 'Users (app users)', slug: 'users' },
+      { label: 'Permissions vs entitlements', slug: 'permissions-entitlements' },
+      { label: 'Customer access', slug: 'customer-access' },
+    ],
+  },
+  {
     slug: 'organisation',
     title: 'Organisation',
     summary: 'The tenant hub. Members, customers, packaging, and billing hang off this record.',
@@ -269,56 +361,6 @@ export const DOC_CONCEPTS: DocConcept[] = [
     },
     examples: [
       {
-        title: 'Two kinds of people',
-        problem:
-          'Almost every confusion here comes from one word doing two jobs. A "user" can mean somebody on your team who signs into KYC, or somebody who uses the product you sell. They are different objects with different lifecycles, and they never mix.',
-        grant: `MEMBERS                        APP USERS
-your team                      your customers
-
-sign into KYC                  never see KYC
-belong to your organisation    belong to your organisation
-hold a KYC role                hold an app role
-  owner, admin, member           whatever you name
-
-"may Priya invite a           "may Ana edit
- teammate?"                     document d1?"
-
-governed by Members            governed by Customer access
-enforced by KYC                enforced by your backend`,
-        note:
-          'App users are records, not logins. They may come from your own database, or from Clerk or Auth0 by ingest, and KYC stores a profile and an id for each. Nothing you do in customer access can affect who may operate KYC, and nothing you do in Members can affect what your customers may do.',
-      },
-      {
-        title: 'Two kinds of capability',
-        problem:
-          'The same split runs through what may be done, and the word "capability" is similarly overloaded. One set is fixed and belongs to KYC. The other is yours and starts empty.',
-        grant: `PLATFORM                       APP
-what your organisation         what your customers
-may use inside KYC             may do inside your product
-
-fixed, defined by KYC          open, declared by you
-app_users:write                document:read
-billing:read                   invoice:refund
-members:invite                 project:archive
-
-comes with your KYC plan       you declare it, nothing seeded
-checked by KYC's gates         checked by your backend`,
-        note:
-          'A new organisation starts with an empty app vocabulary on purpose. A default shipped by KYC would be a guess about a product it has never seen, and a wrong guess is something people work around rather than delete. Templates offer a starting point you can read first and then edit.',
-      },
-      {
-        title: 'And a third thing that is not access at all',
-        problem:
-          'Entitlements are often mistaken for permissions because both end in a yes or no. They answer a different question, and the difference shows up in what you tell the person who was refused.',
-        grant: `PERMISSION            may this SUBJECT do this?
-                      no  ->  "ask your admin"
-
-ENTITLEMENT           did this ORGANISATION buy this?
-                      no  ->  "upgrade your plan"`,
-        note:
-          'Product features and plans are entitlements: what you have unlocked for a customer commercially. Customer access is permission: what a customer is allowed to do with what they have. A customer can be entitled to a feature and not permitted to use it, and both checks have to pass.',
-      },
-      {
         title: 'Your first hour, end to end',
         problem:
           'A document product. Projects hold documents, editors can write, viewers can read, and everyone in a workspace can read. Here is the whole setup, in the order the pieces depend on each other, ending with a question that returns a real answer.',
@@ -408,6 +450,7 @@ written when the profile is created`,
       },
     ],
     related: [
+      { label: 'Getting started', slug: 'getting-started' },
       { label: 'Access recipes', slug: 'customer-access-examples' },
       { label: 'Scope kinds', slug: 'customer-scope-kinds' },
       { label: 'Capabilities', slug: 'customer-capabilities' },
@@ -680,15 +723,21 @@ export function conceptNavGroups(base: string) {
     return { id: groupId, label, hint, items }
   }
 
-  const core = ['organisation', 'permissions-entitlements', 'customer-access'].map((slug) =>
-    asItem(BY_SLUG.get(slug)!),
-  )
+  // Getting started carries the cross-cutting vocabulary. Members against app
+  // users, and platform against app, are not customer-access ideas: they run
+  // through every section, and they used to be explained inside one of them.
+  const core = [
+    'getting-started',
+    'organisation',
+    'permissions-entitlements',
+    'customer-access',
+  ].map((slug) => asItem(BY_SLUG.get(slug)!))
 
   return [
     {
       id: 'core',
-      label: 'Core ideas',
-      hint: 'How KYC models tenants and access',
+      label: 'Getting started',
+      hint: 'The vocabulary, and which words mean two things',
       items: core,
     },
     fromGroup('product', 'Product', 'What the organisation runs for its customers'),
