@@ -7,12 +7,13 @@ Related: [authorisation](authorisation.md) · [authentication](authentication.md
 ## Contents
 
 1. [What it is, and what it is not](#what-it-is-and-what-it-is-not)
-2. [The flow](#the-flow)
-3. [The objects](#the-objects)
-4. [Reading access back](#reading-access-back)
-5. [Asking the graph](#asking-the-graph)
-6. [Rules that hold](#rules-that-hold)
-7. [Where it lives](#where-it-lives)
+2. [How a question is answered](#how-a-question-is-answered)
+3. [The flow](#the-flow)
+4. [The objects](#the-objects)
+5. [Reading access back](#reading-access-back)
+6. [Asking the graph](#asking-the-graph)
+7. [Rules that hold](#rules-that-hold)
+8. [Where it lives](#where-it-lives)
 
 ---
 
@@ -56,6 +57,47 @@ The older model still works and is unchanged. `GET /v1/app-users/{id}/access` re
 It had no idea what a *project* of the merchant's was. Putting a check on the request path would also make KYC own the merchant's latency. So KYC stores the model and returns an assembled grant set; evaluation happens in the merchant's own process.
 
 The subject is **app users only**. A merchant's own KYC operators keep organisation-wide roles. Scoping *them* to projects would mean KYC's gates learning which project every resource belongs to, which is a much larger change and is not done.
+
+## How a question is answered
+
+Every question is the same shape: may this subject do this action to this resource? It is answered by walking outward from the **resource**, not by looking the subject up in a list.
+
+The facts are all one kind, read as *A's relation is B*, and they come from both sides:
+
+| Fact | Written by | Example |
+| --- | --- | --- |
+| A grant | the merchant's operator, in KYC | `project:apollo #can_write role:editor#holder` |
+| Who holds a role | KYC, from `app_grants` | `role:editor #holder group:eng#member_of` |
+| Group membership | KYC, from `app_user_group_members` | `group:eng #member_of app_user:ana` |
+| Containment | **the merchant's backend** | `document:d1 #parent project:apollo` |
+| Ownership | **the merchant's backend** | `document:d1 #owner app_user:ana` |
+
+The last two are the merchant's because KYC cannot derive them. A `scope_id` is a string it stores and never resolves, so it has no idea which documents exist, which project one sits in, or who owns it.
+
+Nothing in that table names Ana and `d1` together, and Ana can still write `d1`:
+
+```
+may app_user:ana write document:d1 ?
+
+1  does d1 name ana on can_write?          no
+2  d1's rule is
+     write = can_write + can_all + owner + parent->write
+   so follow parent
+3  d1 #parent project:apollo               ask apollo the same question
+4  apollo #can_write role:editor#holder    whoever holds editor
+5  role:editor #holder group:eng#member_of whoever is in eng
+6  group:eng #member_of app_user:ana       found -> allowed
+```
+
+Three properties fall out of this, and they are the reason the model is shaped this way.
+
+**A grant is a pointer, not a copy.** Step 4 names the *role*, so what the role contains is resolved when the question is asked. Editing `editor` changes what every holder can do without rewriting one grant. The same is true of groups at step 5.
+
+**One grant at a container covers everything inside it.** That is step 2, the arrow. A grant never has to name `d1`, which is what an exported grant set could never do, because KYC had never heard of the document.
+
+**Nothing subtracts.** Every fact adds, so the order they were written in cannot change the answer and there is no precedence to resolve. The cost is that a grant cannot be narrowed after the fact: to keep somebody out of something, grant nothing that reaches it.
+
+A denial distinguishes *no path at all* from *a path, but no rule granting this action*, which is the difference between a missing containment edge and a missing capability. `POST /check` returns the route it took, or the absence of one, which is usually the fastest way to find which of the five facts is missing.
 
 ## The flow
 

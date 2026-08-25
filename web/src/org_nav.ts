@@ -31,7 +31,6 @@ export type OrgSection =
   | 'settings'
   | 'api-keys'
   | 'activity'
-  | 'authorisation'
   | 'docs'
 
 export type NavGroupId = 'product' | 'customer-access' | 'actions' | 'platform'
@@ -76,7 +75,6 @@ export const ORG_SECTIONS: OrgNavItem[] = [
   { id: 'settings', label: 'Settings', path: 'settings' },
   { id: 'api-keys', label: 'API keys', path: 'api-keys' },
   { id: 'activity', label: 'Activity', path: 'activity' },
-  { id: 'authorisation', label: 'Authorisation', path: 'authorisation' },
   { id: 'docs', label: 'Documentation', path: 'docs' },
 ]
 
@@ -141,11 +139,6 @@ export const ORG_NAV_GROUPS: OrgNavGroup[] = [
       // customers. It sat under product features, which read as the latter.
       { id: 'billing', label: 'Billing', path: 'billing' },
       { id: 'activity', label: 'Activity', path: 'activity' },
-      // The authorisation model itself, drawn. It sits here because this group
-      // is what the organisation uses inside KYC, and the schema is fixed for
-      // every tenant. A merchant's own model is a different graph and belongs
-      // in customer access, once that tier is on the graph.
-      { id: 'authorisation', label: 'Authorisation', path: 'authorisation' },
       { id: 'docs', label: 'Documentation', path: 'docs' },
     ],
   },
@@ -176,7 +169,6 @@ export function sectionFromPathname(pathname: string, orgId: string): OrgSection
     case 'settings':
     case 'api-keys':
     case 'activity':
-    case 'authorisation':
     case 'docs':
       return head
     // A create, show or edit screen keeps its own path and highlights the page
@@ -215,7 +207,6 @@ export function resourcePath(
     | 'settings'
     | 'docs'
     | 'activity'
-    | 'authorisation'
     | 'customer-map'
     | 'customer-edges'
     | 'customer-playground'
