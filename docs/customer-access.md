@@ -62,7 +62,7 @@ The subject is **app users only**. A merchant's own KYC operators keep organisat
 2. **Declare capabilities** — the verbs the backend checks, as `resource:action`.
 3. **Compose roles** — named capability sets, which may build on other roles.
 4. **Group customers** *(optional)* — grant to a set once instead of one at a time.
-5. **Issue grants** — one subject, one set of capabilities, one scope, optionally with an expiry and exceptions.
+5. **Issue grants** — one subject, one set of capabilities, one scope, optionally with an expiry.
 6. **Read the grant set back** — cache it against `version`, decide locally.
 
 ## The objects
@@ -117,17 +117,17 @@ The organisation is that ceiling, and it is deliberately not a scope kind you de
 
 `global` and `organisation` stay reserved and undeclarable for the same reason from the other side: your world ends at your organisation, so a scope reaching past it would cross into another merchant's.
 
-**A grant may narrow itself.** Three exclusion lists, one per wildcard:
+**A grant cannot narrow itself.** There were three exclusion lists, one per wildcard, and they are gone. They could not survive the move onto the edge graph, and the reason is worth keeping: an exception has to become a subtraction in a rule, a rule belongs to a **type** rather than to one grant, and it would therefore veto every other grant reaching that type. That is the veto [invariant 6](authorisation.md#invariants) forbids, and the thing that brings ordering, precedence and conflict resolution back with it.
 
-| Wildcard | Exclusion | Reads as |
-| --- | --- | --- |
-| everyone | `except_app_user_ids` | everyone except these customers |
-| all capabilities | `except_capabilities` | everything except `account:delete` |
-| a wide scope | `except_scopes` | all of Acme except `project:salaries` |
+So grants only ever add, which is what keeps them unordered and evaluation first-match. To say the things the exclusions used to say:
 
-A wildcard is a claim about a set nobody can enumerate; an exception names the members that do not belong. They are one feature, and each exception narrows **the grant it sits on and nothing else**. So no grant subtracts from another, grants stay unordered, and deleting one still removes access rather than adding it.
+| You want | Say it as |
+| --- | --- |
+| everyone but a few | grant to a group, and leave those customers out of it |
+| everything but one verb | declare that verb on a type the grant does not reach |
+| everywhere but one place | grant at the level you mean, not at the ceiling |
 
-The limit that follows: an exclusion is **not a lock**. If a second grant reaches an excluded resource, that grant allows. For a hard "nobody reaches this", issue nothing that reaches it.
+The rule underneath is the one the model always had: for a hard "nobody reaches this", issue nothing that reaches it. That was already the only kind of lock that held, because an exclusion never stopped a second grant from allowing.
 
 **Constraint** narrows a grant with something only the request knows. There is one: `self_subject`, which applies the grant only to resources belonging to the holder. Combined with the everyone subject it is the whole "customers may manage their own things" rule, in one row:
 
@@ -156,8 +156,6 @@ GET /v1/app-users/{id}/access
       "capabilities": ["docs:read", "docs:write"],
       "source": "group:au_customers app-role:editor",
       "all_capabilities": false,
-      "except_capabilities": [],
-      "except_scopes": [{ "kind": "project", "id": "salaries" }],
       "constraint": ""
     }
   ]
@@ -166,8 +164,7 @@ GET /v1/app-users/{id}/access
 
 **Every field here is load-bearing, and your backend must honour all of them.**
 A grant with `all_capabilities` lists no capabilities and carries the most; one
-with `except_scopes` reaches less than its scope suggests; one with
-`"constraint": "self_subject"` applies only to rows the holder owns. Code that
+with `"constraint": "self_subject"` applies only to rows the holder owns. Code that
 reads `capabilities` alone will allow more than was granted, and KYC cannot stop
 it — the evaluation happens in your process. Read every field, not just
 `capabilities`.
@@ -183,7 +180,7 @@ This is the whole read surface: there is **no per-request check endpoint**, buil
 These are the [invariants](authorisation.md#invariants) as they apply to this namespace.
 
 1. **Deny by default.** No grant, no access. A new customer holds nothing until a grant reaches them.
-2. **No grant subtracts from another.** A grant may narrow itself with exceptions; it can never veto a different grant. That is what keeps grants unordered and evaluation first-match.
+2. **No grant subtracts from another.** A grant cannot narrow itself and cannot veto a different one. That is what keeps grants unordered and evaluation first-match, and it is why the exclusion lists were removed rather than carried onto the graph.
 3. **Capabilities are closed per namespace.** Open for the merchant, closed for KYC. The boundary is structural rather than checked: a merchant capability is stored in a table scoped to the organisation and stamped `org:<id>` whenever it is read, so it has no way to name anything in `kyc`. `CreateAppCapability` additionally validates the key through the evaluator's own registry, so a merchant cannot declare a shape KYC would reject.
 4. **Out of scope is indistinguishable from absent.** A customer with no grant for a scope cannot tell it apart from a scope that does not exist.
 5. **No principal grants what it does not hold.** Not yet enforced on this tier; the boundary rests on point 3 alone. The KYC tier has it (`CanWrite` in [`core/reach`](../core/reach)), and this tier gets it when it is modelled there.

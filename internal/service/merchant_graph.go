@@ -102,6 +102,10 @@ func (s *Service) WriteMerchantEdges(ctx context.Context, orgID string, edges []
 	}
 	ns := accessmodel.MerchantNamespace(orgID)
 
+	// Validate the whole batch before writing any of it. A batch that fails
+	// halfway leaves a graph nobody asked for, and a retry then has to reason
+	// about which half landed.
+	rows := make([]sqlc.WriteReachEdgeParams, 0, len(edges))
 	for _, e := range edges {
 		edge, err := validMerchantEdge(schema, e)
 		if err != nil {
@@ -109,9 +113,22 @@ func (s *Service) WriteMerchantEdges(ctx context.Context, orgID string, edges []
 		}
 		p := accessmodel.RowFor(edge, "merchant")
 		p.Namespace = ns
-		if err := s.db.Q().WriteReachEdge(ctx, p); err != nil {
-			return 0, err
+		rows = append(rows, p)
+	}
+
+	// One transaction, and the version bump inside it. A reader that sees the
+	// new version has to be able to see every edge it counts, or a cache
+	// refreshes against a graph that is still half written.
+	if err := s.db.WithTx(ctx, func(q *sqlc.Queries) error {
+		for _, p := range rows {
+			if err := q.WriteReachEdge(ctx, p); err != nil {
+				return err
+			}
 		}
+		_, err := q.BumpReachNamespaceVersion(ctx, ns)
+		return err
+	}); err != nil {
+		return 0, err
 	}
 	return len(edges), nil
 }
@@ -126,15 +143,34 @@ func (s *Service) DeleteMerchantEdge(ctx context.Context, orgID string, e Mercha
 	if _, err := validMerchantEdge(schema, e); err != nil {
 		return err
 	}
-	return s.db.Q().DeleteReachEdge(ctx, sqlc.DeleteReachEdgeParams{
-		Namespace:       accessmodel.MerchantNamespace(orgID),
-		ObjectType:      e.ObjectType,
-		ObjectID:        e.ObjectID,
-		Relation:        e.Relation,
-		SubjectType:     e.SubjectType,
-		SubjectID:       e.SubjectID,
-		SubjectRelation: e.SubjectRelation,
+	ns := accessmodel.MerchantNamespace(orgID)
+	// A delete is the case the version exists for. It moves no timestamp on any
+	// surviving row, so without the bump a revocation is invisible to every
+	// cache and the stale answer is the *wider* one.
+	return s.db.WithTx(ctx, func(q *sqlc.Queries) error {
+		if err := q.DeleteReachEdge(ctx, sqlc.DeleteReachEdgeParams{
+			Namespace:       ns,
+			ObjectType:      e.ObjectType,
+			ObjectID:        e.ObjectID,
+			Relation:        e.Relation,
+			SubjectType:     e.SubjectType,
+			SubjectID:       e.SubjectID,
+			SubjectRelation: e.SubjectRelation,
+		}); err != nil {
+			return err
+		}
+		_, err := q.BumpReachNamespaceVersion(ctx, ns)
+		return err
 	})
+}
+
+// MerchantGraphVersion is what a merchant caches against.
+//
+// It answers "has anything changed since the number I hold", which a timestamp
+// on the edge table cannot: a delete moves no timestamp, and a revocation is
+// exactly the change a cache must not miss.
+func (s *Service) MerchantGraphVersion(ctx context.Context, orgID string) (int64, error) {
+	return s.db.Q().GetReachNamespaceVersion(ctx, accessmodel.MerchantNamespace(orgID))
 }
 
 // MaxMerchantEdgeBatch bounds one write. Generous for a sync loop and small

@@ -73,10 +73,6 @@ func (s AppScope) String() string { return s.Kind + ":" + s.ID }
 type AppGrant struct {
 	ID    string
 	Scope AppScope
-	// Except are scopes this grant does not reach, despite Scope covering them.
-	// For what positive scoping cannot say: ten thousand projects, one of them
-	// confidential, and no appetite for 9,999 grants.
-	Except []AppScope
 	// Capabilities are the concrete verbs this grant carries.
 	Capabilities []string
 	// AllCapabilities carries every capability in the organisation's namespace,
@@ -89,11 +85,8 @@ type AppGrant struct {
 	// The narrower wildcard needs no field of its own. Scope.ID of "*" means
 	// every instance of that kind, which is the same star the rest of the system
 	// uses for "everything of this type".
-	AllScopes bool
-	// ExceptCapabilities are carved out of the wildcard. Meaningless without
-	// one, since a concrete list simply omits what it does not grant.
-	ExceptCapabilities []string
-	Constraint         AppConstraint
+	AllScopes  bool
+	Constraint AppConstraint
 	// ExpiresAt is nil for a standing grant.
 	ExpiresAt *time.Time
 	// Source records how the holder came to have this: a role, a group, the

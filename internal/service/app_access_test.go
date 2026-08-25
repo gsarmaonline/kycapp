@@ -659,11 +659,18 @@ func TestRouteTableGateDeniesForReal(t *testing.T) {
 	}
 }
 
-// --- Wildcards and exceptions ---
+// --- Wildcards ---
 //
-// A wildcard claims a set nobody can enumerate; an exception names the members
-// that do not belong. They are one feature, and these tests pin the properties
-// that make the pairing safe rather than a deny rule in disguise.
+// A wildcard claims a set nobody can enumerate, which is what makes it useful:
+// it covers what does not exist yet. It used to be paired with an exception
+// list naming the members that do not belong, and that half is gone. An
+// exception would have to become a subtraction in a rule, a rule belongs to a
+// type rather than to one grant, and it would therefore veto every other grant
+// reaching that type -- the veto invariant 6 forbids, and the thing that brings
+// ordering and precedence back.
+//
+// What survives is the model's original answer for a hard lock: grant nothing
+// that reaches the resource.
 
 // The everyone subject exists so a baseline does not need per-customer
 // bookkeeping. One row, and a customer who signs up later is covered by
@@ -695,44 +702,6 @@ func TestEveryoneGrantCoversFutureCustomers(t *testing.T) {
 	}
 }
 
-// The counterpart to the subject wildcard: offboard one person without
-// enumerating everyone else.
-func TestEveryoneGrantExcludesNamedCustomers(t *testing.T) {
-	f := newAppAccess(t, "everyoneexcept")
-	f.declareScope(t, "tenant")
-	f.declareCapability(t, "profile:read")
-	roleID := f.createRole(t, "reader", []string{"profile:read"}, nil)
-
-	kept := f.createAppUser(t, "kept@customer.com")
-	dropped := f.createAppUser(t, "dropped@customer.com")
-
-	if code, out := f.post(t, "/app-grants", map[string]any{
-		"subject_kind": "everyone", "role_id": roleID,
-		"scope_kind": "tenant", "scope_id": "acme",
-		"except_app_user_ids": []string{dropped},
-	}); code != http.StatusCreated {
-		t.Fatalf("everyone grant: %d %v", code, out)
-	}
-
-	if got := len(f.accessFor(t, kept)["grants"].([]any)); got != 1 {
-		t.Errorf("an unexcluded customer keeps the grant, got %d", got)
-	}
-	if got := len(f.accessFor(t, dropped)["grants"].([]any)); got != 0 {
-		t.Errorf("an excluded customer must hold nothing, got %d", got)
-	}
-
-	// A typo here would silently exclude nobody, so an unknown id is refused.
-	if code, _ := f.post(t, "/app-grants", map[string]any{
-		"subject_kind": "everyone", "role_id": roleID,
-		"scope_kind": "tenant", "scope_id": "other",
-		"except_app_user_ids": []string{"not-a-real-customer"},
-	}); code != http.StatusBadRequest {
-		t.Errorf("an unknown excluded customer must be rejected, got %d", code)
-	}
-}
-
-// The capability wildcard carries verbs declared after the grant was written.
-// That is the whole point, and also the risk the merchant is accepting.
 func TestCapabilityWildcardCoversLaterDeclarations(t *testing.T) {
 	f := newAppAccess(t, "wildcard")
 	f.declareScope(t, "tenant")
@@ -768,87 +737,6 @@ func TestCapabilityWildcardCoversLaterDeclarations(t *testing.T) {
 	}
 }
 
-// A carve-out with no wildcard beside it does nothing while reading as though
-// it does, and one naming an undeclared capability protects against nothing.
-func TestCapabilityExceptionsAreCheckedAndCarried(t *testing.T) {
-	f := newAppAccess(t, "capexcept")
-	f.declareScope(t, "tenant")
-	f.declareCapability(t, "docs:read")
-	f.declareCapability(t, "account:delete")
-	userID := f.createAppUser(t, "carve@customer.com")
-
-	if code, out := f.post(t, "/app-grants", map[string]any{
-		"app_user_id": userID, "all_capabilities": true,
-		"scope_kind": "tenant", "scope_id": "acme",
-		"except_capabilities": []string{"account:delete"},
-	}); code != http.StatusCreated {
-		t.Fatalf("wildcard with carve-out: %d %v", code, out)
-	}
-	g := f.accessFor(t, userID)["grants"].([]any)[0].(map[string]any)
-	except := g["except_capabilities"].([]any)
-	if len(except) != 1 || except[0].(string) != "account:delete" {
-		t.Errorf("the carve-out must reach the merchant's backend, got %v", except)
-	}
-
-	roleID := f.createRole(t, "reader", []string{"docs:read"}, nil)
-	if code, _ := f.post(t, "/app-grants", map[string]any{
-		"app_user_id": userID, "role_id": roleID,
-		"scope_kind": "tenant", "scope_id": "b",
-		"except_capabilities": []string{"account:delete"},
-	}); code != http.StatusBadRequest {
-		t.Errorf("a carve-out without a wildcard must be rejected, got %d", code)
-	}
-	if code, _ := f.post(t, "/app-grants", map[string]any{
-		"app_user_id": userID, "all_capabilities": true,
-		"scope_kind": "tenant", "scope_id": "c",
-		"except_capabilities": []string{"never:declared"},
-	}); code != http.StatusBadRequest {
-		t.Errorf("an undeclared carve-out must be rejected, got %d", code)
-	}
-}
-
-// Scope exceptions exist for the case positive scoping cannot express: a huge
-// include set and a tiny exclusion. They must reach the merchant's backend,
-// which is the only place they can be enforced.
-func TestScopeExceptionsAreCheckedAndCarried(t *testing.T) {
-	f := newAppAccess(t, "scopeexcept")
-	f.declareScope(t, "tenant")
-	f.declareScope(t, "project")
-	f.declareCapability(t, "docs:read")
-	roleID := f.createRole(t, "reader", []string{"docs:read"}, nil)
-	userID := f.createAppUser(t, "carve@customer.com")
-
-	if code, out := f.post(t, "/app-grants", map[string]any{
-		"app_user_id": userID, "role_id": roleID,
-		"scope_kind": "tenant", "scope_id": "acme",
-		"except_scopes": []map[string]string{{"kind": "project", "id": "salaries"}},
-	}); code != http.StatusCreated {
-		t.Fatalf("grant with an excluded scope: %d %v", code, out)
-	}
-	g := f.accessFor(t, userID)["grants"].([]any)[0].(map[string]any)
-	except := g["except_scopes"].([]any)
-	if len(except) != 1 {
-		t.Fatalf("the exclusion must reach the backend, got %v", except)
-	}
-	if got := except[0].(map[string]any)["id"].(string); got != "salaries" {
-		t.Errorf("want the excluded scope id, got %q", got)
-	}
-
-	// An undeclared kind excludes nothing, for the same reason it grants
-	// nothing: it silently matches no resource.
-	if code, _ := f.post(t, "/app-grants", map[string]any{
-		"app_user_id": userID, "role_id": roleID,
-		"scope_kind": "tenant", "scope_id": "b",
-		"except_scopes": []map[string]string{{"kind": "undeclared", "id": "x"}},
-	}); code != http.StatusBadRequest {
-		t.Errorf("an undeclared excluded kind must be rejected, got %d", code)
-	}
-}
-
-// The scope wildcard, at both levels. Without it "every project" could not be
-// written at all: a merchant issued one grant per project and reissued on every
-// new one, which is exactly the bookkeeping the everyone subject and the
-// capability wildcard exist to remove.
 func TestScopeWildcardReachesTheBackend(t *testing.T) {
 	f := newAppAccess(t, "scopewild")
 	f.declareScope(t, "project")
@@ -1180,8 +1068,7 @@ func TestAccessSetWireFormatIsStable(t *testing.T) {
 	if code, out := f.post(t, "/app-grants", map[string]any{
 		"app_user_id": userID, "role_id": roleID,
 		"scope_kind": "project", "scope_id": "p1",
-		"constraint":    "self_subject",
-		"except_scopes": []map[string]any{{"kind": "project", "id": "secret"}},
+		"constraint": "self_subject",
 	}); code != http.StatusCreated {
 		t.Fatalf("grant: %d %v", code, out)
 	}
@@ -1204,7 +1091,7 @@ func TestAccessSetWireFormatIsStable(t *testing.T) {
 	// than was granted.
 	for _, key := range []string{
 		"id", "scope_kind", "scope_id", "capabilities", "source",
-		"all_capabilities", "all_scopes", "except_capabilities", "except_scopes", "constraint",
+		"all_capabilities", "all_scopes", "constraint",
 	} {
 		if _, ok := g[key]; !ok {
 			t.Errorf("grant is missing %q: %v", key, g)
@@ -1220,16 +1107,15 @@ func TestAccessSetWireFormatIsStable(t *testing.T) {
 	if caps, ok := g["capabilities"].([]any); !ok || len(caps) != 1 || caps[0] != "deploy:read" {
 		t.Errorf("capabilities = %v, wanted [deploy:read]", g["capabilities"])
 	}
-	// An absent list serialises as [] rather than null.
-	if ex, ok := g["except_capabilities"].([]any); !ok || len(ex) != 0 {
-		t.Errorf("except_capabilities = %v, wanted []", g["except_capabilities"])
-	}
-	scopes, ok := g["except_scopes"].([]any)
-	if !ok || len(scopes) != 1 {
-		t.Fatalf("except_scopes = %v, wanted one entry", g["except_scopes"])
-	}
-	if sc := scopes[0].(map[string]any); sc["kind"] != "project" || sc["id"] != "secret" {
-		t.Errorf("except_scopes[0] = %v", sc)
+	// The exception lists are gone, and their absence is pinned so putting one
+	// back has to be a decision rather than a slip. They could not move to
+	// edges: an exception would become a subtraction in a rule, and a rule
+	// belongs to a type rather than to one grant, so it would veto every other
+	// grant reaching that type. That is the veto invariant 6 forbids.
+	for _, key := range []string{"except_capabilities", "except_scopes", "except_app_user_ids"} {
+		if _, present := g[key]; present {
+			t.Errorf("%q must not be in the wire format any more: %v", key, g)
+		}
 	}
 	// expires_at appears only on a grant that has one.
 	if _, present := g["expires_at"]; present {

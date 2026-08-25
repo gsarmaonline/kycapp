@@ -43,15 +43,12 @@ type AccessGrant = AppAccessSet['grants'][number]
 function describeCapabilities(g: AccessGrant): string {
   const base = g.all_capabilities ? 'every capability' : g.capabilities.join(', ') || 'none'
   const parts = [base]
-  if (g.except_capabilities.length) parts.push(`except ${g.except_capabilities.join(', ')}`)
   if (g.constraint === 'self_subject') parts.push('on their own rows only')
   return parts.join(', ')
 }
 
 function describeScope(g: AccessGrant): string {
-  const base = `${g.scope_kind} / ${g.scope_id}`
-  if (!g.except_scopes.length) return base
-  return `${base}, except ${g.except_scopes.map((s) => `${s.kind}/${s.id}`).join(', ')}`
+  return `${g.scope_kind} / ${g.scope_id}`
 }
 
 export function UsersShow() {

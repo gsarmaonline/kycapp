@@ -184,9 +184,11 @@ Out of scope is a 404, byte-identical to a resource that does not exist. Otherwi
 
 Invariant 6 is what makes the rest tractable. A single deny rule reintroduces ordering, priority and conflict resolution.
 
-It used to read *"additive only, no deny rules, ever"*, and the wording was too strong for what it protects. A grant may now carry **exclusions** — scopes it does not reach, capabilities carved out of its wildcard, customers an everyone-grant skips. Each narrows **the grant it sits on** and nothing else, so grants stay unordered, `Decide` stays a first-match loop, and deleting a grant still removes access rather than adding it. What remains forbidden is a rule that vetoes a *different* grant, which is the thing that would bring back precedence.
+It once read *"additive only, no deny rules, ever"*, was softened to admit **exclusions** on a grant, and is now back to the strong form. The softening did not survive contact with the graph.
 
-The practical consequence: an exclusion is not a lock. If a second grant reaches an excluded resource, that grant allows. For a hard "nobody reaches this", no grant may reach it.
+An exclusion narrowed the grant it sat on and nothing else, which was the property that kept grants unordered. Expressed as edges it cannot stay that way: the only place to write a subtraction is a rule, a rule belongs to a **type** rather than to a grant, and it would therefore veto every *other* grant reaching that type. That is exactly the veto this invariant forbids. Generating one rule per grant was the alternative and makes the schema a function of the data; a deny edge was the other, and `core/reach` exists to avoid it.
+
+So the exclusion lists were removed from the merchant tier rather than carried across — see [customer-access.md](customer-access.md). What survives is the answer the model always had: for a hard "nobody reaches this", no grant may reach it. That was already the only kind of lock that held, because an exclusion never stopped a second grant from allowing.
 
 Invariant 2 has one structural carve-out: **break-glass**, which holds everything by definition, so the subset rule is satisfied rather than bypassed. A recovery credential is not a carve-out: minting one requires already holding global reach, so it is ordinary delegation. Organisation creation was a second carve-out and is now ordinary delegation when a staff member creates the tenant; self-serve signup still mints a founding owner grant from the system.
 
@@ -393,37 +395,34 @@ signups. The alternative — materialising a membership per customer — costs a
 and a queue job per person and expresses exactly the same thing.
 
 This is a wildcard over the subject axis, and it widens as the population grows.
-That is the deal, and it is why it carries an exclusion list.
+That is the deal, and narrowing the population is done by granting to a group
+rather than to everyone.
 
-### 11. Exceptions — what positive scoping cannot say
+### 11. Exceptions — removed
 
-Ten thousand projects, one confidential:
+Every axis with a wildcard used to carry an exclusion list, on the reasoning
+that a wildcard is a claim about a set nobody can enumerate and no such claim is
+ever exactly right:
 
-```
-subject: everyone
-scope:   organisation:acme
-role:    reader
-except:  project:salaries
-```
-
-Positive scoping would need 9,999 grants to express the same thing. The
-exclusion narrows **this grant only** — a separate grant reaching
-`project:salaries` still allows, so the outcome never depends on grant order.
-
-Every axis with a wildcard has one, because a wildcard is a claim about a set
-nobody can enumerate and no such claim is ever exactly right:
-
-| Wildcard | Exclusion | Evaluated in |
+| Wildcard | Exclusion | Was evaluated in |
 | --- | --- | --- |
 | subject `everyone` | `except_app_user_ids` | assembly, in SQL |
 | capabilities `all_capabilities` | `except_capabilities` | `Grant.Allows` |
 | scope | `except_scopes` | `Grant.Reaches`, after containment |
 
+All three are gone, for the reason under [invariant 6](#invariants): a
+subtraction has nowhere to live in the graph except a rule, and a rule vetoes
+every grant reaching its type rather than the one it was written on.
+
+The cases they covered are still expressible, just positively. Everyone but a
+few is a grant to a group. Everywhere but one place is a grant at the level you
+mean instead of at the ceiling. Everything but one verb is that verb declared on
+a type the grant does not reach.
+
 ### 12. Capability wildcards — and what they cost
 
 ```
 capabilities: every capability in org:acme
-except:       account:delete
 ```
 
 A concrete list is a statement about capabilities that exist. A wildcard is a
@@ -431,10 +430,22 @@ standing instruction that re-evaluates whenever the vocabulary changes — decla
 `billing:refund` next quarter and every holder gains it, with no edit to any
 grant.
 
-The carve-out list does not fix that. It lets you name the dangerous verbs you
-know of today; tomorrow's arrive granted. A merchant who wants "everything"
-without that property ticks every box in the role form instead, which expands at
-authoring time and stores concrete.
+That property is the point rather than the cost. A concrete list stops covering
+the administrator it was issued to the moment the vocabulary grows, and the
+failure shows up as a mysterious 403 that is fixed by editing every grant. A
+merchant who wants "everything as it stands today" ticks every box in the role
+form instead, which expands at authoring time and stores concrete.
+
+There is no carve-out list beside it any more; see
+[invariant 6](#invariants). A verb that should not ride along on a wildcard is
+declared on a type those holders do not reach.
+
+On the edge graph the wildcard is the `can_all` relation, unioned into every
+rule on a type. The star elsewhere lives in a node **id** — `app_user:*` is the
+everyone grant, `project:*` is every project — and a capability is a relation
+rather than a node, which is why it needed a relation of its own rather than a
+pattern. `edgesFor` stays an exact prefix lookup on the edge primary key, and
+the grammar gains no operator.
 
 The registry still refuses to let anyone **declare** a capability named `*`
 (since removed). The wildcard lives on the
@@ -448,7 +459,8 @@ backend":
 | Wanted | Why not |
 | --- | --- |
 | "May delete accounts, but never their own" | A deny rule. Grants only add; there is no way to subtract from a grant that already allows. |
-| "Nobody may ever reach this resource" | An exclusion narrows one grant. Reach the resource with a second grant and it allows. Guarantee it by granting nothing that reaches it. |
+| "Nobody may ever reach this resource" | Grants only add and cannot be narrowed. Guarantee it by granting nothing that reaches it, which was always the only lock that held. |
+| "Everyone except these few" | An exclusion would have to subtract in a rule, and a rule vetoes every grant reaching its type. Grant to a group and leave them out of it. |
 | "Read only" as a flag | A capability set containing no write verbs. Adding a flag would put two mechanisms in the same job. |
 | "Approve if two people agree" | Workflow, not authorisation. Nothing here has a notion of pending state. |
 

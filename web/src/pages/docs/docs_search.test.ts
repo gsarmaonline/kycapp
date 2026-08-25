@@ -29,8 +29,8 @@ describe('searchDocs', () => {
   // Someone reading the API reference searches for the field name, not for the
   // prose that describes it.
   it('finds API field names that appear only in a code sample', () => {
-    expect(searchDocs('except_scopes').map((h) => h.slug)).toContain('customer-access')
-    expect(searchDocs('all_capabilities').length).toBeGreaterThan(0)
+    expect(searchDocs('all_capabilities').map((h) => h.slug)).toContain('customer-access')
+    expect(searchDocs('scope_kind').length).toBeGreaterThan(0)
   })
 
   it('is case insensitive', () => {

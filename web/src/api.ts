@@ -1387,9 +1387,6 @@ export type AppGrant = {
   expires_at?: string
   /** Carries every capability in the org's namespace, including later ones. */
   all_capabilities: boolean
-  except_capabilities: string[]
-  except_scopes: AppScopeRef[]
-  except_app_users: string[]
   constraint: '' | 'self_subject'
   /**
    * Every scope of every kind: the widest a grant can be, since an organisation
@@ -1633,9 +1630,6 @@ export function createAppGrant(
      * organisation is where a merchant's world ends.
      */
     all_scopes?: boolean
-    except_capabilities?: string[]
-    except_scopes?: AppScopeRef[]
-    except_app_user_ids?: string[]
     constraint?: '' | 'self_subject'
   },
 ) {
@@ -1680,8 +1674,6 @@ export type AppAccessSet = {
     source: string
     expires_at?: string
     all_capabilities: boolean
-    except_capabilities: string[]
-    except_scopes: AppScopeRef[]
     constraint: '' | 'self_subject'
   }[]
 }
