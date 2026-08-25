@@ -712,15 +712,21 @@ view now gives a key the organisations its owner reaches.
 
 **Not done, in the order it should happen:**
 
-1. **Model the merchant tier.** `app_access.go` still uses the previous
-   evaluator. It is the half with open vocabulary, so it will exercise the
-   namespace boundary harder than KYC's own tier did. on the same requests and log every
-   disagreement. The current suite becomes the differential test.
+1. ~~**Model the merchant tier.**~~ Done. `MerchantSchema` derives a schema from
+   the merchant's own vocabulary and `merchant_projection.sql` turns their
+   roles, role inheritance, groups, membership and grants into edges in their
+   namespace, so `POST /check` answers from the graph. It is the half with open
+   vocabulary, and it did exercise the namespace boundary harder than KYC's own
+   tier: the capability wildcard needed a relation of its own, because the star
+   lives in a node id and a capability is a relation.
 2. **Retire the view's legacy branches**, one at a time. Each removal is paired
    with running the projection so those edges become rows in `reach_edges`, and
    with teaching the write path that changes them to write edges directly.
 3. **Delete the old tables** once nothing reads them. `core/access` itself is
-   already gone: the merchant tier now owns its wire format and borrows only
-   `reach.ExpandSets` for role inheritance.
-4. **The reverse index**, behind an unchanged interface. Not before there is a
-   storage engine to index.
+   already gone. The merchant tier still owns its wire format, because a
+   merchant's backend evaluates the assembled set in its own process, but it no
+   longer borrows one function: its model is edges and its questions are walks.
+4. ~~**The reverse index**~~ Done, in `core/reach/reverse.go`, behind the
+   interface it was designed for. `list-objects` answers "what can this subject
+   reach" and `list-subjects` answers "who can reach this", which is the
+   question a share dialog asks.

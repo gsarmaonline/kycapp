@@ -11,11 +11,14 @@
 > the model of *who holds what* here is accurate; the account of how a decision
 > is reached is not.
 >
-> Still current: the **merchant-hosted tier** in
-> [Merchant-hosted access control](#merchant-hosted-access-control), which has
-> not been modelled in the new engine. It no longer shares an evaluator with
-> anything: it owns its wire format in `internal/service/app_grant.go` and
-> flattens role inheritance with `reach.ExpandSets`.
+> The **merchant-hosted tier** in
+> [Merchant-hosted access control](#merchant-hosted-access-control) is now on
+> the same engine. `internal/accessmodel/merchant_projection.sql` turns a
+> merchant's roles, role inheritance, groups, group membership and grants into
+> edges in their own namespace, so `POST /check` answers from the graph rather
+> than from a second store that could not see the first. It still owns its wire
+> format in `internal/service/app_grant.go`, because a merchant's backend
+> evaluates the assembled set locally.
 
 **May this caller do this, here?** This document covers the access decision and the model behind it.
 
@@ -225,7 +228,11 @@ This mirrors a pattern KYC already has. Merchants declare their app-user **attri
 GET /v1/app-users/{id}/access  ->  { grants: [...], version: 47 }
 ```
 
-The merchant's backend caches it and evaluates locally through the SDK, with a webhook on change. A per-request `POST /v1/access/check` stays available for simple integrations, but it must not be the default: it would put a network hop inside every request of their app and make KYC own their latency.
+The merchant's backend caches it and evaluates locally through the SDK, with a webhook on change. This is still the default, and for the same reason: a per-request check would put a network hop inside every request of their app and make KYC own their latency.
+
+The per-request path exists now, as `POST /v1/organisations/{id}/check`, alongside `list-objects` and `list-subjects`. It is not a second model: the merchant's roles, groups, membership and grants are projected into edges in their own namespace, so both surfaces answer from the same facts. The one thing the grant set cannot do is answer about a *resource* — KYC never learns what one of their documents is — so a check needs the containment and ownership edges the merchant writes.
+
+The endpoint named above as `/v1/access/check` was never built under that path. Note that `version` is what makes caching safe, and it did not survive first contact: it was the newest timestamp across grants, roles and memberships, so a delete moved nothing and a revoked grant stayed in every cache. It is a counter now.
 
 ### Note on scope
 
@@ -284,13 +291,29 @@ scope:      tenant:acme
 constraint: self_subject
 ```
 
-One row, every customer, present and future. `Decide` compares
-`GrantSet.Subject` against `Resource.Subject`, both supplied by whoever runs the
-evaluator.
+One row, every customer, present and future. `Decide` compared
+`GrantSet.Subject` against `Resource.Subject`, both supplied by whoever ran the
+evaluator, and it had no opinion on which verbs were allowed: `account:delete`
+was stopped by leaving it out of the role, never by the constraint.
 
-Note what this does **not** do. It has no opinion on which verbs are allowed —
-`account:delete` is stopped by leaving it out of the role, never by the
-constraint. The constraint only ever answers "is this thing yours?".
+**On the graph this is an edge, and the property above does not survive.**
+
+```
+document:d1  #owner  app_user:ana
+rule read = can_read + can_all + owner + parent->read
+```
+
+The walk answers "is this thing yours?" with the comparison it already makes at
+the leaves. But ownership unions into every rule, so it confers every action its
+type answers. Keeping the old bound needs *owner AND the grant*, and the grammar
+has no parentheses — terms associate strictly left to right, so
+`can_write + owner & self_write` parses as `(can_write + owner) & self_write` and
+the intersection swallows the union. Withhold a verb by declaring it on a type
+owners do not reach.
+
+The other half of the cost: KYC can derive containment from nothing, so the
+merchant writes the owner edge when the resource is created. The constraint cost
+no writes at all.
 
 ### 4. Multi-tenancy — the boundary is just a scope
 
@@ -481,6 +504,8 @@ reach this?" answerable at all.
 | 5 | Platform routes gated by capability instead of staff status. | **Built** |
 | 6 | API and UI for issuing time-boxed staff access, so just-in-time becomes the default rather than something the schema merely allows. | Not started — see [todo](todo.md#access-control-follow-ups) |
 | 7 | Merchant-hosted access control: merchants declare scope kinds, capabilities and roles for their app users, with materialised inheritance, and read back a cached grant set. | **Built** |
+| 8 | The merchant tier on the graph: roles, role inheritance, groups, membership and grants projected into `reach_edges`, so the grant store and `POST /check` stop being two stores that cannot see each other. | **Built** |
+| 9 | Delegation on the merchant tier. `CanWrite` is wired on KYC's own write paths; a merchant issuing an app grant is still bounded by the namespace alone, not by what the issuer holds. | Not started |
 
 Shadow mode was skipped deliberately: it de-risks a live system, and this one is not deployed, so the existing API suite served the same purpose. The gates were swapped outright and every authorisation test passed unchanged.
 
